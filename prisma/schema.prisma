@@ -1,0 +1,436 @@
+// DeviceCare data model — derived from Requirements Spec v8, Section 6.
+//
+// PROVIDER NOTE
+// The target database is MySQL. Local development currently runs on a SQLite
+// file so the app is usable without a database server. To switch:
+//   1. provider = "mysql"
+//   2. DATABASE_URL="mysql://..."
+//   3. npm run db:migrate  (against an empty database)
+// Every column type below exists on both providers. Fields marked `// JSON`
+// hold serialized JSON as text because SQLite has no Json column; on MySQL
+// you may optionally annotate them with @db.Text / @db.LongText or convert
+// them to `Json` — the service layer already (de)serializes them.
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy and locations (FA-500..504, NFA-804)
+// ---------------------------------------------------------------------------
+
+model Tenant {
+  id              String                 @id @default(cuid())
+  name            String
+  createdAt       DateTime               @default(now())
+  users           User[]
+  sites           Site[]
+  instances       DeviceInstance[]
+  captured        CapturedArticle[]
+  requests        ServiceRequest[]
+  orderRequests   OrderRequest[]
+  dispatchTargets DispatchTarget[]
+  externalCalls   ExternalCallLog[]
+  oxidConnection  TenantOxidConnection?
+}
+
+/// Clinic staff — DeviceCare login (not OXID identity).
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  email        String
+  name         String
+  role         String // superadmin | device_admin | security_officer | user
+  passwordHash String
+  active       Boolean  @default(true)
+  /** TOTP MFA — secret stored AES-GCM encrypted (base64 payload). */
+  totpEnabled      Boolean   @default(false)
+  totpSecretEnc    String?
+  totpVerifiedAt   DateTime?
+  /** JSON array of scrypt-hashed one-time backup codes. */
+  totpBackupHashes String?
+  /** Pending enrollment secret (encrypted) until confirm; cleared on enable/cancel. */
+  totpPendingEnc   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  serviceRequests      ServiceRequest[]
+  orderRequests        OrderRequest[]
+  oxidConnectionsMade  TenantOxidConnection[] @relation("OxidConnectedBy")
+  totpChallenges       TotpChallenge[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([email])
+}
+
+/// Short-lived login challenge after password OK when TOTP is enabled.
+model TotpChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Exactly one OXID shop link per tenant — configured by admin in Settings.
+model TenantOxidConnection {
+  id                String    @id @default(cuid())
+  tenantId          String    @unique
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  shopBaseUrl       String?
+  customerNumber    String?
+  companyName       String?
+  accessToken       String?
+  refreshToken      String?
+  expiresAt         DateTime?
+  status            String    @default("disconnected") // disconnected | connected | error
+  lastError         String?
+  connectedAt       DateTime?
+  connectedByUserId String?
+  connectedBy       User?     @relation("OxidConnectedBy", fields: [connectedByUserId], references: [id])
+  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime  @default(now())
+}
+
+model Site {
+  id              String  @id @default(cuid())
+  tenantId        String
+  name            String
+  code            String? // short site identifier (e.g. BONN-A)
+  address         String? // physical / deployment address
+  deliveryAddress String? // goods receiving — spare parts go here
+  tenant          Tenant  @relation(fields: [tenantId], references: [id])
+  areas           Area[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model Area {
+  id        String           @id @default(cuid())
+  siteId    String
+  name      String
+  site      Site             @relation(fields: [siteId], references: [id])
+  instances DeviceInstance[]
+
+  @@index([siteId])
+}
+
+// ---------------------------------------------------------------------------
+// Device master (model) vs. device inventory (instance) — never merged
+// ---------------------------------------------------------------------------
+
+model DeviceModel {
+  id                      String                   @id @default(cuid())
+  basicUdiDi              String?                  @unique
+  udiDi                   String?
+  gtins                   String? // JSON string[]
+  manufacturer            String?
+  manufacturerSrn         String?
+  tradeName               String?
+  modelName               String?
+  riskClass               String?
+  emdnCode                String?
+  gmdnCode                String?
+  source                  String // manual | catalog | beudamed
+  sourceFetchedAt         DateTime?
+  version                 Int                      @default(1)
+  state                   String                   @default("draft") // draft | review | released
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  instances               DeviceInstance[]
+  externalRecords         ExternalSourceRecord[]
+  classificationProposals ClassificationProposal[]
+
+  @@index([udiDi])
+  @@index([manufacturer, modelName])
+}
+
+// FA-103 / SS-201 — raw external payload, versioned by fetchedAt
+model ExternalSourceRecord {
+  id            String      @id @default(cuid())
+  deviceModelId String
+  deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [id])
+  source        String // "beudamed" | "oxid"
+  identifier    String // the identifier that was queried (udiDi / gtin)
+  payload       String // JSON — raw external response, never sent to the browser
+  fetchedAt     DateTime
+
+  @@index([source, identifier, fetchedAt])
+  @@index([deviceModelId])
+}
+
+model DeviceInstance {
+  id                String          @id @default(cuid())
+  tenantId          String
+  tenant            Tenant          @relation(fields: [tenantId], references: [id])
+  inventoryNumber   String
+  serialNumber      String?
+  modelId           String?
+  model             DeviceModel?    @relation(fields: [modelId], references: [id])
+  areaId            String?
+  area              Area?           @relation(fields: [areaId], references: [id])
+  room              String?
+  commissionedAt    DateTime?
+  responsiblePerson String?
+  classificationId  String?         @unique
+  classification    Classification? @relation(fields: [classificationId], references: [id])
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([tenantId, inventoryNumber])
+  @@index([tenantId, serialNumber])
+}
+
+// DAT-302a — service-only subject created by stage 4 manual capture
+model CapturedArticle {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  name                  String
+  manufacturer          String?
+  number                String?
+  numberType            String // gtin | pzn | manufacturer | none
+  rawIdentifier         String?
+  nameplateAttachmentId String?
+  capturedBy            String?
+  capturedAt            DateTime @default(now())
+  serviceOnly           Boolean  @default(true) // MUST be enforced server-side, see DAT-302a
+
+  @@index([tenantId])
+}
+
+// ---------------------------------------------------------------------------
+// Classification (FA-400..404) — a suggestion, never a determination
+// ---------------------------------------------------------------------------
+
+model Classification {
+  id                     String          @id @default(cuid())
+  annex1                 Boolean?
+  annex2                 Boolean?
+  softwareClass          String? // null | IIb | III | C | D
+  radiation              Boolean?
+  confirmedBy            String?
+  confirmedAt            DateTime?
+  proposalId             String?
+  overriddenFromProposal Boolean         @default(false)
+  instance               DeviceInstance?
+}
+
+model ClassificationRule {
+  id            String    @id @default(cuid())
+  matchType     String // emdn | gmdn | basicUdiDi | manufacturerModel
+  matchValue    String
+  annex1        Boolean?
+  annex2        Boolean?
+  softwareClass String?
+  radiation     Boolean?
+  confidence    String // verified | derived | guess
+  source        String
+  validFrom     DateTime?
+  validTo       DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([matchType, matchValue])
+}
+
+model ClassificationProposal {
+  id            String      @id @default(cuid())
+  deviceModelId String
+  deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [id])
+  ruleId        String?
+  annex1        Boolean?
+  annex2        Boolean?
+  softwareClass String?
+  radiation     Boolean?
+  confidence    String
+  source        String
+  createdAt     DateTime    @default(now())
+
+  @@index([deviceModelId])
+}
+
+// ---------------------------------------------------------------------------
+// Service requests (FA-600..602, SS-701..703)
+// ---------------------------------------------------------------------------
+
+model ServiceRequest {
+  id              String           @id @default(cuid())
+  reference       String           @unique
+  idempotencyKey  String           @unique
+  fingerprint     String // hash of the business payload; detects key reuse with a different body (23.1)
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  subjectType     String // instance | model | captured
+  subjectId       String
+  serviceType     String
+  priority        String?
+  note            String?
+  raisedBy        String? // denormalized display name at create time
+  raisedById      String?
+  raisedByUser    User?            @relation(fields: [raisedById], references: [id])
+  siteId          String?
+  locationText    String // location of use — FA-500
+  accessHint      String?
+  contact         String?
+  deliveryAddress String // separate from locationText — FA-503
+  classification  String? // JSON — { proposed, selected, confirmed, overridden }
+  correlationId   String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  state           String           @default("captured")
+  statusEvents    StatusEvent[]
+  attachments     Attachment[]
+  dispatchRecords DispatchRecord[]
+
+  @@index([tenantId, createdAt])
+  @@index([raisedById])
+}
+
+model StatusEvent {
+  id               String         @id @default(cuid())
+  serviceRequestId String
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  state            String
+  changedAt        DateTime       @default(now())
+  source           String
+  actor            String?
+  note             String?
+
+  @@index([serviceRequestId, changedAt])
+}
+
+model Attachment {
+  id               String         @id @default(cuid())
+  serviceRequestId String
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
+  kind             String // nameplate | fault_photo
+  url              String // "/api/attachments/<blobId>" or an external https URL
+  createdAt        DateTime       @default(now())
+
+  @@index([serviceRequestId])
+}
+
+// Photo bytes (already downscaled to ≤1600px client-side, NFA-803). There is no
+// object storage in the pilot environment, so the data URL is kept inline.
+// On MySQL annotate `dataUrl` with @db.LongText.
+model AttachmentBlob {
+  id        String   @id @default(cuid())
+  tenantId  String
+  kind      String // nameplate | fault_photo
+  dataUrl   String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model DispatchTarget {
+  id          String  @id @default(cuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  type        String // oxid | erp | webhook | mail
+  name        String
+  endpoint    String?
+  auth        String? // JSON
+  mapping     String? // JSON
+  enabled     Boolean @default(true)
+  retryPolicy String? // JSON
+
+  dispatchRecords DispatchRecord[]
+
+  @@index([tenantId, enabled])
+}
+
+model DispatchRecord {
+  id               String          @id @default(cuid())
+  serviceRequestId String
+  serviceRequest   ServiceRequest  @relation(fields: [serviceRequestId], references: [id])
+  targetId         String?
+  targetRef        DispatchTarget? @relation(fields: [targetId], references: [id])
+  target           String // denormalized target type/name for diagnostics
+  timestamp        DateTime        @default(now())
+  success          Boolean         @default(false)
+  httpStatus       Int?
+  response         String? // JSON — sanitized, never raw credentials
+  error            String?
+  attemptCount     Int             @default(1)
+  correlationId    String?
+
+  @@index([serviceRequestId])
+}
+
+// ---------------------------------------------------------------------------
+// Spare-parts order requests (Section 37) — separate from ServiceRequest
+// ---------------------------------------------------------------------------
+
+model OrderRequest {
+  id              String      @id @default(cuid())
+  reference       String      @unique
+  idempotencyKey  String      @unique
+  fingerprint     String
+  tenantId        String
+  tenant          Tenant      @relation(fields: [tenantId], references: [id])
+  raisedBy        String? // denormalized display name
+  raisedById      String?
+  raisedByUser    User?       @relation(fields: [raisedById], references: [id])
+  subjectType     String? // instance | model | captured
+  subjectId       String?
+  deliveryAddress String
+  note            String?
+  approvalState   String      @default("pending_approval") // pending_approval | approved | rejected
+  state           String      @default("captured")
+  correlationId   String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  items           OrderItem[]
+
+  @@index([tenantId, createdAt])
+  @@index([raisedById])
+}
+
+model OrderItem {
+  id             String       @id @default(cuid())
+  orderRequestId String
+  orderRequest   OrderRequest @relation(fields: [orderRequestId], references: [id])
+  articleId      String?
+  articleNumber  String
+  description    String
+  quantity       Int
+  unitPrice      Float?
+
+  @@index([orderRequestId])
+}
+
+// ---------------------------------------------------------------------------
+// Observability — NFA-807: every external query is logged
+// ---------------------------------------------------------------------------
+
+model ExternalCallLog {
+  id             String   @id @default(cuid())
+  tenantId       String?
+  tenant         Tenant?  @relation(fields: [tenantId], references: [id])
+  system         String // beudamed | oxid
+  operation      String
+  identifierHash String // sha256 of the identifier, never the raw value
+  correlationId  String?
+  startedAt      DateTime @default(now())
+  durationMs     Int
+  cacheHit       Boolean  @default(false)
+  success        Boolean
+  httpStatus     Int?
+  error          String?
+
+  @@index([system, identifierHash, startedAt])
+  @@index([tenantId, startedAt])
+}

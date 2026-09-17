@@ -1,0 +1,37 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# env — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# prisma local file database
+prisma/dev.db
+prisma/dev.db-journal
+prisma/test.db
+prisma/test.db-journal
+
+# testing
+coverage/
+playwright-report/
+test-results/
+.vitest/
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+*.tsbuildinfo
+
+# local implementation / UX / architecture notes (not part of the app)
+DeviceCare_Implementation_Guide_Continued.md
+DeviceCare_Mobile_Tablet_UX_Exact_Cursor_Spec.md
+reusable-auth-rbac-architecture.md
+shadcn-datatable-filters.md
