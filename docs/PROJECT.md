@@ -58,7 +58,7 @@ Tenancy is strict: every inventory row, request, and dispatch target belongs to 
 | UI | **React 19**, TypeScript, **Tailwind v4**, Radix primitives |
 | State | **Zustand** (`scanStore`, `requestStore`, `sessionStore`, `offlineQueueStore`, …) |
 | Validation | **zod** |
-| Persistence | **Prisma 6** → SQLite locally (`file:./dev.db`); schema portable toward MySQL |
+| Persistence | **Prisma 6** → **MySQL** (`DATABASE_URL`); Vitest can use `TEST_DATABASE_URL` |
 | Offline | IndexedDB via **`idb`** |
 | Scanning | **`@zxing/browser`** |
 | 2FA | **`otplib`** + **`qrcode`** |
@@ -482,7 +482,8 @@ See `.env.example`. Important variables:
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | Prisma DB (default SQLite `file:./dev.db`) |
+| `DATABASE_URL` | Prisma MySQL connection string |
+| `TEST_DATABASE_URL` | Optional isolated MySQL DB for Vitest |
 | `SESSION_SECRET` | Sign session cookie (`openssl rand -hex 32`) |
 | `TOTP_ENCRYPTION_KEY` | Encrypt TOTP secrets (optional; defaults to session secret) |
 | `TOTP_ISSUER` | Authenticator account label (default `DeviceCare`) |
@@ -497,9 +498,9 @@ See `.env.example`. Important variables:
 
 ```bash
 npm install
-cp .env.example .env          # SQLite + mock/stub adapters work by default
-npm run db:migrate            # prisma/dev.db from migrations
-npm run db:seed               # deterministic demo tenant data
+cp .env.example .env          # set DATABASE_URL to your MySQL instance
+npx prisma migrate deploy
+npm run db:seed
 npm run dev                   # http://localhost:3000
 ```
 
@@ -508,17 +509,9 @@ npm run dev                   # http://localhost:3000
 | `npm run build` / `start` | Production build / serve |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
-| `npm test` | Vitest (isolated `prisma/test.db`) |
+| `npm test` | Vitest (MySQL via `DATABASE_URL` or `TEST_DATABASE_URL`) |
 | `npm run test:e2e` | Playwright (install Chromium once) |
 | `npm run db:studio` | Prisma Studio |
-
-### SQLite → MySQL later
-
-Schema uses portable column types. Switch steps:
-
-1. `provider = "mysql"` in `prisma/schema.prisma`
-2. Set MySQL `DATABASE_URL`
-3. Fresh migrate history against empty MySQL (`rm -rf prisma/migrations && npx prisma migrate dev --name init && npm run db:seed`)
 
 ---
 

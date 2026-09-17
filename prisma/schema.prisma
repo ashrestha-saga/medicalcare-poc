@@ -1,18 +1,12 @@
 // DeviceCare data model — derived from Requirements Spec v8, Section 6.
 //
 // PROVIDER NOTE
-// The target database is MySQL. Local development currently runs on a SQLite
-// file so the app is usable without a database server. To switch:
-//   1. provider = "mysql"
-//   2. DATABASE_URL="mysql://..."
-//   3. npm run db:migrate  (against an empty database)
-// Every column type below exists on both providers. Fields marked `// JSON`
-// hold serialized JSON as text because SQLite has no Json column; on MySQL
-// you may optionally annotate them with @db.Text / @db.LongText or convert
-// them to `Json` — the service layer already (de)serializes them.
+// Target database is MySQL. Fields marked `// JSON` hold serialized JSON as
+// text for historical compatibility; you may optionally use `@db.Text` /
+// `@db.LongText` or `Json` — the service layer already (de)serializes them.
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -51,12 +45,12 @@ model User {
   active       Boolean  @default(true)
   /** TOTP MFA — secret stored AES-GCM encrypted (base64 payload). */
   totpEnabled      Boolean   @default(false)
-  totpSecretEnc    String?
+  totpSecretEnc    String?  @db.Text
   totpVerifiedAt   DateTime?
   /** JSON array of scrypt-hashed one-time backup codes. */
-  totpBackupHashes String?
+  totpBackupHashes String?  @db.Text
   /** Pending enrollment secret (encrypted) until confirm; cleared on enable/cancel. */
-  totpPendingEnc   String?
+  totpPendingEnc   String?  @db.Text
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -91,11 +85,11 @@ model TenantOxidConnection {
   shopBaseUrl       String?
   customerNumber    String?
   companyName       String?
-  accessToken       String?
-  refreshToken      String?
+  accessToken       String?   @db.Text
+  refreshToken      String?   @db.Text
   expiresAt         DateTime?
   status            String    @default("disconnected") // disconnected | connected | error
-  lastError         String?
+  lastError         String?   @db.Text
   connectedAt       DateTime?
   connectedByUserId String?
   connectedBy       User?     @relation("OxidConnectedBy", fields: [connectedByUserId], references: [id])
@@ -108,8 +102,8 @@ model Site {
   tenantId        String
   name            String
   code            String? // short site identifier (e.g. BONN-A)
-  address         String? // physical / deployment address
-  deliveryAddress String? // goods receiving — spare parts go here
+  address         String? @db.Text // physical / deployment address
+  deliveryAddress String? @db.Text // goods receiving — spare parts go here
   tenant          Tenant  @relation(fields: [tenantId], references: [id])
   areas           Area[]
 
@@ -135,7 +129,7 @@ model DeviceModel {
   id                      String                   @id @default(cuid())
   basicUdiDi              String?                  @unique
   udiDi                   String?
-  gtins                   String? // JSON string[]
+  gtins                   String? @db.Text // JSON string[]
   manufacturer            String?
   manufacturerSrn         String?
   tradeName               String?
@@ -164,7 +158,7 @@ model ExternalSourceRecord {
   deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [id])
   source        String // "beudamed" | "oxid"
   identifier    String // the identifier that was queried (udiDi / gtin)
-  payload       String // JSON — raw external response, never sent to the browser
+  payload       String @db.LongText // JSON — raw external response, never sent to the browser
   fetchedAt     DateTime
 
   @@index([source, identifier, fetchedAt])
@@ -276,16 +270,16 @@ model ServiceRequest {
   subjectId       String
   serviceType     String
   priority        String?
-  note            String?
+  note            String?          @db.Text
   raisedBy        String? // denormalized display name at create time
   raisedById      String?
   raisedByUser    User?            @relation(fields: [raisedById], references: [id])
   siteId          String?
-  locationText    String // location of use — FA-500
-  accessHint      String?
+  locationText    String           @db.Text // location of use — FA-500
+  accessHint      String?          @db.Text
   contact         String?
-  deliveryAddress String // separate from locationText — FA-503
-  classification  String? // JSON — { proposed, selected, confirmed, overridden }
+  deliveryAddress String           @db.Text // separate from locationText — FA-503
+  classification  String?          @db.Text // JSON — { proposed, selected, confirmed, overridden }
   correlationId   String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -306,7 +300,7 @@ model StatusEvent {
   changedAt        DateTime       @default(now())
   source           String
   actor            String?
-  note             String?
+  note             String?        @db.Text
 
   @@index([serviceRequestId, changedAt])
 }
@@ -316,7 +310,7 @@ model Attachment {
   serviceRequestId String
   serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
   kind             String // nameplate | fault_photo
-  url              String // "/api/attachments/<blobId>" or an external https URL
+  url              String         @db.Text // "/api/attachments/<blobId>" or an external https URL
   createdAt        DateTime       @default(now())
 
   @@index([serviceRequestId])
@@ -324,12 +318,11 @@ model Attachment {
 
 // Photo bytes (already downscaled to ≤1600px client-side, NFA-803). There is no
 // object storage in the pilot environment, so the data URL is kept inline.
-// On MySQL annotate `dataUrl` with @db.LongText.
 model AttachmentBlob {
   id        String   @id @default(cuid())
   tenantId  String
   kind      String // nameplate | fault_photo
-  dataUrl   String
+  dataUrl   String   @db.LongText
   createdAt DateTime @default(now())
 
   @@index([tenantId])
@@ -341,11 +334,11 @@ model DispatchTarget {
   tenant      Tenant  @relation(fields: [tenantId], references: [id])
   type        String // oxid | erp | webhook | mail
   name        String
-  endpoint    String?
-  auth        String? // JSON
-  mapping     String? // JSON
+  endpoint    String? @db.Text
+  auth        String? @db.Text // JSON
+  mapping     String? @db.Text // JSON
   enabled     Boolean @default(true)
-  retryPolicy String? // JSON
+  retryPolicy String? @db.Text // JSON
 
   dispatchRecords DispatchRecord[]
 
@@ -362,8 +355,8 @@ model DispatchRecord {
   timestamp        DateTime        @default(now())
   success          Boolean         @default(false)
   httpStatus       Int?
-  response         String? // JSON — sanitized, never raw credentials
-  error            String?
+  response         String?         @db.Text // JSON — sanitized, never raw credentials
+  error            String?         @db.Text
   attemptCount     Int             @default(1)
   correlationId    String?
 
@@ -386,8 +379,8 @@ model OrderRequest {
   raisedByUser    User?       @relation(fields: [raisedById], references: [id])
   subjectType     String? // instance | model | captured
   subjectId       String?
-  deliveryAddress String
-  note            String?
+  deliveryAddress String      @db.Text
+  note            String?     @db.Text
   approvalState   String      @default("pending_approval") // pending_approval | approved | rejected
   state           String      @default("captured")
   correlationId   String?
@@ -429,7 +422,7 @@ model ExternalCallLog {
   cacheHit       Boolean  @default(false)
   success        Boolean
   httpStatus     Int?
-  error          String?
+  error          String?  @db.Text
 
   @@index([system, identifierHash, startedAt])
   @@index([tenantId, startedAt])

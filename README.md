@@ -25,16 +25,24 @@ Identifiers worth trying:
 | `04012345678949` | Stage 3 — BEUDAMED (only with `BEUDAMED_ADAPTER_MODE=mock`), persisted into the device master in `review` state |
 | `04012345678956` | Stage 4 — unknown → manual capture (nameplate photo mandatory, service-only) |
 
-## Database: SQLite now, MySQL later
+## Database (MySQL)
 
-Prisma currently points at a local file (`DATABASE_URL="file:./dev.db"`). The schema deliberately uses only column types that exist on both providers (JSON is stored as text, no native-type annotations), so switching is a three-step change:
+Prisma uses **MySQL**. Set `DATABASE_URL` in `.env` (URL-encode special characters in the password).
 
-1. `prisma/schema.prisma`: `provider = "sqlite"` → `provider = "mysql"`
-2. `.env`: `DATABASE_URL="mysql://user:password@host:3306/devicecare"`
-3. Regenerate the migration history for MySQL against the empty database:
-   `rm -rf prisma/migrations && npx prisma migrate dev --name init && npm run db:seed`
+```bash
+npx prisma migrate deploy   # apply migrations to an empty (or matching) database
+npm run db:seed             # demo tenant data
+```
 
-(SQLite migration SQL is not portable, hence the fresh `init` migration.)
+For a clean schema reset against an empty database:
+
+```bash
+npx prisma migrate reset    # destructive — drops data, re-applies migrations, runs seed
+```
+
+Vitest uses the same MySQL URL unless you set `TEST_DATABASE_URL` to an isolated database (recommended so `npm test` does not wipe app data).
+
+Optional: local SQLite files under `prisma/*.db` are unused while on MySQL and can be deleted.
 
 ## Scripts
 

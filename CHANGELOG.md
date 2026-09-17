@@ -37,10 +37,11 @@ Keep entries short, user-facing, and in the past tense (“Added X”, “Fixed 
 
 - Project documentation in `docs/PROJECT.md`
 - Changelog workflow (`CHANGELOG.md`)
+- MySQL as the primary database provider (replacing local SQLite for app runtime)
 
 ### Changed
 
--
+- Prisma `provider` set to `mysql`; Vitest uses MySQL via `DATABASE_URL` / `TEST_DATABASE_URL`
 
 ### Fixed
 
