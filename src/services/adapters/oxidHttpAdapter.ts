@@ -68,6 +68,7 @@ export function mapOxidArticleToDeviceModel(row: Record<string, unknown>, lookup
     sourceFetchedAt: new Date().toISOString(),
     version: 1,
     state: "released",
+    maintenanceCycleMonths: null,
   };
 }
 

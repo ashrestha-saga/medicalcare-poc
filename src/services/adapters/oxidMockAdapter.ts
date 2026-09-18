@@ -23,6 +23,7 @@ const MOCK_CATALOG: Record<string, Omit<DeviceModelDTO, "id" | "source" | "sourc
     riskClass: "III",
     emdnCode: "Z120401",
     gmdnCode: "17882",
+    maintenanceCycleMonths: null,
   },
 };
 

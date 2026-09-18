@@ -64,6 +64,8 @@ export interface CatalogModelFormState {
   gmdnCode: string;
   source: DeviceModelSource;
   state: CatalogModelState;
+  /** Months; empty string in form means unset. */
+  maintenanceCycleMonths: string;
 }
 
 /** Payload written via create/update catalog APIs (mirrors schema). */
@@ -80,6 +82,7 @@ export interface CatalogModelWriteDTO {
   gmdnCode?: string | null;
   source?: DeviceModelSource;
   state?: CatalogModelState;
+  maintenanceCycleMonths?: number | null;
   classification?: {
     annex1?: boolean | null;
     annex2?: boolean | null;

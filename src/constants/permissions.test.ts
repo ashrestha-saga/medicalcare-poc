@@ -8,18 +8,20 @@ import {
 } from "@/constants/permissions";
 import { resolveCapabilities } from "@/services/auth/capabilitiesService";
 
-describe("Phase A RBAC map", () => {
+describe("RBAC defaults & path guards", () => {
   it("gives superadmin every slug including users/roles admin and shell:nav", () => {
     expect(hasPermission("superadmin", "settings:oxid")).toBe(true);
     expect(hasPermission("superadmin", "shell:nav")).toBe(true);
     expect(hasPermission("superadmin", "users:view")).toBe(true);
     expect(hasPermission("superadmin", "locations:view")).toBe(true);
     expect(hasPermission("superadmin", "roles:view")).toBe(true);
+    expect(hasPermission("superadmin", "roles:update")).toBe(true);
     expect(hasPermission("superadmin", "requests:view-all")).toBe(true);
     expect(permissionsForRole("superadmin")).toEqual(ROLE_PERMISSIONS.superadmin);
     expect(menuForRole("superadmin").map((m) => m.id)).toEqual([
       "inventory",
       "catalog",
+      "clarifications",
       "requests",
       "users",
       "locations",
@@ -35,6 +37,7 @@ describe("Phase A RBAC map", () => {
     expect(hasPermission("device_admin", "inventory:update")).toBe(true);
     expect(hasPermission("device_admin", "catalog:view")).toBe(true);
     expect(hasPermission("device_admin", "catalog:update")).toBe(true);
+    expect(hasPermission("device_admin", "clarifications:view")).toBe(true);
     expect(hasPermission("device_admin", "account:security")).toBe(true);
     expect(hasPermission("device_admin", "users:view")).toBe(false);
     expect(hasPermission("device_admin", "locations:view")).toBe(false);
@@ -43,6 +46,7 @@ describe("Phase A RBAC map", () => {
     expect(menuForRole("device_admin").map((m) => m.id)).toEqual([
       "inventory",
       "catalog",
+      "clarifications",
       "requests",
       "security",
     ]);
@@ -97,19 +101,20 @@ describe("Phase A RBAC map", () => {
     expect(canAccessPath("/settings", admin)).toBe(true);
   });
 
-  it("resolveCapabilities mirrors the static map", () => {
-    const caps = resolveCapabilities("security_officer");
+  it("resolveCapabilities mirrors seeded / default grants", async () => {
+    const caps = await resolveCapabilities("security_officer");
     expect(caps.role).toBe("security_officer");
     expect(caps.permissions).toContain("requests:view-all");
     expect(caps.permissions).toContain("shell:nav");
     expect(caps.menu.some((m) => m.id === "settings")).toBe(false);
     expect(caps.menu.some((m) => m.id === "users")).toBe(false);
 
-    const adminCaps = resolveCapabilities("superadmin");
+    const adminCaps = await resolveCapabilities("superadmin");
     expect(adminCaps.menu.map((m) => m.id)).toContain("users");
     expect(adminCaps.menu.map((m) => m.id)).toContain("roles");
+    expect(adminCaps.permissions).toContain("roles:update");
 
-    const userCaps = resolveCapabilities("user");
+    const userCaps = await resolveCapabilities("user");
     expect(userCaps.menu).toEqual([]);
     expect(userCaps.permissions).not.toContain("shell:nav");
   });

@@ -6,6 +6,7 @@
 import { PrismaClient } from "@prisma/client";
 import { pathToFileURL } from "node:url";
 import { hashPassword } from "../src/lib/password";
+import { seedRoleGrantsIfEmpty } from "../src/services/roles/roleGrantsService";
 
 export const SEED = {
   tenantId: "demo-tenant",
@@ -132,7 +133,7 @@ export async function seed(prisma: PrismaClient) {
 
   await prisma.deviceModel.upsert({
     where: { id: SEED.models.pumpX200 },
-    update: {},
+    update: { maintenanceCycleMonths: 12 },
     create: {
       id: SEED.models.pumpX200,
       basicUdiDi: "4012345X200BASIC",
@@ -147,12 +148,13 @@ export async function seed(prisma: PrismaClient) {
       gmdnCode: "13217",
       source: "catalog",
       state: "released",
+      maintenanceCycleMonths: 12,
     },
   });
 
   await prisma.deviceModel.upsert({
     where: { id: SEED.models.monitorM10 },
-    update: {},
+    update: { maintenanceCycleMonths: 12 },
     create: {
       id: SEED.models.monitorM10,
       basicUdiDi: "4012345M10BASIC0",
@@ -165,12 +167,13 @@ export async function seed(prisma: PrismaClient) {
       emdnCode: "Z120501",
       source: "catalog",
       state: "released",
+      maintenanceCycleMonths: 12,
     },
   });
 
   await prisma.deviceModel.upsert({
     where: { id: SEED.models.ventilatorV3 },
-    update: {},
+    update: { maintenanceCycleMonths: 6 },
     create: {
       id: SEED.models.ventilatorV3,
       udiDi: SEED.gtins.ventilatorV3,
@@ -181,12 +184,22 @@ export async function seed(prisma: PrismaClient) {
       riskClass: "IIb",
       source: "catalog",
       state: "released",
+      maintenanceCycleMonths: 6,
     },
   });
 
+  const pumpCommissioned = new Date("2023-03-15T00:00:00.000Z");
+  const monitorCommissioned = new Date("2024-01-10T00:00:00.000Z");
+
   await prisma.deviceInstance.upsert({
     where: { id: SEED.instances.pump },
-    update: {},
+    update: {
+      maintenanceCycleMonths: 12,
+      maintenanceAnchorAt: pumpCommissioned,
+      nextMaintenanceDueAt: new Date("2024-03-15T00:00:00.000Z"),
+      responsibleUserId: SEED.users.anna,
+      responsiblePerson: "Anna Technik",
+    },
     create: {
       id: SEED.instances.pump,
       tenantId: tenant.id,
@@ -195,14 +208,22 @@ export async function seed(prisma: PrismaClient) {
       modelId: SEED.models.pumpX200,
       areaId: SEED.areas.bonnIcu,
       room: "Room 4",
-      commissionedAt: new Date("2023-03-15T00:00:00.000Z"),
-      responsiblePerson: "Dr. Weber",
+      commissionedAt: pumpCommissioned,
+      responsiblePerson: "Anna Technik",
+      responsibleUserId: SEED.users.anna,
+      maintenanceCycleMonths: 12,
+      maintenanceAnchorAt: pumpCommissioned,
+      nextMaintenanceDueAt: new Date("2024-03-15T00:00:00.000Z"),
     },
   });
 
   await prisma.deviceInstance.upsert({
     where: { id: SEED.instances.monitor },
-    update: {},
+    update: {
+      maintenanceCycleMonths: 12,
+      maintenanceAnchorAt: monitorCommissioned,
+      nextMaintenanceDueAt: new Date("2025-01-10T00:00:00.000Z"),
+    },
     create: {
       id: SEED.instances.monitor,
       tenantId: tenant.id,
@@ -211,7 +232,10 @@ export async function seed(prisma: PrismaClient) {
       modelId: SEED.models.monitorM10,
       areaId: SEED.areas.bonnRadiology,
       room: "Room 12",
-      commissionedAt: new Date("2024-01-10T00:00:00.000Z"),
+      commissionedAt: monitorCommissioned,
+      maintenanceCycleMonths: 12,
+      maintenanceAnchorAt: monitorCommissioned,
+      nextMaintenanceDueAt: new Date("2025-01-10T00:00:00.000Z"),
     },
   });
 
@@ -316,6 +340,8 @@ export async function seed(prisma: PrismaClient) {
     },
   });
 
+  const roleGrantsCreated = await seedRoleGrantsIfEmpty(prisma);
+
   return {
     tenant: tenant.id,
     users: users.length,
@@ -325,6 +351,7 @@ export async function seed(prisma: PrismaClient) {
     instances: 2,
     rules: 2,
     dispatchTargets: 2,
+    roleGrantsCreated,
   };
 }
 

@@ -1,9 +1,12 @@
 import type { TenantContext } from "@/interfaces/session";
 import type { PermissionSlug } from "@/interfaces/permissions";
-import { hasPermission } from "@/constants/permissions";
 import { CORRELATION_HEADER } from "@/constants/session";
 import { forbidden, unauthorized } from "@/lib/errors";
 import { newCorrelationId } from "@/lib/crypto";
+import {
+  cachedHasPermission,
+  ensureRoleGrantCache,
+} from "@/services/roles/roleGrantsService";
 import { readSession } from "./session";
 
 export { CORRELATION_HEADER };
@@ -11,18 +14,20 @@ export { CORRELATION_HEADER };
 /**
  * Section 16.1 / 32 — tenant context comes from the authenticated server
  * session, never from the request body. Every protected route calls this first.
+ * Also warms the Phase B role-grant cache.
  */
 export async function requireTenantContext(req: Request): Promise<TenantContext> {
   const user = await readSession();
   if (!user) throw unauthorized();
+  await ensureRoleGrantCache();
   const incoming = req.headers.get(CORRELATION_HEADER);
   const correlationId = incoming && /^[A-Za-z0-9-]{8,64}$/.test(incoming) ? incoming : newCorrelationId();
   return { tenantId: user.tenantId, user, correlationId };
 }
 
-/** True if the session role grants any of the listed slugs. */
+/** True if the session role grants any of the listed slugs (DB-backed cache). */
 export function requirePermission(ctx: TenantContext, ...slugs: PermissionSlug[]): void {
-  if (!slugs.some((slug) => hasPermission(ctx.user.role, slug))) throw forbidden();
+  if (!slugs.some((slug) => cachedHasPermission(ctx.user.role, slug))) throw forbidden();
 }
 
 /** @deprecated Prefer requirePermission — kept for rare role-only checks during migration. */

@@ -7,6 +7,7 @@ export type PermissionSlug =
   | "inventory:update"
   | "catalog:view"
   | "catalog:update"
+  | "clarifications:view"
   | "requests:create"
   | "parts:request"
   | "requests:view-mine"
@@ -25,11 +26,13 @@ export type PermissionSlug =
   | "locations:create"
   | "locations:update"
   | "locations:delete"
-  | "roles:view";
+  | "roles:view"
+  | "roles:update";
 
 export type MenuModuleId =
   | "inventory"
   | "catalog"
+  | "clarifications"
   | "requests"
   | "users"
   | "locations"

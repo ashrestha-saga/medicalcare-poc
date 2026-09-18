@@ -19,10 +19,18 @@ function emptyForm(): CatalogModelFormState {
     gmdnCode: "",
     source: "manual",
     state: "draft",
+    maintenanceCycleMonths: "",
   };
 }
 
 export function toCatalogModelWriteDTO(form: CatalogModelFormState): CatalogModelWriteDTO {
+  const cycleRaw = form.maintenanceCycleMonths.trim();
+  const cycle =
+    cycleRaw === ""
+      ? null
+      : Number.isFinite(Number(cycleRaw))
+        ? Math.floor(Number(cycleRaw))
+        : null;
   return {
     tradeName: form.tradeName.trim() || null,
     modelName: form.modelName.trim() || null,
@@ -39,6 +47,7 @@ export function toCatalogModelWriteDTO(form: CatalogModelFormState): CatalogMode
     gmdnCode: form.gmdnCode.trim() || null,
     source: form.source,
     state: form.state,
+    maintenanceCycleMonths: cycle,
   };
 }
 

@@ -88,6 +88,14 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
               <FieldBox label="GMDN / EMDN" value={catalogGmdnEmdn(model)} />
               <FieldBox label="Manufacturer" value={model.manufacturer ?? "—"} />
               <FieldBox label="Data source" value={catalogSourceLabel(model.source)} />
+              <FieldBox
+                label="Maintenance cycle"
+                value={
+                  model.maintenanceCycleMonths != null
+                    ? `${model.maintenanceCycleMonths} months`
+                    : "—"
+                }
+              />
             </CardContent>
           </Card>
 

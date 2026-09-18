@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ScanLine } from "lucide-react";
+import type { RowSelectionState } from "@tanstack/react-table";
+import { Printer, ScanLine } from "lucide-react";
 import type { DeviceInstanceDTO } from "@/interfaces";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
+import { printInventoryLabels } from "@/components/features/devices/labels/printInventoryLabels";
+import { toInventoryLabels } from "@/lib/inventory/label";
 import { useDevicesColumns } from "@/components/hooks/devices/useDevicesColumns";
 import { useDevicesList } from "@/components/hooks/devices/useDevicesList";
 import { useSites } from "@/components/hooks/location/useSites";
@@ -24,6 +27,7 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
   const [keywordInput, setKeywordInput] = useState(list.q);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   useEffect(() => {
     return () => {
@@ -50,13 +54,18 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
     void list.refresh("");
   }, [list]);
 
+  const printOne = useCallback((device: DeviceInstanceDTO) => {
+    printInventoryLabels(toInventoryLabels([device]));
+  }, []);
+
   const columnActions = useMemo(
     () => ({
       canUpdate: list.canUpdate,
       onOpen: onSelect,
       onEdit,
+      onPrint: printOne,
     }),
-    [list.canUpdate, onSelect, onEdit],
+    [list.canUpdate, onSelect, onEdit, printOne],
   );
 
   const columns = useDevicesColumns(columnActions);
@@ -65,6 +74,16 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
     if (!siteFilter) return list.devices;
     return list.devices.filter((d) => d.location?.siteId === siteFilter);
   }, [list.devices, siteFilter]);
+
+  const selectedDevices = useMemo(
+    () => filtered.filter((d) => rowSelection[d.id]),
+    [filtered, rowSelection],
+  );
+
+  const printSelected = useCallback(() => {
+    if (selectedDevices.length === 0) return;
+    printInventoryLabels(toInventoryLabels(selectedDevices));
+  }, [selectedDevices]);
 
   return (
     <div className="space-y-3 px-4 pb-4 sm:px-[18px]" data-testid="devices-list">
@@ -92,13 +111,30 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
         getRowId={(row) => row.id}
         emptyMessage="No devices in this inventory."
         onRowClick={onSelect}
+        rowSelection={rowSelection}
+        onRowSelectionChange={setRowSelection}
         toolbarTrailing={
-          <Button type="button" size="sm" className="h-8" asChild data-testid="devices-scan">
-            <Link href="/">
-              <ScanLine className="h-4 w-4" />
-              Scan
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedDevices.length > 0 && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8"
+                onClick={printSelected}
+                data-testid="devices-print-bulk"
+              >
+                <Printer className="h-4 w-4" />
+                Print labels ({selectedDevices.length})
+              </Button>
+            )}
+            <Button type="button" size="sm" className="h-8" asChild data-testid="devices-scan">
+              <Link href="/">
+                <ScanLine className="h-4 w-4" />
+                Scan
+              </Link>
+            </Button>
+          </div>
         }
       />
     </div>

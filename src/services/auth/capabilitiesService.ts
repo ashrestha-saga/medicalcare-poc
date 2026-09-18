@@ -1,12 +1,18 @@
 import type { CapabilitiesResponse } from "@/interfaces/permissions";
 import type { UserRole } from "@/interfaces/session";
-import { menuForRole, permissionsForRole } from "@/constants/permissions";
+import { menuFromPermissions } from "@/constants/permissions";
+import {
+  ensureRoleGrantCache,
+  getCachedPermissions,
+} from "@/services/roles/roleGrantsService";
 
-/** Resolve Phase A capabilities from the session role (static map). */
-export function resolveCapabilities(role: UserRole): CapabilitiesResponse {
+/** Resolve capabilities from DB-backed role grants (Phase B). */
+export async function resolveCapabilities(role: UserRole): Promise<CapabilitiesResponse> {
+  await ensureRoleGrantCache();
+  const permissions = [...getCachedPermissions(role)];
   return {
     role,
-    permissions: [...permissionsForRole(role)],
-    menu: menuForRole(role),
+    permissions,
+    menu: menuFromPermissions(permissions),
   };
 }

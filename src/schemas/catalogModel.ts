@@ -24,6 +24,13 @@ export const createCatalogModelSchema = z.object({
   gmdnCode: nullableTrimmed,
   source: catalogModelSourceSchema.optional().default("manual"),
   state: catalogModelStateSchema.optional().default("draft"),
+  maintenanceCycleMonths: z
+    .number()
+    .int()
+    .min(1)
+    .max(120)
+    .nullable()
+    .optional(),
 });
 
 export const updateCatalogModelSchema = createCatalogModelSchema.partial().extend({

@@ -27,4 +27,6 @@ export interface InventarizeOffer {
   /** Serial from GS1 scan when present. */
   serialHint: string | null;
   commissionedYear: string;
+  /** Model default cycle (months); inventarize may override. */
+  maintenanceCycleMonths: number | null;
 }

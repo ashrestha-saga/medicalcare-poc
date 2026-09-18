@@ -2,9 +2,10 @@
 
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronsUpDown, Eye, Pencil } from "lucide-react";
+import { ChevronsUpDown, Eye, Pencil, Printer } from "lucide-react";
 import type { DeviceInstanceDTO } from "@/interfaces";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 function SortHeader({
@@ -44,13 +45,42 @@ export interface DevicesTableActions {
   canUpdate: boolean;
   onOpen: (device: DeviceInstanceDTO) => void;
   onEdit: (device: DeviceInstanceDTO) => void;
+  onPrint: (device: DeviceInstanceDTO) => void;
 }
 
 export function useDevicesColumns(actions: DevicesTableActions): ColumnDef<DeviceInstanceDTO>[] {
-  const { canUpdate, onOpen, onEdit } = actions;
+  const { canUpdate, onOpen, onEdit, onPrint } = actions;
 
   return useMemo(
     () => [
+      {
+        id: "select",
+        enableSorting: false,
+        enableHiding: false,
+        header: ({ table }) => (
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected()
+                ? true
+                : table.getIsSomePageRowsSelected()
+                  ? "indeterminate"
+                  : false
+            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all on page"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label={`Select ${row.original.inventoryNumber}`}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ),
+        meta: { className: "w-[1%] whitespace-nowrap pr-0" },
+      },
       {
         accessorKey: "inventoryNumber",
         id: "inventoryNumber",
@@ -105,6 +135,27 @@ export function useDevicesColumns(actions: DevicesTableActions): ColumnDef<Devic
         ),
       },
       {
+        id: "maintenanceDue",
+        accessorFn: (row) => row.nextMaintenanceDueAt ?? "",
+        header: ({ column }) => <SortHeader label="Maint. due" column={column} />,
+        cell: ({ row }) => {
+          const status = row.original.maintenanceStatus;
+          const due = formatDate(row.original.nextMaintenanceDueAt);
+          const tone =
+            status === "overdue"
+              ? "text-destructive"
+              : status === "due"
+                ? "text-amber-700 dark:text-amber-400"
+                : "text-muted-foreground";
+          return (
+            <span className={`whitespace-nowrap ${tone}`} data-testid="device-maint-due-cell">
+              {due}
+              {status !== "unset" && status !== "ok" ? ` · ${status}` : ""}
+            </span>
+          );
+        },
+      },
+      {
         id: "actions",
         enableHiding: false,
         enableSorting: false,
@@ -131,6 +182,22 @@ export function useDevicesColumns(actions: DevicesTableActions): ColumnDef<Devic
                   </TooltipTrigger>
                   <TooltipContent>Open</TooltipContent>
                 </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-[var(--accent)] hover:bg-[rgba(30,127,224,0.14)] hover:text-[var(--accent)]"
+                      onClick={() => onPrint(device)}
+                      data-testid="device-print"
+                      aria-label={`Print label ${device.inventoryNumber}`}
+                    >
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Print label</TooltipContent>
+                </Tooltip>
                 {canUpdate && (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -155,6 +222,6 @@ export function useDevicesColumns(actions: DevicesTableActions): ColumnDef<Devic
         },
       },
     ],
-    [canUpdate, onOpen, onEdit],
+    [canUpdate, onOpen, onEdit, onPrint],
   );
 }

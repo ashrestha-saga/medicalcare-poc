@@ -220,6 +220,7 @@ export function mapBeudamedToDeviceModel(
     gmdnCode,
     source: "beudamed",
     sourceFetchedAt: fetchedAt.toISOString(),
+    maintenanceCycleMonths: null,
   };
 }
 

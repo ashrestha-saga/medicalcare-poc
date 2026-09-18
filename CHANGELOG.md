@@ -35,12 +35,18 @@ Keep entries short, user-facing, and in the past tense (“Added X”, “Fixed 
 
 ### Added
 
+- DB-backed role permission grants (`RoleGrant`) with editable Roles admin UI (`roles:update`)
+- Clarifications list for incomplete inventory data (superadmin / device admin)
+- Responsible person as device-admin user dropdown (modular `/api/users/options`)
+- Maintenance cycle on models/instances with next due date, completion roll-forward, and audit events
+- Inventory barcode labels (CODE128 of inventory number + name/serial) with single and bulk print
 - Project documentation in `docs/PROJECT.md`
 - Changelog workflow (`CHANGELOG.md`)
 - MySQL as the primary database provider (replacing local SQLite for app runtime)
 
 ### Changed
 
+- Role permissions resolve from the database (seeded from `ROLE_PERMISSIONS`); `/roles` is no longer read-only
 - Prisma `provider` set to `mysql`; Vitest uses MySQL via `DATABASE_URL` / `TEST_DATABASE_URL`
 
 ### Fixed

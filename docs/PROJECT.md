@@ -140,7 +140,7 @@ Primary entities (see `prisma/schema.prisma`):
 | `/requests` | Service / order request list |
 | `/users` | User administration |
 | `/locations` | Sites and areas |
-| `/roles` | Static role catalog (Phase A) |
+| `/roles` | Role catalog (DB grants; editable with `roles:update`) |
 | `/security` | Enroll / disable TOTP (QR + backup codes) |
 | `/settings` | Tenant settings (incl. OXID shop link) |
 | `/auth/callback` | OXID OAuth2 callback (route handler) |
@@ -202,7 +202,8 @@ Route handlers under `src/app/api/`:
 |---|---|
 | `GET` | `/api/me/capabilities` |
 | `GET`/`POST` | `/api/users` (+ `[id]`, reset-password) |
-| `GET` | `/api/roles` |
+| `GET` | `/api/roles` | Catalog + all permission slugs (`roles:view`) |
+| `PATCH` | `/api/roles/[role]` | Replace grants (`roles:update`) |
 | `GET`/`POST`/`PATCH`/`DELETE` | `/api/sites` |
 | `GET`/`POST`/`DELETE` | `/api/settings/oxid` |
 | `GET`/`POST` | `/api/oxid/token`, `GET` `/api/oxid/categories` |
@@ -406,20 +407,20 @@ Permission slug: **`account:security`**. Path `/security` is reachable **without
 
 ## 15. Roles & permissions (RBAC)
 
-Static map in `src/constants/permissions.ts` (Phase A — no per-user DB grants yet).
+**Phase B:** grants live in `RoleGrant` (global). `ROLE_PERMISSIONS` in `src/constants/permissions.ts` is the seed/fallback default. Runtime resolution uses `roleGrantsService` (warmed in `requireTenantContext`); capabilities via `GET /api/me/capabilities`. Superadmins edit grants on `/roles` (`roles:update`). Some superadmin slugs are locked (`SUPERADMIN_LOCKED_PERMISSIONS`).
 
 ### Roles
 
 | Role | Summary |
 |---|---|
-| `superadmin` | All permission slugs |
+| `superadmin` | All permission slugs (by default) |
 | `device_admin` | Service staff + `inventory:update` + `catalog:update` |
 | `security_officer` | Service staff + `requests:view-all` |
 | `user` | Inventory home + create request/parts + own requests + `/security`; **no** `shell:nav` |
 
 ### Permission slugs (catalog)
 
-`shell:nav`, `inventory:view` / `update`, `catalog:view` / `update`, `requests:create`, `parts:request`, `requests:view-mine` / `view-open` / `view-all` / `transition`, `account:security`, `settings:view` / `oxid`, `users:*`, `locations:*`, `roles:view`.
+`shell:nav`, `inventory:view` / `update`, `catalog:view` / `update`, `clarifications:view`, `requests:create`, `parts:request`, `requests:view-mine` / `view-open` / `view-all` / `transition`, `account:security`, `settings:view` / `oxid`, `users:*`, `locations:*`, `roles:view` / `update`.
 
 ### Path guard
 
@@ -547,7 +548,8 @@ Try these identifiers after seed:
 
 - Root [`README.md`](../README.md) — quick start and high-level architecture
 - `prisma/schema.prisma` — authoritative data model
-- `src/constants/permissions.ts` — Phase A RBAC map
+- `src/constants/permissions.ts` — RBAC defaults + path/menu helpers
+- `src/services/roles/roleGrantsService.ts` — DB-backed RoleGrant cache + catalog CRUD
 - `src/services/resolve/resolveService.ts` — resolution chain
 - `src/services/auth/totpService.ts` — 2FA lifecycle
 - `src/services/inventory/deviceInventoryService.ts` — inventarnummer allocation & inventarize create

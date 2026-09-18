@@ -19,18 +19,19 @@ generator client {
 // ---------------------------------------------------------------------------
 
 model Tenant {
-  id              String                 @id @default(cuid())
-  name            String
-  createdAt       DateTime               @default(now())
-  users           User[]
-  sites           Site[]
-  instances       DeviceInstance[]
-  captured        CapturedArticle[]
-  requests        ServiceRequest[]
-  orderRequests   OrderRequest[]
-  dispatchTargets DispatchTarget[]
-  externalCalls   ExternalCallLog[]
-  oxidConnection  TenantOxidConnection?
+  id                String                 @id @default(cuid())
+  name              String
+  createdAt         DateTime               @default(now())
+  users             User[]
+  sites             Site[]
+  instances         DeviceInstance[]
+  captured          CapturedArticle[]
+  requests          ServiceRequest[]
+  orderRequests     OrderRequest[]
+  dispatchTargets   DispatchTarget[]
+  externalCalls     ExternalCallLog[]
+  oxidConnection    TenantOxidConnection?
+  maintenanceEvents MaintenanceEvent[]
 }
 
 /// Clinic staff — DeviceCare login (not OXID identity).
@@ -58,6 +59,7 @@ model User {
   orderRequests        OrderRequest[]
   oxidConnectionsMade  TenantOxidConnection[] @relation("OxidConnectedBy")
   totpChallenges       TotpChallenge[]
+  responsibleDevices   DeviceInstance[]       @relation("DeviceResponsibleUser")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -141,6 +143,8 @@ model DeviceModel {
   sourceFetchedAt         DateTime?
   version                 Int                      @default(1)
   state                   String                   @default("draft") // draft | review | released
+  /** Default maintenance interval in months for new inventory copies. */
+  maintenanceCycleMonths Int?
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   instances               DeviceInstance[]
@@ -166,25 +170,61 @@ model ExternalSourceRecord {
 }
 
 model DeviceInstance {
-  id                String          @id @default(cuid())
-  tenantId          String
-  tenant            Tenant          @relation(fields: [tenantId], references: [id])
-  inventoryNumber   String
-  serialNumber      String?
-  modelId           String?
-  model             DeviceModel?    @relation(fields: [modelId], references: [id])
-  areaId            String?
-  area              Area?           @relation(fields: [areaId], references: [id])
-  room              String?
-  commissionedAt    DateTime?
-  responsiblePerson String?
-  classificationId  String?         @unique
-  classification    Classification? @relation(fields: [classificationId], references: [id])
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
+  id                     String             @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant             @relation(fields: [tenantId], references: [id])
+  inventoryNumber        String
+  serialNumber           String?
+  modelId                String?
+  model                  DeviceModel?       @relation(fields: [modelId], references: [id])
+  areaId                 String?
+  area                   Area?              @relation(fields: [areaId], references: [id])
+  room                   String?
+  commissionedAt         DateTime?
+  /** Denormalized display name for lists/labels. */
+  responsiblePerson      String?
+  /** Preferred: link to tenant user (e.g. device_admin). */
+  responsibleUserId      String?
+  responsibleUser        User?              @relation("DeviceResponsibleUser", fields: [responsibleUserId], references: [id])
+  classificationId       String?            @unique
+  classification         Classification?    @relation(fields: [classificationId], references: [id])
+  /** Copied from model at inventarize; may be overridden per unit. */
+  maintenanceCycleMonths Int?
+  /** Start of current period — usually commissionedAt or createdAt. */
+  maintenanceAnchorAt    DateTime?
+  /** When maintenance was last marked done. */
+  lastMaintainedAt       DateTime?
+  /** Next due = (lastMaintainedAt ?? maintenanceAnchorAt) + cycle months. */
+  nextMaintenanceDueAt   DateTime?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  maintenanceEvents      MaintenanceEvent[]
 
   @@unique([tenantId, inventoryNumber])
   @@index([tenantId, serialNumber])
+  @@index([tenantId, nextMaintenanceDueAt])
+  @@index([responsibleUserId])
+}
+
+/// Audit log for maintenance schedule changes (completion, cycle edits, etc.).
+model MaintenanceEvent {
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  deviceInstanceId String
+  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
+  /// completed | skipped | rescheduled | cycle_changed
+  kind             String
+  performedAt      DateTime
+  previousDueAt    DateTime?
+  nextDueAt        DateTime?
+  cycleMonths      Int?
+  note             String?        @db.Text
+  actorUserId      String?
+  createdAt        DateTime       @default(now())
+
+  @@index([tenantId, deviceInstanceId, performedAt])
+  @@index([tenantId, performedAt])
 }
 
 // DAT-302a — service-only subject created by stage 4 manual capture
@@ -426,4 +466,20 @@ model ExternalCallLog {
 
   @@index([system, identifierHash, startedAt])
   @@index([tenantId, startedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Phase B — DB-backed role → permission grants (editable by superadmin)
+// ---------------------------------------------------------------------------
+
+/// Global grant: role slug (User.role) → permission slug.
+model RoleGrant {
+  id         String   @id @default(cuid())
+  role       String // superadmin | device_admin | security_officer | user
+  permission String // e.g. inventory:view
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([role, permission])
+  @@index([role])
 }

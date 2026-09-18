@@ -1,10 +1,14 @@
 "use client";
 
+import { useCallback } from "react";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Printer } from "lucide-react";
 import type { DeviceInstanceDetailDTO, DeviceInstanceDTO } from "@/interfaces";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { InventoryBarcodeLabel } from "@/components/features/devices/labels/InventoryBarcodeLabel";
+import { printInventoryLabels } from "@/components/features/devices/labels/printInventoryLabels";
+import { toInventoryLabel } from "@/lib/inventory/label";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 
 interface DeviceDetailProps {
@@ -46,6 +50,11 @@ export function DeviceDetail({ device, canEdit, onBack, onEdit }: DeviceDetailPr
   const detail = isDetail(device) ? device : null;
   const modelClass = detail?.modelClassification;
   const modelHref = device.modelId && canViewCatalog ? `/catalog/${device.modelId}` : null;
+  const label = toInventoryLabel(device);
+
+  const onPrint = useCallback(() => {
+    printInventoryLabels([label]);
+  }, [label]);
 
   return (
     <div className="px-4 pb-6 sm:px-[18px]" data-testid="device-detail">
@@ -59,6 +68,17 @@ export function DeviceDetail({ device, canEdit, onBack, onEdit }: DeviceDetailPr
               Edit
             </Button>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={onPrint}
+            data-testid="device-print-label"
+          >
+            <Printer className="h-4 w-4" />
+            Print label
+          </Button>
         </div>
         <h2 data-testid="device-detail-title">{device.tradeName ?? device.inventoryNumber}</h2>
         <p className="p-requests__sub">
@@ -79,9 +99,39 @@ export function DeviceDetail({ device, canEdit, onBack, onEdit }: DeviceDetailPr
           <Row label="Location" value={device.location?.text} />
           <Row label="Responsible" value={device.responsiblePerson} />
           <Row label="Commissioned" value={formatDate(device.commissionedAt)} />
+          <Row
+            label="Maintenance cycle"
+            value={
+              device.maintenanceCycleMonths != null
+                ? `${device.maintenanceCycleMonths} months`
+                : null
+            }
+          />
+          <Row label="Last maintained" value={formatDate(device.lastMaintainedAt)} />
+          <Row label="Next maintenance due" value={formatDate(device.nextMaintenanceDueAt)} />
+          <Row
+            label="Maintenance status"
+            value={
+              device.maintenanceStatus === "unset"
+                ? "Not set"
+                : device.maintenanceStatus.charAt(0).toUpperCase() + device.maintenanceStatus.slice(1)
+            }
+          />
         </dl>
 
         <aside className="space-y-4">
+          <div className="rounded-md border border-border bg-card/40 p-4" data-testid="device-detail-label">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Label preview
+            </p>
+            <div className="mt-3 flex justify-center">
+              <InventoryBarcodeLabel label={label} />
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Barcode encodes the inventory number for camera scan.
+            </p>
+          </div>
+
           <div className="rounded-md border border-border bg-card/40 p-4" data-testid="device-detail-classification">
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Classification — from the model

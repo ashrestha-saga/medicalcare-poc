@@ -98,6 +98,19 @@ export function CatalogModelFormDialog({ open, onOpenChange, onSubmit }: Catalog
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cat-cycle">Maintenance cycle (months)</Label>
+              <Input
+                id="cat-cycle"
+                type="number"
+                min={1}
+                max={120}
+                placeholder="e.g. 12"
+                value={form.maintenanceCycleMonths}
+                onChange={(e) => setField("maintenanceCycleMonths", e.target.value)}
+                data-testid="catalog-maintenance-cycle"
+              />
+            </div>
           </div>
 
           <DialogFooter>

@@ -1,7 +1,6 @@
-import type { AdminUserDTO, RoleCatalogEntry, TenantContext } from "@/interfaces";
+import type { AdminUserDTO, TenantContext } from "@/interfaces";
 import type { UserRole } from "@/interfaces/session";
-import { ROLE_PERMISSIONS } from "@/constants/permissions";
-import { DEFAULT_USER_ROLE, ROLES, USER_ROLES } from "@/constants/roles";
+import { DEFAULT_USER_ROLE, USER_ROLES } from "@/constants/roles";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { conflict, notFound, unauthorized, unprocessable } from "@/lib/errors";
 import { hashPassword, verifyPassword } from "@/lib/password";
@@ -170,25 +169,6 @@ export const userAdminService = {
       where: { id: row.id },
       data: { passwordHash: hashPassword(input.newPassword) },
     });
-  },
-};
-
-export const roleCatalogService = {
-  async list(ctx: TenantContext): Promise<RoleCatalogEntry[]> {
-    requirePermission(ctx, "roles:view");
-    const counts = await prisma.user.groupBy({
-      by: ["role"],
-      where: { tenantId: ctx.tenantId },
-      _count: { _all: true },
-    });
-    const countByRole = new Map(counts.map((c) => [c.role, c._count._all]));
-
-    return ROLES.map((r) => ({
-      value: r.value,
-      label: r.label,
-      permissions: [...ROLE_PERMISSIONS[r.value]],
-      userCount: countByRole.get(r.value) ?? 0,
-    }));
   },
 };
 

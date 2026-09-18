@@ -16,6 +16,8 @@ export interface DeviceModelDTO {
   sourceFetchedAt: string | null;
   version: number;
   state: "draft" | "review" | "released";
+  /** Default maintenance interval in months for new inventory copies. */
+  maintenanceCycleMonths: number | null;
 }
 
 export interface DeviceLocationDTO {
@@ -39,6 +41,14 @@ export interface DeviceInstanceDTO {
   location: DeviceLocationDTO | null;
   commissionedAt: string | null;
   responsiblePerson: string | null;
+  responsibleUserId: string | null;
+  /** Instance maintenance interval (months); copied from model at inventarize. */
+  maintenanceCycleMonths: number | null;
+  maintenanceAnchorAt: string | null;
+  lastMaintainedAt: string | null;
+  nextMaintenanceDueAt: string | null;
+  /** Derived: ok | due | overdue | unset */
+  maintenanceStatus: "ok" | "due" | "overdue" | "unset";
   /** Confirmed classification on the instance, if one exists. */
   classification: {
     annex1: boolean | null;
@@ -79,6 +89,8 @@ export interface DeviceInstanceDetailDTO extends DeviceInstanceDTO {
   udiDi: string | null;
   modelSource: DeviceModelSource | null;
   modelState: DeviceModelDTO["state"] | null;
+  /** Model default cycle (for reference / inventarize hints). */
+  modelMaintenanceCycleMonths: number | null;
   /** Always from the linked model (proposal/rules) — not editable on the instance. */
   modelClassification: ModelClassificationDTO | null;
   course: DeviceCourseEventDTO[];

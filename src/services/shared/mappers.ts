@@ -26,12 +26,15 @@ import type {
 } from "@/interfaces";
 import { inspectionTagsFromFlags } from "@/lib/inspectionTags";
 import { parseJson } from "@/lib/json";
+import { deriveMaintenanceStatus } from "@/lib/maintenance/schedule";
 
 export { inspectionTagsFromFlags };
 
 /** Prisma rows → DTOs. Raw external shapes never pass through here (Section 8). */
 
-export function toDeviceModelDTO(row: DeviceModel): DeviceModelDTO {
+export function toDeviceModelDTO(
+  row: DeviceModel & { maintenanceCycleMonths?: number | null },
+): DeviceModelDTO {
   return {
     id: row.id,
     basicUdiDi: row.basicUdiDi,
@@ -48,18 +51,27 @@ export function toDeviceModelDTO(row: DeviceModel): DeviceModelDTO {
     sourceFetchedAt: row.sourceFetchedAt?.toISOString() ?? null,
     version: row.version,
     state: row.state as DeviceModelDTO["state"],
+    maintenanceCycleMonths: row.maintenanceCycleMonths ?? null,
   };
 }
 
+/** Instance row + includes. Extra scalars declared so editors stay valid if Prisma Client lags generate. */
 export type DeviceInstanceWithRelations = DeviceInstance & {
-  model: DeviceModel | null;
+  model: (DeviceModel & { maintenanceCycleMonths?: number | null }) | null;
   area: (Area & { site: Site }) | null;
   classification: Classification | null;
+  responsibleUser?: { id: string; name: string; email?: string | null } | null;
+  responsibleUserId?: string | null;
+  maintenanceCycleMonths?: number | null;
+  maintenanceAnchorAt?: Date | null;
+  lastMaintainedAt?: Date | null;
+  nextMaintenanceDueAt?: Date | null;
 };
 
 export function toDeviceInstanceDTO(row: DeviceInstanceWithRelations): DeviceInstanceDTO {
   const site = row.area?.site ?? null;
   const parts = [site?.name, row.area?.name, row.room].filter(Boolean);
+  const responsibleName = row.responsibleUser?.name ?? row.responsiblePerson;
   return {
     id: row.id,
     inventoryNumber: row.inventoryNumber,
@@ -79,7 +91,13 @@ export function toDeviceInstanceDTO(row: DeviceInstanceWithRelations): DeviceIns
         }
       : null,
     commissionedAt: row.commissionedAt?.toISOString() ?? null,
-    responsiblePerson: row.responsiblePerson,
+    responsiblePerson: responsibleName,
+    responsibleUserId: row.responsibleUserId ?? row.responsibleUser?.id ?? null,
+    maintenanceCycleMonths: row.maintenanceCycleMonths ?? null,
+    maintenanceAnchorAt: row.maintenanceAnchorAt?.toISOString() ?? null,
+    lastMaintainedAt: row.lastMaintainedAt?.toISOString() ?? null,
+    nextMaintenanceDueAt: row.nextMaintenanceDueAt?.toISOString() ?? null,
+    maintenanceStatus: deriveMaintenanceStatus(row.nextMaintenanceDueAt),
     classification: row.classification
       ? {
           annex1: row.classification.annex1,

@@ -2,6 +2,7 @@
 
 import type { InventarizeOffer } from "@/interfaces";
 import { useInventarize } from "@/components/hooks/service-request/useInventarize";
+import { UserSelect } from "@/components/features/shared/UserSelect";
 import { RequiredMark } from "@/components/ui/RequiredMark";
 
 export function InventarizeForm({
@@ -30,17 +31,17 @@ export function InventarizeForm({
       <div className="p-inventarize__body">
         <div className="p-field">
           <label htmlFor="inv-person">Verantwortliche Person</label>
-          <input
+          <UserSelect
             id="inv-person"
-            value={form.responsiblePerson}
-            onChange={(e) => form.setResponsiblePerson(e.target.value)}
-            placeholder="Name"
-            autoComplete="name"
+            showLabel={false}
+            value={form.responsibleUserId}
+            onChange={form.setResponsibleUserId}
+            roles={["device_admin"]}
+            placeholder="Geräteadministrator wählen"
+            disabled={form.busy}
+            error={form.fieldErrors.responsibleUserId}
             data-testid="inventarize-responsible"
           />
-          {form.fieldErrors.responsiblePerson && (
-            <p className="p-err">{form.fieldErrors.responsiblePerson}</p>
-          )}
         </div>
 
         <div className="p-grid2 p-grid2--always">
@@ -107,6 +108,24 @@ export function InventarizeForm({
               <p className="p-err">{form.fieldErrors.commissionedAt}</p>
             )}
           </div>
+        </div>
+
+        <div className="p-field">
+          <label htmlFor="inv-cycle">Wartungsintervall (Monate)</label>
+          <input
+            id="inv-cycle"
+            className="t-mono"
+            type="number"
+            min={1}
+            max={120}
+            value={form.maintenanceCycleMonths}
+            onChange={(e) => form.setMaintenanceCycleMonths(e.target.value)}
+            placeholder="z. B. 12"
+            data-testid="inventarize-cycle"
+          />
+          {form.fieldErrors.maintenanceCycleMonths && (
+            <p className="p-err">{form.fieldErrors.maintenanceCycleMonths}</p>
+          )}
         </div>
 
         <div className="p-inventarize__meta">

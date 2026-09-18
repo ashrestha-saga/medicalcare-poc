@@ -2,13 +2,14 @@ import type { MenuModule, PermissionSlug } from "@/interfaces/permissions";
 import type { UserRole } from "@/interfaces/session";
 import { isAlwaysAllowPath } from "@/constants/authRoutes";
 
-/** Full Phase A catalog. Superadmin receives every slug. */
+/** Full permission catalog. Superadmin receives every slug by default. */
 export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "shell:nav",
   "inventory:view",
   "inventory:update",
   "catalog:view",
   "catalog:update",
+  "clarifications:view",
   "requests:create",
   "parts:request",
   "requests:view-mine",
@@ -28,6 +29,7 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "locations:update",
   "locations:delete",
   "roles:view",
+  "roles:update",
 ] as const;
 
 /** Staff who manage the service queue — includes the nav rail. */
@@ -44,26 +46,38 @@ const SERVICE_STAFF: readonly PermissionSlug[] = [
 ];
 
 /**
- * Static role → permission map (Phase A).
- * User/role admin slugs are superadmin-only until Phase B DB grants.
+ * Static role → permission map — used as seed defaults / fallback when RoleGrant is empty.
+ * Runtime grants load from DB (Phase B) via roleGrantsService.
  *
  * `shell:nav` — left rail. Without it, only the app home (`/`) is routable;
  * Logout moves to the account bar.
  * `catalog:update` — central DeviceModel writes (superadmin + device_admin only).
+ * `roles:update` — edit RoleGrant rows (superadmin by default).
  */
 export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
   superadmin: ALL_PERMISSIONS,
-  device_admin: [...SERVICE_STAFF, "inventory:update", "catalog:update"],
+  device_admin: [...SERVICE_STAFF, "inventory:update", "catalog:update", "clarifications:view"],
   security_officer: [...SERVICE_STAFF, "requests:view-all"],
   // No shell:nav → Inventory-only chrome; /requests is blocked by RouteGuard.
   // /security is allowed without shell:nav (see canAccessPath).
   user: ["inventory:view", "requests:create", "parts:request", "requests:view-mine", "account:security"],
 };
 
+/** Permissions that cannot be removed from the superadmin role. */
+export const SUPERADMIN_LOCKED_PERMISSIONS: readonly PermissionSlug[] = [
+  "shell:nav",
+  "roles:view",
+  "roles:update",
+  "users:view",
+  "users:update",
+  "account:security",
+] as const;
+
 /** Sidebar modules. Visibility = `shell:nav` + module slug. */
 export const MENU_MODULES: readonly MenuModule[] = [
   { id: "inventory", label: "Inventory", href: "/devices", slug: "inventory:view" },
   { id: "catalog", label: "Catalog", href: "/catalog", slug: "catalog:view" },
+  { id: "clarifications", label: "Clarifications", href: "/clarifications", slug: "clarifications:view" },
   { id: "requests", label: "Requests", href: "/requests", slug: "requests:view-mine" },
   { id: "users", label: "Users", href: "/users", slug: "users:view" },
   { id: "locations", label: "Locations", href: "/locations", slug: "locations:view" },
@@ -77,6 +91,7 @@ export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/": "inventory:view",
   "/devices": "inventory:view",
   "/catalog": "catalog:view",
+  "/clarifications": "clarifications:view",
   "/requests": "requests:view-mine",
   "/users": "users:view",
   "/locations": "locations:view",
@@ -101,6 +116,13 @@ export function menuForRole(role: UserRole): MenuModule[] {
   return MENU_MODULES.filter((m) => hasPermission(role, m.slug));
 }
 
+/** Build sidebar from an explicit grant list (Phase B DB-backed capabilities). */
+export function menuFromPermissions(permissions: readonly PermissionSlug[]): MenuModule[] {
+  const set = new Set(permissions);
+  if (!set.has("shell:nav")) return [];
+  return MENU_MODULES.filter((m) => set.has(m.slug));
+}
+
 export function normalizeAppPath(path: string): string {
   if (!path) return APP_HOME_PATH;
   const bare = path.split("?")[0]?.split("#")[0] || APP_HOME_PATH;
@@ -113,6 +135,7 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   if (PATH_PERMISSION_MAP[pathname]) return PATH_PERMISSION_MAP[pathname];
   if (pathname.startsWith("/devices")) return "inventory:view";
   if (pathname.startsWith("/catalog")) return "catalog:view";
+  if (pathname.startsWith("/clarifications")) return "clarifications:view";
   if (pathname.startsWith("/requests")) return "requests:view-mine";
   if (pathname.startsWith("/users")) return "users:view";
   if (pathname.startsWith("/locations")) return "locations:view";

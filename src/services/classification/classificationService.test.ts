@@ -18,6 +18,7 @@ const model: DeviceModelDTO = {
   sourceFetchedAt: null,
   version: 1,
   state: "released",
+  maintenanceCycleMonths: null,
 };
 
 const rule = (over: Partial<ClassificationRuleDTO>): ClassificationRuleDTO => ({

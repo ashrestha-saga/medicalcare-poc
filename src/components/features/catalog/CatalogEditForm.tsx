@@ -168,6 +168,19 @@ export function CatalogEditForm({ form }: CatalogEditFormProps) {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-cycle">Maintenance cycle (months)</Label>
+                  <Input
+                    id="edit-cycle"
+                    type="number"
+                    min={1}
+                    max={120}
+                    placeholder="e.g. 12"
+                    value={form.form.maintenanceCycleMonths}
+                    onChange={(e) => form.setField("maintenanceCycleMonths", e.target.value)}
+                    data-testid="catalog-edit-maintenance-cycle"
+                  />
+                </div>
               </CardContent>
             </Card>
 

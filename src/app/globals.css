@@ -3003,6 +3003,64 @@ body {
   background: rgba(0, 0, 0, 0.2);
 }
 
+.p-roles__card {
+  align-items: flex-start;
+}
+
+.p-roles__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.p-roles__title-row .p-admin__meta {
+  display: block;
+  margin-top: 2px;
+}
+
+.p-roles__edit {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.p-roles__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px 12px;
+}
+
+.p-roles__perm {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--on-dark-soft);
+  cursor: pointer;
+}
+
+.p-roles__perm code {
+  font-size: 11px;
+  color: var(--on-dark);
+}
+
+.p-roles__locked {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-style: normal;
+  opacity: 0.7;
+}
+
+.p-roles__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* —— Capturer home: Bestandsverzeichnis (no nav) —— */
 .p-capturer-idle {
   display: flex;

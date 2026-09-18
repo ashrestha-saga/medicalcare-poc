@@ -10,7 +10,12 @@ import { conflict, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { toDeviceInstanceDTO } from "@/services/shared/mappers";
 import { inspectionTagsFromFlags } from "@/lib/inspectionTags";
+import {
+  computeNextMaintenanceDueAt,
+  resolveMaintenanceCycleMonths,
+} from "@/lib/maintenance/schedule";
 import type { CreateDeviceInput, UpdateDeviceInput } from "@/schemas/device";
+import { userOptionsService } from "@/services/users/userOptionsService";
 import { Prisma } from "@prisma/client";
 
 const INV_PREFIX = "INV-";
@@ -45,6 +50,7 @@ const include = {
   model: true,
   area: { include: { site: true } },
   classification: true,
+  responsibleUser: { select: { id: true, name: true, email: true } },
 } as const;
 
 export interface DeviceListQuery {
@@ -145,6 +151,7 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
     udiDi: row.model?.udiDi ?? null,
     modelSource: (row.model?.source as DeviceInstanceDetailDTO["modelSource"]) ?? null,
     modelState: (row.model?.state as DeviceInstanceDetailDTO["modelState"]) ?? null,
+    modelMaintenanceCycleMonths: row.model?.maintenanceCycleMonths ?? null,
     modelClassification,
     course: [
       {
@@ -152,6 +159,15 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
         at: row.createdAt.toISOString(),
         actor: null,
       },
+      ...(row.lastMaintainedAt
+        ? [
+            {
+              label: "Maintenance completed",
+              at: row.lastMaintainedAt.toISOString(),
+              actor: null,
+            },
+          ]
+        : []),
       ...(row.updatedAt.getTime() !== row.createdAt.getTime()
         ? [
             {
@@ -179,6 +195,11 @@ export const deviceInventoryService: InventoryResolver & {
   ): Promise<DeviceInstanceDTO | null>;
   create(ctx: TenantContext, input: CreateDeviceInput): Promise<DeviceInstanceDetailDTO>;
   update(ctx: TenantContext, id: string, input: UpdateDeviceInput): Promise<DeviceInstanceDetailDTO>;
+  completeMaintenance(
+    ctx: TenantContext,
+    id: string,
+    input?: { performedAt?: string | null; note?: string | null },
+  ): Promise<DeviceInstanceDetailDTO>;
 } = {
   async find(identifier, tenantId) {
     const candidates = new Set<string>();
@@ -331,6 +352,26 @@ export const deviceInventoryService: InventoryResolver & {
     }
 
     const commissionedAt = parseCommissionedAt(input.commissionedAt) ?? null;
+    const now = new Date();
+    const cycleMonths = resolveMaintenanceCycleMonths(
+      input.maintenanceCycleMonths,
+      model.maintenanceCycleMonths,
+    );
+    const maintenanceAnchorAt = commissionedAt ?? now;
+    const nextMaintenanceDueAt = computeNextMaintenanceDueAt({
+      cycleMonths,
+      anchorAt: maintenanceAnchorAt,
+    });
+
+    const responsible =
+      input.responsibleUserId !== undefined
+        ? await userOptionsService.resolveInTenant(ctx.tenantId, input.responsibleUserId)
+        : null;
+    if (input.responsibleUserId && !responsible) {
+      throw unprocessable("Unknown responsible user.", { field: "responsibleUserId" });
+    }
+    const responsiblePerson =
+      responsible?.name ?? (input.responsiblePerson?.trim() || null);
 
     try {
       const created = await prisma.$transaction(async (tx) => {
@@ -343,8 +384,13 @@ export const deviceInventoryService: InventoryResolver & {
             modelId: input.modelId,
             areaId: input.areaId ?? null,
             room: input.room?.trim() || null,
-            responsiblePerson: input.responsiblePerson?.trim() || null,
+            responsibleUserId: responsible?.id ?? null,
+            responsiblePerson,
             commissionedAt,
+            maintenanceCycleMonths: cycleMonths,
+            maintenanceAnchorAt,
+            lastMaintainedAt: null,
+            nextMaintenanceDueAt,
           },
           include,
         });
@@ -383,6 +429,46 @@ export const deviceInventoryService: InventoryResolver & {
 
     const commissionedAt = parseCommissionedAt(input.commissionedAt);
 
+    let responsiblePatch: { responsibleUserId: string | null; responsiblePerson: string | null } | undefined;
+    if (input.responsibleUserId !== undefined) {
+      if (input.responsibleUserId === null || input.responsibleUserId === "") {
+        responsiblePatch = { responsibleUserId: null, responsiblePerson: null };
+      } else {
+        const responsible = await userOptionsService.resolveInTenant(ctx.tenantId, input.responsibleUserId);
+        if (!responsible) {
+          throw unprocessable("Unknown responsible user.", { field: "responsibleUserId" });
+        }
+        responsiblePatch = {
+          responsibleUserId: responsible.id,
+          responsiblePerson: responsible.name,
+        };
+      }
+    } else if (input.responsiblePerson !== undefined) {
+      responsiblePatch = {
+        responsibleUserId: existing.responsibleUserId,
+        responsiblePerson: input.responsiblePerson,
+      };
+    }
+
+    const nextCycle =
+      input.maintenanceCycleMonths !== undefined
+        ? input.maintenanceCycleMonths
+        : existing.maintenanceCycleMonths;
+    const nextCommissioned =
+      commissionedAt !== undefined ? commissionedAt : existing.commissionedAt;
+    const scheduleTouched =
+      input.maintenanceCycleMonths !== undefined || commissionedAt !== undefined;
+    const nextAnchor = scheduleTouched
+      ? (nextCommissioned ?? existing.maintenanceAnchorAt ?? existing.createdAt)
+      : existing.maintenanceAnchorAt;
+    const nextDue = scheduleTouched
+      ? computeNextMaintenanceDueAt({
+          cycleMonths: nextCycle,
+          anchorAt: nextAnchor,
+          lastMaintainedAt: existing.lastMaintainedAt,
+        })
+      : undefined;
+
     try {
       await prisma.$transaction(async (tx) => {
         await tx.deviceInstance.update({
@@ -390,18 +476,49 @@ export const deviceInventoryService: InventoryResolver & {
           data: {
             ...(input.inventoryNumber !== undefined ? { inventoryNumber: input.inventoryNumber } : {}),
             ...(input.serialNumber !== undefined ? { serialNumber: input.serialNumber } : {}),
-            ...(input.responsiblePerson !== undefined ? { responsiblePerson: input.responsiblePerson } : {}),
+            ...(responsiblePatch ?? {}),
             ...(input.room !== undefined ? { room: input.room } : {}),
             ...(input.areaId !== undefined ? { areaId: input.areaId } : {}),
             ...(commissionedAt !== undefined ? { commissionedAt } : {}),
+            ...(input.maintenanceCycleMonths !== undefined
+              ? { maintenanceCycleMonths: input.maintenanceCycleMonths }
+              : {}),
+            ...(scheduleTouched
+              ? {
+                  maintenanceAnchorAt: nextAnchor,
+                  nextMaintenanceDueAt: nextDue ?? null,
+                }
+              : {}),
           },
         });
+
+        if (
+          scheduleTouched &&
+          (existing.maintenanceCycleMonths !== nextCycle ||
+            existing.nextMaintenanceDueAt?.getTime() !== nextDue?.getTime())
+        ) {
+          await tx.maintenanceEvent.create({
+            data: {
+              tenantId: ctx.tenantId,
+              deviceInstanceId: id,
+              kind: "cycle_changed",
+              performedAt: new Date(),
+              previousDueAt: existing.nextMaintenanceDueAt,
+              nextDueAt: nextDue ?? null,
+              cycleMonths: nextCycle,
+              actorUserId: ctx.user.id,
+            },
+          });
+        }
 
         const modelPatch = {
           ...(input.tradeName !== undefined ? { tradeName: input.tradeName } : {}),
           ...(input.modelName !== undefined ? { modelName: input.modelName } : {}),
           ...(input.manufacturer !== undefined ? { manufacturer: input.manufacturer } : {}),
           ...(input.udiDi !== undefined ? { udiDi: input.udiDi } : {}),
+          ...(input.modelMaintenanceCycleMonths !== undefined
+            ? { maintenanceCycleMonths: input.modelMaintenanceCycleMonths }
+            : {}),
         };
         if (existing.modelId && Object.keys(modelPatch).length > 0) {
           await tx.deviceModel.update({
@@ -416,6 +533,62 @@ export const deviceInventoryService: InventoryResolver & {
       }
       throw err;
     }
+
+    const refreshed = await loadInstance(id, ctx.tenantId);
+    if (!refreshed) throw notFound("Device not found.");
+    return toDetailDTO(refreshed);
+  },
+
+  async completeMaintenance(ctx, id, input) {
+    requirePermission(ctx, "inventory:update");
+    const existing = await loadInstance(id, ctx.tenantId);
+    if (!existing) throw notFound("Device not found.");
+
+    const cycle = existing.maintenanceCycleMonths;
+    if (cycle == null || cycle <= 0) {
+      throw unprocessable("Set a maintenance cycle (months) before marking maintenance done.", {
+        field: "maintenanceCycleMonths",
+      });
+    }
+
+    let performedAt = new Date();
+    if (input?.performedAt?.trim()) {
+      const parsed = new Date(input.performedAt.trim());
+      if (Number.isNaN(parsed.getTime())) {
+        throw unprocessable("Invalid performed date.", { field: "performedAt" });
+      }
+      performedAt = parsed;
+    }
+
+    const previousDueAt = existing.nextMaintenanceDueAt;
+    const nextDueAt = computeNextMaintenanceDueAt({
+      cycleMonths: cycle,
+      anchorAt: existing.maintenanceAnchorAt ?? existing.commissionedAt ?? existing.createdAt,
+      lastMaintainedAt: performedAt,
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.deviceInstance.update({
+        where: { id },
+        data: {
+          lastMaintainedAt: performedAt,
+          nextMaintenanceDueAt: nextDueAt,
+        },
+      });
+      await tx.maintenanceEvent.create({
+        data: {
+          tenantId: ctx.tenantId,
+          deviceInstanceId: id,
+          kind: "completed",
+          performedAt,
+          previousDueAt,
+          nextDueAt,
+          cycleMonths: cycle,
+          note: input?.note?.trim() || null,
+          actorUserId: ctx.user.id,
+        },
+      });
+    });
 
     const refreshed = await loadInstance(id, ctx.tenantId);
     if (!refreshed) throw notFound("Device not found.");

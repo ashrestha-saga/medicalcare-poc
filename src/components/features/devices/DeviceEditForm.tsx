@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ExternalLink, Loader2 } from "lucide-react";
 import type { SiteDTO } from "@/interfaces";
 import type { useDeviceEditor } from "@/components/hooks/devices/useDeviceEditor";
+import { UserSelect } from "@/components/features/shared/UserSelect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -197,18 +198,16 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                   data-testid="device-year"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="device-responsible" required>
-                  Responsible person
-                </Label>
-                <Input
-                  id="device-responsible"
-                  value={form.responsiblePerson}
-                  onChange={(e) => form.setResponsiblePerson(e.target.value)}
-                  disabled={form.busy}
-                  data-testid="device-responsible"
-                />
-              </div>
+              <UserSelect
+                id="device-responsible"
+                value={form.responsibleUserId}
+                onChange={form.setResponsibleUserId}
+                roles={["device_admin"]}
+                label="Responsible person"
+                placeholder="Select device administrator"
+                disabled={form.busy}
+                data-testid="device-responsible"
+              />
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -256,10 +255,52 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
               />
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="device-cycle">Maintenance cycle (months)</Label>
+                <Input
+                  id="device-cycle"
+                  type="number"
+                  min={1}
+                  max={120}
+                  value={form.maintenanceCycleMonths}
+                  onChange={(e) => form.setMaintenanceCycleMonths(e.target.value)}
+                  disabled={form.busy}
+                  placeholder="e.g. 12"
+                  data-testid="device-maintenance-cycle"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Next due</Label>
+                <Input
+                  value={
+                    form.detail.nextMaintenanceDueAt
+                      ? new Date(form.detail.nextMaintenanceDueAt).toLocaleDateString("de-DE")
+                      : "—"
+                  }
+                  readOnly
+                  disabled
+                  data-testid="device-next-due"
+                />
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-2 pt-2">
               <Button type="submit" disabled={form.busy} data-testid="device-save">
                 {form.busy && <Loader2 className="h-4 w-4 animate-spin" />}
                 Save
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={
+                  form.busy || form.completingMaintenance || !form.maintenanceCycleMonths.trim()
+                }
+                onClick={() => void form.markMaintenanceDone()}
+                data-testid="device-mark-maintenance-done"
+              >
+                {form.completingMaintenance && <Loader2 className="h-4 w-4 animate-spin" />}
+                Mark maintenance done
               </Button>
               <Button type="button" variant="outline" disabled={form.busy} onClick={form.close}>
                 Cancel

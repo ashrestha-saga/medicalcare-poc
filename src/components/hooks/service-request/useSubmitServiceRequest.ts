@@ -29,6 +29,7 @@ function buildInventarizeOffer(
     room: form.room.trim() || null,
     serialHint: resolution.identifier.serial ?? null,
     commissionedYear: String(new Date().getFullYear()),
+    maintenanceCycleMonths: model.maintenanceCycleMonths ?? null,
   };
 }
 

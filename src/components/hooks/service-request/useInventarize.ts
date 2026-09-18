@@ -13,8 +13,11 @@ import { toast } from "@/store/toastStore";
  */
 export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
   const [serialNumber, setSerialNumber] = useState(offer.serialHint ?? "");
-  const [responsiblePerson, setResponsiblePerson] = useState("");
+  const [responsibleUserId, setResponsibleUserId] = useState<string | null>(null);
   const [commissionedYear, setCommissionedYear] = useState(offer.commissionedYear);
+  const [maintenanceCycleMonths, setMaintenanceCycleMonths] = useState(
+    offer.maintenanceCycleMonths != null ? String(offer.maintenanceCycleMonths) : "",
+  );
   const [duplicate, setDuplicate] = useState<DeviceInstanceDTO | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -62,8 +65,9 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
   const submit = useCallback(async () => {
     const parsed = inventarizeFormSchema.safeParse({
       serialNumber,
-      responsiblePerson,
+      responsibleUserId: responsibleUserId ?? undefined,
       commissionedAt: commissionedYear,
+      maintenanceCycleMonths: maintenanceCycleMonths.trim() || undefined,
     });
     if (!parsed.success) {
       setFieldErrors(zodFieldErrors(parsed.error));
@@ -80,15 +84,19 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
     setError(null);
     setBusy(true);
     try {
+      const cycleRaw = parsed.data.maintenanceCycleMonths?.trim();
+      const cycle =
+        cycleRaw && /^\d+$/.test(cycleRaw) ? Number(cycleRaw) : (offer.maintenanceCycleMonths ?? null);
       const res = await api<{ device: DeviceInstanceDTO }>("/api/devices", {
         method: "POST",
         body: JSON.stringify({
           modelId: offer.modelId,
           serialNumber: parsed.data.serialNumber,
-          responsiblePerson: parsed.data.responsiblePerson?.trim() || null,
+          responsibleUserId: parsed.data.responsibleUserId ?? null,
           areaId: offer.areaId,
           room: offer.room,
           commissionedAt: parsed.data.commissionedAt?.trim() || null,
+          maintenanceCycleMonths: cycle,
         }),
       });
       if (count != null) setCount(count + 1);
@@ -110,12 +118,14 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
     }
   }, [
     serialNumber,
-    responsiblePerson,
+    responsibleUserId,
     commissionedYear,
+    maintenanceCycleMonths,
     duplicate,
     offer.modelId,
     offer.areaId,
     offer.room,
+    offer.maintenanceCycleMonths,
     count,
     setCount,
     onDone,
@@ -127,10 +137,12 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
     locationText: offer.locationText,
     serialNumber,
     setSerialNumber,
-    responsiblePerson,
-    setResponsiblePerson,
+    responsibleUserId,
+    setResponsibleUserId,
     commissionedYear,
     setCommissionedYear,
+    maintenanceCycleMonths,
+    setMaintenanceCycleMonths,
     duplicate,
     checking,
     busy,

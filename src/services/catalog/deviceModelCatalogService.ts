@@ -164,6 +164,7 @@ export const deviceModelCatalogService = {
         gmdnCode: input.gmdnCode ?? null,
         source: input.source ?? "manual",
         state: input.state ?? "draft",
+        maintenanceCycleMonths: input.maintenanceCycleMonths ?? null,
       },
       include: listIncludeForTenant(ctx.tenantId),
     });
@@ -199,6 +200,9 @@ export const deviceModelCatalogService = {
           ...(input.gmdnCode !== undefined ? { gmdnCode: input.gmdnCode } : {}),
           ...(input.source !== undefined ? { source: input.source } : {}),
           ...(input.state !== undefined ? { state: input.state } : {}),
+          ...(input.maintenanceCycleMonths !== undefined
+            ? { maintenanceCycleMonths: input.maintenanceCycleMonths }
+            : {}),
           version: { increment: 1 },
         },
       });
@@ -276,6 +280,9 @@ export const deviceModelCatalogService = {
               ...(row.gmdnCode !== undefined ? { gmdnCode: row.gmdnCode } : {}),
               ...(row.source !== undefined ? { source: row.source } : {}),
               ...(row.state !== undefined ? { state: row.state } : {}),
+              ...(row.maintenanceCycleMonths !== undefined
+                ? { maintenanceCycleMonths: row.maintenanceCycleMonths }
+                : {}),
               version: { increment: 1 },
             },
           });
@@ -295,6 +302,7 @@ export const deviceModelCatalogService = {
               gmdnCode: row.gmdnCode ?? null,
               source: row.source ?? "catalog",
               state: row.state ?? "draft",
+              maintenanceCycleMonths: row.maintenanceCycleMonths ?? null,
             },
           });
           result.created += 1;

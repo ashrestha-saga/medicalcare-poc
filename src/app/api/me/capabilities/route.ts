@@ -8,7 +8,7 @@ export async function GET(req: Request) {
   try {
     const ctx = await requireTenantContext(req);
     correlationId = ctx.correlationId;
-    return Response.json(resolveCapabilities(ctx.user.role), {
+    return Response.json(await resolveCapabilities(ctx.user.role), {
       headers: { "x-correlation-id": ctx.correlationId },
     });
   } catch (error) {

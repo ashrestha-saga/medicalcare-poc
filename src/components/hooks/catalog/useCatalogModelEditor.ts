@@ -25,6 +25,7 @@ function emptyForm(): CatalogModelFormState {
     gmdnCode: "",
     source: "manual",
     state: "draft",
+    maintenanceCycleMonths: "",
   };
 }
 
@@ -62,6 +63,8 @@ export function useCatalogModelEditor(onSaved: (model: CatalogModelDetailDTO) =>
       gmdnCode: model.gmdnCode ?? "",
       source: model.source,
       state: model.state,
+      maintenanceCycleMonths:
+        model.maintenanceCycleMonths != null ? String(model.maintenanceCycleMonths) : "",
     });
     const sw = model.classification?.softwareClass?.toUpperCase() ?? "";
     setAnnex1(Boolean(model.classification?.annex1));
@@ -126,6 +129,12 @@ export function useCatalogModelEditor(onSaved: (model: CatalogModelDetailDTO) =>
         gmdnCode: form.gmdnCode.trim() || null,
         source: form.source,
         state: form.state,
+        maintenanceCycleMonths: (() => {
+          const raw = form.maintenanceCycleMonths.trim();
+          if (!raw) return null;
+          const n = Number(raw);
+          return Number.isFinite(n) ? Math.floor(n) : null;
+        })(),
         classification: {
           annex1,
           annex2,

@@ -20,9 +20,11 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
   const [serialNumber, setSerialNumber] = useState("");
   const [udiDi, setUdiDi] = useState("");
   const [purchaseYear, setPurchaseYear] = useState("");
-  const [responsiblePerson, setResponsiblePerson] = useState("");
+  const [responsibleUserId, setResponsibleUserId] = useState<string | null>(null);
   const [areaId, setAreaId] = useState<string>("");
   const [room, setRoom] = useState("");
+  const [maintenanceCycleMonths, setMaintenanceCycleMonths] = useState("");
+  const [completingMaintenance, setCompletingMaintenance] = useState(false);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -40,9 +42,12 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
     setSerialNumber(device.serialNumber ?? "");
     setUdiDi(device.udiDi ?? "");
     setPurchaseYear(device.commissionedAt ? String(new Date(device.commissionedAt).getUTCFullYear()) : "");
-    setResponsiblePerson(device.responsiblePerson ?? "");
+    setResponsibleUserId(device.responsibleUserId ?? null);
     setAreaId(device.location?.areaId ?? "");
     setRoom(device.location?.room ?? "");
+    setMaintenanceCycleMonths(
+      device.maintenanceCycleMonths != null ? String(device.maintenanceCycleMonths) : "",
+    );
     setFieldErrors({});
   }, []);
 
@@ -75,6 +80,7 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
         });
         return;
       }
+      const cycleRaw = maintenanceCycleMonths.trim();
       const body: UpdateDeviceInput = {
         inventoryNumber: inventoryNumber.trim(),
         serialNumber: serialNumber.trim() || null,
@@ -83,9 +89,10 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
         manufacturer: manufacturer.trim() || null,
         udiDi: udiDi.trim() || null,
         commissionedAt: purchaseYear.trim() || null,
-        responsiblePerson: responsiblePerson.trim() || null,
+        responsibleUserId,
         areaId: areaId || null,
         room: room.trim() || null,
+        maintenanceCycleMonths: cycleRaw === "" ? null : Number(cycleRaw),
       };
       const res = await api<{ device: DeviceInstanceDetailDTO }>(`/api/devices/${detail.id}`, {
         method: "PATCH",
@@ -108,12 +115,31 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
     manufacturer,
     udiDi,
     purchaseYear,
-    responsiblePerson,
+    responsibleUserId,
     areaId,
     room,
+    maintenanceCycleMonths,
     hydrate,
     onSaved,
   ]);
+
+  const markMaintenanceDone = useCallback(async () => {
+    if (!detail) return;
+    setCompletingMaintenance(true);
+    try {
+      const res = await api<{ device: DeviceInstanceDetailDTO }>(
+        `/api/devices/${detail.id}/maintenance-complete`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      toast.success("Maintenance marked done; next due date updated.");
+      hydrate(res.device);
+      onSaved(res.device);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not complete maintenance.");
+    } finally {
+      setCompletingMaintenance(false);
+    }
+  }, [detail, hydrate, onSaved]);
 
   return {
     open,
@@ -135,12 +161,16 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
     setUdiDi,
     purchaseYear,
     setPurchaseYear,
-    responsiblePerson,
-    setResponsiblePerson,
+    responsibleUserId,
+    setResponsibleUserId,
     areaId,
     setAreaId,
     room,
     setRoom,
+    maintenanceCycleMonths,
+    setMaintenanceCycleMonths,
+    completingMaintenance,
+    markMaintenanceDone,
     openEdit,
     close,
     submit,
