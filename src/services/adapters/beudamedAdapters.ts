@@ -191,12 +191,24 @@ export function mapBeudamedToDeviceModel(
   const primaryDi = asString(r.primary_di) ?? asString(r.udiDi) ?? udiDi;
   const basicUdiDi = asString(r.basic_udi_di) ?? asString(r.basicUdiDi);
   const tradeName =
-    asString(r.name) ?? asString(r.brand_name) ?? asString((r.device as Record<string, unknown> | undefined)?.tradeName);
+    asString(r.name) ??
+    asString(r.brand_name) ??
+    asString(r.trade_name) ??
+    asString(r.tradeName) ??
+    asString(r.device_name) ??
+    asString(r.commercial_name) ??
+    asString(r.product_name) ??
+    asString((r.device as Record<string, unknown> | undefined)?.tradeName) ??
+    asString((r.device as Record<string, unknown> | undefined)?.name);
   const modelName =
     asString(r.version_or_model_number) ??
     asString(r.catalog_number) ??
     asString(r.reference) ??
+    asString(r.model_number) ??
+    asString(r.modelName) ??
     asString((r.device as Record<string, unknown> | undefined)?.model);
+  // Prefer a human name; fall back to model number then UDI so requests never show blank.
+  const displayTradeName = tradeName ?? modelName ?? primaryDi;
   const manufacturer =
     asString(r.manufacturer_name) ??
     asString(r.company_name) ??
@@ -213,7 +225,7 @@ export function mapBeudamedToDeviceModel(
     gtins: [primaryDi],
     manufacturer,
     manufacturerSrn,
-    tradeName,
+    tradeName: displayTradeName,
     modelName,
     riskClass,
     emdnCode,

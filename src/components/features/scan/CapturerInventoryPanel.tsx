@@ -6,7 +6,7 @@ import { CapturerInventoryList } from "@/components/features/scan/CapturerInvent
 import { CapturerDeviceRecord } from "@/components/features/scan/CapturerDeviceRecord";
 import { useCapturerInventoryUi } from "@/store/capturerInventoryStore";
 
-/** Full-panel Bestandsverzeichnis opened from the account-bar button. */
+/** Full-panel inventory register opened from the account-bar button. */
 export function CapturerInventoryPanel() {
   const open = useCapturerInventoryUi((s) => s.open);
   const closePanel = useCapturerInventoryUi((s) => s.closePanel);

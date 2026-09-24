@@ -17,7 +17,7 @@ import { InventoryLocationCheck } from "./InventoryLocationCheck";
 function formatFetchedAt(iso: string): string {
   try {
     const d = new Date(iso);
-    return d.toLocaleDateString("de-DE", { day: "numeric", month: "numeric", year: "numeric" });
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "numeric", year: "numeric" });
   } catch {
     return iso.slice(0, 10);
   }
@@ -26,7 +26,7 @@ function formatFetchedAt(iso: string): string {
 /** Stage 2 adopt — inventory miss, article master (local or OXID) knows the model. */
 function CatalogModelView({ resolution, onAdopt, onClose }: CatalogModelViewProps) {
   const model = resolution.model;
-  const title = model?.tradeName ?? model?.modelName ?? "Artikel";
+  const title = model?.tradeName ?? model?.modelName ?? "Article";
   const code = model?.udiDi ?? model?.gtins?.[0] ?? resolution.identifier.udiDi ?? resolution.identifier.gtin ?? null;
   const isOxid = resolution.source.system === "oxid-catalog";
 
@@ -44,7 +44,7 @@ function CatalogModelView({ resolution, onAdopt, onClose }: CatalogModelViewProp
           </div>
         )}
         <p className="p-adopt__status">
-          Artikel aus dem Artikelstamm
+          Article from the article master
           {isOxid ? " · OXID Shop" : ""}
         </p>
       </section>
@@ -56,20 +56,20 @@ function CatalogModelView({ resolution, onAdopt, onClose }: CatalogModelViewProp
           data-testid="source-banner"
           data-source={resolution.source.system}
         >
-          {isOxid ? "OXID Shop · Artikelstamm" : "Artikelstamm (lokal)"}
+          {isOxid ? "OXID Shop · Article master" : "Article master (local)"}
         </div>
 
         <div className="p-lead p-adopt__lead" data-s="catalog" data-testid="catalog-lead">
-          Zu diesem Code ist kein Gerät hinterlegt. Der Artikelstamm kennt das Produkt — für die
-          Serviceanfrage genügt das. Ein Gerätebuch entsteht dadurch nicht.
+          No device is on file for this code. The article master knows the product — that is
+          enough for the service request. An equipment record is not created.
         </div>
 
         <p className="p-ext-note p-adopt__note">
-          UDI-DI identifiziert das Modell, nicht das Exemplar.
+          UDI-DI identifies the model, not the individual unit.
         </p>
 
         <button type="button" className="p-cta p-adopt__cta" onClick={onAdopt} data-testid="adopt-catalog">
-          Für Service übernehmen
+          Continue for service
         </button>
       </div>
     </div>
@@ -112,15 +112,15 @@ function CatalogActionView({ resolution, onService, onParts, onBack, onClose }: 
 /** EXTERNAL DATA — shown first when stage 3 (BEUDAMED / EUDAMED) answers. */
 function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternalViewProps) {
   const model = resolution.model;
-  const title = model?.tradeName ?? model?.modelName ?? "Gerät";
+  const title = model?.tradeName ?? model?.modelName ?? "Device";
   const udi = model?.udiDi ?? resolution.identifier.udiDi ?? resolution.identifier.gtin ?? null;
   const fetched = formatFetchedAt(resolution.source.fetchedAt);
 
   const rows: { label: string; value: string }[] = [
-    model?.manufacturer ? { label: "Hersteller", value: model.manufacturer } : null,
-    model?.riskClass ? { label: "Risikoklasse", value: model.riskClass } : null,
+    model?.manufacturer ? { label: "Manufacturer", value: model.manufacturer } : null,
+    model?.riskClass ? { label: "Risk class", value: model.riskClass } : null,
     model?.emdnCode ? { label: "EMDN", value: model.emdnCode } : null,
-    model?.basicUdiDi ? { label: "Basis-UDI-DI", value: model.basicUdiDi } : null,
+    model?.basicUdiDi ? { label: "Basic UDI-DI", value: model.basicUdiDi } : null,
     model?.gmdnCode ? { label: "GMDN", value: model.gmdnCode } : null,
   ].filter(Boolean) as { label: string; value: string }[];
 
@@ -137,7 +137,7 @@ function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternal
             {model?.manufacturer && <span>{model.manufacturer}</span>}
           </div>
         )}
-        <p className="p-adopt__status">Externe Herstellerdaten</p>
+        <p className="p-adopt__status">External manufacturer data</p>
       </section>
 
       <div className="p-adopt__body">
@@ -147,13 +147,13 @@ function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternal
           data-testid="source-banner"
           data-source="beudamed"
         >
-          BEUDAMED · EUDAMED-Spiegelung
-          {resolution.source.cached ? " · Cache" : ""} · Abgerufen {fetched}
+          BEUDAMED · EUDAMED mirror
+          {resolution.source.cached ? " · Cache" : ""} · Fetched {fetched}
         </div>
 
         <div className="p-lead p-adopt__lead" data-s="catalog" data-testid="beudamed-lead">
-          Der Code ist lokal unbekannt. Herstellerdaten wurden aus dem BEUDAMED-Spiegel
-          (EUDAMED) geladen und können für den Serviceauftrag übernommen werden.
+          The code is unknown locally. Manufacturer data was loaded from the BEUDAMED mirror
+          (EUDAMED) and can be used for the service request.
         </div>
 
         {rows.length > 0 && (
@@ -168,31 +168,30 @@ function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternal
         )}
 
         <p className="p-ext-note p-adopt__note">
-          UDI-DI identifiziert das Modell, nicht das Exemplar. Ein Gerätedatensatz entsteht
-          dadurch nicht.
+          UDI-DI identifies the model, not the individual unit. A device record is not
+          created by this step.
         </p>
 
         <button type="button" className="p-cta p-adopt__cta" onClick={onAdopt} data-testid="continue-service-request">
-          Für Service übernehmen
+          Continue for service
         </button>
       </div>
     </div>
   );
 }
 
-/** Stage 1 — device already in inventory: confirm Einsatzort, then service / parts. */
+/** Stage 1 — device already in inventory: confirm place of use, then service / parts. */
 function InventoryDeviceView({ resolution, onService, onParts, onClose }: InventoryDeviceViewProps) {
   const device = resolution.device!;
-  const proposal = resolution.classificationProposal;
   const siteId = useRequestStore((s) => s.form.siteId);
   const [locError, setLocError] = useState<string | null>(null);
 
   const inv = device.inventoryNumber;
-  const tags = inspectionTagsFromFlags(device.classification ?? proposal ?? null);
+  const tags = inspectionTagsFromFlags(device.classification ?? null);
 
   const goService = () => {
     if (!siteId.trim()) {
-      setLocError("Bitte Standort wählen.");
+      setLocError("Please select a site.");
       return;
     }
     setLocError(null);
@@ -201,7 +200,7 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
 
   const goParts = () => {
     if (!siteId.trim()) {
-      setLocError("Bitte Standort wählen.");
+      setLocError("Please select a site.");
       return;
     }
     setLocError(null);
@@ -223,8 +222,8 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
 
       <div className="p-inv__body">
         <div className="p-lead p-inv__lead" data-s="inventory" data-testid="inventory-lead">
-          <strong>Bereits im Bestandsverzeichnis · {inv}</strong>
-          <span>Nur noch den Einsatzort bestätigen – die Gerätedaten stehen.</span>
+          <strong>Already in inventory · {inv}</strong>
+          <span>Confirm the place of use — the device data is already on file.</span>
         </div>
 
         <InventoryLocationCheck error={locError} />
@@ -240,19 +239,19 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
             </div>
           )}
           <Link href="/devices" className="p-inv__record-link" data-testid="inventory-record-link">
-            Datensatz ansehen →
+            View record →
           </Link>
         </div>
       </div>
 
       <div className="p-two p-inv__actions">
         <button type="button" className="p-big" data-p="1" onClick={goService} data-testid="continue-service-request">
-          <b>Service beauftragen</b>
-          <span>Prüfung, Wartung oder Reparatur beim Servicepartner anfordern</span>
+          <b>Request service</b>
+          <span>Request inspection, maintenance, or repair from the service partner</span>
         </button>
         <button type="button" className="p-big" onClick={goParts} data-testid="open-parts">
-          <b>Ersatzteile bestellen</b>
-          <span>Zum Gerät passende Artikel über plusorder bestellen</span>
+          <b>Order spare parts</b>
+          <span>Order matching articles for this device via plusorder</span>
         </button>
       </div>
     </div>
@@ -263,7 +262,6 @@ export function DeviceScreen() {
   const {
     resolution,
     captured,
-    proposal,
     partsAllowed,
     isCatalogModel,
     isBeudamed,
@@ -323,25 +321,6 @@ export function DeviceScreen() {
           </button>
         }
       />
-
-      {proposal && (
-        <div className="p-lead" data-s="catalog" data-testid="device-proposal">
-          <span className="p-cls-tag" data-c={proposal.confidence === "verified" ? "v" : "d"}>
-            {proposal.confidence}
-          </span>{" "}
-          {[
-            proposal.annex1 && "Annex 1 (STK)",
-            proposal.annex2 && "Annex 2 (MTK)",
-            proposal.softwareClass && `Software ${proposal.softwareClass}`,
-            proposal.radiation && "Radiation",
-          ]
-            .filter(Boolean)
-            .join(" · ") || "No inspection obligations suggested"}
-          <div style={{ marginTop: 6, opacity: 0.85 }}>
-            A suggestion only — you choose and confirm the inspection type in the next step.
-          </div>
-        </div>
-      )}
 
       <div className="p-two">
         <button type="button" className="p-big" data-p="1" onClick={continueToServiceRequest} data-testid="continue-service-request">

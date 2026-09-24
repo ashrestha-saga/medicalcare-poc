@@ -1,20 +1,23 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useUsersList } from "@/components/hooks/users/useUsersList";
+import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { UsersTable } from "./users-table";
 
 /** Superadmin user management — gated by users:* permission slugs. */
 export function UsersScreen() {
+  const t = useTranslations("pages.users");
+  const tCommon = useTranslations("common");
   const list = useUsersList();
 
   if (!list.canView) {
     return (
       <div className="p-work" data-testid="users-denied">
         <main className="p-main">
-          <section className="p-devhead">
-            <h2>Users</h2>
-            <p className="p-requests__sub">You don&apos;t have permission to view users.</p>
-          </section>
+          <ListPageShell title={t("title")} description={tCommon("denied")}>
+            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
+          </ListPageShell>
         </main>
       </div>
     );
@@ -23,16 +26,9 @@ export function UsersScreen() {
   return (
     <div className="p-work" data-testid="users-page">
       <main className="p-main">
-        <div className="p-admin">
-          <section className="p-devhead p-admin__head">
-            <div className="p-admin__head-copy">
-              <h2>Users</h2>
-              <p className="p-requests__sub">Create clinic accounts and assign roles</p>
-            </div>
-          </section>
-
+        <ListPageShell title={t("title")} description={t("description")}>
           <UsersTable list={list} />
-        </div>
+        </ListPageShell>
       </main>
     </div>
   );

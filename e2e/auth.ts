@@ -6,6 +6,7 @@ import { SESSION_COOKIE, buildSessionToken } from "../src/lib/auth/sessionToken"
 const E2E_USER: SessionUser = {
   id: "user-tech-1",
   name: "Anna Technik",
+  accountKind: "clinic",
   role: "device_admin",
   tenantId: "demo-tenant",
 };

@@ -6,7 +6,7 @@ import { IDENTIFIER_KIND_LABELS } from "@/constants/scan";
 import { parseIdentifier } from "@/lib/gs1";
 
 /**
- * Inline “Inventarnummer eingeben” panel (mobile full pane / tablet right pane).
+ * Inline “Enter inventory number” panel (mobile full pane / tablet right pane).
  * Live GS1/GTIN parse feedback while typing (same parser as resolve).
  */
 export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
@@ -28,13 +28,13 @@ export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
   return (
     <div className="p-manualentry" data-testid="manual-entry-panel">
       <div className="p-manualentry-body">
-        <h1 className="p-manualentry-title">Inventarnummer eingeben</h1>
+        <h1 className="p-manualentry-title">Enter inventory number</h1>
         <p className="p-manualentry-lead">
-          Für beschädigte Etiketten, Geräte ohne Barcode oder wenn die Kamera nicht freigegeben ist.
+          For damaged labels, devices without a barcode, or when the camera is not available.
         </p>
 
         <label className="p-manualentry-label" htmlFor="manual-id">
-          Inventar- oder Seriennummer <span className="p-req" aria-hidden="true">*</span>
+          Inventory or serial number <span className="p-req" aria-hidden="true">*</span>
         </label>
         <input
           ref={inputRef}
@@ -85,7 +85,7 @@ export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
 
         <div className="p-actions p-manualentry-actions">
           <button type="button" className="btn-secondary" onClick={onClose} data-testid="manual-entry-cancel">
-            Zurück
+            Back
           </button>
           <button
             type="button"
@@ -94,7 +94,7 @@ export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
             disabled={!value.trim()}
             data-testid="manual-entry-submit"
           >
-            Suchen
+            Search
           </button>
         </div>
       </div>

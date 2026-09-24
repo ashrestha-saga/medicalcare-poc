@@ -12,6 +12,7 @@ const ONE_PIXEL_PNG = Buffer.from(
 const TECH: SessionUser = {
   id: "user-tech-1",
   name: "Anna Technik",
+  accountKind: "clinic",
   role: "device_admin",
   tenantId: "demo-tenant",
 };
@@ -19,6 +20,7 @@ const TECH: SessionUser = {
 const NURSE: SessionUser = {
   id: "user-nurse-1",
   name: "Ben Pflege",
+  accountKind: "clinic",
   role: "user",
   tenantId: "demo-tenant",
 };
@@ -87,7 +89,7 @@ test.describe("AC-E2E-01 — scan → device → service request → reference",
 
     await expect(page.getByTestId("catalog-model-view")).toBeVisible();
     await expect(page.getByTestId("source-banner")).toHaveAttribute("data-source", "catalog");
-    await expect(page.getByTestId("catalog-lead")).toContainText("kein Gerät hinterlegt");
+    await expect(page.getByTestId("catalog-lead")).toContainText("No device is on file");
     await page.getByTestId("adopt-catalog").click();
 
     await expect(page.getByTestId("catalog-action-view")).toBeVisible();

@@ -1,9 +1,10 @@
 import { z } from "zod";
 
-/** Clinic email/password sign-in form + POST /api/auth/login body. */
+/** Clinic or partner email/password sign-in form + POST /api/auth/login body. */
 export const loginSchema = z.object({
   email: z.string().trim().email("Please enter a valid email.").max(200),
   password: z.string().min(1, "Please enter your password.").max(200),
+  door: z.enum(["clinic", "partner"]).default("clinic"),
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;

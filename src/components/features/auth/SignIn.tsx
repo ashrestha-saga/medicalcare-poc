@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import type { SignInProps } from "@/interfaces";
 import { Spinner } from "@/components/ui/Loading";
 import { RequiredMark } from "@/components/ui/RequiredMark";
 import { useSignIn } from "@/components/hooks/auth/useSignIn";
 
-/** Clinic email/password sign-in (OXID is linked later in Settings by superadmin). */
-export function SignIn({ notice }: SignInProps) {
+/** Email/password sign-in — clinic or partner door. */
+export function SignIn({ notice, door = "clinic" }: SignInProps) {
   const {
     email,
     setEmail,
@@ -20,7 +21,9 @@ export function SignIn({ notice }: SignInProps) {
     submitPassword,
     submitTotp,
     backToPassword,
-  } = useSignIn();
+  } = useSignIn(door);
+
+  const isPartner = door === "partner";
 
   return (
     <div className="p-stage">
@@ -45,7 +48,9 @@ export function SignIn({ notice }: SignInProps) {
             <p style={{ marginTop: 6, fontSize: 12.5, color: "var(--on-dark-soft)", lineHeight: 1.55 }}>
               {needs2fa
                 ? "Enter the code from your authenticator app."
-                : "Scan a device, identify it, raise a request."}
+                : isPartner
+                  ? "Partner organisation sign-in — people and clinic contracts."
+                  : "Scan a device, identify it, raise a request."}
             </p>
           </div>
 
@@ -129,9 +134,24 @@ export function SignIn({ notice }: SignInProps) {
           )}
 
           {!needs2fa && (
-            <p style={{ marginTop: 14, fontSize: 11.5, color: "var(--on-dark-soft)", lineHeight: 1.5 }}>
-              Demo: anna@demo.local / demo (device admin) · admin@demo.local / demo (superadmin)
-            </p>
+            <>
+              <p style={{ marginTop: 14, fontSize: 11.5, color: "var(--on-dark-soft)", lineHeight: 1.5 }}>
+                {isPartner
+                  ? "Demo: k.adler@msr.example / demo · j.reinhardt@msr.example / demo"
+                  : "Demo: anna@demo.local / demo (device admin) · admin@demo.local / demo (superadmin)"}
+              </p>
+              <p style={{ marginTop: 10, fontSize: 12, color: "var(--on-dark-soft)" }}>
+                {isPartner ? (
+                  <Link href="/login" data-testid="login-switch-clinic">
+                    Clinic sign-in
+                  </Link>
+                ) : (
+                  <Link href="/login/partner" data-testid="login-switch-partner">
+                    Partner organisation sign-in
+                  </Link>
+                )}
+              </p>
+            </>
           )}
         </div>
       </div>

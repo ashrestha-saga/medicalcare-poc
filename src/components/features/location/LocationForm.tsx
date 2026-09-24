@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { LocationFormProps } from "@/interfaces";
 import { CUSTOM_DELIVERY } from "@/constants/location";
 import { useLocationForm } from "@/components/hooks/location/useLocationForm";
@@ -7,18 +8,20 @@ import { useLocationForm } from "@/components/hooks/location/useLocationForm";
 export { buildLocationText } from "@/components/hooks/location/useLocationForm";
 
 export function LocationForm({ errors }: LocationFormProps) {
+  const t = useTranslations("serviceRequest");
+  const tFilters = useTranslations("filters");
   const { form, patch, sites, site, deliveryOptions, customMode, selectValue, onSelectDelivery } = useLocationForm();
 
   return (
     <>
       <div className="p-sec" data-testid="location-section">
         <p className="p-sec-title">
-          Einsatzort <span className="p-req" aria-hidden="true">*</span>
+          {t("placeOfUse")} <span className="p-req" aria-hidden="true">*</span>
         </p>
         <div className="p-grid2 p-grid2--always">
           <div className="p-field">
             <label htmlFor="loc-site">
-              Standort <span className="p-req" aria-hidden="true">*</span>
+              {t("site")} <span className="p-req" aria-hidden="true">*</span>
             </label>
             <select
               id="loc-site"
@@ -27,7 +30,7 @@ export function LocationForm({ errors }: LocationFormProps) {
               aria-required="true"
               data-testid="site-select"
             >
-              <option value="">Standort wählen…</option>
+              <option value="">{t("selectSite")}</option>
               {sites.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -37,7 +40,7 @@ export function LocationForm({ errors }: LocationFormProps) {
             {errors.site && <p className="p-err">{errors.site}</p>}
           </div>
           <div className="p-field">
-            <label htmlFor="loc-area">Bereich</label>
+            <label htmlFor="loc-area">{t("area")}</label>
             <select
               id="loc-area"
               value={form.areaId}
@@ -45,7 +48,7 @@ export function LocationForm({ errors }: LocationFormProps) {
               disabled={!site}
               data-testid="area-select"
             >
-              <option value="">Bereich wählen…</option>
+              <option value="">{t("selectArea")}</option>
               {site?.areas.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name}
@@ -56,13 +59,13 @@ export function LocationForm({ errors }: LocationFormProps) {
         </div>
         <div className="p-field">
           <label htmlFor="loc-room">
-            Raum <span className="p-req" aria-hidden="true">*</span>
+            {t("room")} <span className="p-req" aria-hidden="true">*</span>
           </label>
           <input
             id="loc-room"
             value={form.room}
             onChange={(e) => patch({ room: e.target.value })}
-            placeholder="Raum — z. B. 3.02"
+            placeholder={t("roomPlaceholder")}
             aria-required="true"
             data-testid="room-input"
           />
@@ -70,23 +73,23 @@ export function LocationForm({ errors }: LocationFormProps) {
         </div>
 
         <div className="p-field">
-          <label htmlFor="loc-access">Zugangshinweis</label>
+          <label htmlFor="loc-access">{t("accessNote")}</label>
           <textarea
             id="loc-access"
             value={form.accessHint}
             onChange={(e) => patch({ accessHint: e.target.value })}
-            placeholder="Pforte, Schlüssel, Öffnungszeiten, Ansprechpartner"
+            placeholder={t("accessPlaceholder")}
             data-testid="access-hint-input"
             rows={3}
           />
-          <p className="p-field-hint">Entscheidet darüber, ob der Techniker das Gerät erreicht.</p>
+          <p className="p-field-hint">{t("accessHint")}</p>
         </div>
       </div>
 
       <div className="p-sec" data-testid="delivery-section">
         <div className="p-field">
           <label htmlFor="delivery-select">
-            Lieferanschrift <span className="p-req" aria-hidden="true">*</span>
+            {t("delivery")} <span className="p-req" aria-hidden="true">*</span>
           </label>
           <select
             id="delivery-select"
@@ -95,13 +98,13 @@ export function LocationForm({ errors }: LocationFormProps) {
             aria-required="true"
             data-testid="delivery-select"
           >
-            <option value="">Lieferanschrift wählen…</option>
+            <option value="">{t("selectDelivery")}</option>
             {deliveryOptions.map((addr) => (
               <option key={addr} value={addr}>
                 {addr}
               </option>
             ))}
-            <option value={CUSTOM_DELIVERY}>Andere Anschrift…</option>
+            <option value={CUSTOM_DELIVERY}>{t("otherAddress")}</option>
           </select>
 
           {(customMode || selectValue === CUSTOM_DELIVERY) && (
@@ -110,7 +113,7 @@ export function LocationForm({ errors }: LocationFormProps) {
               className="p-delivery-custom"
               value={form.deliveryAddress}
               onChange={(e) => patch({ deliveryAddress: e.target.value })}
-              placeholder="Straße, Hausnummer, PLZ Ort — z. B. Warenannahme Haus B"
+              placeholder={tFilters("deliveryPlaceholder")}
               rows={3}
               data-testid="delivery-input"
             />
@@ -121,7 +124,7 @@ export function LocationForm({ errors }: LocationFormProps) {
           )}
 
           {errors.deliveryAddress && <p className="p-err">{errors.deliveryAddress}</p>}
-          <p className="p-field-hint">Ersatzteile gehen an die Warenannahme, nicht an den Einsatzort.</p>
+          <p className="p-field-hint">Spare parts go to goods receiving, not to the place of use.</p>
         </div>
       </div>
     </>

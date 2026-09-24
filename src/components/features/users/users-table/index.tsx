@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { AdminUserDTO } from "@/interfaces";
 import { ApiError } from "@/lib/http/apiClient";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ interface UsersTableProps {
 }
 
 export function UsersTable({ list }: UsersTableProps) {
+  const tFilters = useTranslations("filters");
   const form = useUserForm(() => void list.refresh());
   const reset = useResetPasswordForm(() => undefined);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,7 +104,7 @@ export function UsersTable({ list }: UsersTableProps) {
 
   return (
     <>
-      <div className="space-y-3 px-4 pb-4 sm:px-[18px]" data-testid="users-list">
+      <div className="space-y-3" data-testid="users-list">
         <UsersFilterToolbar
           roleFilter={roleFilter}
           statusFilter={statusFilter}
@@ -127,6 +129,7 @@ export function UsersTable({ list }: UsersTableProps) {
           totalItems={filtered.length}
           getRowId={(row) => row.id}
           emptyMessage="No users found."
+          searchPlaceholder={tFilters("searchUsers")}
           toolbarTrailing={
             list.canCreate ? (
               <Button

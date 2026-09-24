@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { RowSelectionState } from "@tanstack/react-table";
-import { Printer, ScanLine } from "lucide-react";
+import { Printer, Plus, ScanLine } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { DeviceInstanceDTO } from "@/interfaces";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
@@ -23,6 +24,7 @@ interface DevicesTableProps {
 }
 
 export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
+  const tFilters = useTranslations("filters");
   const sites = useSites();
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [siteFilter, setSiteFilter] = useState<string | null>(null);
@@ -86,7 +88,7 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
   }, [selectedDevices]);
 
   return (
-    <div className="space-y-3 px-4 pb-4 sm:px-[18px]" data-testid="devices-list">
+    <div className="space-y-3" data-testid="devices-list">
       <DevicesFilterToolbar
         sites={sites}
         siteFilter={siteFilter}
@@ -110,6 +112,7 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
         totalItems={filtered.length}
         getRowId={(row) => row.id}
         emptyMessage="No devices in this inventory."
+        searchPlaceholder={tFilters("searchDevices")}
         onRowClick={onSelect}
         rowSelection={rowSelection}
         onRowSelectionChange={setRowSelection}
@@ -126,6 +129,14 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
               >
                 <Printer className="h-4 w-4" />
                 Print labels ({selectedDevices.length})
+              </Button>
+            )}
+            {list.canUpdate && (
+              <Button type="button" size="sm" variant="outline" className="h-8" asChild data-testid="devices-erstanlage">
+                <Link href="/registration">
+                  <Plus className="h-4 w-4" />
+                  Registration
+                </Link>
               </Button>
             )}
             <Button type="button" size="sm" className="h-8" asChild data-testid="devices-scan">

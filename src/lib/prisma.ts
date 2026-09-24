@@ -1,14 +1,27 @@
 import { PrismaClient } from "@prisma/client";
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as {
+  prisma?: PrismaClient;
+  prismaSchemaVersion?: string;
+};
 
-// One client per process; hot reload in dev would otherwise open a new connection each time.
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+/** Bump when User/schema fields change so next.dev drops a stale client. */
+const PRISMA_SCHEMA_VERSION = "training-module-v1";
+
+function createClient() {
+  return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
 }
+
+// One client per process; recreate when schema version changes after generate.
+if (
+  !globalForPrisma.prisma ||
+  globalForPrisma.prismaSchemaVersion !== PRISMA_SCHEMA_VERSION
+) {
+  void globalForPrisma.prisma?.$disconnect().catch(() => undefined);
+  globalForPrisma.prisma = createClient();
+  globalForPrisma.prismaSchemaVersion = PRISMA_SCHEMA_VERSION;
+}
+
+export const prisma = globalForPrisma.prisma;

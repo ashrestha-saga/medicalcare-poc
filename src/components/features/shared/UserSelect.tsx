@@ -15,7 +15,7 @@ const NONE = "__none__";
 
 export interface UserSelectProps {
   value: string | null;
-  onChange: (userId: string | null) => void;
+  onChange: (userId: string | null, user?: { id: string; name: string } | null) => void;
   /** Default: device_admin only. */
   roles?: UserRole[];
   active?: boolean | null;
@@ -55,7 +55,14 @@ export function UserSelect({
   const select = (
     <Select
       value={value || NONE}
-      onValueChange={(v) => onChange(v === NONE ? null : v)}
+      onValueChange={(v) => {
+        if (v === NONE) {
+          onChange(null, null);
+          return;
+        }
+        const user = users.find((u) => u.id === v);
+        onChange(v, user ? { id: user.id, name: user.name } : null);
+      }}
       disabled={disabled || loading}
     >
       <SelectTrigger id={id} data-testid={testId} className={className}>

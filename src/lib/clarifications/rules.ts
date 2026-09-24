@@ -34,9 +34,11 @@ export interface ClarificationEvalInput {
   serialNumber: string | null;
   modelName: string | null;
   tradeName: string | null;
-  /** Latest model classification proposal confidence, if any. */
+  /** Instance lifecycle state (draft | review | released | retired). */
+  state: string | null;
+  /** Open model classification confidence, if any. */
   classificationConfidence: string | null;
-  hasClassificationProposal: boolean;
+  hasModelClassification: boolean;
   /** Other inventory numbers sharing this serial (same tenant). */
   duplicateSerialInventoryNumbers: string[];
 }
@@ -44,6 +46,17 @@ export interface ClarificationEvalInput {
 /** Pure rules — keep in sync with Klärliste product rules. */
 export function evaluateClarificationIssues(input: ClarificationEvalInput): ClarificationIssue[] {
   const issues: ClarificationIssue[] = [];
+
+  const state = input.state?.trim().toLowerCase() ?? "";
+  if (state && state !== "released" && state !== "retired") {
+    issues.push(
+      issue(
+        "not_released",
+        state === "review" ? "Not yet released (under review)" : "Not yet released (draft)",
+        "medium",
+      ),
+    );
+  }
 
   if (!input.responsibleUserId?.trim() && !input.responsiblePerson?.trim()) {
     issues.push(issue("missing_responsible", "Responsible person missing", "low"));
@@ -53,7 +66,7 @@ export function evaluateClarificationIssues(input: ClarificationEvalInput): Clar
     issues.push(issue("missing_maintenance_cycle", "Maintenance cycle missing", "medium"));
   }
 
-  if (!input.hasClassificationProposal) {
+  if (!input.hasModelClassification) {
     issues.push(issue("missing_classification", "No classification on model", "medium"));
   } else {
     const conf = input.classificationConfidence?.toLowerCase() ?? "";

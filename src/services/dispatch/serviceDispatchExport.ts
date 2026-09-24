@@ -40,22 +40,6 @@ export function splitLocationText(
 export function herkunftLabel(source: ServiceDispatchArticle["source"]): string {
   switch (source) {
     case "inventory":
-      return "Gerätebestand";
-    case "catalog":
-    case "oxid-catalog":
-      return "Artikelstamm (GTIN/UDI)";
-    case "beudamed":
-      return "BEUDAMED · EUDAMED-Spiegelung";
-    case "manual":
-      return "Manuell erfasst";
-    default:
-      return "Unbekannt";
-  }
-}
-
-export function herkunftLabelEn(source: ServiceDispatchArticle["source"]): string {
-  switch (source) {
-    case "inventory":
       return "Equipment inventory";
     case "catalog":
     case "oxid-catalog":
@@ -67,6 +51,11 @@ export function herkunftLabelEn(source: ServiceDispatchArticle["source"]): strin
     default:
       return "Unknown";
   }
+}
+
+/** @deprecated Use herkunftLabel — kept as alias for call sites that previously used EN-only. */
+export function herkunftLabelEn(source: ServiceDispatchArticle["source"]): string {
+  return herkunftLabel(source);
 }
 
 function escapeHtml(value: string): string {
@@ -105,13 +94,13 @@ function classificationNote(
 ): { confirmed: boolean; note: string | null } {
   const confirmed = Boolean(request.classification?.confirmed);
   if (!article.name && !article.number) {
-    return { confirmed, note: "keine Modelldaten" };
+    return { confirmed, note: "no model data" };
   }
   if (request.classification?.overridden) {
-    return { confirmed, note: "Vorschlag überschrieben" };
+    return { confirmed, note: "suggestion overridden" };
   }
   if (request.classification?.proposed && !confirmed) {
-    return { confirmed, note: "Vorschlag nicht bestätigt" };
+    return { confirmed, note: "suggestion not confirmed" };
   }
   return { confirmed, note: null };
 }
@@ -457,31 +446,31 @@ export function formatServiceRequestEmail(
   to: string,
   ctx: ServiceDispatchContext = {},
 ): ServiceDispatchEmail {
-  const subject = `Serviceanforderung ${exportBody.reference} — ${exportBody.service}`;
-  const einsatzort = [exportBody.site, exportBody.area, exportBody.room].filter(Boolean).join(" · ") || DASH;
+  const subject = `Service request ${exportBody.reference} — ${exportBody.service}`;
+  const placeOfUse = [exportBody.site, exportBody.area, exportBody.room].filter(Boolean).join(" · ") || DASH;
   const kunde = formatKundeLine(ctx);
 
   const body = [
-    `Gerät:  ${dash(exportBody.deviceName)}`,
-    `Kennung:      ${dash(exportBody.deviceCode)}`,
+    `Device:  ${dash(exportBody.deviceName)}`,
+    `Identifier:      ${dash(exportBody.deviceCode)}`,
     ...(exportBody.inventoryNumber || exportBody.serialNumber
       ? [
-          `Inventarnummer: ${dash(exportBody.inventoryNumber)}`,
-          `Seriennummer:   ${dash(exportBody.serialNumber)}`,
+          `Inventory No.: ${dash(exportBody.inventoryNumber)}`,
+          `Serial No.:   ${dash(exportBody.serialNumber)}`,
         ]
       : []),
-    `Standort:     ${exportBody.location == null ? "null" : dash(exportBody.location)}`,
-    `Leistung:     ${exportBody.service}`,
-    `Hinweis:    ${dash(exportBody.note)}`,
-    `Kunde:    ${kunde}`,
-    `Melder:      ${dash(exportBody.raisedBy)}`,
-    `Herkunft:  ${herkunftLabel(exportBody.article.source)}`,
-    `Artikel:    ${dash(exportBody.article.name)}`,
-    `Hersteller:   ${dash(exportBody.article.manufacturer)}`,
-    `Nummer:  ${dash(exportBody.article.number)}`,
-    `Einsatzort:  ${einsatzort}`,
-    `Zugangshinweis: ${dash(exportBody.accessHint)}`,
-    `Lieferanschrift: ${dash(exportBody.deliveryAddress)}`,
+    `Location:     ${exportBody.location == null ? "null" : dash(exportBody.location)}`,
+    `Service:     ${exportBody.service}`,
+    `Note:    ${dash(exportBody.note)}`,
+    `Customer:    ${kunde}`,
+    `Reporter:      ${dash(exportBody.raisedBy)}`,
+    `Origin:  ${herkunftLabel(exportBody.article.source)}`,
+    `Item:    ${dash(exportBody.article.name)}`,
+    `Manufacturer:   ${dash(exportBody.article.manufacturer)}`,
+    `Number:  ${dash(exportBody.article.number)}`,
+    `Place of use:  ${placeOfUse}`,
+    `Access note: ${dash(exportBody.accessHint)}`,
+    `Delivery address: ${dash(exportBody.deliveryAddress)}`,
   ].join("\n");
 
   return {

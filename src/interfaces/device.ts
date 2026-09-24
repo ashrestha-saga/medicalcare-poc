@@ -1,3 +1,5 @@
+import type { DeviceDutyDTO } from "./registration";
+
 export type DeviceModelSource = "manual" | "catalog" | "beudamed";
 
 export interface DeviceModelDTO {
@@ -38,6 +40,13 @@ export interface DeviceInstanceDTO {
   modelName: string | null;
   tradeName: string | null;
   modelId: string | null;
+  /** Instance lifecycle: draft | review | released | retired */
+  state: "draft" | "review" | "released" | "retired";
+  /**
+   * Linked catalog model state (`draft` | `review` | `released`).
+   * While not `released`, inventory row is pending catalog review (fade + lock edit).
+   */
+  modelState: "draft" | "review" | "released" | null;
   location: DeviceLocationDTO | null;
   commissionedAt: string | null;
   responsiblePerson: string | null;
@@ -60,9 +69,11 @@ export interface DeviceInstanceDTO {
   } | null;
   /**
    * Display tags for capturer inventory (STK / MTK / StrSchV / …)
-   * from confirmed instance classification or latest model proposal.
+   * from open model classification on the linked DeviceModel.
    */
   inspectionTags: string[];
+  /** True when linked catalog model is not yet released. */
+  catalogPending: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -91,9 +102,13 @@ export interface DeviceInstanceDetailDTO extends DeviceInstanceDTO {
   modelState: DeviceModelDTO["state"] | null;
   /** Model default cycle (for reference / inventarize hints). */
   modelMaintenanceCycleMonths: number | null;
-  /** Always from the linked model (proposal/rules) — not editable on the instance. */
+  /** Always from the linked model (open DeviceModelClassification) — not editable on the instance. */
   modelClassification: ModelClassificationDTO | null;
   course: DeviceCourseEventDTO[];
+  /** Open (unsuspended) duties from the latest release snapshot. */
+  duties: DeviceDutyDTO[];
+  /** Earliest applicable duty dueAt — not the Wartung-only nextMaintenanceDueAt. */
+  nextObligationDueAt: string | null;
 }
 
 export type CapturedNumberType = "gtin" | "pzn" | "manufacturer" | "none";

@@ -7,6 +7,8 @@ export const AUTH_ROUTES = ["/login"] as const;
 
 export const AUTH_HOME = "/";
 
+export const PARTNER_HOME = "/partner";
+
 /**
  * Paths that skip route-level permission checks inside the authenticated shell.
  * Login is outside the shell; keep `/login` for edge middleware later.
@@ -19,4 +21,8 @@ export function isAuthRoute(pathname: string): boolean {
 
 export function isAlwaysAllowPath(pathname: string): boolean {
   return ALWAYS_ALLOW_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+export function isPartnerAppPath(pathname: string): boolean {
+  return pathname === PARTNER_HOME || pathname.startsWith(`${PARTNER_HOME}/`);
 }

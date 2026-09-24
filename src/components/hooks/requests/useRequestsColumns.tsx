@@ -3,11 +3,13 @@
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronsUpDown, Eye } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import type { ServiceRequestDTO } from "@/interfaces";
-import { formatWhen, stateTone } from "@/components/hooks/requests";
+import { formatWhen, serviceRequestStateBadge } from "@/components/hooks/requests";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { AppLocale } from "@/lib/locale";
 
 function SortHeader({
   label,
@@ -29,44 +31,84 @@ function SortHeader({
   );
 }
 
-function stateBadgeVariant(state: string): "success" | "warning" | "secondary" | "outline" {
-  const tone = stateTone(state);
-  if (tone === "done") return "success";
-  if (tone === "work") return "warning";
-  if (tone === "open") return "outline";
-  return "secondary";
-}
-
 export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void): ColumnDef<ServiceRequestDTO>[] {
+  const locale = useLocale() as AppLocale;
+  const t = useTranslations("table.requests");
+  const tTable = useTranslations("table");
+  const tStatus = useTranslations("status");
+
   return useMemo(
     () => [
       {
         accessorKey: "reference",
         id: "reference",
-        header: ({ column }) => <SortHeader label="Reference" column={column} />,
+        header: ({ column }) => <SortHeader label={t("reference")} column={column} />,
         cell: ({ row }) => <span className="font-medium text-foreground">{row.original.reference}</span>,
+      },
+      {
+        id: "device",
+        accessorFn: (row) => row.deviceName ?? row.inventoryNumber ?? row.subjectId,
+        header: ({ column }) => <SortHeader label={t("device")} column={column} />,
+        cell: ({ row }) => {
+          const name = row.original.deviceName?.trim() || row.original.subjectId;
+          const inv = row.original.inventoryNumber?.trim();
+          return (
+            <div>
+              <p className="font-medium text-foreground">{name}</p>
+              <p className="text-xs text-muted-foreground">{inv || "—"}</p>
+            </div>
+          );
+        },
       },
       {
         accessorKey: "serviceType",
         id: "serviceType",
-        header: ({ column }) => <SortHeader label="Service" column={column} />,
+        header: ({ column }) => <SortHeader label={t("service")} column={column} />,
         cell: ({ row }) => row.original.serviceType,
       },
       {
-        accessorKey: "priority",
-        id: "priority",
-        header: ({ column }) => <SortHeader label="Priority" column={column} />,
-        cell: ({ row }) => row.original.priority ?? "—",
+        id: "allocatedTo",
+        accessorFn: (row) => row.executorOrg?.name ?? "",
+        header: ({ column }) => <SortHeader label={t("allocatedTo")} column={column} />,
+        cell: ({ row }) => {
+          const org = row.original.executorOrg;
+          if (!org) return <span className="text-muted-foreground">—</span>;
+          return (
+            <div>
+              <p className="text-foreground">{org.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {org.kind === "internal" ? "in-house" : org.kind === "external" ? "external" : org.code}
+              </p>
+            </div>
+          );
+        },
       },
       {
         accessorKey: "state",
         id: "state",
-        header: ({ column }) => <SortHeader label="Status" column={column} />,
-        cell: ({ row }) => (
-          <Badge variant={stateBadgeVariant(row.original.state)} data-tone={stateTone(row.original.state)}>
-            {row.original.state}
-          </Badge>
-        ),
+        header: ({ column }) => <SortHeader label={t("status")} column={column} />,
+        cell: ({ row }) => {
+          const badge = serviceRequestStateBadge(row.original.state);
+          const state = row.original.state;
+          const known =
+            state === "captured" ||
+            state === "queued" ||
+            state === "transmitted" ||
+            state === "acknowledged" ||
+            state === "in_progress" ||
+            state === "completed" ||
+            state === "rejected";
+          const label = known ? tStatus(state) : badge.label;
+          return (
+            <Badge
+              variant={badge.variant}
+              className={badge.className}
+              data-tone={badge.tone}
+            >
+              {label}
+            </Badge>
+          );
+        },
         filterFn: (row, _id, value: string[]) => {
           if (!value?.length) return true;
           return value.includes(row.original.state);
@@ -75,13 +117,13 @@ export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void)
       {
         accessorKey: "raisedBy",
         id: "raisedBy",
-        header: ({ column }) => <SortHeader label="Raised by" column={column} />,
+        header: ({ column }) => <SortHeader label={t("raisedBy")} column={column} />,
         cell: ({ row }) => row.original.raisedBy ?? "—",
       },
       {
         accessorKey: "locationText",
         id: "location",
-        header: ({ column }) => <SortHeader label="Location" column={column} />,
+        header: ({ column }) => <SortHeader label={t("location")} column={column} />,
         cell: ({ row }) => (
           <span className="max-w-[220px] truncate text-muted-foreground" title={row.original.locationText}>
             {row.original.locationText}
@@ -91,16 +133,16 @@ export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void)
       {
         accessorKey: "createdAt",
         id: "createdAt",
-        header: ({ column }) => <SortHeader label="Created" column={column} />,
+        header: ({ column }) => <SortHeader label={t("created")} column={column} />,
         cell: ({ row }) => (
-          <span className="whitespace-nowrap text-muted-foreground">{formatWhen(row.original.createdAt)}</span>
+          <span className="whitespace-nowrap text-muted-foreground">{formatWhen(row.original.createdAt, locale)}</span>
         ),
       },
       {
         id: "actions",
         enableHiding: false,
         enableSorting: false,
-        header: () => <span className="sr-only">Actions</span>,
+        header: () => <span className="sr-only">{tTable("actions")}</span>,
         meta: { className: "w-[1%] whitespace-nowrap text-right" },
         cell: ({ row }) => {
           const request = row.original;
@@ -116,13 +158,13 @@ export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void)
                       className="h-8 gap-1.5"
                       onClick={() => onOpen(request)}
                       data-testid="request-open"
-                      aria-label={`Open ${request.reference}`}
+                      aria-label={`${tTable("open")} ${request.reference}`}
                     >
                       <Eye className="h-3.5 w-3.5" />
-                      Open
+                      {tTable("open")}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Open request</TooltipContent>
+                  <TooltipContent>{tTable("open")}</TooltipContent>
                 </Tooltip>
               </div>
             </TooltipProvider>
@@ -130,6 +172,6 @@ export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void)
         },
       },
     ],
-    [onOpen],
+    [locale, onOpen, t, tTable, tStatus],
   );
 }

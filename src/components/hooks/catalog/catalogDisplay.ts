@@ -1,5 +1,7 @@
 import type { CatalogClassificationOption, CatalogClassificationSummary, CatalogModelListItemDTO } from "@/interfaces";
 
+type ClassifyT = (key: string) => string;
+
 export function catalogShortId(id: string): string {
   if (id.startsWith("model-")) return id.replace(/^model-/, "M-").toUpperCase().slice(0, 12);
   return id.slice(0, 8).toUpperCase();
@@ -17,37 +19,38 @@ export function catalogGmdnEmdn(model: { gmdnCode: string | null; emdnCode: stri
 
 export function catalogClassificationOptions(
   classification: CatalogClassificationSummary | null | undefined,
+  t: ClassifyT,
 ): CatalogClassificationOption[] {
   const sw = classification?.softwareClass?.toUpperCase() ?? "";
   return [
     {
       id: "annex1",
-      title: "Annex 1 MPBetreibV — safety-related inspection",
-      description: "STK obligation · typically 24 months (operator may set shorter)",
+      title: t("annex1Title"),
+      description: t("annex1Description"),
       checked: Boolean(classification?.annex1),
     },
     {
       id: "annex2",
-      title: "Annex 2 — measuring function",
-      description: "MTK · calibration / metrology checks as applicable",
+      title: t("annex2Title"),
+      description: t("annex2Description"),
       checked: Boolean(classification?.annex2),
     },
     {
       id: "softwareIIb",
-      title: "Software class IIb",
-      description: "IEC 62304 · risk class for medical device software",
+      title: t("softwareIIbTitle"),
+      description: t("softwareIIbDescription"),
       checked: sw === "IIB",
     },
     {
       id: "softwareC",
-      title: "Software class C",
-      description: "IEC 62304 class C · highest software safety class",
+      title: t("softwareCTitle"),
+      description: t("softwareCDescription"),
       checked: sw === "C",
     },
     {
       id: "radiation",
-      title: "Radiation (StrlSchV)",
-      description: "Radiation protection ordinance applies to this device type",
+      title: t("radiationTitle"),
+      description: t("radiationDescription"),
       checked: Boolean(classification?.radiation),
     },
   ];

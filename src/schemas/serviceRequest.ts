@@ -1,26 +1,7 @@
 import { z } from "zod";
 import { INSPECTION_TYPE_CODES, PRIORITIES } from "@/constants/inspectionTypes";
 
-const softwareClassSchema = z.enum(["IIb", "III", "C", "D"]).nullable();
-
-export const classificationProposalSchema = z.object({
-  annex1: z.boolean().nullable(),
-  annex2: z.boolean().nullable(),
-  softwareClass: softwareClassSchema,
-  radiation: z.boolean().nullable(),
-  confidence: z.enum(["verified", "derived", "guess"]),
-  source: z.string().max(500),
-  ruleId: z.string().optional(),
-});
-
-export const classificationSubmissionSchema = z.object({
-  proposed: classificationProposalSchema.nullable(),
-  selected: z.array(z.number().int().min(0).max(50)).max(50),
-  confirmed: z.boolean(),
-  overridden: z.boolean(),
-});
-
-const MAX_DATA_URL_BYTES = 1_500_000; // ~1.5 MB — a 1600px JPEG is far below this (NFA-803)
+const MAX_DATA_URL_BYTES = 1_500_000;
 
 export const attachmentInputSchema = z.object({
   kind: z.enum(["nameplate", "fault_photo"]),
@@ -53,10 +34,15 @@ export const createServiceRequestSchema = z.object({
   accessHint: z.string().trim().max(300).optional(),
   contact: z.string().trim().max(200).optional(),
   deliveryAddress: z.string().trim().min(1, "Please enter the delivery address.").max(500),
-  classification: classificationSubmissionSchema.optional(),
   attachments: z.array(attachmentInputSchema).max(6).optional(),
   raisedBy: z.string().trim().min(1).max(200),
   correlationId: z.string().trim().max(64).optional(),
+  /** FA-710 — due_date | app */
+  source: z.enum(["due_date", "app"]).optional(),
+  /** Link to frozen duty when created from a Fälligkeit. */
+  dutyId: z.string().trim().min(1).max(100).nullable().optional(),
+  /** Skip auto-dispatch so allocate → transmit can run (FA-713/714). */
+  deferDispatch: z.boolean().optional(),
 });
 
 export type CreateServiceRequestInput = z.infer<typeof createServiceRequestSchema>;
@@ -71,13 +57,18 @@ export const statusFeedbackSchema = z.object({
 
 export type StatusFeedbackInput = z.infer<typeof statusFeedbackSchema>;
 
-/** In-app technician transitions (DeviceCare is system of record for clinic-side work). */
 export const transitionServiceRequestSchema = z.object({
   state: z.enum(["in_progress", "completed"]),
   note: z.string().trim().max(2000).optional(),
 });
 
 export type TransitionServiceRequestInput = z.infer<typeof transitionServiceRequestSchema>;
+
+export const allocateServiceRequestSchema = z.object({
+  executorOrgId: z.string().trim().min(1, "Please choose an executor."),
+});
+
+export type AllocateServiceRequestInput = z.infer<typeof allocateServiceRequestSchema>;
 
 export const serviceRequestListScopeSchema = z.enum(["mine", "open", "all"]);
 export type ServiceRequestListScope = z.infer<typeof serviceRequestListScopeSchema>;

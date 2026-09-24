@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import type {
   CatalogModelDetailDTO,
   CatalogModelImportResult,
@@ -12,6 +13,7 @@ import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { toast } from "@/store/toastStore";
 
 export function useCatalogModels() {
+  const t = useTranslations("pages.catalog");
   const { checkPermission } = usePermissions();
   const canView = checkPermission("catalog:view");
   const canUpdate = checkPermission("catalog:update");
@@ -35,13 +37,13 @@ export function useCatalogModels() {
         const res = await api<{ models: CatalogModelListItemDTO[] }>(`/api/catalog/models${qs}`);
         setModels(res.models);
       } catch (err) {
-        toast.error(err instanceof ApiError ? err.message : "Could not load model catalog.");
+        toast.error(err instanceof ApiError ? err.message : t("toastLoadCatalogFailed"));
         setModels([]);
       } finally {
         setLoading(false);
       }
     },
-    [canView, q],
+    [canView, q, t],
   );
 
   useEffect(() => {
@@ -50,18 +52,21 @@ export function useCatalogModels() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount / gate fetch
   }, [canView]);
 
-  const selectModelById = useCallback(async (id: string) => {
-    setDetailLoading(true);
-    try {
-      const res = await api<{ model: CatalogModelDetailDTO }>(`/api/catalog/models/${id}`);
-      setSelected(res.model);
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Could not load model.");
-      setSelected(null);
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+  const selectModelById = useCallback(
+    async (id: string) => {
+      setDetailLoading(true);
+      try {
+        const res = await api<{ model: CatalogModelDetailDTO }>(`/api/catalog/models/${id}`);
+        setSelected(res.model);
+      } catch (err) {
+        toast.error(err instanceof ApiError ? err.message : t("toastLoadModelFailed"));
+        setSelected(null);
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [t],
+  );
 
   const selectModel = useCallback(
     async (model: CatalogModelListItemDTO) => {
@@ -82,22 +87,25 @@ export function useCatalogModels() {
         method: "POST",
         body: JSON.stringify(input),
       });
-      toast.success("Model created.");
+      toast.success(t("toastModelCreated"));
       await refresh();
       return res.model;
     },
-    [refresh],
+    [refresh, t],
   );
 
-  const update = useCallback(async (id: string, input: CatalogModelWriteDTO) => {
-    const res = await api<{ model: CatalogModelDetailDTO }>(`/api/catalog/models/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(input),
-    });
-    toast.success("Model updated.");
-    applyUpdated(res.model);
-    return res.model;
-  }, [applyUpdated]);
+  const update = useCallback(
+    async (id: string, input: CatalogModelWriteDTO) => {
+      const res = await api<{ model: CatalogModelDetailDTO }>(`/api/catalog/models/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      });
+      toast.success(t("toastModelUpdated"));
+      applyUpdated(res.model);
+      return res.model;
+    },
+    [applyUpdated, t],
+  );
 
   const importFile = useCallback(
     async (file: File) => {
@@ -108,11 +116,11 @@ export function useCatalogModels() {
         body,
       });
       const { created, updated, skipped } = res.result;
-      toast.success(`Import finished: ${created} created, ${updated} updated, ${skipped} skipped.`);
+      toast.success(t("toastImportFinished", { created, updated, skipped }));
       await refresh();
       return res.result;
     },
-    [refresh],
+    [refresh, t],
   );
 
   return {

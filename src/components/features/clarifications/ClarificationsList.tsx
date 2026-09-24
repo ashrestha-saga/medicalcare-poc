@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { ClarificationItemDTO, ClarificationSeverity, ClarificationSummaryDTO } from "@/interfaces";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,36 +56,38 @@ export function ClarificationsList({
   canEdit,
   onEdit,
 }: ClarificationsListProps) {
+  const t = useTranslations("pages.clarifications");
+
   return (
-    <div className="space-y-4 px-4 pb-6 sm:px-[18px]" data-testid="clarifications-list">
+    <div className="space-y-4" data-testid="clarifications-list">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard
           value={summary.openCases}
-          label="Open cases"
-          hint="Devices with at least one issue"
+          label={t("openCases")}
+          hint={t("openCasesHint")}
         />
         <SummaryCard
           value={summary.duplicates}
-          label="Possible duplicates"
-          hint="Same serial on another unit"
+          label={t("duplicates")}
+          hint={t("duplicatesHint")}
         />
         <SummaryCard
           value={summary.derivedClassification}
-          label="Derived classification"
-          hint="Not verified on the model"
+          label={t("derived")}
+          hint={t("derivedHint")}
         />
         <SummaryCard
           value={summary.missingResponsible}
-          label="Missing responsible"
-          hint="No device administrator linked"
+          label={t("missingResponsible")}
+          hint={t("missingResponsibleHint")}
         />
       </div>
 
       {loading ? (
-        <p className="py-8 text-sm text-muted-foreground">Loading clarifications…</p>
+        <p className="py-8 text-sm text-muted-foreground">{t("loading")}</p>
       ) : items.length === 0 ? (
         <p className="rounded-md border border-border bg-card/40 px-4 py-8 text-center text-sm text-muted-foreground">
-          No clarification items — inventory records look complete.
+          {t("empty")}
         </p>
       ) : (
         <ul className="space-y-3">
@@ -125,7 +128,7 @@ export function ClarificationsList({
                   <p className="text-sm text-amber-800 dark:text-amber-300">{item.reasonText}</p>
                   {item.sourceLabel && (
                     <p className="text-[11px] text-muted-foreground">
-                      Model source: {item.sourceLabel}
+                      {t("modelSource", { source: item.sourceLabel })}
                     </p>
                   )}
                 </div>
@@ -138,7 +141,7 @@ export function ClarificationsList({
                   onClick={() => onEdit(item)}
                   data-testid="clarification-edit"
                 >
-                  Edit
+                  {t("edit")}
                 </Button>
               )}
             </li>
@@ -147,8 +150,7 @@ export function ClarificationsList({
       )}
 
       <div className="rounded-md border border-border border-l-4 border-l-[var(--accent)] bg-card/40 px-4 py-3 text-sm text-muted-foreground">
-        Fix missing fields and duplicates here or in Inventory. Classification quality is maintained on
-        the linked catalog model.
+        {t("footer")}
       </div>
     </div>
   );

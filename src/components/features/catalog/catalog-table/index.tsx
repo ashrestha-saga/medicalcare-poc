@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { FileSpreadsheet, Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { CatalogTableProps } from "@/interfaces";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
@@ -11,6 +12,7 @@ import { CatalogImportDialog } from "../CatalogImportDialog";
 import { CatalogModelFormDialog } from "../CatalogModelFormDialog";
 
 export function CatalogTable({ list, onSelect, onEdit }: CatalogTableProps) {
+  const tFilters = useTranslations("filters");
   const table = useCatalogTable(list);
 
   const columns = useCatalogColumns({
@@ -63,7 +65,7 @@ export function CatalogTable({ list, onSelect, onEdit }: CatalogTableProps) {
         getRowId={(row) => row.id}
         onRowClick={onSelect}
         displayPagination
-        searchPlaceholder="Model, manufacturer, basic UDI-DI…"
+        searchPlaceholder={tFilters("searchCatalog")}
       />
 
       <CatalogModelFormDialog

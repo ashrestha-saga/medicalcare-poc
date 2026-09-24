@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useTranslations } from "next-intl";
 import type {
   CatalogModelDetailDTO,
   CatalogModelFormState,
@@ -31,6 +32,7 @@ function emptyForm(): CatalogModelFormState {
 
 /** Full-page edit for a catalog model (inventory-style, not a modal). */
 export function useCatalogModelEditor(onSaved: (model: CatalogModelDetailDTO) => void) {
+  const t = useTranslations("pages.catalog");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -82,13 +84,13 @@ export function useCatalogModelEditor(onSaved: (model: CatalogModelDetailDTO) =>
         const res = await api<{ model: CatalogModelDetailDTO }>(`/api/catalog/models/${model.id}`);
         hydrate(res.model);
       } catch (err) {
-        toast.error(err instanceof ApiError ? err.message : "Could not load model.");
+        toast.error(err instanceof ApiError ? err.message : t("toastLoadModelFailed"));
         setOpen(false);
       } finally {
         setLoading(false);
       }
     },
-    [hydrate],
+    [hydrate, t],
   );
 
   const setField = useCallback(<K extends keyof CatalogModelFormState>(key: K, value: CatalogModelFormState[K]) => {
@@ -146,16 +148,16 @@ export function useCatalogModelEditor(onSaved: (model: CatalogModelDetailDTO) =>
         method: "PATCH",
         body: JSON.stringify(body),
       });
-      toast.success("Model updated.");
+      toast.success(t("toastModelUpdated"));
       hydrate(res.model);
       onSaved(res.model);
       setOpen(false);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Save failed.");
+      toast.error(err instanceof ApiError ? err.message : t("toastSaveFailed"));
     } finally {
       setBusy(false);
     }
-  }, [annex1, annex2, detail, form, hydrate, onSaved, radiation, softwareC, softwareIIb]);
+  }, [annex1, annex2, detail, form, hydrate, onSaved, radiation, softwareC, softwareIIb, t]);
 
   return {
     open,

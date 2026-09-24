@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronsUpDown, Eye, Pencil } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { CatalogBadgeDisplay, CatalogModelListItemDTO, CatalogTableActions } from "@/interfaces";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,13 +94,15 @@ export function catalogClassificationBadges(model: CatalogModelListItemDTO): Cat
 
 export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<CatalogModelListItemDTO>[] {
   const { canUpdate, onOpen, onEdit } = actions;
+  const t = useTranslations("table.catalog");
+  const tTable = useTranslations("table");
 
   return useMemo(
     () => [
       {
         accessorKey: "state",
         id: "status",
-        header: ({ column }) => <SortHeader label="Status" column={column} />,
+        header: ({ column }) => <SortHeader label={t("status")} column={column} />,
         cell: ({ row }) => {
           const badge = catalogStateBadge(row.original.state);
           return <Badge variant={badge.variant}>{badge.label}</Badge>;
@@ -108,7 +111,7 @@ export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<Catal
       {
         id: "model",
         accessorFn: (row) => row.displayName,
-        header: ({ column }) => <SortHeader label="Model" column={column} />,
+        header: ({ column }) => <SortHeader label={t("model")} column={column} />,
         cell: ({ row }) => {
           const m = row.original;
           const meta = [catalogShortId(m.id), m.manufacturer, `v${m.version}`].filter(Boolean).join(" · ");
@@ -123,7 +126,7 @@ export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<Catal
       {
         id: "classification",
         enableSorting: false,
-        header: () => <span className="text-xs font-medium text-muted-foreground">Classification</span>,
+        header: () => <span className="text-xs font-medium text-muted-foreground">{t("classification")}</span>,
         cell: ({ row }) => {
           const badges = catalogClassificationBadges(row.original);
           if (!badges.length) return <span className="text-muted-foreground">—</span>;
@@ -141,7 +144,7 @@ export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<Catal
       {
         id: "source",
         accessorKey: "source",
-        header: ({ column }) => <SortHeader label="Source" column={column} />,
+        header: ({ column }) => <SortHeader label={t("source")} column={column} />,
         cell: ({ row }) => {
           const badge = catalogSourceBadge(row.original.source);
           return (
@@ -154,7 +157,7 @@ export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<Catal
       {
         id: "confidence",
         accessorFn: (row) => row.classification?.confidence ?? "",
-        header: ({ column }) => <SortHeader label="Confidence" column={column} />,
+        header: ({ column }) => <SortHeader label={t("confidence")} column={column} />,
         cell: ({ row }) => {
           const badge = catalogConfidenceBadge(row.original.classification?.confidence);
           if (!badge) return <span className="text-muted-foreground">—</span>;
@@ -168,7 +171,7 @@ export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<Catal
       {
         id: "gtin",
         accessorKey: "gtinCoverage",
-        header: ({ column }) => <SortHeader label="GTIN" column={column} />,
+        header: ({ column }) => <SortHeader label={t("gtin")} column={column} />,
         cell: ({ row }) => {
           const value = row.original.gtinCoverage;
           const color =
@@ -184,7 +187,7 @@ export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<Catal
       {
         accessorKey: "siteCount",
         id: "sites",
-        header: ({ column }) => <SortHeader label="Sites" column={column} />,
+        header: ({ column }) => <SortHeader label={t("sites")} column={column} />,
         cell: ({ row }) => <span className="tabular-nums">{row.original.siteCount}</span>,
         meta: { className: "w-[1%] whitespace-nowrap text-right" },
       },
@@ -192,7 +195,7 @@ export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<Catal
         id: "actions",
         enableHiding: false,
         enableSorting: false,
-        header: () => <span className="sr-only">Actions</span>,
+        header: () => <span className="sr-only">{tTable("actions")}</span>,
         meta: { className: "w-[1%] whitespace-nowrap text-right" },
         cell: ({ row }) => {
           const model = row.original;
@@ -208,12 +211,12 @@ export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<Catal
                       className="h-8 w-8 text-[var(--accent)] hover:bg-[rgba(30,127,224,0.14)] hover:text-[var(--accent)]"
                       onClick={() => onOpen(model)}
                       data-testid="catalog-open"
-                      aria-label={`Open ${model.displayName}`}
+                      aria-label={`${tTable("open")} ${model.displayName}`}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Open</TooltipContent>
+                  <TooltipContent>{tTable("open")}</TooltipContent>
                 </Tooltip>
                 {canUpdate && (
                   <Tooltip>
@@ -239,6 +242,6 @@ export function useCatalogColumns(actions: CatalogTableActions): ColumnDef<Catal
         },
       },
     ],
-    [canUpdate, onEdit, onOpen],
+    [canUpdate, onEdit, onOpen, t, tTable],
   );
 }

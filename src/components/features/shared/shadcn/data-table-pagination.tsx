@@ -6,6 +6,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -35,6 +36,7 @@ export function DataTablePagination<TData>({
   setPageSize,
   totalItems,
 }: DataTablePaginationProps<TData>) {
+  const t = useTranslations("table");
   const serverDriven = currentPage != null && totalPages != null && setPage != null;
   const pageIndex = serverDriven ? currentPage - 1 : table.getState().pagination.pageIndex;
   const pageCount = serverDriven ? totalPages : table.getPageCount();
@@ -57,7 +59,7 @@ export function DataTablePagination<TData>({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-1 py-2">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>Rows per page</span>
+        <span>{t("rowsPerPage")}</span>
         <Select value={String(size)} onValueChange={(v) => changeSize(Number(v))}>
           <SelectTrigger className="h-8 w-[70px]" data-testid="data-table-page-size">
             <SelectValue />
@@ -70,12 +72,12 @@ export function DataTablePagination<TData>({
             ))}
           </SelectContent>
         </Select>
-        {totalItems != null && <span>Total: {totalItems} items</span>}
+        {totalItems != null && <span>{t("totalItems", { count: totalItems })}</span>}
       </div>
 
       <div className="flex items-center gap-2">
         <span className="text-xs text-muted-foreground">
-          Page {pageCount === 0 ? 0 : pageIndex + 1} of {pageCount}
+          {t("pageOf", { page: pageCount === 0 ? 0 : pageIndex + 1, pages: pageCount })}
         </span>
         <div className="flex items-center gap-1">
           <Button
@@ -85,7 +87,7 @@ export function DataTablePagination<TData>({
             className="h-8 w-8"
             disabled={!canPrev}
             onClick={() => goTo(1)}
-            aria-label="First page"
+            aria-label={t("firstPage")}
           >
             <ChevronsLeft className="h-4 w-4" />
           </Button>
@@ -96,7 +98,7 @@ export function DataTablePagination<TData>({
             className="h-8 w-8"
             disabled={!canPrev}
             onClick={() => goTo(pageIndex)}
-            aria-label="Previous page"
+            aria-label={t("prevPage")}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -107,7 +109,7 @@ export function DataTablePagination<TData>({
             className="h-8 w-8"
             disabled={!canNext}
             onClick={() => goTo(pageIndex + 2)}
-            aria-label="Next page"
+            aria-label={t("nextPage")}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -118,7 +120,7 @@ export function DataTablePagination<TData>({
             className="h-8 w-8"
             disabled={!canNext}
             onClick={() => goTo(pageCount)}
-            aria-label="Last page"
+            aria-label={t("lastPage")}
           >
             <ChevronsRight className="h-4 w-4" />
           </Button>

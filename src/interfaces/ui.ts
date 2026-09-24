@@ -1,10 +1,7 @@
-import type { ClassificationProposalDTO, ResolveResponse } from "@/interfaces";
+import type { ResolveResponse } from "@/interfaces";
 
 export interface ClassificationPanelProps {
-  proposal: ClassificationProposalDTO | null | undefined;
-  alreadyConfirmed?: boolean;
   error?: string | null;
-  compact?: boolean;
 }
 
 export interface CatalogModelViewProps {

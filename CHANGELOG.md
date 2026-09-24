@@ -35,6 +35,20 @@ Keep entries short, user-facing, and in the past tense (“Added X”, “Fixed 
 
 ### Added
 
+- Erstanlage (initial registration) wizard: identity → characteristics → duties → prerequisites; duties preview and release APIs under `/api/registration/*`
+- Admin model reclassification at `/registration/reclassify/[modelId]`
+- `POST /api/registration/preview` (derive duties without a draft) and payload `POST /api/registration/release`
+- Dual-language UI (EN / DE) via next-intl, cookie locale, status-bar and Settings language toggle
+- Training module (`/training`, `training:view`): events overview, person×model matrix, record session API
+- Management page (`/management`): partner organisation contracts and people with access for the clinic
+- Partner portal (`/partner`, `/login/partner`): organisation home, people, and contracted clinics
+- Service-request executor allocation and transmit flow (`/api/service-requests/.../allocate|transmit`)
+- Appearance setting (System / Light / Dark) with clinical light theme tokens and browser persistence
+- Reference master data (`RefProductKind`, `RefInspectionType`, `RefAnnex2Item`, …) seeded from stammdaten
+- Historised `DeviceModelClassification`, release snapshots, and frozen `DeviceDuty` rows
+- Per-duty due dates on release/reclassify (`DeviceDuty.dueAt`) with inventory duties list and mark-done
+- Due dates board (`/due-dates`, `duties:view`) with assignment from a duty
+- `POST /api/duties/[id]/complete`, `GET /api/devices/[id]/duties`, `GET /api/duties`
 - DB-backed role permission grants (`RoleGrant`) with editable Roles admin UI (`roles:update`)
 - Clarifications list for incomplete inventory data (superadmin / device admin)
 - Responsible person as device-admin user dropdown (modular `/api/users/options`)
@@ -46,12 +60,22 @@ Keep entries short, user-facing, and in the past tense (“Added X”, “Fixed 
 
 ### Changed
 
+- Scan service-type selection is **manual** only (classification proposal engine removed)
+- Clarifications and inventory detail read open `DeviceModelClassification` instead of proposals
+- Released device identity/classification fields are immutable via PATCH
 - Role permissions resolve from the database (seeded from `ROLE_PERMISSIONS`); `/roles` is no longer read-only
 - Prisma `provider` set to `mysql`; Vitest uses MySQL via `DATABASE_URL` / `TEST_DATABASE_URL`
+- Erstanlage wizard no longer saves a draft on Continue; the device is written on Release (`POST /api/registration/release`). Inventarize drafts still resume at `/registration/[id]`.
+- Locale switch swaps message catalogs in place (no full page reload), so wizard form state is preserved
+- New modules (training, management, partner) follow page → feature → hooks → interface → service → schema layering
+
+### Removed
+
+- `Classification` / `ClassificationRule` / `ClassificationProposal` models and `classificationService` proposal flow
 
 ### Fixed
 
--
+- Locale toggle no longer wiped in-progress Erstanlage form state
 
 ### Security
 

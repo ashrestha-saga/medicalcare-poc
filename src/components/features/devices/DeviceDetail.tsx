@@ -10,12 +10,15 @@ import { InventoryBarcodeLabel } from "@/components/features/devices/labels/Inve
 import { printInventoryLabels } from "@/components/features/devices/labels/printInventoryLabels";
 import { toInventoryLabel } from "@/lib/inventory/label";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
+import { DeviceDutiesPanel } from "./DeviceDutiesPanel";
 
 interface DeviceDetailProps {
   device: DeviceInstanceDTO | DeviceInstanceDetailDTO;
   canEdit?: boolean;
   onBack: () => void;
   onEdit?: () => void;
+  completingDutyId?: string | null;
+  onCompleteDuty?: (dutyId: string) => void;
 }
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
@@ -44,13 +47,35 @@ function isDetail(device: DeviceInstanceDTO | DeviceInstanceDetailDTO): device i
   return "modelClassification" in device;
 }
 
-export function DeviceDetail({ device, canEdit, onBack, onEdit }: DeviceDetailProps) {
+function classificationLabels(device: DeviceInstanceDTO | DeviceInstanceDetailDTO): string {
+  const detail = isDetail(device) ? device : null;
+  const c = detail?.modelClassification;
+  if (!c) return "";
+  return [
+    c.softwareClass ? `SW ${c.softwareClass}` : null,
+    c.annex1 ? "Annex 1" : null,
+    c.annex2 ? "Annex 2" : null,
+    c.radiation ? "Radiation" : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+export function DeviceDetail({
+  device,
+  canEdit,
+  onBack,
+  onEdit,
+  completingDutyId,
+  onCompleteDuty,
+}: DeviceDetailProps) {
   const { checkPermission } = usePermissions();
   const canViewCatalog = checkPermission("catalog:view");
   const detail = isDetail(device) ? device : null;
   const modelClass = detail?.modelClassification;
   const modelHref = device.modelId && canViewCatalog ? `/catalog/${device.modelId}` : null;
   const label = toInventoryLabel(device);
+  const classLabels = classificationLabels(device);
 
   const onPrint = useCallback(() => {
     printInventoryLabels([label]);
@@ -86,6 +111,11 @@ export function DeviceDetail({ device, canEdit, onBack, onEdit }: DeviceDetailPr
           {device.manufacturer ? ` · ${device.manufacturer}` : ""}
           {device.modelName ? ` · ${device.modelName}` : ""}
         </p>
+        {device.catalogPending && (
+          <p className="mt-2 text-sm text-amber-700 dark:text-amber-400" data-testid="device-catalog-pending">
+            Catalog model is under review — inventory edit is locked until the model is released.
+          </p>
+        )}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -142,16 +172,7 @@ export function DeviceDetail({ device, canEdit, onBack, onEdit }: DeviceDetailPr
                   {modelClass.confidence}
                 </Badge>
               )}
-              <p className="text-sm">
-                {[
-                  modelClass?.softwareClass,
-                  modelClass?.annex1 ? "Annex 1" : null,
-                  modelClass?.annex2 ? "Annex 2" : null,
-                  modelClass?.radiation ? "Radiation" : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ") || "—"}
-              </p>
+              <p className="text-sm">{classLabels || "—"}</p>
               <p className="text-xs text-muted-foreground">
                 {modelClass
                   ? `Applies to all ${modelClass.instanceCount} copies of this model.`
@@ -169,6 +190,15 @@ export function DeviceDetail({ device, canEdit, onBack, onEdit }: DeviceDetailPr
           </div>
         </aside>
       </div>
+
+      {detail && (
+        <DeviceDutiesPanel
+          device={detail}
+          canComplete={canEdit}
+          completingId={completingDutyId}
+          onComplete={onCompleteDuty}
+        />
+      )}
     </div>
   );
 }

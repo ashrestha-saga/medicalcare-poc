@@ -1,88 +1,84 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ServiceRequestDTO } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
-import { completeWorkNoteSchema } from "@/schemas/forms";
 import { toast } from "@/store/toastStore";
-import { isCompletable, isStartable } from "./requestDisplay";
 
 /**
- * Start / complete transitions for a single service request detail view.
+ * Allocate / transmit for assignment detail (FA-713/714).
+ * Accepted / scheduled / completed come from an external portal later.
  */
 export function useRequestTransition(
   request: ServiceRequestDTO,
   onUpdated: (next: ServiceRequestDTO) => void,
 ) {
   const [busy, setBusy] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const [workNote, setWorkNote] = useState("");
+  const [executorOrgId, setExecutorOrgId] = useState(request.executorOrgId ?? "");
 
-  const startable = isStartable(request.state);
-  const completable = isCompletable(request.state);
+  useEffect(() => {
+    setExecutorOrgId(request.executorOrgId ?? "");
+  }, [request.executorOrgId]);
 
-  const start = useCallback(async () => {
+  const canAllocate = !request.allocationLocked;
+  const canTransmit = Boolean(request.executorOrgId) && !request.allocationLocked;
+
+  const allocate = useCallback(
+    async (nextOrgId: string) => {
+      if (!nextOrgId) return;
+      setBusy(true);
+      try {
+        const res = await api<{ request: ServiceRequestDTO }>(
+          `/api/service-requests/${encodeURIComponent(request.reference)}/allocate`,
+          {
+            method: "POST",
+            body: JSON.stringify({ executorOrgId: nextOrgId }),
+          },
+        );
+        onUpdated(res.request);
+        toast.success("Executor allocated.");
+      } catch (e) {
+        setExecutorOrgId(request.executorOrgId ?? "");
+        toast.error(e instanceof ApiError ? e.message : "Could not allocate.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [onUpdated, request.executorOrgId, request.reference],
+  );
+
+  const onExecutorChange = useCallback(
+    (nextOrgId: string) => {
+      setExecutorOrgId(nextOrgId);
+      if (nextOrgId && nextOrgId !== request.executorOrgId) {
+        void allocate(nextOrgId);
+      }
+    },
+    [allocate, request.executorOrgId],
+  );
+
+  const transmit = useCallback(async () => {
     setBusy(true);
     try {
-      const next = await api<ServiceRequestDTO>(
-        `/api/service-requests/${encodeURIComponent(request.reference)}/transition`,
-        {
-          method: "POST",
-          body: JSON.stringify({ state: "in_progress" }),
-        },
+      const res = await api<{ request: ServiceRequestDTO }>(
+        `/api/service-requests/${encodeURIComponent(request.reference)}/transmit`,
+        { method: "POST", body: JSON.stringify({}) },
       );
-      onUpdated(next);
-      toast.success("Work started.");
+      onUpdated(res.request);
+      toast.success("Assignment transmitted.");
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not start work.");
+      toast.error(e instanceof ApiError ? e.message : "Could not transmit.");
     } finally {
       setBusy(false);
     }
   }, [onUpdated, request.reference]);
 
-  const complete = useCallback(async () => {
-    const parsed = completeWorkNoteSchema.safeParse({ note: workNote });
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0]?.message ?? "Please enter a work note.");
-      return;
-    }
-    setBusy(true);
-    try {
-      const next = await api<ServiceRequestDTO>(
-        `/api/service-requests/${encodeURIComponent(request.reference)}/transition`,
-        {
-          method: "POST",
-          body: JSON.stringify({ state: "completed", note: parsed.data.note }),
-        },
-      );
-      onUpdated(next);
-      setCompleting(false);
-      setWorkNote("");
-      toast.success("Maintenance marked complete.");
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not complete.");
-    } finally {
-      setBusy(false);
-    }
-  }, [onUpdated, request.reference, workNote]);
-
-  const openComplete = useCallback(() => setCompleting(true), []);
-
-  const cancelComplete = useCallback(() => {
-    setCompleting(false);
-    setWorkNote("");
-  }, []);
-
   return {
     busy,
-    completing,
-    workNote,
-    setWorkNote,
-    startable,
-    completable,
-    start,
-    complete,
-    openComplete,
-    cancelComplete,
+    executorOrgId,
+    onExecutorChange,
+    canAllocate,
+    canTransmit,
+    transmit,
   };
 }

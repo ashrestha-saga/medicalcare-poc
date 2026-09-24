@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { CatalogModelFormState } from "@/interfaces";
 import type { useCatalogModelEditor } from "@/components/hooks/catalog/useCatalogModelEditor";
 import { catalogShortId } from "@/components/hooks/catalog/catalogDisplay";
@@ -28,6 +29,7 @@ interface CatalogEditFormProps {
 }
 
 export function CatalogEditForm({ form }: CatalogEditFormProps) {
+  const tClass = useTranslations("classificationOptions");
   const detail = form.detail;
   const status = detail ? catalogStateBadge(detail.state) : null;
   const meta = detail
@@ -186,8 +188,8 @@ export function CatalogEditForm({ form }: CatalogEditFormProps) {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base lowercase">classification</CardTitle>
-                <CardDescription>determines all inspection requirements for the copies.</CardDescription>
+                <CardTitle className="text-base lowercase">{tClass("sectionTitle")}</CardTitle>
+                <CardDescription>{tClass("sectionDescription")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <label className="flex items-start gap-3 rounded-md border border-border/70 px-3 py-2.5">
@@ -197,8 +199,10 @@ export function CatalogEditForm({ form }: CatalogEditFormProps) {
                     className="mt-0.5"
                   />
                   <span>
-                    <span className="block text-sm font-medium">Annex 1 MPBetreibV — safety-related inspection</span>
-                    <span className="block text-xs text-muted-foreground">STK obligation · typically 24 months</span>
+                    <span className="block text-sm font-medium">{tClass("annex1Title")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {tClass("annex1DescriptionShort")}
+                    </span>
                   </span>
                 </label>
                 <label className="flex items-start gap-3 rounded-md border border-border/70 px-3 py-2.5">
@@ -208,8 +212,10 @@ export function CatalogEditForm({ form }: CatalogEditFormProps) {
                     className="mt-0.5"
                   />
                   <span>
-                    <span className="block text-sm font-medium">Annex 2 — measuring function</span>
-                    <span className="block text-xs text-muted-foreground">MTK · calibration / metrology checks</span>
+                    <span className="block text-sm font-medium">{tClass("annex2Title")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {tClass("annex2DescriptionShort")}
+                    </span>
                   </span>
                 </label>
                 <label className="flex items-start gap-3 rounded-md border border-border/70 px-3 py-2.5">
@@ -222,8 +228,10 @@ export function CatalogEditForm({ form }: CatalogEditFormProps) {
                     className="mt-0.5"
                   />
                   <span>
-                    <span className="block text-sm font-medium">Software class IIb</span>
-                    <span className="block text-xs text-muted-foreground">IEC 62304 risk class</span>
+                    <span className="block text-sm font-medium">{tClass("softwareIIbTitle")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {tClass("softwareIIbDescriptionShort")}
+                    </span>
                   </span>
                 </label>
                 <label className="flex items-start gap-3 rounded-md border border-border/70 px-3 py-2.5">
@@ -236,8 +244,10 @@ export function CatalogEditForm({ form }: CatalogEditFormProps) {
                     className="mt-0.5"
                   />
                   <span>
-                    <span className="block text-sm font-medium">Software class C</span>
-                    <span className="block text-xs text-muted-foreground">IEC 62304 class C</span>
+                    <span className="block text-sm font-medium">{tClass("softwareCTitle")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {tClass("softwareCDescriptionShort")}
+                    </span>
                   </span>
                 </label>
                 <label className="flex items-start gap-3 rounded-md border border-border/70 px-3 py-2.5">
@@ -247,16 +257,20 @@ export function CatalogEditForm({ form }: CatalogEditFormProps) {
                     className="mt-0.5"
                   />
                   <span>
-                    <span className="block text-sm font-medium">Radiation (StrlSchV)</span>
-                    <span className="block text-xs text-muted-foreground">Radiation protection ordinance</span>
+                    <span className="block text-sm font-medium">{tClass("radiationTitle")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {tClass("radiationDescriptionShort")}
+                    </span>
                   </span>
                 </label>
                 <Alert variant="info">
                   <Info className="h-4 w-4" />
-                  <AlertTitle>Changes require confirmation from those affected</AlertTitle>
+                  <AlertTitle>{tClass("changeAlertTitle")}</AlertTitle>
                   <AlertDescription>
-                    This classification change affects {detail.copyCount} items across {detail.siteCount} sites in this
-                    clinic.
+                    {tClass("changeAlertBody", {
+                      copies: detail.copyCount,
+                      sites: detail.siteCount,
+                    })}
                   </AlertDescription>
                 </Alert>
               </CardContent>

@@ -18,7 +18,7 @@ import { useCapturerInventoryUi } from "@/store/capturerInventoryStore";
 
 /**
  * Inventory / scan workflow body. Auth + AppShell come from (app)/layout.
- * Capturer opens Bestandsverzeichnis from the account-bar button.
+ * Capturer opens the inventory register from the account-bar button.
  */
 export function ScanApp() {
   const form = useFormFactor();

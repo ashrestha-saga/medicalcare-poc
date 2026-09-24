@@ -2,12 +2,17 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import type { FormFactor } from "@/interfaces";
 import { AuthGate } from "@/components/features/auth/AuthGate";
 import { RouteGuard } from "@/components/guards/RouteGuard";
 import { AppShell } from "@/components/layout/AppShell";
 import { Toaster } from "@/components/ui/Toaster";
+import { Loading } from "@/components/ui/Loading";
 import { PermissionProvider } from "@/lib/providers/PermissionProvider";
+import { useSessionStore } from "@/store/sessionStore";
+import { PARTNER_HOME } from "@/constants/authRoutes";
+import { isPartnerSession } from "@/interfaces/session";
 
 export type { FormFactor };
 
@@ -33,6 +38,40 @@ function useFormFactorState(): FormFactor {
   return form;
 }
 
+function BouncePartners({ children }: { children: ReactNode }) {
+  const user = useSessionStore((s) => s.user);
+  const status = useSessionStore((s) => s.status);
+
+  useEffect(() => {
+    if (status === "signed-in" && isPartnerSession(user)) {
+      window.location.replace(PARTNER_HOME);
+    }
+  }, [status, user]);
+
+  if (status === "signed-in" && isPartnerSession(user)) {
+    return <Loading label="Opening partner portal…" />;
+  }
+  return <>{children}</>;
+}
+
+function useAccountSubtitle(pathname: string): string | undefined {
+  const t = useTranslations("nav");
+  if (pathname.startsWith("/devices")) return t("subtitleInventory");
+  if (pathname.startsWith("/catalog")) return t("subtitleCatalog");
+  if (pathname.startsWith("/requests")) return t("subtitleRequests");
+  if (pathname.startsWith("/users")) return t("subtitleUsers");
+  if (pathname.startsWith("/locations")) return t("subtitleLocations");
+  if (pathname.startsWith("/roles")) return t("subtitleRoles");
+  if (pathname.startsWith("/settings")) return t("subtitleSettings");
+  if (pathname.startsWith("/management")) return t("subtitleManagement");
+  if (pathname.startsWith("/due-dates")) return t("subtitleDueDates");
+  if (pathname.startsWith("/training")) return t("subtitleTraining");
+  if (pathname.startsWith("/registration")) return t("subtitleRegistration");
+  if (pathname.startsWith("/clarifications")) return t("subtitleClarifications");
+  if (pathname.startsWith("/security")) return t("subtitleSecurity");
+  return undefined;
+}
+
 /**
  * Client shell for the (app) route group:
  * session/PIN gate → PermissionProvider → RouteGuard → nav chrome → page.
@@ -40,21 +79,7 @@ function useFormFactorState(): FormFactor {
 export function AuthenticatedShell({ children }: { children: ReactNode }) {
   const form = useFormFactorState();
   const pathname = usePathname();
-  const accountSubtitle = pathname.startsWith("/devices")
-    ? "Device inventory"
-    : pathname.startsWith("/catalog")
-      ? "Model catalog"
-      : pathname.startsWith("/requests")
-        ? "Service requests"
-        : pathname.startsWith("/users")
-          ? "User management"
-          : pathname.startsWith("/locations")
-            ? "Clinic locations"
-            : pathname.startsWith("/roles")
-              ? "Role catalog"
-              : pathname.startsWith("/settings")
-                ? "Settings"
-                : undefined;
+  const accountSubtitle = useAccountSubtitle(pathname);
   const testId = pathname.startsWith("/devices")
     ? "devices-shell"
     : pathname.startsWith("/catalog")
@@ -74,12 +99,14 @@ export function AuthenticatedShell({ children }: { children: ReactNode }) {
   return (
     <FormFactorContext.Provider value={form}>
       <AuthGate>
-        <PermissionProvider>
-          <AppShell form={form} accountSubtitle={accountSubtitle} testId={testId}>
-            <RouteGuard>{children}</RouteGuard>
-          </AppShell>
-          <Toaster />
-        </PermissionProvider>
+        <BouncePartners>
+          <PermissionProvider>
+            <AppShell form={form} accountSubtitle={accountSubtitle} testId={testId}>
+              <RouteGuard>{children}</RouteGuard>
+            </AppShell>
+            <Toaster />
+          </PermissionProvider>
+        </BouncePartners>
       </AuthGate>
     </FormFactorContext.Provider>
   );

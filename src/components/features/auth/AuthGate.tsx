@@ -13,9 +13,9 @@ import { PinSetup } from "./PinSetup";
 /**
  * Composes signed-out → (PIN setup) → locked → app. `user` and `locked` are
  * independent, so a locked session survives a reload without re-login.
- * Signed-out users are sent to /login (auth route group).
+ * Signed-out users are sent to loginPath (default /login).
  */
-export function AuthGate({ children }: AuthGateProps) {
+export function AuthGate({ children, loginPath = "/login" }: AuthGateProps) {
   const { status, signOut } = useSession();
   const user = useSessionStore((s) => s.user);
   const locked = useSessionStore((s) => s.locked);
@@ -36,10 +36,10 @@ export function AuthGate({ children }: AuthGateProps) {
     if (status === "loading") return;
     if (status === "signed-out" || !user) {
       if (typeof window !== "undefined" && !isAuthRoute(window.location.pathname)) {
-        window.location.replace("/login");
+        window.location.replace(loginPath);
       }
     }
-  }, [status, user]);
+  }, [status, user, loginPath]);
 
   if (status === "loading") return <Loading label="Checking session…" />;
 
@@ -52,17 +52,23 @@ export function AuthGate({ children }: AuthGateProps) {
     return <>{children}</>;
   }
 
+  // Partners use a light shell without PIN lock in this POC.
+  if (user.accountKind === "partner") {
+    return <>{children}</>;
+  }
+
   if (locked && pinHash) {
     return (
       <LockScreen
         onLockedOut={() => {
           void signOut({
             redirectTo:
-              "/login?notice=" + encodeURIComponent("Too many wrong PIN attempts. Please sign in again."),
+              `${loginPath}?notice=` +
+              encodeURIComponent("Too many wrong PIN attempts. Please sign in again."),
           });
         }}
         onSignOut={() => {
-          void signOut();
+          void signOut({ redirectTo: loginPath });
         }}
       />
     );

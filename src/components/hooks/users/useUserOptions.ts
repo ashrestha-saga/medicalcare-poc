@@ -33,20 +33,16 @@ function buildQuery(params: UseUserOptionsParams): string {
  * Default: active device administrators.
  */
 export function useUserOptions(params: UseUserOptionsParams = {}) {
-  const {
-    roles,
-    active,
-    q,
-    excludeIds,
-    enabled = true,
-  } = params;
+  const { roles, active = true, q, excludeIds, enabled = true } = params;
 
   const [users, setUsers] = useState<UserOptionDTO[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Stabilize array deps — callers often pass inline `["device_admin"]` each render.
   const rolesKey = (roles ?? ["device_admin"]).join(",");
   const excludeKey = (excludeIds ?? []).join(",");
+  const qKey = q?.trim() ?? "";
 
   const refresh = useCallback(async () => {
     if (!enabled) return;
@@ -54,10 +50,10 @@ export function useUserOptions(params: UseUserOptionsParams = {}) {
     setError(null);
     try {
       const query: UseUserOptionsParams = {
-        roles: roles === undefined ? ["device_admin"] : roles,
+        roles: rolesKey ? (rolesKey.split(",") as UserRole[]) : [],
         active,
-        q,
-        excludeIds,
+        q: qKey || undefined,
+        excludeIds: excludeKey ? excludeKey.split(",") : undefined,
       };
       const res = await api<{ users: UserOptionDTO[] }>(`/api/users/options${buildQuery(query)}`);
       setUsers(res.users);
@@ -67,7 +63,7 @@ export function useUserOptions(params: UseUserOptionsParams = {}) {
     } finally {
       setLoading(false);
     }
-  }, [enabled, rolesKey, active, q, excludeKey, roles, excludeIds]);
+  }, [enabled, rolesKey, active, qKey, excludeKey]);
 
   useEffect(() => {
     void refresh();

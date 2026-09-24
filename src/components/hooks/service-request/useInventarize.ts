@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { DeviceInstanceDTO, InventarizeOffer } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { inventarizeFormSchema } from "@/schemas/device";
@@ -8,16 +9,17 @@ import { zodFieldErrors } from "@/schemas/formErrors";
 import { useCapturerInventoryUi } from "@/store/capturerInventoryStore";
 import { toast } from "@/store/toastStore";
 
+type InventarizeCreateResult = DeviceInstanceDTO & { registrationPath?: string };
+
 /**
- * Post-request inventarize: Zod-validated serial, duplicate check, auto INV-#####.
+ * Post-request inventarize: creates a draft instance and deep-links to Erstanlage.
+ * Maintenance cycle is left unset — derived later on Erstanlage release.
  */
 export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
+  const router = useRouter();
   const [serialNumber, setSerialNumber] = useState(offer.serialHint ?? "");
   const [responsibleUserId, setResponsibleUserId] = useState<string | null>(null);
   const [commissionedYear, setCommissionedYear] = useState(offer.commissionedYear);
-  const [maintenanceCycleMonths, setMaintenanceCycleMonths] = useState(
-    offer.maintenanceCycleMonths != null ? String(offer.maintenanceCycleMonths) : "",
-  );
   const [duplicate, setDuplicate] = useState<DeviceInstanceDTO | null>(null);
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -27,7 +29,7 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
   const count = useCapturerInventoryUi((s) => s.count);
 
   const artUndTyp =
-    offer.tradeName?.trim() || offer.modelName?.trim() || "Gerät";
+    offer.tradeName?.trim() || offer.modelName?.trim() || offer.udiDi?.trim() || "Device";
 
   useEffect(() => {
     const serial = serialNumber.trim();
@@ -67,7 +69,6 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
       serialNumber,
       responsibleUserId: responsibleUserId ?? undefined,
       commissionedAt: commissionedYear,
-      maintenanceCycleMonths: maintenanceCycleMonths.trim() || undefined,
     });
     if (!parsed.success) {
       setFieldErrors(zodFieldErrors(parsed.error));
@@ -77,17 +78,14 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
     setFieldErrors({});
 
     if (duplicate) {
-      setError("Dieses Exemplar ist bereits im Bestandsverzeichnis.");
+      setError("This unit is already in the inventory.");
       return;
     }
 
     setError(null);
     setBusy(true);
     try {
-      const cycleRaw = parsed.data.maintenanceCycleMonths?.trim();
-      const cycle =
-        cycleRaw && /^\d+$/.test(cycleRaw) ? Number(cycleRaw) : (offer.maintenanceCycleMonths ?? null);
-      const res = await api<{ device: DeviceInstanceDTO }>("/api/devices", {
+      const res = await api<{ device: InventarizeCreateResult }>("/api/devices", {
         method: "POST",
         body: JSON.stringify({
           modelId: offer.modelId,
@@ -96,11 +94,12 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
           areaId: offer.areaId,
           room: offer.room,
           commissionedAt: parsed.data.commissionedAt?.trim() || null,
-          maintenanceCycleMonths: cycle,
         }),
       });
       if (count != null) setCount(count + 1);
-      toast.success(`Aufgenommen als ${res.device.inventoryNumber}.`);
+      toast.success(`Draft ${res.device.inventoryNumber} created — continue to registration.`);
+      const path = res.device.registrationPath ?? `/registration/${res.device.id}`;
+      router.push(path);
       onDone();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
@@ -111,7 +110,7 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
         }
         setError(e.message);
       } else {
-        setError(e instanceof ApiError ? e.message : "Aufnehmen fehlgeschlagen.");
+        setError(e instanceof ApiError ? e.message : "Failed to add device.");
       }
     } finally {
       setBusy(false);
@@ -120,15 +119,14 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
     serialNumber,
     responsibleUserId,
     commissionedYear,
-    maintenanceCycleMonths,
     duplicate,
     offer.modelId,
     offer.areaId,
     offer.room,
-    offer.maintenanceCycleMonths,
     count,
     setCount,
     onDone,
+    router,
   ]);
 
   return {
@@ -141,8 +139,6 @@ export function useInventarize(offer: InventarizeOffer, onDone: () => void) {
     setResponsibleUserId,
     commissionedYear,
     setCommissionedYear,
-    maintenanceCycleMonths,
-    setMaintenanceCycleMonths,
     duplicate,
     checking,
     busy,

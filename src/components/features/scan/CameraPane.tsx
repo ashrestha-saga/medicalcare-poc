@@ -38,14 +38,14 @@ export function CameraPane({ tabletHint = false }: { tabletHint?: boolean }) {
         }}
       >
         <KeypadIcon />
-        Nummer eingeben
+        Enter number
       </button>
       <div className="p-camhint">
         {phase === "manual-entry"
-          ? "Scannen pausiert — Nummer rechts eingeben"
+          ? "Scanning paused — enter the number on the right"
           : tabletHint
-            ? "Kamera bleibt aktiv — rechts läuft der Vorgang"
-            : "Geräteetikett in den Rahmen halten"}
+            ? "Camera stays active — continue on the right"
+            : "Hold the device label in the frame"}
       </div>
     </div>
   );

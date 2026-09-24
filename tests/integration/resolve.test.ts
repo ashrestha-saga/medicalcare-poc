@@ -14,13 +14,12 @@ afterAll(async () => {
 });
 
 describe("resolution chain — FA-100 (AC #1, #2, #9)", () => {
-  it("stage 1: inventory number → device instance with location and verified proposal", async () => {
+  it("stage 1: inventory number → device instance with location", async () => {
     const r = await resolveService.resolve(parseIdentifier("INV-10001"), TENANT, cid);
     expect(r.stage).toBe("inventory");
     expect(r.device?.inventoryNumber).toBe("INV-10001");
     expect(r.device?.location?.text).toBe("Bonn Clinic, ICU, Room 4");
     expect(r.model?.modelName).toBe("X200");
-    expect(r.classificationProposal?.confidence).toBe("verified");
     expect(r.source.system).toBe("device-inventory");
     expect(r.correlationId).toBe(cid);
   });
@@ -39,17 +38,17 @@ describe("resolution chain — FA-100 (AC #1, #2, #9)", () => {
     expect(r.device).toBeUndefined();
   });
 
-  it("stage 2: GTIN with no instance → local article master, derived proposal, no DeviceInstance created (FA-102)", async () => {
+  it("stage 2: GTIN with no instance → local article master, no DeviceInstance created (FA-102)", async () => {
     const before = await prisma.deviceInstance.count();
     const r = await resolveService.resolve(parseIdentifier("04012345678925"), TENANT, cid);
     expect(r.stage).toBe("catalog");
     expect(r.model?.modelName).toBe("V3");
     expect(r.device).toBeUndefined();
-    expect(r.classificationProposal).toBeUndefined(); // no rule for V3
     expect(await prisma.deviceInstance.count()).toBe(before);
 
-    const derived = await resolveService.resolve(parseIdentifier("04012345678918"), TENANT, cid);
-    expect(derived.classificationProposal?.confidence).toBe("derived");
+    const other = await resolveService.resolve(parseIdentifier("04012345678918"), TENANT, cid);
+    expect(other.stage).toBe("catalog");
+    expect(other.model).toBeTruthy();
   });
 
   it("stage 2: OXID (mock) catalog adapter answers for a GTIN unknown locally", async () => {

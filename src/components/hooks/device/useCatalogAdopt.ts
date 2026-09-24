@@ -23,12 +23,10 @@ export function useCatalogAdopt() {
   const isBeudamed = resolution?.stage === "beudamed" && !captured;
   const isInventory = resolution?.stage === "inventory" && !captured;
   const partsAllowed = !captured;
-  const proposal = resolution?.classificationProposal;
 
   return {
     resolution,
     captured,
-    proposal,
     partsAllowed,
     isCatalogModel,
     isBeudamed,

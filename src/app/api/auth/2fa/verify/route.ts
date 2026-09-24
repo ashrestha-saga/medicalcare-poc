@@ -22,9 +22,8 @@ export async function POST(req: Request) {
 
     await clearTotpChallengeCookie();
     await createSession(user);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- omit from response
-    const { tenantId, ...publicUser } = user;
-    return Response.json({ user: publicUser, tenantName });
+    const { tenantId: _tenantId, ...publicUser } = user;
+    return Response.json({ user: publicUser, tenantName, homePath: "/" });
   } catch (error) {
     return errorResponse(error);
   }

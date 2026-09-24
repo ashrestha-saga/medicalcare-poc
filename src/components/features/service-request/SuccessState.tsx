@@ -30,7 +30,7 @@ export function SuccessState() {
     const deviceTitle =
       inventarizeOffer.tradeName?.trim() ||
       inventarizeOffer.modelName?.trim() ||
-      "Gerät";
+      "Device";
     return (
       <InventarizeForm
         offer={inventarizeOffer}
@@ -49,8 +49,8 @@ export function SuccessState() {
       {isQueued ? (
         <p className="p-done-sub">
           {online
-            ? "Wird gesendet, sobald möglich…"
-            : "Wird automatisch gesendet, wenn die Verbindung wieder da ist."}
+            ? "Will be sent as soon as possible…"
+            : "Will be sent automatically when the connection returns."}
         </p>
       ) : (
         <p className="ref" data-testid="success-reference">
@@ -61,9 +61,9 @@ export function SuccessState() {
       {detail && isService && !isQueued && (
         <>
           <section className="p-dispatch" data-testid="dispatch-results">
-            <p className="p-sec-title">Versandkanäle</p>
+            <p className="p-sec-title">Dispatch channels</p>
             {records.length === 0 ? (
-              <p className="p-done-sub">Keine Dispatch-Ziele konfiguriert.</p>
+              <p className="p-done-sub">No dispatch targets configured.</p>
             ) : (
               <ul className="p-dispatch-list">
                 {records.map((d) => (
@@ -80,11 +80,11 @@ export function SuccessState() {
                         )}
                         {d.httpStatus != null && (
                           <span className="p-dispatch-meta">
-                            HTTP {d.httpStatus} · Versuch {d.attemptCount}
+                            HTTP {d.httpStatus} · Attempt {d.attemptCount}
                           </span>
                         )}
                         {d.httpStatus == null && d.attemptCount > 1 && (
-                          <span className="p-dispatch-meta">Versuch {d.attemptCount}</span>
+                          <span className="p-dispatch-meta">Attempt {d.attemptCount}</span>
                         )}
                       </div>
                     </div>
@@ -94,8 +94,8 @@ export function SuccessState() {
             )}
             {dispatchSummary && (
               <p className="p-dispatch-summary" data-testid="dispatch-summary">
-                {dispatchSummary.ok}/{dispatchSummary.total} Kanäle erfolgreich
-                {dispatchSummary.fail > 0 ? ` · ${dispatchSummary.fail} fehlgeschlagen` : ""}
+                {dispatchSummary.ok}/{dispatchSummary.total} channels succeeded
+                {dispatchSummary.fail > 0 ? ` · ${dispatchSummary.fail} failed` : ""}
               </p>
             )}
           </section>
@@ -114,7 +114,7 @@ export function SuccessState() {
       )}
 
       <button type="button" className="p-cta" onClick={reset} data-testid="scan-next">
-        Weiter scannen
+        Scan next
       </button>
     </div>
   );

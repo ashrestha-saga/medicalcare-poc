@@ -42,6 +42,8 @@ npx prisma migrate reset    # destructive — drops data, re-applies migrations,
 
 Vitest uses the same MySQL URL unless you set `TEST_DATABASE_URL` to an isolated database (recommended so `npm test` does not wipe app data).
 
+**UI language:** Settings → Language (`en` / `de`). Stored as cookie `devicecare.locale` (default `en`). Message catalogs live in `messages/`.
+
 Optional: local SQLite files under `prisma/*.db` are unused while on MySQL and can be deleted.
 
 ## Scripts
@@ -63,7 +65,7 @@ Interactive auth is **OXID only**. Playwright injects a signed session cookie fo
 src/
   app/            layout, page, globals.css (design tokens), api/* route handlers, auth/callback
   components/     ui/ primitives · features/{auth,scan,device,classification,location,service-request,cart,log} · App.tsx shell
-  services/       resolveService (4-stage chain), classificationService, serviceRequestService, orderRequestService,
+  services/       resolveService (4-stage chain), registration/*, serviceRequestService, orderRequestService,
                   dispatchService (registry), beudamedService (cache/timeout/rate limit), captureService, oxidAuthService,
                   adapters/ (oxid mock+http, beudamed stub/mock/http, mail/webhook dispatch)
   interfaces/     DTOs shared by server and client
@@ -80,9 +82,9 @@ tests/            vitest setup/globalSetup + integration tests · e2e/ Playwrigh
 3. **BEUDAMED** — 90-day `ExternalSourceRecord` cache, 2 s timeout, per-identifier (1/h) and per-tenant (200/day) rate limits; any failure is swallowed and falls through. Hits are persisted as `DeviceModel` in `review` state.
 4. **Manual capture** — `POST /api/captures`; `serviceOnly: true` is forced server-side and the UI state machine forbids `manual-capture → parts`.
 
-### Classification is a suggestion
+### Erstanlage & service type
 
-`classificationService.decide()` is a pure function: rule priority `basicUdiDi → emdn → gmdn → manufacturerModel`, tie-break by specificity → confidence → bounded validity → id. `verified` proposals pre-select and **require** confirmation (server returns 422 otherwise); `derived`/`guess` never pre-select. The full inspection list is always rendered.
+Initial registration (`/registration`) keeps identity and characteristics in the client until release (`POST /api/registration/release`). Duty preview is `POST /api/registration/preview` (no draft). Inventarize still creates a draft and deep-links to Erstanlage. Scan / service request uses **manual** service-type selection from `INSPECTION_TYPES` (no proposal engine).
 
 ### Service requests
 

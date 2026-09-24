@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Loader2, TriangleAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { useCatalogModels } from "@/components/hooks/catalog/useCatalogModels";
 import { useCatalogModelEditor } from "@/components/hooks/catalog/useCatalogModelEditor";
 import { CatalogDetail } from "./CatalogDetail";
@@ -18,11 +19,20 @@ interface CatalogScreenProps {
 
 /** Central DeviceModel catalog — list → detail → full-page edit; create stays a modal. */
 export function CatalogScreen({ modelId }: CatalogScreenProps) {
+  const t = useTranslations("pages.catalog");
+  const tCommon = useTranslations("common");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const wantEdit = searchParams.get("edit") === "1";
+  const editOpenedFor = useRef<string | null>(null);
   const list = useCatalogModels();
   const editor = useCatalogModelEditor((model) => {
     list.applyUpdated(model);
+    if (wantEdit && modelId) {
+      router.replace(`/catalog/${modelId}`);
+    }
   });
+  const { open: editorOpen, openEdit } = editor;
 
   useEffect(() => {
     if (!list.canView) return;
@@ -34,14 +44,22 @@ export function CatalogScreen({ modelId }: CatalogScreenProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sync URL → selection only
   }, [modelId, list.canView]);
 
+  useEffect(() => {
+    if (!wantEdit || !modelId || !list.canUpdate) return;
+    if (!list.selected || list.selected.id !== modelId) return;
+    if (editorOpen) return;
+    if (editOpenedFor.current === modelId) return;
+    editOpenedFor.current = modelId;
+    void openEdit(list.selected);
+  }, [wantEdit, modelId, list.canUpdate, list.selected, editorOpen, openEdit]);
+
   if (!list.canView) {
     return (
       <div className="p-work" data-testid="catalog-denied">
         <main className="p-main">
-          <section className="p-devhead">
-            <h2>Model catalog</h2>
-            <p className="p-requests__sub">You don&apos;t have permission to view the model catalog.</p>
-          </section>
+          <ListPageShell title={t("title")} description={tCommon("denied")}>
+            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
+          </ListPageShell>
         </main>
       </div>
     );
@@ -71,33 +89,26 @@ export function CatalogScreen({ modelId }: CatalogScreenProps) {
             </div>
           )
         ) : (
-          <div className="px-4 pb-6 pt-4 sm:px-[18px]">
-            <Card className="border-border/80 bg-card/60">
-              <CardHeader className="gap-4">
-                <div>
-                  <CardTitle className="text-2xl">Model catalog</CardTitle>
-                  <CardDescription className="mt-1.5">
-                    Device database · centrally maintained, across all clients
-                  </CardDescription>
-                </div>
-                <Alert variant="warning" data-testid="catalog-warning">
-                  <TriangleAlert className="h-4 w-4" />
-                  <AlertTitle>Changes to the catalog affect all clients</AlertTitle>
-                  <AlertDescription>
-                    Classification and model master data are shared. Prefer versioned updates and confirm with affected
-                    clinics before releasing safety-relevant changes.
-                  </AlertDescription>
-                </Alert>
-              </CardHeader>
-              <CardContent>
-                <CatalogTable
-                  list={list}
-                  onSelect={(model) => openModel(model.id)}
-                  onEdit={(model) => void editor.openEdit(model)}
-                />
-              </CardContent>
-            </Card>
-          </div>
+          <ListPageShell
+            title={t("title")}
+            description={t("description")}
+            headerExtra={
+              <Alert variant="warning" data-testid="catalog-warning">
+                <TriangleAlert className="h-4 w-4" />
+                <AlertTitle>Changes to the catalog affect all clients</AlertTitle>
+                <AlertDescription>
+                  Classification and model master data are shared. Prefer versioned updates and confirm
+                  with affected clinics before releasing safety-relevant changes.
+                </AlertDescription>
+              </Alert>
+            }
+          >
+            <CatalogTable
+              list={list}
+              onSelect={(model) => openModel(model.id)}
+              onEdit={(model) => void editor.openEdit(model)}
+            />
+          </ListPageShell>
         )}
       </main>
     </div>

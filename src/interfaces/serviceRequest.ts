@@ -30,7 +30,6 @@ export interface CreateServiceRequestDTO {
   contact?: string;
   /** Always separate from locationText, even if identical text — FA-503. */
   deliveryAddress: string;
-  classification?: ClassificationSubmissionDTO;
   /** Attachment ids / data URLs already uploaded or embedded. */
   attachments?: AttachmentInputDTO[];
   raisedBy: string;
@@ -62,6 +61,22 @@ export interface DispatchRecordDTO {
   detail: string | null;
 }
 
+export interface ExecutorOrgDTO {
+  id: string;
+  code: string;
+  name: string;
+  kind: "external" | "internal" | string;
+  active: boolean;
+}
+
+export interface AssignmentDutyContextDTO {
+  id: string;
+  title: string;
+  basisText: string;
+  dueAt: string | null;
+  inspectionTypeCode: string;
+}
+
 export interface ServiceRequestDTO {
   id: string;
   reference: string;
@@ -80,6 +95,17 @@ export interface ServiceRequestDTO {
   classification: ClassificationSubmissionDTO | null;
   state: string;
   createdAt: string;
+  source: "due_date" | "app" | string;
+  dutyId: string | null;
+  executorOrgId: string | null;
+  executorOrg: ExecutorOrgDTO | null;
+  allocatedAt: string | null;
+  allocatedBy: string | null;
+  transmittedAt: string | null;
+  allocationLocked: boolean;
+  deviceName: string | null;
+  inventoryNumber: string | null;
+  duty: AssignmentDutyContextDTO | null;
   statusEvents: StatusEventDTO[];
   dispatchRecords: DispatchRecordDTO[];
   attachmentCount: number;
@@ -88,6 +114,8 @@ export interface ServiceRequestDTO {
 export interface RequestDetailProps {
   request: ServiceRequestDTO;
   canWork: boolean;
+  canAllocate?: boolean;
+  executors?: ExecutorOrgDTO[];
   onBack: () => void;
   onUpdated: (next: ServiceRequestDTO) => void;
 }

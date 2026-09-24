@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { InventarizeOffer } from "@/interfaces";
 import { useInventarize } from "@/components/hooks/service-request/useInventarize";
 import { UserSelect } from "@/components/features/shared/UserSelect";
@@ -14,30 +15,31 @@ export function InventarizeForm({
   deviceTitle: string;
   onDone: () => void;
 }) {
+  const t = useTranslations("inventarize");
+  const tCommon = useTranslations("common");
   const form = useInventarize(offer, onDone);
 
   return (
     <div className="p-inventarize" data-testid="inventarize-form">
       <header className="p-inventarize__head">
-        <h2>Gerät ins Bestandsverzeichnis aufnehmen</h2>
+        <h2>{t("title")}</h2>
         <p className="p-inventarize__device">{deviceTitle}</p>
       </header>
 
       <div className="p-inventarize__info" data-testid="inventarize-info">
-        Der Auftrag ist übermittelt. Möchten Sie das Gerät dauerhaft im Bestandsverzeichnis
-        führen? Die Angaben aus der Anforderung sind übernommen.
+        {t("info")}
       </div>
 
       <div className="p-inventarize__body">
         <div className="p-field">
-          <label htmlFor="inv-person">Verantwortliche Person</label>
+          <label htmlFor="inv-person">{t("responsible")}</label>
           <UserSelect
             id="inv-person"
             showLabel={false}
             value={form.responsibleUserId}
             onChange={form.setResponsibleUserId}
             roles={["device_admin"]}
-            placeholder="Geräteadministrator wählen"
+            placeholder={t("responsiblePlaceholder")}
             disabled={form.busy}
             error={form.fieldErrors.responsibleUserId}
             data-testid="inventarize-responsible"
@@ -46,27 +48,27 @@ export function InventarizeForm({
 
         <div className="p-grid2 p-grid2--always">
           <div className="p-field">
-            <label htmlFor="inv-type">Art und Typ</label>
+            <label htmlFor="inv-type">{t("typeModel")}</label>
             <input id="inv-type" value={form.artUndTyp} readOnly data-testid="inventarize-type" />
           </div>
 
           <div className="p-field">
             <label htmlFor="inv-serial">
-              Seriennummer <RequiredMark />
+              {t("serial")} <RequiredMark />
             </label>
             <input
               id="inv-serial"
               className="t-mono"
               value={form.serialNumber}
               onChange={(e) => form.setSerialNumber(e.target.value)}
-              placeholder="Seriennummer vom Typenschild"
+              placeholder={t("serialPlaceholder")}
               autoComplete="off"
               aria-required="true"
               aria-invalid={Boolean(form.fieldErrors.serialNumber) || Boolean(form.duplicate)}
               data-invalid={form.fieldErrors.serialNumber || form.duplicate ? "1" : undefined}
               data-testid="inventarize-serial"
             />
-            {form.checking && <p className="p-inventarize__hint">Prüfe Bestand…</p>}
+            {form.checking && <p className="p-inventarize__hint">{t("checking")}</p>}
             {form.fieldErrors.serialNumber && (
               <p className="p-err" data-testid="inventarize-serial-error">
                 {form.fieldErrors.serialNumber}
@@ -74,7 +76,7 @@ export function InventarizeForm({
             )}
             {form.duplicate && (
               <p className="p-warn" data-testid="inventarize-duplicate">
-                Bereits im Bestandsverzeichnis · {form.duplicate.inventoryNumber}
+                {t("duplicate", { inventory: form.duplicate.inventoryNumber })}
                 {form.duplicate.serialNumber ? ` · SN ${form.duplicate.serialNumber}` : ""}
               </p>
             )}
@@ -94,13 +96,13 @@ export function InventarizeForm({
           </div>
 
           <div className="p-field">
-            <label htmlFor="inv-year">Anschaffungsjahr</label>
+            <label htmlFor="inv-year">{t("year")}</label>
             <input
               id="inv-year"
               className="t-mono"
               value={form.commissionedYear}
               onChange={(e) => form.setCommissionedYear(e.target.value)}
-              placeholder="JJJJ"
+              placeholder={t("yearPlaceholder")}
               inputMode="numeric"
               data-testid="inventarize-year"
             />
@@ -110,34 +112,16 @@ export function InventarizeForm({
           </div>
         </div>
 
-        <div className="p-field">
-          <label htmlFor="inv-cycle">Wartungsintervall (Monate)</label>
-          <input
-            id="inv-cycle"
-            className="t-mono"
-            type="number"
-            min={1}
-            max={120}
-            value={form.maintenanceCycleMonths}
-            onChange={(e) => form.setMaintenanceCycleMonths(e.target.value)}
-            placeholder="z. B. 12"
-            data-testid="inventarize-cycle"
-          />
-          {form.fieldErrors.maintenanceCycleMonths && (
-            <p className="p-err">{form.fieldErrors.maintenanceCycleMonths}</p>
-          )}
-        </div>
-
         <div className="p-inventarize__meta">
           <div className="p-inventarize__meta-row">
-            <span className="p-inventarize__meta-label">Standort</span>
+            <span className="p-inventarize__meta-label">{t("location")}</span>
             <p className="t-mono" data-testid="inventarize-location">
-              {form.locationText || "—"}
+              {form.locationText || tCommon("dash")}
             </p>
           </div>
           <div className="p-inventarize__meta-row">
-            <span className="p-inventarize__meta-label">Einstufung</span>
-            <p className="p-inventarize__badge">Keine Einstufung hinterlegt</p>
+            <span className="p-inventarize__meta-label">{t("classification")}</span>
+            <p className="p-inventarize__badge">{t("noClassification")}</p>
           </div>
         </div>
 
@@ -156,7 +140,7 @@ export function InventarizeForm({
           disabled={form.busy}
           data-testid="inventarize-skip"
         >
-          Nicht aufnehmen
+          {t("skip")}
         </button>
         <button
           type="button"
@@ -165,7 +149,7 @@ export function InventarizeForm({
           disabled={form.busy}
           data-testid="inventarize-submit"
         >
-          {form.busy ? "Speichern…" : "Aufnehmen"}
+          {form.busy ? t("creating") : t("submit")}
         </button>
       </div>
     </div>

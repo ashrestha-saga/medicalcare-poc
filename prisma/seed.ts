@@ -7,6 +7,10 @@ import { PrismaClient } from "@prisma/client";
 import { pathToFileURL } from "node:url";
 import { hashPassword } from "../src/lib/password";
 import { seedRoleGrantsIfEmpty } from "../src/services/roles/roleGrantsService";
+import { dutyService } from "../src/services/registration/dutyService";
+import { seedHandoverInventory } from "./seeds/handoverInventory";
+import { seedPartnerOrgs } from "./seeds/partnerOrgs";
+import { seedRegistrationRef } from "./seeds/registrationRef";
 
 export const SEED = {
   tenantId: "demo-tenant",
@@ -26,11 +30,8 @@ export const SEED = {
     cologneOr: "area-cologne-or",
   },
   models: {
-    // stage 1 + verified rule (manufacturer+model)
     pumpX200: "model-pump-x200",
-    // stage 2 catalog hit + derived rule (EMDN)
     monitorM10: "model-monitor-m10",
-    // stage 2 catalog hit, no rule at all
     ventilatorV3: "model-ventilator-v3",
   },
   instances: {
@@ -42,17 +43,31 @@ export const SEED = {
     monitorM10: "04012345678918",
     ventilatorV3: "04012345678925",
   },
-  rules: {
-    pumpVerified: "rule-pump-x200-verified",
-    monitorDerived: "rule-emdn-z12-derived",
+  classifications: {
+    pump: "cls-pump-x200",
+    monitor: "cls-monitor-m10",
   },
   dispatchTargets: {
+    /** @deprecated legacy ids — remapped to O-INT in seed */
     mail: "dispatch-mail-demo",
     oxid: "dispatch-oxid-demo",
+    msrMail: "dispatch-msr-mail",
+    msrApi: "dispatch-msr-api",
+    rtsMail: "dispatch-rts-mail",
+    rtsApi: "dispatch-rts-api",
+    intMail: "dispatch-mail-demo",
+    intOxid: "dispatch-oxid-demo",
+  },
+  executors: {
+    msr: "exec-o-msr",
+    rts: "exec-o-rts",
+    int: "exec-o-int",
   },
 } as const;
 
 export async function seed(prisma: PrismaClient) {
+  await seedRegistrationRef(prisma);
+
   const tenant = await prisma.tenant.upsert({
     where: { id: SEED.tenantId },
     update: { name: "Demo Clinic" },
@@ -69,10 +84,19 @@ export async function seed(prisma: PrismaClient) {
   for (const u of users) {
     await prisma.user.upsert({
       where: { id: u.id },
-      update: { email: u.email, name: u.name, role: u.role, passwordHash: demoHash, active: true, tenantId: tenant.id },
+      update: {
+        email: u.email,
+        name: u.name,
+        role: u.role,
+        accountKind: "clinic",
+        passwordHash: demoHash,
+        active: true,
+        tenantId: tenant.id,
+      },
       create: {
         id: u.id,
         tenantId: tenant.id,
+        accountKind: "clinic",
         email: u.email,
         name: u.name,
         role: u.role,
@@ -191,6 +215,24 @@ export async function seed(prisma: PrismaClient) {
   const pumpCommissioned = new Date("2023-03-15T00:00:00.000Z");
   const monitorCommissioned = new Date("2024-01-10T00:00:00.000Z");
 
+  await prisma.siteHeadcount.deleteMany({ where: { siteId: { in: [SEED.sites.bonn, SEED.sites.cologne] } } });
+  await prisma.siteHeadcount.create({
+    data: {
+      siteId: SEED.sites.bonn,
+      validFrom: new Date("2024-01-01"),
+      headcount: 18,
+      recordedBy: "seed",
+    },
+  });
+  await prisma.siteHeadcount.create({
+    data: {
+      siteId: SEED.sites.cologne,
+      validFrom: new Date("2024-01-01"),
+      headcount: 12,
+      recordedBy: "seed",
+    },
+  });
+
   await prisma.deviceInstance.upsert({
     where: { id: SEED.instances.pump },
     update: {
@@ -199,6 +241,9 @@ export async function seed(prisma: PrismaClient) {
       nextMaintenanceDueAt: new Date("2024-03-15T00:00:00.000Z"),
       responsibleUserId: SEED.users.anna,
       responsiblePerson: "Anna Technik",
+      state: "released",
+      source: "manual",
+      productKindCode: "aktiv-therapie",
     },
     create: {
       id: SEED.instances.pump,
@@ -214,6 +259,9 @@ export async function seed(prisma: PrismaClient) {
       maintenanceCycleMonths: 12,
       maintenanceAnchorAt: pumpCommissioned,
       nextMaintenanceDueAt: new Date("2024-03-15T00:00:00.000Z"),
+      state: "released",
+      source: "manual",
+      productKindCode: "aktiv-therapie",
     },
   });
 
@@ -223,6 +271,9 @@ export async function seed(prisma: PrismaClient) {
       maintenanceCycleMonths: 12,
       maintenanceAnchorAt: monitorCommissioned,
       nextMaintenanceDueAt: new Date("2025-01-10T00:00:00.000Z"),
+      state: "released",
+      source: "manual",
+      productKindCode: "messgeraet",
     },
     create: {
       id: SEED.instances.monitor,
@@ -236,67 +287,64 @@ export async function seed(prisma: PrismaClient) {
       maintenanceCycleMonths: 12,
       maintenanceAnchorAt: monitorCommissioned,
       nextMaintenanceDueAt: new Date("2025-01-10T00:00:00.000Z"),
+      state: "released",
+      source: "manual",
+      productKindCode: "messgeraet",
     },
   });
 
-  await prisma.classificationRule.upsert({
-    where: { id: SEED.rules.pumpVerified },
-    update: {},
-    create: {
-      id: SEED.rules.pumpVerified,
-      matchType: "manufacturerModel",
-      matchValue: "Example Medical|X200",
-      annex1: true,
-      annex2: false,
-      softwareClass: null,
-      radiation: false,
-      confidence: "verified",
-      source: "seed: manufacturer classification letter 2024-06",
-      validFrom: new Date("2024-06-01T00:00:00.000Z"),
-    },
+  await prisma.deviceModelClassification.updateMany({
+    where: { deviceModelId: { in: [SEED.models.pumpX200, SEED.models.monitorM10] }, validTo: null },
+    data: { validTo: new Date() },
   });
-
-  await prisma.classificationRule.upsert({
-    where: { id: SEED.rules.monitorDerived },
-    update: {},
-    create: {
-      id: SEED.rules.monitorDerived,
-      matchType: "emdn",
-      matchValue: "Z120501",
-      annex1: true,
-      annex2: null,
-      softwareClass: null,
-      radiation: false,
-      confidence: "derived",
-      source: "seed: EMDN group heuristic",
-    },
-  });
-
-  await prisma.classificationProposal.deleteMany({
-    where: { deviceModelId: { in: [SEED.models.pumpX200, SEED.models.monitorM10] } },
-  });
-  await prisma.classificationProposal.create({
-    data: {
+  await prisma.deviceModelClassification.upsert({
+    where: { id: SEED.classifications.pump },
+    update: {
       deviceModelId: SEED.models.pumpX200,
-      ruleId: SEED.rules.pumpVerified,
-      annex1: true,
-      annex2: false,
-      softwareClass: null,
+      stk: true,
       radiation: false,
+      softwareClass: null,
       confidence: "verified",
-      source: "seed: manufacturer classification letter 2024-06",
+      evidenceText: "seed: manufacturer classification letter 2024-06",
+      ruleSetId: "rs-mpbetreibv",
+      confirmedBy: "seed",
+      confirmedAt: new Date("2024-06-01T00:00:00.000Z"),
+      validTo: null,
+    },
+    create: {
+      id: SEED.classifications.pump,
+      deviceModelId: SEED.models.pumpX200,
+      stk: true,
+      radiation: false,
+      softwareClass: null,
+      confidence: "verified",
+      evidenceText: "seed: manufacturer classification letter 2024-06",
+      ruleSetId: "rs-mpbetreibv",
+      confirmedBy: "seed",
+      confirmedAt: new Date("2024-06-01T00:00:00.000Z"),
     },
   });
-  await prisma.classificationProposal.create({
-    data: {
+  await prisma.deviceModelClassification.upsert({
+    where: { id: SEED.classifications.monitor },
+    update: {
       deviceModelId: SEED.models.monitorM10,
-      ruleId: SEED.rules.monitorDerived,
-      annex1: true,
-      annex2: null,
-      softwareClass: null,
+      stk: true,
       radiation: false,
+      softwareClass: null,
       confidence: "derived",
-      source: "seed: EMDN group heuristic",
+      evidenceText: "seed: EMDN group heuristic",
+      ruleSetId: "rs-mpbetreibv",
+      validTo: null,
+    },
+    create: {
+      id: SEED.classifications.monitor,
+      deviceModelId: SEED.models.monitorM10,
+      stk: true,
+      radiation: false,
+      softwareClass: null,
+      confidence: "derived",
+      evidenceText: "seed: EMDN group heuristic",
+      ruleSetId: "rs-mpbetreibv",
     },
   });
 
@@ -305,53 +353,144 @@ export async function seed(prisma: PrismaClient) {
     port: 587,
     secure: false,
     user: "noreply@mhosts.de",
-    pass: "123456",
+    pass: "2mtyz^tE",
     from: "noreply@mhosts.de",
   };
 
-  await prisma.dispatchTarget.upsert({
-    where: { id: SEED.dispatchTargets.mail },
-    update: {
-      endpoint: "service@plusorder.de",
-      enabled: true,
+  const executors = [
+    { id: SEED.executors.msr, code: "O-MSR", name: "Medtech Service Rhein GmbH", kind: "external", sortOrder: 1 },
+    { id: SEED.executors.rts, code: "O-RTS", name: "Radiotec Service", kind: "external", sortOrder: 2 },
+    { id: SEED.executors.int, code: "O-INT", name: "Eigene Medizintechnik", kind: "internal", sortOrder: 3 },
+  ] as const;
+  for (const ex of executors) {
+    await prisma.executorOrg.upsert({
+      where: { tenantId_code: { tenantId: tenant.id, code: ex.code } },
+      update: { name: ex.name, kind: ex.kind, active: true, sortOrder: ex.sortOrder },
+      create: {
+        id: ex.id,
+        tenantId: tenant.id,
+        code: ex.code,
+        name: ex.name,
+        kind: ex.kind,
+        active: true,
+        sortOrder: ex.sortOrder,
+      },
+    });
+  }
+
+  // Per-org channels — each partner owns mail + API (enabled independently).
+  const orgTargets: {
+    id: string;
+    executorOrgId: string;
+    type: string;
+    name: string;
+    endpoint: string | null;
+    auth?: string;
+    retryPolicy?: string;
+  }[] = [
+    {
+      id: SEED.dispatchTargets.msrMail,
+      executorOrgId: SEED.executors.msr,
+      type: "mail",
+      name: "MSR mailbox",
+      endpoint: "msr@medtech-rhein.example",
       auth: JSON.stringify(mailSmtpAuth),
     },
-    create: {
-      id: SEED.dispatchTargets.mail,
-      tenantId: tenant.id,
+    {
+      id: SEED.dispatchTargets.msrApi,
+      executorOrgId: SEED.executors.msr,
+      type: "webhook",
+      name: "MSR partner API",
+      endpoint: "mock://ok",
+    },
+    {
+      id: SEED.dispatchTargets.rtsMail,
+      executorOrgId: SEED.executors.rts,
+      type: "mail",
+      name: "RTS mailbox",
+      endpoint: "service@radiotec.example",
+      auth: JSON.stringify(mailSmtpAuth),
+    },
+    {
+      id: SEED.dispatchTargets.rtsApi,
+      executorOrgId: SEED.executors.rts,
+      type: "webhook",
+      name: "RTS partner API",
+      endpoint: "mock://ok",
+    },
+    {
+      id: SEED.dispatchTargets.intMail,
+      executorOrgId: SEED.executors.int,
       type: "mail",
       name: "Medical technology mailbox",
       endpoint: "service@plusorder.de",
       auth: JSON.stringify(mailSmtpAuth),
-      enabled: true,
     },
-  });
-  await prisma.dispatchTarget.upsert({
-    where: { id: SEED.dispatchTargets.oxid },
-    update: {},
-    create: {
-      id: SEED.dispatchTargets.oxid,
-      tenantId: tenant.id,
+    {
+      id: SEED.dispatchTargets.intOxid,
+      executorOrgId: SEED.executors.int,
       type: "oxid",
       name: "OXID service desk",
-      endpoint: null, // ⚠ PENDING API SPEC — mock adapter until then
-      enabled: true,
+      endpoint: null,
       retryPolicy: JSON.stringify({ maxAttempts: 3, backoffMs: 2000 }),
     },
+  ];
+
+  for (const t of orgTargets) {
+    await prisma.dispatchTarget.upsert({
+      where: { id: t.id },
+      update: {
+        executorOrgId: t.executorOrgId,
+        type: t.type,
+        name: t.name,
+        endpoint: t.endpoint,
+        auth: t.auth ?? null,
+        retryPolicy: t.retryPolicy ?? null,
+        enabled: true,
+      },
+      create: {
+        id: t.id,
+        tenantId: tenant.id,
+        executorOrgId: t.executorOrgId,
+        type: t.type,
+        name: t.name,
+        endpoint: t.endpoint,
+        auth: t.auth ?? null,
+        retryPolicy: t.retryPolicy ?? null,
+        enabled: true,
+      },
+    });
+  }
+
+  // Disable any leftover unowned targets from earlier seeds.
+  await prisma.dispatchTarget.updateMany({
+    where: { tenantId: tenant.id, executorOrgId: null },
+    data: { enabled: false },
   });
 
   const roleGrantsCreated = await seedRoleGrantsIfEmpty(prisma);
 
+  const partners = await seedPartnerOrgs(prisma, tenant.id);
+
+  // Handover testdaten → existing Prisma models only; all under demo-tenant.
+  const handover = await seedHandoverInventory(prisma, tenant.id);
+
+  const dutiesBackfilled = await dutyService.backfillDueDates(prisma);
+
   return {
     tenant: tenant.id,
     users: users.length,
-    sites: 2,
-    areas: 3,
-    models: 3,
-    instances: 2,
-    rules: 2,
-    dispatchTargets: 2,
+    sites: 2 + handover.sites,
+    areas: 3 + handover.areas,
+    models: 3 + handover.models,
+    instances: 2 + handover.instances,
+    classifications: 2 + handover.classifications,
+    dispatchTargets: orgTargets.length,
+    executorOrgs: executors.length,
     roleGrantsCreated,
+    partners,
+    handover,
+    dutiesBackfilled,
   };
 }
 

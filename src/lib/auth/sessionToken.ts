@@ -10,6 +10,18 @@ export interface SessionPayload {
   exp: number;
 }
 
+function isValidSessionUser(user: SessionUser | undefined): user is SessionUser {
+  if (!user?.id) return false;
+  const kind = user.accountKind ?? "clinic";
+  if (kind === "partner") return Boolean(user.organisationId);
+  return Boolean(user.tenantId);
+}
+
+function normalizeSessionUser(user: SessionUser): SessionUser {
+  const kind = user.accountKind ?? "clinic";
+  return { ...user, accountKind: kind };
+}
+
 /** Pure cookie token helpers — safe to import from Playwright (no next/headers). */
 export function encodeSessionPayload(payload: SessionPayload, secret: string): string {
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -19,7 +31,7 @@ export function encodeSessionPayload(payload: SessionPayload, secret: string): s
 
 export function buildSessionToken(user: SessionUser, secret: string, ttlSeconds = SESSION_TTL_SECONDS): string {
   const now = Math.floor(Date.now() / 1000);
-  return encodeSessionPayload({ user, iat: now, exp: now + ttlSeconds }, secret);
+  return encodeSessionPayload({ user: normalizeSessionUser(user), iat: now, exp: now + ttlSeconds }, secret);
 }
 
 export function decodeSessionToken(token: string | undefined, secret: string): SessionPayload | null {
@@ -31,7 +43,8 @@ export function decodeSessionToken(token: string | undefined, secret: string): S
   try {
     const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as SessionPayload;
     if (typeof payload.exp !== "number" || payload.exp < Date.now() / 1000) return null;
-    if (!payload.user?.id || !payload.user?.tenantId) return null;
+    if (!isValidSessionUser(payload.user)) return null;
+    payload.user = normalizeSessionUser(payload.user);
     return payload;
   } catch {
     return null;

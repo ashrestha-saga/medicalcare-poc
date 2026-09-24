@@ -3,25 +3,30 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useSession } from "@/hooks/useSession";
 import { useSessionStore } from "@/store/sessionStore";
 import { useSites } from "@/components/hooks/location/useSites";
 import { OfflineBar } from "@/components/ui/OfflineBar";
-import { roleLabel } from "@/constants/roles";
+import { LocaleToggle } from "@/components/features/shared/LocaleToggle";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { api } from "@/lib/http/apiClient";
 import { useCapturerInventoryUi } from "@/store/capturerInventoryStore";
 import {
   CatalogIcon,
+  DueDatesIcon,
   InventoryIcon,
   LocationsIcon,
   LogoutIcon,
+  ManagementIcon,
   MenuIcon,
+  RegistrationIcon,
   RequestsIcon,
   RolesIcon,
   SecurityIcon,
   SettingsIcon,
+  TrainingIcon,
   UsersIcon,
 } from "./navIcons";
 
@@ -48,6 +53,9 @@ function AccountBar({
   onOpenInventory?: () => void;
   showSecurity?: boolean;
 }) {
+  const t = useTranslations("nav");
+  const tCap = useTranslations("capturer");
+  const tRoles = useTranslations("roles");
   const user = useSessionStore((s) => s.user);
   const tenantName = useSessionStore((s) => s.tenantName);
   const lock = useSessionStore((s) => s.lock);
@@ -58,8 +66,9 @@ function AccountBar({
   const siteDelivery = site ? (area ? `${site.name} · ${area.name}` : site.name) : null;
   const org = user?.companyName?.trim() || tenantName || null;
   const deliveryLine = user?.deliveryLine || siteDelivery || "—";
-  const countLabel =
-    inventoryCount == null ? "…" : String(inventoryCount);
+  const countLabel = inventoryCount == null ? "…" : String(inventoryCount);
+  const roleKey = user?.role;
+  const roleText = roleKey ? tRoles(roleKey) : "—";
 
   return (
     <div className="p-acctbar on">
@@ -68,7 +77,7 @@ function AccountBar({
           {user?.name}
           {org ? ` · ${org}` : ""}
         </b>
-        <span>{subtitle ?? `Lieferung: ${deliveryLine}`}</span>
+        <span>{subtitle ?? t("delivery", { line: deliveryLine })}</span>
       </div>
       {showInventory && onOpenInventory && (
         <button
@@ -76,28 +85,29 @@ function AccountBar({
           className="k p-acctbar__inventory"
           onClick={onOpenInventory}
           data-testid="capturer-inventory-button"
-          title="Bestandsverzeichnis"
+          title={tCap("buttonTitle")}
         >
-          Bestand
+          {tCap("button")}
           <span className="p-acctbar__inventory-count">{countLabel}</span>
         </button>
       )}
       {showSecurity && (
-        <Link href="/security" className="k" data-testid="capturer-security-link" title="Security">
+        <Link href="/security" className="k" data-testid="capturer-security-link" title={tCap("security")}>
           2FA
         </Link>
       )}
       <span className="k" data-testid="user-role">
-        {roleLabel(user?.role)}
+        {roleText}
       </span>
+      <LocaleToggle />
       {pinHash && (
         <button type="button" className="k" onClick={lock} data-testid="lock-button">
-          LOCK
+          {t("lock")}
         </button>
       )}
       {showLogout && (
-        <button type="button" className="k" onClick={onSignOut} data-testid="sign-out" title="Logout">
-          Logout
+        <button type="button" className="k" onClick={onSignOut} data-testid="sign-out" title={t("logout")}>
+          {t("logout")}
         </button>
       )}
     </div>
@@ -105,11 +115,15 @@ function AccountBar({
 }
 
 function NavIcon({ id }: { id: MenuModuleId }) {
+  if (id === "registration") return <RegistrationIcon />;
+  if (id === "due-dates") return <DueDatesIcon />;
+  if (id === "training") return <TrainingIcon />;
   if (id === "catalog") return <CatalogIcon />;
   if (id === "requests") return <RequestsIcon />;
   if (id === "users") return <UsersIcon />;
   if (id === "locations") return <LocationsIcon />;
   if (id === "roles") return <RolesIcon />;
+  if (id === "management") return <ManagementIcon />;
   if (id === "security") return <SecurityIcon />;
   if (id === "settings") return <SettingsIcon />;
   return <InventoryIcon />;
@@ -117,11 +131,16 @@ function NavIcon({ id }: { id: MenuModuleId }) {
 
 function isNavActive(id: MenuModuleId, pathname: string): boolean {
   if (id === "inventory") return pathname.startsWith("/devices");
+  if (id === "registration") return pathname.startsWith("/registration");
+  if (id === "due-dates") return pathname.startsWith("/due-dates");
+  if (id === "training") return pathname.startsWith("/training");
   if (id === "catalog") return pathname.startsWith("/catalog");
+  if (id === "clarifications") return pathname.startsWith("/clarifications");
   if (id === "requests") return pathname.startsWith("/requests");
   if (id === "users") return pathname.startsWith("/users");
   if (id === "locations") return pathname.startsWith("/locations");
   if (id === "roles") return pathname.startsWith("/roles");
+  if (id === "management") return pathname.startsWith("/management");
   if (id === "security") return pathname.startsWith("/security");
   if (id === "settings") return pathname.startsWith("/settings");
   return false;
@@ -142,6 +161,7 @@ export function AppShell({
   accountSubtitle?: string;
   testId?: string;
 }) {
+  const t = useTranslations("nav");
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const { signOut } = useSession();
@@ -186,7 +206,7 @@ export function AppShell({
           <button
             type="button"
             className="p-nav-toggle"
-            aria-label={open ? "Collapse navigation" : "Expand navigation"}
+            aria-label={open ? t("collapse") : t("expand")}
             aria-expanded={open}
             data-testid="nav-toggle"
             onClick={() => setOpen((v) => !v)}
@@ -194,7 +214,7 @@ export function AppShell({
             <MenuIcon />
           </button>
 
-          <aside className="p-nav" aria-label="Main navigation" data-testid="app-nav">
+          <aside className="p-nav" aria-label={t("main")} data-testid="app-nav">
             <nav className="p-nav__primary">
               {primary.map((item) => {
                 const active = isNavActive(item.id, pathname);
@@ -204,11 +224,11 @@ export function AppShell({
                     href={item.href}
                     className={navItemClass(active)}
                     aria-current={active ? "page" : undefined}
-                    title={item.label}
+                    title={t(item.id as "inventory")}
                     data-testid={`nav-${item.id}`}
                   >
                     <NavIcon id={item.id} />
-                    <span className="p-nav__label">{item.label}</span>
+                    <span className="p-nav__label">{t(item.id as "inventory")}</span>
                   </Link>
                 );
               })}
@@ -219,23 +239,23 @@ export function AppShell({
                 <Link
                   href={settingsItem.href}
                   className={navItemClass(settingsActive)}
-                  title="Settings"
+                  title={t("settings")}
                   data-testid="settings-button"
                   aria-current={settingsActive ? "page" : undefined}
                 >
                   <SettingsIcon />
-                  <span className="p-nav__label">Settings</span>
+                  <span className="p-nav__label">{t("settings")}</span>
                 </Link>
               )}
               <button
                 type="button"
                 className={navItemClass(false)}
-                title="Logout"
+                title={t("logout")}
                 data-testid="sign-out"
                 onClick={() => void signOut()}
               >
                 <LogoutIcon />
-                <span className="p-nav__label">Logout</span>
+                <span className="p-nav__label">{t("logout")}</span>
               </button>
             </div>
           </aside>

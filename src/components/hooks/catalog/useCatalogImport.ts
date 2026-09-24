@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { CatalogModelImportResult } from "@/interfaces";
 import { ApiError } from "@/lib/http/apiClient";
 import { toast } from "@/store/toastStore";
@@ -13,6 +14,7 @@ export function useCatalogImport({
   onOpenChange: (open: boolean) => void;
   onImport: (file: File) => Promise<CatalogModelImportResult>;
 }) {
+  const t = useTranslations("pages.catalog");
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,7 +41,7 @@ export function useCatalogImport({
 
   const runImport = useCallback(async () => {
     if (!file) {
-      toast.error("Choose an Excel or CSV file first.");
+      toast.error(t("toastChooseFile"));
       return;
     }
     setBusy(true);
@@ -47,11 +49,11 @@ export function useCatalogImport({
       const res = await onImport(file);
       setResult(res);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Import failed.");
+      toast.error(err instanceof ApiError ? err.message : t("toastImportFailed"));
     } finally {
       setBusy(false);
     }
-  }, [file, onImport]);
+  }, [file, onImport, t]);
 
   return {
     inputRef,

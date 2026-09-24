@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { SiteDTO } from "@/interfaces";
 import { ApiError } from "@/lib/http/apiClient";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ interface LocationsTableProps {
 }
 
 export function LocationsTable({ list }: LocationsTableProps) {
+  const tFilters = useTranslations("filters");
   const form = useLocationAdminForm(() => void list.refresh());
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keywordInput, setKeywordInput] = useState(list.q);
@@ -83,7 +85,7 @@ export function LocationsTable({ list }: LocationsTableProps) {
 
   return (
     <>
-      <div className="space-y-3 px-4 pb-4 sm:px-[18px]" data-testid="locations-list">
+      <div className="space-y-3" data-testid="locations-list">
         <DataTable
           data={list.sites}
           columns={columns}
@@ -97,7 +99,7 @@ export function LocationsTable({ list }: LocationsTableProps) {
           totalItems={list.sites.length}
           getRowId={(row) => row.id}
           emptyMessage="No locations yet."
-          searchPlaceholder="Designation, identifier, address…"
+          searchPlaceholder={tFilters("searchLocations")}
           toolbarTrailing={trailing}
         />
       </div>

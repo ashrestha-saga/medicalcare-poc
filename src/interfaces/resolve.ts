@@ -1,8 +1,9 @@
-import type { ClassificationProposalDTO } from "./classification";
 import type { DeviceInstanceDTO, DeviceModelDTO } from "./device";
 
 /** FA-100 — the four stages, in order. */
 export type ResolutionStage = "inventory" | "catalog" | "beudamed" | "capture";
+/** @deprecated Prefer ResolutionStage */
+export type ResolveStage = ResolutionStage;
 
 export type IdentifierKind = "gtin" | "udi-di" | "inventory" | "serial" | "unknown";
 
@@ -37,7 +38,6 @@ export interface ResolveResponse {
   identifier: ParsedIdentifier;
   device?: DeviceInstanceDTO;
   model?: DeviceModelDTO;
-  classificationProposal?: ClassificationProposalDTO;
   source: ResolveSource;
   correlationId: string;
 }

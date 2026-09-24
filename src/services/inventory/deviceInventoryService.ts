@@ -14,6 +14,7 @@ import {
   computeNextMaintenanceDueAt,
   resolveMaintenanceCycleMonths,
 } from "@/lib/maintenance/schedule";
+import { listDutiesForInstance, nextObligationDueAt, syncWartungDutyOnComplete } from "@/services/registration/dutyService";
 import type { CreateDeviceInput, UpdateDeviceInput } from "@/schemas/device";
 import { userOptionsService } from "@/services/users/userOptionsService";
 import { Prisma } from "@prisma/client";
@@ -47,9 +48,8 @@ export interface InventoryResolver {
 }
 
 const include = {
-  model: true,
+  model: { include: { classifications: { where: { validTo: null }, take: 1, orderBy: { validFrom: "desc" as const } } } },
   area: { include: { site: true } },
-  classification: true,
   responsibleUser: { select: { id: true, name: true, email: true } },
 } as const;
 
@@ -75,47 +75,15 @@ async function resolveModelClassification(
 ): Promise<ModelClassificationDTO | null> {
   if (!modelId) return null;
 
-  const [proposal, instanceCount] = await Promise.all([
-    prisma.classificationProposal.findFirst({
-      where: { deviceModelId: modelId },
-      orderBy: { createdAt: "desc" },
+  const [cls, instanceCount] = await Promise.all([
+    prisma.deviceModelClassification.findFirst({
+      where: { deviceModelId: modelId, validTo: null },
+      orderBy: { validFrom: "desc" },
     }),
     prisma.deviceInstance.count({ where: { modelId } }),
   ]);
 
-  if (proposal) {
-    return {
-      annex1: proposal.annex1,
-      annex2: proposal.annex2,
-      softwareClass: proposal.softwareClass,
-      radiation: proposal.radiation,
-      confidence: proposal.confidence,
-      source: proposal.source,
-      instanceCount,
-    };
-  }
-
-  const model = await prisma.deviceModel.findUnique({ where: { id: modelId } });
-  if (!model) return null;
-
-  const rule =
-    (model.emdnCode
-      ? await prisma.classificationRule.findFirst({
-          where: { matchType: "emdn", matchValue: model.emdnCode },
-          orderBy: { createdAt: "desc" },
-        })
-      : null) ??
-    (model.manufacturer && model.modelName
-      ? await prisma.classificationRule.findFirst({
-          where: {
-            matchType: "manufacturerModel",
-            matchValue: `${model.manufacturer}|${model.modelName}`,
-          },
-          orderBy: { createdAt: "desc" },
-        })
-      : null);
-
-  if (!rule) {
+  if (!cls) {
     return {
       annex1: null,
       annex2: null,
@@ -128,12 +96,12 @@ async function resolveModelClassification(
   }
 
   return {
-    annex1: rule.annex1,
-    annex2: rule.annex2,
-    softwareClass: rule.softwareClass,
-    radiation: rule.radiation,
-    confidence: rule.confidence,
-    source: rule.source,
+    annex1: cls.stk,
+    annex2: cls.mtkItemId != null || Boolean(cls.evidenceText?.includes("annex2-asserted")),
+    softwareClass: cls.softwareClass,
+    radiation: cls.radiation,
+    confidence: cls.confidence,
+    source: cls.evidenceText,
     instanceCount,
   };
 }
@@ -145,6 +113,7 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
     base.inspectionTags.length > 0
       ? base.inspectionTags
       : inspectionTagsFromFlags(modelClassification);
+  const duties = await listDutiesForInstance(row.tenantId, row.id);
   return {
     ...base,
     inspectionTags,
@@ -178,6 +147,8 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
           ]
         : []),
     ],
+    duties,
+    nextObligationDueAt: nextObligationDueAt(duties),
   };
 }
 
@@ -272,29 +243,7 @@ export const deviceInventoryService: InventoryResolver & {
       take: 500,
     });
 
-    const dtos = rows.map(toDeviceInstanceDTO);
-    const modelIds = [
-      ...new Set(dtos.map((d) => d.modelId).filter((id): id is string => Boolean(id))),
-    ];
-    if (!modelIds.length) return dtos;
-
-    const proposals = await prisma.classificationProposal.findMany({
-      where: { deviceModelId: { in: modelIds } },
-      orderBy: { createdAt: "desc" },
-    });
-    const latestByModel = new Map<string, (typeof proposals)[number]>();
-    for (const p of proposals) {
-      if (!latestByModel.has(p.deviceModelId)) latestByModel.set(p.deviceModelId, p);
-    }
-
-    return dtos.map((dto) => {
-      if (dto.inspectionTags.length || !dto.modelId) return dto;
-      const proposal = latestByModel.get(dto.modelId);
-      return {
-        ...dto,
-        inspectionTags: inspectionTagsFromFlags(proposal),
-      };
-    });
+    return rows.map(toDeviceInstanceDTO);
   },
 
   async get(ctx, id) {
@@ -353,15 +302,18 @@ export const deviceInventoryService: InventoryResolver & {
 
     const commissionedAt = parseCommissionedAt(input.commissionedAt) ?? null;
     const now = new Date();
-    const cycleMonths = resolveMaintenanceCycleMonths(
-      input.maintenanceCycleMonths,
-      model.maintenanceCycleMonths,
-    );
+    // Inventarize path: do not set a maintenance cycle — Erstanlage derives it from duties.
+    const cycleMonths =
+      input.maintenanceCycleMonths !== undefined && input.maintenanceCycleMonths !== null
+        ? resolveMaintenanceCycleMonths(input.maintenanceCycleMonths, null)
+        : null;
     const maintenanceAnchorAt = commissionedAt ?? now;
-    const nextMaintenanceDueAt = computeNextMaintenanceDueAt({
-      cycleMonths,
-      anchorAt: maintenanceAnchorAt,
-    });
+    const nextMaintenanceDueAt = cycleMonths
+      ? computeNextMaintenanceDueAt({
+          cycleMonths,
+          anchorAt: maintenanceAnchorAt,
+        })
+      : null;
 
     const responsible =
       input.responsibleUserId !== undefined
@@ -391,11 +343,15 @@ export const deviceInventoryService: InventoryResolver & {
             maintenanceAnchorAt,
             lastMaintainedAt: null,
             nextMaintenanceDueAt,
+            state: "draft",
+            source: "wizard",
+            createdByUserId: ctx.user.id,
           },
           include,
         });
       });
-      return toDetailDTO(created);
+      const detail = await toDetailDTO(created);
+      return { ...detail, registrationPath: `/registration/${created.id}` };
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
         throw conflict("Inventory number already in use. Please try again.");
@@ -409,6 +365,57 @@ export const deviceInventoryService: InventoryResolver & {
     const existing = await loadInstance(id, ctx.tenantId);
     if (!existing) throw notFound("Device not found.");
 
+    if (existing.model?.state && existing.model.state !== "released") {
+      throw unprocessable(
+        "Catalog model is under review — inventory details cannot be edited until the model is released.",
+        { field: "modelState", modelState: existing.model.state },
+      );
+    }
+
+    const nextState = input.state ?? existing.state;
+    const identityMutable = nextState !== "released" && nextState !== "retired";
+
+    if (existing.state === "released" && nextState === "released") {
+      const nextCommissionedPreview = parseCommissionedAt(input.commissionedAt);
+      const commissionedChanged =
+        input.commissionedAt !== undefined &&
+        (() => {
+          const raw = input.commissionedAt;
+          if (raw === null || (typeof raw === "string" && raw.trim() === "")) {
+            return existing.commissionedAt != null;
+          }
+          if (typeof raw === "string" && /^\d{4}$/.test(raw.trim())) {
+            return (
+              existing.commissionedAt == null ||
+              Number(raw.trim()) !== existing.commissionedAt.getUTCFullYear()
+            );
+          }
+          return (
+            (nextCommissionedPreview?.getTime() ?? null) !==
+            (existing.commissionedAt?.getTime() ?? null)
+          );
+        })();
+      const identityChanged =
+        (input.inventoryNumber !== undefined &&
+          input.inventoryNumber !== existing.inventoryNumber) ||
+        (input.serialNumber !== undefined &&
+          (input.serialNumber ?? null) !== (existing.serialNumber ?? null)) ||
+        commissionedChanged ||
+        (input.tradeName !== undefined &&
+          (input.tradeName ?? null) !== (existing.model?.tradeName ?? null)) ||
+        (input.modelName !== undefined &&
+          (input.modelName ?? null) !== (existing.model?.modelName ?? null)) ||
+        (input.manufacturer !== undefined &&
+          (input.manufacturer ?? null) !== (existing.model?.manufacturer ?? null)) ||
+        (input.udiDi !== undefined &&
+          (input.udiDi ?? null) !== (existing.model?.udiDi ?? null));
+      if (identityChanged) {
+        throw unprocessable("Released records are immutable (identity/classification).", {
+          field: "state",
+        });
+      }
+    }
+
     if (input.areaId) {
       const area = await prisma.area.findFirst({
         where: { id: input.areaId, site: { tenantId: ctx.tenantId } },
@@ -416,7 +423,11 @@ export const deviceInventoryService: InventoryResolver & {
       if (!area) throw unprocessable("Unknown area for this tenant.", { field: "areaId" });
     }
 
-    if (input.inventoryNumber && input.inventoryNumber !== existing.inventoryNumber) {
+    if (
+      identityMutable &&
+      input.inventoryNumber &&
+      input.inventoryNumber !== existing.inventoryNumber
+    ) {
       const clash = await prisma.deviceInstance.findFirst({
         where: {
           tenantId: ctx.tenantId,
@@ -427,7 +438,7 @@ export const deviceInventoryService: InventoryResolver & {
       if (clash) throw conflict("Inventory number already in use.");
     }
 
-    const commissionedAt = parseCommissionedAt(input.commissionedAt);
+    const commissionedAt = identityMutable ? parseCommissionedAt(input.commissionedAt) : undefined;
 
     let responsiblePatch: { responsibleUserId: string | null; responsiblePerson: string | null } | undefined;
     if (input.responsibleUserId !== undefined) {
@@ -474,12 +485,25 @@ export const deviceInventoryService: InventoryResolver & {
         await tx.deviceInstance.update({
           where: { id },
           data: {
-            ...(input.inventoryNumber !== undefined ? { inventoryNumber: input.inventoryNumber } : {}),
-            ...(input.serialNumber !== undefined ? { serialNumber: input.serialNumber } : {}),
+            ...(input.state !== undefined ? { state: input.state } : {}),
+            ...(input.state === "retired" && existing.state !== "retired"
+              ? { retiredAt: new Date() }
+              : {}),
+            ...(input.state !== undefined &&
+            input.state !== "retired" &&
+            existing.retiredAt != null
+              ? { retiredAt: null }
+              : {}),
+            ...(identityMutable && input.inventoryNumber !== undefined
+              ? { inventoryNumber: input.inventoryNumber }
+              : {}),
+            ...(identityMutable && input.serialNumber !== undefined
+              ? { serialNumber: input.serialNumber }
+              : {}),
             ...(responsiblePatch ?? {}),
             ...(input.room !== undefined ? { room: input.room } : {}),
             ...(input.areaId !== undefined ? { areaId: input.areaId } : {}),
-            ...(commissionedAt !== undefined ? { commissionedAt } : {}),
+            ...(identityMutable && commissionedAt !== undefined ? { commissionedAt } : {}),
             ...(input.maintenanceCycleMonths !== undefined
               ? { maintenanceCycleMonths: input.maintenanceCycleMonths }
               : {}),
@@ -511,15 +535,21 @@ export const deviceInventoryService: InventoryResolver & {
           });
         }
 
-        const modelPatch = {
-          ...(input.tradeName !== undefined ? { tradeName: input.tradeName } : {}),
-          ...(input.modelName !== undefined ? { modelName: input.modelName } : {}),
-          ...(input.manufacturer !== undefined ? { manufacturer: input.manufacturer } : {}),
-          ...(input.udiDi !== undefined ? { udiDi: input.udiDi } : {}),
-          ...(input.modelMaintenanceCycleMonths !== undefined
-            ? { maintenanceCycleMonths: input.modelMaintenanceCycleMonths }
-            : {}),
-        };
+        const modelPatch = identityMutable
+          ? {
+              ...(input.tradeName !== undefined ? { tradeName: input.tradeName } : {}),
+              ...(input.modelName !== undefined ? { modelName: input.modelName } : {}),
+              ...(input.manufacturer !== undefined ? { manufacturer: input.manufacturer } : {}),
+              ...(input.udiDi !== undefined ? { udiDi: input.udiDi } : {}),
+              ...(input.modelMaintenanceCycleMonths !== undefined
+                ? { maintenanceCycleMonths: input.modelMaintenanceCycleMonths }
+                : {}),
+            }
+          : {
+              ...(input.modelMaintenanceCycleMonths !== undefined
+                ? { maintenanceCycleMonths: input.modelMaintenanceCycleMonths }
+                : {}),
+            };
         if (existing.modelId && Object.keys(modelPatch).length > 0) {
           await tx.deviceModel.update({
             where: { id: existing.modelId },
@@ -587,6 +617,11 @@ export const deviceInventoryService: InventoryResolver & {
           note: input?.note?.trim() || null,
           actorUserId: ctx.user.id,
         },
+      });
+      await syncWartungDutyOnComplete(tx, {
+        tenantId: ctx.tenantId,
+        deviceInstanceId: id,
+        performedAt,
       });
     });
 

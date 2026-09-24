@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type {
   CatalogDetailProps,
   CatalogModelDetailDTO,
@@ -48,10 +50,11 @@ function formatWhen(iso: string): string {
 }
 
 export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailProps) {
+  const tClass = useTranslations("classificationOptions");
   const detail = isDetail(model) ? model : null;
   const status = catalogStateBadge(model.state);
   const meta = [catalogShortId(model.id), model.manufacturer, `v${model.version}`].filter(Boolean).join(" · ");
-  const options = catalogClassificationOptions(model.classification);
+  const options = catalogClassificationOptions(model.classification, tClass);
   const spread = detail?.spread ?? [];
 
   return (
@@ -85,6 +88,16 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2">
               <FieldBox label="Basic UDI-DI" value={model.basicUdiDi ?? "—"} />
+              <FieldBox
+                label="GTIN"
+                value={
+                  [model.udiDi, ...model.gtins]
+                    .map((v) => v?.trim())
+                    .filter((v): v is string => Boolean(v))
+                    .filter((v, i, arr) => arr.indexOf(v) === i)
+                    .join(", ") || "—"
+                }
+              />
               <FieldBox label="GMDN / EMDN" value={catalogGmdnEmdn(model)} />
               <FieldBox label="Manufacturer" value={model.manufacturer ?? "—"} />
               <FieldBox label="Data source" value={catalogSourceLabel(model.source)} />
@@ -101,8 +114,8 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base lowercase">classification</CardTitle>
-              <CardDescription>determines all inspection requirements for the copies.</CardDescription>
+              <CardTitle className="text-base lowercase">{tClass("sectionTitle")}</CardTitle>
+              <CardDescription>{tClass("sectionDescription")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {options.map((opt) => (
@@ -117,14 +130,27 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
                   </span>
                 </label>
               ))}
+              {model.classification?.confidence ? (
+                <p className="text-xs text-muted-foreground">
+                  Confidence: <span className="uppercase">{model.classification.confidence}</span>
+                  {model.classification.source ? ` · ${model.classification.source}` : ""}
+                </p>
+              ) : null}
               <Alert variant="info">
                 <Info className="h-4 w-4" />
-                <AlertTitle>Changes require confirmation from those affected</AlertTitle>
+                <AlertTitle>{tClass("changeAlertTitle")}</AlertTitle>
                 <AlertDescription>
-                  This classification change affects {model.copyCount} items across {model.siteCount} sites in this
-                  clinic. Notify device admins before releasing safety-relevant updates.
+                  {tClass("changeAlertBody", {
+                    copies: model.copyCount,
+                    sites: model.siteCount,
+                  })}
                 </AlertDescription>
               </Alert>
+              {canEdit ? (
+                <Button asChild type="button" size="sm" className="h-8" data-testid="catalog-classification-edit">
+                  <Link href={`/registration/reclassify/${model.id}`}>{tClass("editClassification")}</Link>
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
 

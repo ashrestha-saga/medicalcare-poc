@@ -33,7 +33,7 @@ export const clarificationService = {
       include: {
         model: {
           include: {
-            classificationProposals: { orderBy: { createdAt: "desc" }, take: 1 },
+            classifications: { where: { validTo: null }, orderBy: { validFrom: "desc" }, take: 1 },
           },
         },
         area: { include: { site: true } },
@@ -63,7 +63,7 @@ export const clarificationService = {
           ? bucket.filter((inv) => inv !== row.inventoryNumber)
           : [];
 
-      const proposal = row.model?.classificationProposals[0] ?? null;
+      const cls = row.model?.classifications[0] ?? null;
       const issues = evaluateClarificationIssues({
         responsibleUserId: row.responsibleUserId,
         responsiblePerson: row.responsibleUser?.name ?? row.responsiblePerson,
@@ -72,8 +72,9 @@ export const clarificationService = {
         serialNumber: row.serialNumber,
         modelName: row.model?.modelName ?? null,
         tradeName: row.model?.tradeName ?? null,
-        classificationConfidence: proposal?.confidence ?? null,
-        hasClassificationProposal: Boolean(proposal),
+        state: row.state,
+        classificationConfidence: cls?.confidence ?? null,
+        hasModelClassification: Boolean(cls),
         duplicateSerialInventoryNumbers: duplicatePeers,
       });
 

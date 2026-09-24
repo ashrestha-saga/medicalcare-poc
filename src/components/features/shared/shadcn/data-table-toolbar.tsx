@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, Search, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -36,8 +37,9 @@ export function DataTableToolbar<TData>({
   removeKeyword,
   isLoading,
   trailing,
-  searchPlaceholder = "Search…",
+  searchPlaceholder,
 }: DataTableToolbarProps<TData>) {
+  const t = useTranslations("table");
   const value = setKeyword ? (keyword ?? "") : (table.getState().globalFilter as string) ?? "";
 
   return (
@@ -52,7 +54,7 @@ export function DataTableToolbar<TData>({
               if (setKeyword) setKeyword(next);
               else setFilteringGlobal?.(next);
             }}
-            placeholder={searchPlaceholder}
+            placeholder={searchPlaceholder ?? t("search")}
             className="h-8 pl-8 pr-8"
             data-testid="data-table-search"
           />
@@ -65,7 +67,7 @@ export function DataTableToolbar<TData>({
                   variant="ghost"
                   size="icon"
                   className="h-6 w-6"
-                  aria-label="Clear search"
+                  aria-label={t("clearSearch")}
                   onClick={() => {
                     if (removeKeyword) removeKeyword();
                     else if (setKeyword) setKeyword("");
@@ -86,11 +88,11 @@ export function DataTableToolbar<TData>({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8" data-testid="data-table-columns">
-                Columns
+                {t("columns")}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+              <DropdownMenuLabel>{t("toggleColumns")}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {table
                 .getAllColumns()

@@ -15,7 +15,7 @@ This document describes how the system works, the domain model, and the technica
 5. [Application screens](#5-application-screens)
 6. [API surface](#6-api-surface)
 7. [Device resolution pipeline](#7-device-resolution-pipeline)
-8. [Classification](#8-classification)
+8. [Erstanlage & classification](#8-erstanlage--classification)
 9. [Service requests & spare-parts orders](#9-service-requests--spare-parts-orders)
 10. [Dispatch (mail / OXID / webhook)](#10-dispatch-mail--oxid--webhook)
 11. [Post-request inventarize](#11-post-request-inventarize)
@@ -109,7 +109,7 @@ Primary entities (see `prisma/schema.prisma`):
 | **DeviceInstance** | One physical unit in a tenant’s inventory. Unique `(tenantId, inventoryNumber)`. Optional serial. Links to a model and optionally an area/room. |
 | **CapturedArticle** | Stage-4 unknown device (nameplate photo required). Forced `serviceOnly: true` — no spare-parts path. |
 
-**Important (FA-102):** Catalog and BEUDAMED resolution return a **model only**. They never create a `DeviceInstance`. Units enter inventory via inventarize (`POST /api/devices`) or admin inventory flows.
+**Important (FA-102):** Catalog and BEUDAMED resolution return a **model only**. They never create a `DeviceInstance`. Units enter inventory as **`state=draft`** via inventarize (`POST /api/devices` → `registrationPath`), or on Erstanlage **release** (`POST /api/registration/release`). The Erstanlage wizard does not persist a draft between steps.
 
 **Uniqueness rules (practical):**
 
@@ -122,7 +122,8 @@ Primary entities (see `prisma/schema.prisma`):
 - **ServiceRequest** — idempotent create (`idempotencyKey` + `fingerprint`); subject is `instance` \| `model` \| `captured`; status events + attachments + dispatch records.
 - **OrderRequest** — spare-parts order (separate lifecycle; approval defaults to `pending_approval`).
 - **DispatchTarget** / **DispatchRecord** — per-tenant targets (`mail`, `oxid`, `webhook`) and per-send outcomes.
-- **Classification** rules & proposals — drive service-type suggestions.
+- **DeviceModelClassification** — historised model-level Einstufung (open row = `validTo` null).
+- **Erstanlage** — wizard holds identity/characteristics in the client; release (`POST /api/registration/release`) creates the instance and freezes duties (`DeviceReleaseSnapshot` / `DeviceDuty`). Inventarize still creates a draft and deep-links to `/registration/[id]`. Scan uses **manual** service-type select (no proposal engine).
 - **ExternalSourceRecord** — BEUDAMED (and similar) cache entries.
 - **TenantOxidConnection** — OAuth tokens for the linked OXID shop (server-side only).
 - **TotpChallenge** — short-lived login challenge between password success and session issue.
@@ -136,13 +137,17 @@ Primary entities (see `prisma/schema.prisma`):
 | `/` | Scanner / resolve / request workflow (home) |
 | `/login` | Email + password (+ TOTP step when enabled) |
 | `/devices` | Inventory list & detail |
+| `/due-dates` | Frozen duty due dates and assignments (`duties:view`) |
+| `/registration`, `/registration/[id]` | Erstanlage wizard (create / resume draft) |
+| `/registration`, `/registration/[id]` | Erstanlage wizard (create / resume draft) |
+| `/registration/reclassify/[modelId]` | Admin model-wide reclassification |
 | `/catalog`, `/catalog/[id]` | Device model catalog |
 | `/requests` | Service / order request list |
 | `/users` | User administration |
 | `/locations` | Sites and areas |
 | `/roles` | Role catalog (DB grants; editable with `roles:update`) |
 | `/security` | Enroll / disable TOTP (QR + backup codes) |
-| `/settings` | Tenant settings (incl. OXID shop link) |
+| `/settings` | Tenant settings (appearance theme + OXID shop link) |
 | `/auth/callback` | OXID OAuth2 callback (route handler) |
 
 Layouts: root, `(app)` (authenticated shell), `(auth)`.
@@ -181,6 +186,12 @@ Route handlers under `src/app/api/`:
 |---|---|
 | `GET`/`POST` | `/api/devices` |
 | `GET`/`PATCH` | `/api/devices/[id]` |
+| `POST` | `/api/devices/[id]/maintenance-complete` |
+| `GET` | `/api/devices/[id]/duties` |
+| `GET` | `/api/duties` |
+| `POST` | `/api/duties/[id]/complete` |
+| `GET` | `/api/due-dates` |
+| `POST` | `/api/due-dates/[dutyId]/assign` |
 | `GET`/`POST` | `/api/catalog/models` |
 | `GET`/`PATCH` | `/api/catalog/models/[id]` |
 | `POST` | `/api/catalog/models/import` |
@@ -252,16 +263,23 @@ Client UI state is driven by `scanStore` (resolving → classified → service-r
 
 ---
 
-## 8. Classification
+## 8. Erstanlage & classification
 
-`classificationService.decide()` is a **pure suggestion**:
+Initial registration (**Erstanlage**) is a four-step wizard: identity → characteristics → duties → prerequisites.
 
-- Rule priority: `basicUdiDi → emdn → gmdn → manufacturerModel`
-- Tie-break: specificity → confidence → bounded validity → id
-- **`verified`** proposals may pre-select a service type and **require** explicit confirmation (server returns 422 if confirmation is missing)
-- **`derived`** / **`guess`** never pre-select; the full inspection list is still shown
+- Greenfield `/registration` stays in the client until **Release**. `POST /api/registration/preview` derives duties from the characteristics payload (no draft row). `POST /api/registration/release` then creates the `DeviceInstance` and freezes duties in one step.
+- Inventarize still creates a `state=draft` instance and opens `/registration/[id]`; that path hydrates the wizard and passes `draftId` on release (update + freeze).
+- Einstufung lives on the **model** (`DeviceModelClassification`), historised (`validTo` close + insert).
+- Release (and reclassify apply) writes `confidence = verified` with `confirmedBy` / `confirmedAt`: the prerequisite-gated release **is** the Beleg. Callers can still pass a lower `classificationConfidence` explicitly.
+- Duty derivation runs in application TypeScript (`deriveDuties`); on release, duties freeze into `DeviceReleaseSnapshot` / `DeviceDuty` and are never silently rewritten.
+- Each frozen duty stores its own cycle (`intervalValue` / `intervalUnit` / `deadlineAnchor`) and a computed `dueAt` (`dueDate()`): Wartung is day-exact, STK/IT-Sicherheit month-end, MTK and Sachverständigenprüfung year-end. Event / process / permanent / free-text interval anchors stay `dueAt = null`.
+- Completing a duty (`POST /api/duties/[id]/complete`) sets `lastCompletedAt`, rolls `dueAt` from the completion date, and for Wartung also updates `DeviceInstance.nextMaintenanceDueAt`. `nextObligationDueAt` on inventory detail is `min(dueAt)` across applicable open duties.
+- Inventory detail lists open duties. Instance “mark maintenance done” keeps the Wartung duty in sync.
+- **Reclassify (admin):** `/registration/reclassify/[modelId]` reopens Characteristics → Duties → Prerequisites, then applies to **all** tenant copies of the model (suspend prior duties + new snapshot). Requires `catalog:update` and explicit impact acknowledgement.
+- Prerequisites (FA-501–521) and site § 6 (headcount & MPSB) gate release.
+- Scan / service request: operators **manually** choose the service type from `INSPECTION_TYPES` — there is no classification proposal engine.
 
-Classification does not mutate inventory.
+Released instances reject identity/classification-changing PATCHes (`state === 'released'`).
 
 ---
 
@@ -339,6 +357,8 @@ Inventarnummer is **not** entered by the user and must not be confused with UDI-
 - List / filter tenant `DeviceInstance`s.
 - Create (inventarize or admin create) and patch metadata (location, responsible person, etc.).
 - Lookup used by resolve stage 1 and by inventarize duplicate checks.
+- Released devices show frozen duties with per-classification due dates; completing a duty rolls its next `dueAt`. `nextMaintenanceDueAt` stays Wartung-only; `nextObligationDueAt` is the earliest applicable duty date.
+- `/due-dates` lists those duties tenant-wide (`duties:view`) and can open a service request from a row (`requests:create`).
 
 ### Catalog (`/catalog`, `/api/catalog/models`)
 
@@ -420,7 +440,7 @@ Permission slug: **`account:security`**. Path `/security` is reachable **without
 
 ### Permission slugs (catalog)
 
-`shell:nav`, `inventory:view` / `update`, `catalog:view` / `update`, `clarifications:view`, `requests:create`, `parts:request`, `requests:view-mine` / `view-open` / `view-all` / `transition`, `account:security`, `settings:view` / `oxid`, `users:*`, `locations:*`, `roles:view` / `update`.
+`shell:nav`, `inventory:view` / `update`, `catalog:view` / `update`, `clarifications:view`, `duties:view`, `requests:create`, `parts:request`, `requests:view-mine` / `view-open` / `view-all` / `transition`, `account:security`, `settings:view` / `oxid`, `users:*`, `locations:*`, `roles:view` / `update`.
 
 ### Path guard
 
@@ -530,14 +550,14 @@ npm run dev                   # http://localhost:3000
 - Tenant `demo-tenant`
 - Sites Bonn / Cologne with areas
 - Device models + inventory instances (`INV-10001`, `INV-10002`)
-- Classification rules (verified + derived)
+- Erstanlage Ref* seeds (product kinds, Anlage 2, inspection types, …)
 - Dispatch targets (mail + OXID)
 
 Try these identifiers after seed:
 
 | Input | Expected stage |
 |---|---|
-| `INV-10001` | Inventory — verified classification path |
+| `INV-10001` | Inventory |
 | `(01)04012345678918(21)SN-777` | Catalog (model + serial in identifier) |
 | `04012345678949` | BEUDAMED when `BEUDAMED_ADAPTER_MODE=mock` |
 | `04012345678956` | Unknown → manual capture |

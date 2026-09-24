@@ -10,6 +10,7 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "catalog:view",
   "catalog:update",
   "clarifications:view",
+  "duties:view",
   "requests:create",
   "parts:request",
   "requests:view-mine",
@@ -30,6 +31,8 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "locations:delete",
   "roles:view",
   "roles:update",
+  "management:view",
+  "training:view",
 ] as const;
 
 /** Staff who manage the service queue — includes the nav rail. */
@@ -37,12 +40,15 @@ const SERVICE_STAFF: readonly PermissionSlug[] = [
   "shell:nav",
   "inventory:view",
   "catalog:view",
+  "duties:view",
+  "training:view",
   "requests:create",
   "parts:request",
   "requests:view-mine",
   "requests:view-open",
   "requests:transition",
   "account:security",
+  "management:view",
 ];
 
 /**
@@ -76,12 +82,16 @@ export const SUPERADMIN_LOCKED_PERMISSIONS: readonly PermissionSlug[] = [
 /** Sidebar modules. Visibility = `shell:nav` + module slug. */
 export const MENU_MODULES: readonly MenuModule[] = [
   { id: "inventory", label: "Inventory", href: "/devices", slug: "inventory:view" },
+  { id: "registration", label: "Registration", href: "/registration", slug: "inventory:update" },
+  { id: "due-dates", label: "Due dates", href: "/due-dates", slug: "duties:view" },
+  { id: "training", label: "Training", href: "/training", slug: "training:view" },
   { id: "catalog", label: "Catalog", href: "/catalog", slug: "catalog:view" },
   { id: "clarifications", label: "Clarifications", href: "/clarifications", slug: "clarifications:view" },
   { id: "requests", label: "Requests", href: "/requests", slug: "requests:view-mine" },
   { id: "users", label: "Users", href: "/users", slug: "users:view" },
   { id: "locations", label: "Locations", href: "/locations", slug: "locations:view" },
   { id: "roles", label: "Roles", href: "/roles", slug: "roles:view" },
+  { id: "management", label: "Management", href: "/management", slug: "management:view" },
   { id: "security", label: "Security", href: "/security", slug: "account:security" },
   { id: "settings", label: "Settings", href: "/settings", slug: "settings:view" },
 ];
@@ -90,12 +100,16 @@ export const MENU_MODULES: readonly MenuModule[] = [
 export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/": "inventory:view",
   "/devices": "inventory:view",
+  "/registration": "inventory:update",
+  "/due-dates": "duties:view",
+  "/training": "training:view",
   "/catalog": "catalog:view",
   "/clarifications": "clarifications:view",
   "/requests": "requests:view-mine",
   "/users": "users:view",
   "/locations": "locations:view",
   "/roles": "roles:view",
+  "/management": "management:view",
   "/security": "account:security",
   "/settings": "settings:view",
 };
@@ -134,12 +148,16 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   const pathname = normalizeAppPath(path);
   if (PATH_PERMISSION_MAP[pathname]) return PATH_PERMISSION_MAP[pathname];
   if (pathname.startsWith("/devices")) return "inventory:view";
+  if (pathname.startsWith("/registration")) return "inventory:update";
+  if (pathname.startsWith("/due-dates")) return "duties:view";
+  if (pathname.startsWith("/training")) return "training:view";
   if (pathname.startsWith("/catalog")) return "catalog:view";
   if (pathname.startsWith("/clarifications")) return "clarifications:view";
   if (pathname.startsWith("/requests")) return "requests:view-mine";
   if (pathname.startsWith("/users")) return "users:view";
   if (pathname.startsWith("/locations")) return "locations:view";
   if (pathname.startsWith("/roles")) return "roles:view";
+  if (pathname.startsWith("/management")) return "management:view";
   if (pathname.startsWith("/security")) return "account:security";
   if (pathname.startsWith("/settings")) return "settings:view";
   return null;

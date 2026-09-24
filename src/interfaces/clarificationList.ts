@@ -8,7 +8,8 @@ export type ClarificationIssueCode =
   | "missing_room"
   | "missing_model_name"
   | "missing_serial"
-  | "duplicate_serial";
+  | "duplicate_serial"
+  | "not_released";
 
 /** Visual severity for list accent colors. */
 export type ClarificationSeverity = "high" | "medium" | "low";

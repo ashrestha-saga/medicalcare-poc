@@ -2,8 +2,10 @@ import type { ReactNode } from "react";
 import type { SessionUser } from "./session";
 
 export interface LoginResponse {
-  user: Omit<SessionUser, "tenantId">;
+  user: Omit<SessionUser, "tenantId" | "organisationId">;
   tenantName: string;
+  /** Where the client should navigate after a successful sign-in. */
+  homePath?: string;
 }
 
 /** Password OK but TOTP required before session cookie is issued. */
@@ -32,6 +34,8 @@ export interface TotpSetupConfirmDTO {
 
 export interface SignInProps {
   notice?: string | null;
+  /** Which login door — clinic (default) or partner organisation. */
+  door?: "clinic" | "partner";
 }
 
 export interface LockScreenProps {
@@ -45,4 +49,6 @@ export interface PinSetupProps {
 
 export interface AuthGateProps {
   children: ReactNode;
+  /** Signed-out redirect target. Defaults to /login (clinic door). */
+  loginPath?: string;
 }

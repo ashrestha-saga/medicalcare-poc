@@ -4,24 +4,12 @@ import { z } from "zod";
  * Client-side service-request form fields (before payload assembly).
  * Mirrors the UI checks in ServiceRequestForm; server still validates the DTO.
  */
-export const serviceRequestFormSchema = z
-  .object({
-    serviceType: z.string().trim().min(1, "Please choose a service or inspection type."),
-    site: z.string().trim().min(1, "Please choose a site."),
-    room: z.string().trim().min(1, "Please enter the location of use."),
-    deliveryAddress: z.string().trim().min(1, "Please enter the delivery address."),
-    classificationConfirmed: z.boolean(),
-    requiresClassificationConfirm: z.boolean(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.requiresClassificationConfirm && !value.classificationConfirmed) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["classification"],
-        message: "Please confirm the suggested inspection type.",
-      });
-    }
-  });
+export const serviceRequestFormSchema = z.object({
+  serviceType: z.string().trim().min(1, "Please choose a service or inspection type."),
+  site: z.string().trim().min(1, "Please choose a site."),
+  room: z.string().trim().min(1, "Please enter the location of use."),
+  deliveryAddress: z.string().trim().min(1, "Please enter the delivery address."),
+});
 
 export type ServiceRequestFormInput = z.infer<typeof serviceRequestFormSchema>;
 

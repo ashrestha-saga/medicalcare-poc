@@ -13,10 +13,10 @@ export function OfflineBar() {
   if (online && pending === 0) return null;
 
   const label = !online
-    ? "Offline — Erfassung läuft weiter"
+    ? "Offline — capture continues"
     : pending === 1
-      ? "1 Vorgang wartet auf Verbindung"
-      : `${pending} Vorgänge warten auf Verbindung`;
+      ? "1 item waiting for connection"
+      : `${pending} items waiting for connection`;
 
   return (
     <div data-testid="offline-bar" className="p-offbar on">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { SiteDTO } from "@/interfaces";
 import { DropdownFilter, FilterToolbar } from "@/components/features/shared/filters";
 
@@ -16,12 +17,13 @@ export function DevicesFilterToolbar({
   onSiteChange,
   onClearAll,
 }: DevicesFilterToolbarProps) {
+  const t = useTranslations("filters");
   const hasActiveFilters = Boolean(siteFilter);
   const options = sites.map((s) => ({ value: s.id, label: s.name }));
 
   return (
     <FilterToolbar hasActiveFilters={hasActiveFilters} onClearAll={onClearAll}>
-      <DropdownFilter label="Site" value={siteFilter} options={options} onChange={onSiteChange} />
+      <DropdownFilter label={t("site")} value={siteFilter} options={options} onChange={onSiteChange} />
     </FilterToolbar>
   );
 }

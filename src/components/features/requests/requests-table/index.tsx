@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { ServiceRequestDTO } from "@/interfaces";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
 import { useRequestsColumns } from "@/components/hooks/requests/useRequestsColumns";
@@ -15,6 +16,7 @@ interface RequestsTableProps {
 }
 
 export function RequestsTable({ list, onSelect }: RequestsTableProps) {
+  const tFilters = useTranslations("filters");
   const columns = useRequestsColumns(onSelect);
   const [stateFilter, setStateFilter] = useState<string[] | null>(null);
   const [keyword, setKeyword] = useState("");
@@ -26,8 +28,12 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
       if (!q) return true;
       const haystack = [
         r.reference,
+        r.deviceName ?? "",
+        r.inventoryNumber ?? "",
+        r.subjectId,
         r.serviceType,
-        r.priority ?? "",
+        r.executorOrg?.name ?? "",
+        r.executorOrg?.code ?? "",
         r.state,
         r.raisedBy ?? "",
         r.locationText,
@@ -39,7 +45,7 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
   }, [list.requests, stateFilter, keyword]);
 
   return (
-    <div className="space-y-3 px-4 pb-4 sm:px-[18px]" data-testid="requests-list">
+    <div className="space-y-3" data-testid="requests-list">
       <RequestsFilterToolbar
         scopes={list.scopes}
         scope={list.scope}
@@ -62,6 +68,7 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
         totalItems={filtered.length}
         getRowId={(row) => row.id}
         emptyMessage="No requests in this view."
+        searchPlaceholder={tFilters("searchRequests")}
         onRowClick={onSelect}
       />
     </div>

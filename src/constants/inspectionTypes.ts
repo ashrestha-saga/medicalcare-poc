@@ -7,13 +7,13 @@ export const INSPECTION_TYPES = [
   {
     code: "STK",
     label: "STK — Safety inspection",
-    description: "Sicherheitstechnische Kontrolle (MPBetreibV Annex 1)",
+    description: "Safety inspection (MPBetreibV Annex 1)",
     proposalKey: "annex1",
   },
   {
     code: "MTK",
     label: "MTK — Metrological inspection",
-    description: "Messtechnische Kontrolle (MPBetreibV Annex 2)",
+    description: "Metrological inspection (MPBetreibV Annex 2)",
     proposalKey: "annex2",
   },
   {

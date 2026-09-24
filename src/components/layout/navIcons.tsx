@@ -17,6 +17,26 @@ export function InventoryIcon() {
   );
 }
 
+export function RegistrationIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M8 4.5h8a2 2 0 0 1 2 2V20H6V6.5a2 2 0 0 1 2-2Z" />
+      <path d="M9 4.5V3.8a1.3 1.3 0 0 1 1.3-1.3h3.4A1.3 1.3 0 0 1 15 3.8v.7" />
+      <path d="M12 11v6M9 14h6" />
+    </svg>
+  );
+}
+
+export function DueDatesIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M4 10h16M8 3v4M16 3v4" />
+      <path d="M12 13.5v3.5l2.5 1.5" />
+    </svg>
+  );
+}
+
 export function RequestsIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -86,6 +106,26 @@ export function SecurityIcon() {
     <svg viewBox="0 0 24 24" aria-hidden>
       <path d="M12 3 4 6.5V11c0 4.5 3.2 8.4 8 9.5 4.8-1.1 8-5 8-9.5V6.5L12 3Z" />
       <path d="M12 11v4M12 8.5h.01" />
+    </svg>
+  );
+}
+
+export function ManagementIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M4 19V9.5L12 5l8 4.5V19" />
+      <path d="M9 19v-5h6v5" />
+      <path d="M4 19h16" />
+    </svg>
+  );
+}
+
+export function TrainingIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M4 19V6.5A1.5 1.5 0 0 1 5.5 5H14v14H5.5A1.5 1.5 0 0 1 4 17.5" />
+      <path d="M14 5h4.5A1.5 1.5 0 0 1 20 6.5V19h-6" />
+      <path d="M8 9h4M8 12h4M8 15h3" />
     </svg>
   );
 }

@@ -51,10 +51,10 @@ export const totpService = {
     }
 
     const row = await prisma.user.findFirst({
-      where: { id: input.userId, active: true, totpEnabled: true },
+      where: { id: input.userId, active: true, totpEnabled: true, accountKind: "clinic" },
       include: { tenant: { select: { name: true } } },
     });
-    if (!row?.totpSecretEnc) {
+    if (!row?.totpSecretEnc || !row.tenantId || !row.role || !row.tenant) {
       await prisma.totpChallenge.delete({ where: { id: challenge.id } });
       throw unauthorized("Two-factor authentication is not available.");
     }
@@ -93,13 +93,22 @@ export const totpService = {
     });
 
     logger.info("auth.2fa.success", { userId: row.id, usedBackup: Boolean(remainingBackups) });
-    return { user: toSessionUser(row), tenantName: row.tenant.name };
+    return {
+      user: toSessionUser({
+        id: row.id,
+        name: row.name,
+        role: row.role,
+        tenantId: row.tenantId,
+        tenant: row.tenant,
+      }),
+      tenantName: row.tenant.name,
+    };
   },
 
   async getStatus(ctx: TenantContext): Promise<{ enabled: boolean; verifiedAt: string | null }> {
     requirePermission(ctx, "account:security");
     const row = await prisma.user.findFirst({
-      where: { id: ctx.user.id, tenantId: ctx.tenantId },
+      where: { id: ctx.user.id, tenantId: ctx.tenantId, accountKind: "clinic" },
       select: { totpEnabled: true, totpVerifiedAt: true },
     });
     return {
@@ -115,7 +124,7 @@ export const totpService = {
   }> {
     requirePermission(ctx, "account:security");
     const row = await prisma.user.findFirst({
-      where: { id: ctx.user.id, tenantId: ctx.tenantId, active: true },
+      where: { id: ctx.user.id, tenantId: ctx.tenantId, accountKind: "clinic", active: true },
     });
     if (!row) throw unauthorized();
     if (row.totpEnabled) throw conflict("Two-factor authentication is already enabled.");
@@ -133,7 +142,7 @@ export const totpService = {
   async confirmSetup(ctx: TenantContext, code: string): Promise<{ backupCodes: string[] }> {
     requirePermission(ctx, "account:security");
     const row = await prisma.user.findFirst({
-      where: { id: ctx.user.id, tenantId: ctx.tenantId, active: true },
+      where: { id: ctx.user.id, tenantId: ctx.tenantId, accountKind: "clinic", active: true },
     });
     if (!row?.totpPendingEnc) throw unprocessable("Start two-factor setup first.");
     if (row.totpEnabled) throw conflict("Two-factor authentication is already enabled.");
@@ -166,7 +175,7 @@ export const totpService = {
   async cancelSetup(ctx: TenantContext): Promise<void> {
     requirePermission(ctx, "account:security");
     await prisma.user.updateMany({
-      where: { id: ctx.user.id, tenantId: ctx.tenantId },
+      where: { id: ctx.user.id, tenantId: ctx.tenantId, accountKind: "clinic" },
       data: { totpPendingEnc: null },
     });
   },
@@ -177,7 +186,7 @@ export const totpService = {
   ): Promise<void> {
     requirePermission(ctx, "account:security");
     const row = await prisma.user.findFirst({
-      where: { id: ctx.user.id, tenantId: ctx.tenantId, active: true },
+      where: { id: ctx.user.id, tenantId: ctx.tenantId, accountKind: "clinic", active: true },
     });
     if (!row) throw unauthorized();
     if (!row.totpEnabled || !row.totpSecretEnc) {
@@ -217,7 +226,7 @@ export const totpService = {
   async adminReset(ctx: TenantContext, userId: string): Promise<void> {
     requirePermission(ctx, "users:resetpassword");
     const row = await prisma.user.findFirst({
-      where: { id: userId, tenantId: ctx.tenantId },
+      where: { id: userId, tenantId: ctx.tenantId, accountKind: "clinic" },
     });
     if (!row) throw unauthorized("User not found.");
     await prisma.user.update({

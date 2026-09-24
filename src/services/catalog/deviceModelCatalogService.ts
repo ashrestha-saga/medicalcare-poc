@@ -12,10 +12,10 @@ import { parseJson } from "@/lib/json";
 import { prisma } from "@/lib/prisma";
 import { toDeviceModelDTO } from "@/services/shared/mappers";
 import type { CreateCatalogModelInput, UpdateCatalogModelInput } from "@/schemas/catalogModel";
-import type { ClassificationProposal, DeviceModel, Prisma } from "@prisma/client";
+import type { DeviceModel, DeviceModelClassification, Prisma } from "@prisma/client";
 
 type ModelWithAggregates = DeviceModel & {
-  classificationProposals: ClassificationProposal[];
+  classifications: DeviceModelClassification[];
   instances: { id: string; area: { siteId: string } | null }[];
 };
 
@@ -29,18 +29,55 @@ function gtinCoverage(row: DeviceModel): number {
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
-function latestProposal(proposals: ClassificationProposal[]): CatalogClassificationSummary | null {
-  const latest = proposals[0];
+function openClassification(rows: DeviceModelClassification[]): CatalogClassificationSummary | null {
+  const latest = rows.find((c) => c.validTo == null) ?? rows[0];
   if (!latest) return null;
   return {
-    annex1: latest.annex1,
-    annex2: latest.annex2,
+    annex1: latest.stk,
+    annex2: latest.mtkItemId != null || isAnnex2Asserted(latest.evidenceText),
     softwareClass: latest.softwareClass,
     radiation: latest.radiation,
     confidence: latest.confidence,
-    source: latest.source,
+    source: latest.evidenceText ?? "model-classification",
   };
 }
+
+/** Admin toggled Annex 2 without choosing a specific Anlage-2 item yet. */
+function isAnnex2Asserted(evidenceText: string | null | undefined): boolean {
+  return Boolean(evidenceText?.includes("annex2-asserted"));
+}
+
+/**
+ * Resolve MTK / Annex 2 for catalog admin edits.
+ * - annex2 false → clear item + assertion
+ * - annex2 true → keep existing item, or mark asserted if none
+ * - annex2 omitted → keep previous
+ */
+function resolveAnnex2Write(
+  annex2: boolean | null | undefined,
+  prevMtkItemId: string | null,
+  prevEvidence: string | null | undefined,
+): { mtkItemId: string | null; evidenceText: string } {
+  if (annex2 === false) {
+    return { mtkItemId: null, evidenceText: "catalog:admin-update" };
+  }
+  if (annex2 === true) {
+    if (prevMtkItemId) {
+      return {
+        mtkItemId: prevMtkItemId,
+        evidenceText: prevEvidence?.includes("annex2-asserted")
+          ? "catalog:admin-update"
+          : (prevEvidence ?? "catalog:admin-update"),
+      };
+    }
+    return { mtkItemId: null, evidenceText: "catalog:annex2-asserted" };
+  }
+  return {
+    mtkItemId: prevMtkItemId,
+    evidenceText: prevEvidence ?? "catalog:admin-update",
+  };
+}
+
 
 function toListItem(row: ModelWithAggregates): CatalogModelListItemDTO {
   const siteIds = new Set(
@@ -49,7 +86,7 @@ function toListItem(row: ModelWithAggregates): CatalogModelListItemDTO {
   return {
     ...toDeviceModelDTO(row),
     displayName: displayName(row),
-    classification: latestProposal(row.classificationProposals),
+    classification: openClassification(row.classifications),
     copyCount: row.instances.length,
     siteCount: siteIds.size,
     gtinCoverage: gtinCoverage(row),
@@ -88,7 +125,7 @@ async function toDetail(row: ModelWithAggregates, tenantId: string): Promise<Cat
 
 function listIncludeForTenant(tenantId: string) {
   return {
-    classificationProposals: { orderBy: { createdAt: "desc" as const }, take: 1 },
+    classifications: { where: { validTo: null }, orderBy: { validFrom: "desc" as const }, take: 1 },
     instances: {
       where: { tenantId },
       select: {
@@ -99,39 +136,32 @@ function listIncludeForTenant(tenantId: string) {
   } satisfies Prisma.DeviceModelInclude;
 }
 
-function normalizeGtins(gtins: string[] | undefined): string | null {
-  if (!gtins) return null;
-  const cleaned = [...new Set(gtins.map((g) => g.trim()).filter(Boolean))];
-  return cleaned.length ? JSON.stringify(cleaned) : null;
+function normalizeGtins(gtins: string[] | null | undefined): string | null {
+  if (!gtins?.length) return null;
+  return JSON.stringify(gtins);
 }
 
-/**
- * Central DeviceModel master data; inventory counts are scoped to the session tenant.
- * Reads: catalog:view. Writes: catalog:update (admins only).
- */
 export const deviceModelCatalogService = {
   async list(ctx: TenantContext, q?: string): Promise<CatalogModelListItemDTO[]> {
     requirePermission(ctx, "catalog:view");
-    const needle = q?.trim();
+    const where: Prisma.DeviceModelWhereInput = q?.trim()
+      ? {
+          OR: [
+            { tradeName: { contains: q.trim() } },
+            { modelName: { contains: q.trim() } },
+            { manufacturer: { contains: q.trim() } },
+            { udiDi: { contains: q.trim() } },
+            { basicUdiDi: { contains: q.trim() } },
+          ],
+        }
+      : {};
     const rows = await prisma.deviceModel.findMany({
-      where: needle
-        ? {
-            OR: [
-              { tradeName: { contains: needle } },
-              { modelName: { contains: needle } },
-              { manufacturer: { contains: needle } },
-              { basicUdiDi: { contains: needle } },
-              { udiDi: { contains: needle } },
-              { gtins: { contains: needle } },
-              { emdnCode: { contains: needle } },
-              { gmdnCode: { contains: needle } },
-            ],
-          }
-        : undefined,
+      where,
       include: listIncludeForTenant(ctx.tenantId),
-      orderBy: [{ manufacturer: "asc" }, { tradeName: "asc" }, { modelName: "asc" }],
+      orderBy: [{ tradeName: "asc" }, { modelName: "asc" }],
+      take: 500,
     });
-    return rows.map(toListItem);
+    return rows.map((r) => toListItem(r as ModelWithAggregates));
   },
 
   async getById(ctx: TenantContext, id: string): Promise<CatalogModelDetailDTO> {
@@ -141,7 +171,7 @@ export const deviceModelCatalogService = {
       include: listIncludeForTenant(ctx.tenantId),
     });
     if (!row) throw notFound("Model not found.");
-    return toDetail(row, ctx.tenantId);
+    return toDetail(row as ModelWithAggregates, ctx.tenantId);
   },
 
   async create(ctx: TenantContext, input: CreateCatalogModelInput): Promise<CatalogModelListItemDTO> {
@@ -168,14 +198,14 @@ export const deviceModelCatalogService = {
       },
       include: listIncludeForTenant(ctx.tenantId),
     });
-    return toListItem(created);
+    return toListItem(created as ModelWithAggregates);
   },
 
   async update(ctx: TenantContext, id: string, input: UpdateCatalogModelInput): Promise<CatalogModelDetailDTO> {
     requirePermission(ctx, "catalog:update");
     const existing = await prisma.deviceModel.findUnique({
       where: { id },
-      include: { classificationProposals: { orderBy: { createdAt: "desc" }, take: 1 } },
+      include: { classifications: { where: { validTo: null }, take: 1, orderBy: { validFrom: "desc" } } },
     });
     if (!existing) throw notFound("Model not found.");
 
@@ -208,30 +238,38 @@ export const deviceModelCatalogService = {
       });
 
       if (input.classification) {
-        const prev = existing.classificationProposals[0];
-        const annex1 =
-          input.classification.annex1 !== undefined ? input.classification.annex1 : (prev?.annex1 ?? null);
-        const annex2 =
-          input.classification.annex2 !== undefined ? input.classification.annex2 : (prev?.annex2 ?? null);
-        const softwareClass =
-          input.classification.softwareClass !== undefined
-            ? input.classification.softwareClass
-            : (prev?.softwareClass ?? null);
-        const radiation =
-          input.classification.radiation !== undefined
-            ? input.classification.radiation
-            : (prev?.radiation ?? null);
+        const prev = existing.classifications[0];
+        const ruleSet =
+          (await tx.refRuleSet.findFirst({ where: { code: "MPBETREIBV", validTo: null } })) ??
+          (await tx.refRuleSet.findFirst());
+        if (!ruleSet) throw unprocessable("Rule sets not loaded — please run the seed.");
 
-        await tx.classificationProposal.create({
+        if (prev) {
+          await tx.deviceModelClassification.update({
+            where: { id: prev.id },
+            data: { validTo: new Date() },
+          });
+        }
+
+        const annex2Write = resolveAnnex2Write(
+          input.classification.annex2,
+          prev?.mtkItemId ?? null,
+          prev?.evidenceText,
+        );
+
+        await tx.deviceModelClassification.create({
           data: {
             deviceModelId: id,
-            ruleId: prev?.ruleId ?? null,
-            annex1,
-            annex2,
-            softwareClass,
-            radiation,
-            confidence: prev?.confidence ?? "verified",
-            source: prev?.source ?? "catalog:admin-update",
+            stk: input.classification.annex1 ?? prev?.stk ?? false,
+            radiation: input.classification.radiation ?? prev?.radiation ?? false,
+            softwareClass:
+              input.classification.softwareClass !== undefined
+                ? input.classification.softwareClass
+                : (prev?.softwareClass ?? null),
+            mtkItemId: annex2Write.mtkItemId,
+            confidence: prev?.confidence ?? "derived",
+            evidenceText: annex2Write.evidenceText,
+            ruleSetId: ruleSet.id,
           },
         });
       }
@@ -288,28 +326,26 @@ export const deviceModelCatalogService = {
           });
           result.updated += 1;
         } else {
-          await prisma.deviceModel.create({
-            data: {
-              basicUdiDi: row.basicUdiDi ?? null,
-              udiDi: row.udiDi ?? null,
-              gtins: normalizeGtins(row.gtins),
-              manufacturer: row.manufacturer ?? null,
-              manufacturerSrn: row.manufacturerSrn ?? null,
-              tradeName: row.tradeName ?? null,
-              modelName: row.modelName ?? null,
-              riskClass: row.riskClass ?? null,
-              emdnCode: row.emdnCode ?? null,
-              gmdnCode: row.gmdnCode ?? null,
-              source: row.source ?? "catalog",
-              state: row.state ?? "draft",
-              maintenanceCycleMonths: row.maintenanceCycleMonths ?? null,
-            },
+          await this.create(ctx, {
+            tradeName: row.tradeName ?? null,
+            modelName: row.modelName ?? null,
+            manufacturer: row.manufacturer ?? null,
+            manufacturerSrn: row.manufacturerSrn ?? null,
+            basicUdiDi: row.basicUdiDi ?? null,
+            udiDi: row.udiDi ?? null,
+            gtins: row.gtins ?? undefined,
+            riskClass: row.riskClass ?? null,
+            emdnCode: row.emdnCode ?? null,
+            gmdnCode: row.gmdnCode ?? null,
+            source: row.source ?? "manual",
+            state: row.state ?? "draft",
+            maintenanceCycleMonths: row.maintenanceCycleMonths ?? null,
           });
           result.created += 1;
         }
-      } catch (err) {
+      } catch (e) {
+        result.errors.push(`${label}: ${e instanceof Error ? e.message : "import failed"}`);
         result.skipped += 1;
-        result.errors.push(`${label}: ${err instanceof Error ? err.message : "import failed"}`);
       }
     }
 

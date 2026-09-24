@@ -8,6 +8,7 @@ export type PermissionSlug =
   | "catalog:view"
   | "catalog:update"
   | "clarifications:view"
+  | "duties:view"
   | "requests:create"
   | "parts:request"
   | "requests:view-mine"
@@ -27,10 +28,15 @@ export type PermissionSlug =
   | "locations:update"
   | "locations:delete"
   | "roles:view"
-  | "roles:update";
+  | "roles:update"
+  | "management:view"
+  | "training:view";
 
 export type MenuModuleId =
   | "inventory"
+  | "registration"
+  | "due-dates"
+  | "training"
   | "catalog"
   | "clarifications"
   | "requests"
@@ -38,7 +44,8 @@ export type MenuModuleId =
   | "locations"
   | "roles"
   | "settings"
-  | "security";
+  | "security"
+  | "management";
 
 export interface MenuModule {
   id: MenuModuleId;

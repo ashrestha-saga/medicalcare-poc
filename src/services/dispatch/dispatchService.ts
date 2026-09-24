@@ -22,7 +22,7 @@ import {
 /**
  * SS-702 / SS-703 — adapter registry keyed by DispatchTarget.type.
  * Targets are iterated independently; one failure never blocks another.
- * Adding a target row in the DB requires no code change.
+ * Targets are owned by an ExecutorOrg — dispatch only that org's enabled rows.
  */
 export function buildRegistry(mode = env.oxid.adapterMode): Map<string, DispatchAdapter> {
   const oxid = mode === "http" ? oxidHttpDispatchAdapter : oxidMockDispatchAdapter;
@@ -35,6 +35,16 @@ export function buildRegistry(mode = env.oxid.adapterMode): Map<string, Dispatch
 
 const DEFAULT_MAIL_TO = "service@plusorder.de";
 
+export type DispatchOptions = {
+  /** Required — only this org's enabled DispatchTarget rows are used. */
+  executorOrgId: string;
+  /**
+   * When false, skip writing ServiceRequest.state / StatusEvent (caller owns that),
+   * e.g. assignment transmit after allocate.
+   */
+  updateState?: boolean;
+};
+
 export function createDispatchService(registry: Map<string, DispatchAdapter> = buildRegistry()) {
   return {
     async dispatch(
@@ -42,8 +52,30 @@ export function createDispatchService(registry: Map<string, DispatchAdapter> = b
       tenantId: string,
       correlationId: string,
       user?: SessionUser | null,
+      options?: DispatchOptions,
     ): Promise<DispatchOutcome[]> {
-      const targets = await prisma.dispatchTarget.findMany({ where: { tenantId, enabled: true } });
+      if (!options?.executorOrgId) {
+        logger.warn("dispatch.skipped_no_executor", { correlationId, reference: request.reference });
+        return [];
+      }
+
+      const targets = await prisma.dispatchTarget.findMany({
+        where: {
+          tenantId,
+          enabled: true,
+          executorOrgId: options.executorOrgId,
+        },
+      });
+
+      if (targets.length === 0) {
+        logger.info("dispatch.no_targets", {
+          correlationId,
+          reference: request.reference,
+          executorOrgId: options.executorOrgId,
+        });
+        return [];
+      }
+
       const context = contextFromUser(user);
       const exportBody = await buildServiceDispatchExport(request, context);
       const mailTarget = targets.find((t) => t.type === "mail" && t.endpoint);
@@ -97,13 +129,17 @@ export function createDispatchService(registry: Map<string, DispatchAdapter> = b
             correlationId,
           },
         });
-        logger.info("dispatch.result", { correlationId, target: target.type, success: result.success, attempts: attempt });
+        logger.info("dispatch.result", {
+          correlationId,
+          target: target.type,
+          success: result.success,
+          attempts: attempt,
+        });
         outcomes.push({ targetId: target.id, target: `${target.type}:${target.name}`, result });
       }
 
-      // FA-601 — the only state we assert ourselves is "transmitted on …", and only
-      // when at least one target accepted the request. Failures stay visible as records.
-      if (outcomes.length > 0 && outcomes.some((o) => o.result.success)) {
+      const updateState = options.updateState !== false;
+      if (updateState && outcomes.some((o) => o.result.success)) {
         await prisma.$transaction([
           prisma.serviceRequest.update({ where: { id: request.id }, data: { state: "transmitted" } }),
           prisma.statusEvent.create({

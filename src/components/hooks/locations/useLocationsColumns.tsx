@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronsUpDown, Pencil, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { SiteDTO } from "@/interfaces";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,13 +38,15 @@ function SortHeader({
 
 export function useLocationsColumns(actions: LocationsTableActions): ColumnDef<SiteDTO>[] {
   const { canUpdate, canDelete, onEdit, onDelete } = actions;
+  const t = useTranslations("table.locations");
+  const tTable = useTranslations("table");
 
   return useMemo(
     () => [
       {
         accessorKey: "code",
         id: "code",
-        header: ({ column }) => <SortHeader label="Identifier" column={column} />,
+        header: ({ column }) => <SortHeader label={t("identifier")} column={column} />,
         cell: ({ row }) => (
           <span className="font-mono text-xs text-muted-foreground">{row.original.code ?? "—"}</span>
         ),
@@ -51,13 +54,13 @@ export function useLocationsColumns(actions: LocationsTableActions): ColumnDef<S
       {
         accessorKey: "name",
         id: "name",
-        header: ({ column }) => <SortHeader label="Designation" column={column} />,
+        header: ({ column }) => <SortHeader label={t("designation")} column={column} />,
         cell: ({ row }) => <span className="font-medium text-foreground">{row.original.name}</span>,
       },
       {
         accessorKey: "address",
         id: "address",
-        header: ({ column }) => <SortHeader label="Address" column={column} />,
+        header: ({ column }) => <SortHeader label={t("address")} column={column} />,
         cell: ({ row }) => (
           <span className="max-w-[220px] truncate text-muted-foreground" title={row.original.address ?? undefined}>
             {row.original.address ?? "—"}
@@ -67,7 +70,7 @@ export function useLocationsColumns(actions: LocationsTableActions): ColumnDef<S
       {
         accessorKey: "deliveryAddress",
         id: "deliveryAddress",
-        header: ({ column }) => <SortHeader label="Delivery address" column={column} />,
+        header: ({ column }) => <SortHeader label={t("deliveryAddress")} column={column} />,
         cell: ({ row }) => (
           <span
             className="max-w-[240px] truncate text-muted-foreground"
@@ -81,7 +84,7 @@ export function useLocationsColumns(actions: LocationsTableActions): ColumnDef<S
         id: "areas",
         accessorFn: (row) => row.areas.map((a) => a.name).join(", "),
         enableSorting: false,
-        header: () => <span className="text-xs font-medium text-muted-foreground">Areas</span>,
+        header: () => <span className="text-xs font-medium text-muted-foreground">{t("areas")}</span>,
         cell: ({ row }) => {
           const areas = row.original.areas;
           if (!areas.length) return <span className="text-muted-foreground">—</span>;
@@ -99,7 +102,7 @@ export function useLocationsColumns(actions: LocationsTableActions): ColumnDef<S
       {
         accessorKey: "deviceCount",
         id: "devices",
-        header: ({ column }) => <SortHeader label="Devices" column={column} />,
+        header: ({ column }) => <SortHeader label={t("devices")} column={column} />,
         cell: ({ row }) => <span className="tabular-nums">{row.original.deviceCount}</span>,
         meta: { className: "w-[1%] whitespace-nowrap text-right" },
       },
@@ -107,7 +110,7 @@ export function useLocationsColumns(actions: LocationsTableActions): ColumnDef<S
         id: "actions",
         enableHiding: false,
         enableSorting: false,
-        header: () => <span className="sr-only">Actions</span>,
+        header: () => <span className="sr-only">{tTable("actions")}</span>,
         meta: { className: "w-[1%] whitespace-nowrap text-right" },
         cell: ({ row }) => {
           const site = row.original;
@@ -156,6 +159,6 @@ export function useLocationsColumns(actions: LocationsTableActions): ColumnDef<S
         },
       },
     ],
-    [canUpdate, canDelete, onEdit, onDelete],
+    [canUpdate, canDelete, onEdit, onDelete, t, tTable],
   );
 }

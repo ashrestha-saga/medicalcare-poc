@@ -1,11 +1,14 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import type { DeviceInstanceDetailDTO } from "@/interfaces";
 import {
   deviceDisplayName,
   deviceInspectionTags,
 } from "@/components/hooks/scan/useCapturerInventory";
+import { formatDate } from "@/lib/format";
+import type { AppLocale } from "@/lib/locale";
 
 interface CapturerDeviceRecordProps {
   device: DeviceInstanceDetailDTO | null;
@@ -13,51 +16,47 @@ interface CapturerDeviceRecordProps {
   onClose: () => void;
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+function Field({ label, value, dash }: { label: string; value: string | null | undefined; dash: string }) {
   return (
     <div className="p-bestand-detail__row">
       <dt>{label}</dt>
-      <dd>{value?.trim() ? value : "—"}</dd>
+      <dd>{value?.trim() ? value : dash}</dd>
     </div>
   );
 }
 
-function formatYear(iso: string | null | undefined): string {
-  if (!iso) return "—";
+function formatYear(iso: string | null | undefined, dash: string): string {
+  if (!iso) return dash;
   try {
     return String(new Date(iso).getUTCFullYear());
   } catch {
-    return "—";
+    return dash;
   }
 }
 
-function formatWhen(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return iso.slice(0, 10);
-  }
-}
-
-function sourceLabel(source: DeviceInstanceDetailDTO["modelSource"]): string {
+function sourceLabel(
+  source: DeviceInstanceDetailDTO["modelSource"],
+  labels: { catalog: string; manual: string },
+  dash: string,
+): string {
   if (source === "beudamed") return "BEUDAMED";
-  if (source === "catalog") return "Katalog";
-  if (source === "manual") return "Handerfassung";
-  return "—";
+  if (source === "catalog") return labels.catalog;
+  if (source === "manual") return labels.manual;
+  return dash;
 }
 
 export function CapturerDeviceRecord({ device, loading, onClose }: CapturerDeviceRecordProps) {
+  const t = useTranslations("capturer");
+  const tCommon = useTranslations("common");
+  const locale = useLocale() as AppLocale;
+  const dash = tCommon("dash");
+
   if (loading || !device) {
     return (
       <div className="p-bestand-detail" data-testid="capturer-device-loading">
         <div className="p-bestand-detail__wait">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Gerätedatensatz wird geladen…
+          {t("deviceLoading")}
         </div>
       </div>
     );
@@ -69,7 +68,7 @@ export function CapturerDeviceRecord({ device, loading, onClose }: CapturerDevic
     [device.location?.siteName, device.location?.areaName, device.location?.room]
       .filter(Boolean)
       .join(" · ") ||
-    "—";
+    dash;
 
   return (
     <div className="p-bestand-detail" data-testid="capturer-device-record">
@@ -85,25 +84,25 @@ export function CapturerDeviceRecord({ device, loading, onClose }: CapturerDevic
           type="button"
           className="p-bestand-detail__close"
           onClick={onClose}
-          aria-label="Schließen"
+          aria-label={tCommon("close")}
           data-testid="capturer-device-close"
         >
           ×
         </button>
       </header>
 
-      <p className="p-bestand-detail__section">Gerätedatensatz</p>
+      <p className="p-bestand-detail__section">{t("deviceSection")}</p>
 
       <dl className="p-bestand-detail__fields">
-        <Field label="Inventarnummer" value={device.inventoryNumber} />
-        <Field label="Art und Typ" value={device.modelName ?? device.tradeName} />
-        <Field label="Seriennummer" value={device.serialNumber} />
-        <Field label="UDI-DI" value={device.udiDi} />
-        <Field label="Anschaffungsjahr" value={formatYear(device.commissionedAt)} />
-        <Field label="Hersteller" value={device.manufacturer} />
-        <Field label="Standort" value={location} />
+        <Field label={t("inventoryNumber")} value={device.inventoryNumber} dash={dash} />
+        <Field label={t("typeModel")} value={device.modelName ?? device.tradeName} dash={dash} />
+        <Field label={t("serialNumber")} value={device.serialNumber} dash={dash} />
+        <Field label={t("udiDi")} value={device.udiDi} dash={dash} />
+        <Field label={t("yearAcquired")} value={formatYear(device.commissionedAt, dash)} dash={dash} />
+        <Field label={t("manufacturer")} value={device.manufacturer} dash={dash} />
+        <Field label={t("location")} value={location} dash={dash} />
         <div className="p-bestand-detail__row">
-          <dt>Einstufung</dt>
+          <dt>{t("classification")}</dt>
           <dd>
             {tags.length ? (
               <div className="p-bestand__tags">
@@ -118,7 +117,7 @@ export function CapturerDeviceRecord({ device, loading, onClose }: CapturerDevic
                 ))}
               </div>
             ) : (
-              "—"
+              dash
             )}
           </dd>
         </div>
@@ -129,10 +128,10 @@ export function CapturerDeviceRecord({ device, loading, onClose }: CapturerDevic
           <p className="p-bestand-detail__meta-title">{device.modelClassification.source}</p>
         )}
         <p>
-          Angelegt · {formatWhen(device.createdAt)}
+          {t("created", { when: formatDate(device.createdAt, locale) })}
           {device.responsiblePerson ? ` · ${device.responsiblePerson}` : ""}
         </p>
-        <p>Quelle · {sourceLabel(device.modelSource)}</p>
+        <p>{t("source", { source: sourceLabel(device.modelSource, { catalog: t("sourceCatalog"), manual: t("sourceManual") }, dash) })}</p>
       </div>
 
       <button
@@ -141,7 +140,7 @@ export function CapturerDeviceRecord({ device, loading, onClose }: CapturerDevic
         onClick={onClose}
         data-testid="capturer-device-back"
       >
-        Zurück
+        {tCommon("back")}
       </button>
     </div>
   );

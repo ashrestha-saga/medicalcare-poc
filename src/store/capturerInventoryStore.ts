@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-/** Capturer (§user) Bestandsverzeichnis overlay — opened from the account bar. */
+/** Capturer inventory overlay — opened from the account bar. */
 interface CapturerInventoryUiState {
   open: boolean;
   count: number | null;

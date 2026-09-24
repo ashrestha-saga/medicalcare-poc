@@ -6,6 +6,8 @@ import { api, ApiError } from "@/lib/http/apiClient";
 import type { UpdateDeviceInput } from "@/schemas/device";
 import { toast } from "@/store/toastStore";
 
+export type InventoryInstanceState = DeviceInstanceDTO["state"];
+
 export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => void) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -24,6 +26,7 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
   const [areaId, setAreaId] = useState<string>("");
   const [room, setRoom] = useState("");
   const [maintenanceCycleMonths, setMaintenanceCycleMonths] = useState("");
+  const [state, setState] = useState<InventoryInstanceState>("draft");
   const [completingMaintenance, setCompletingMaintenance] = useState(false);
 
   const close = useCallback(() => {
@@ -48,11 +51,16 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
     setMaintenanceCycleMonths(
       device.maintenanceCycleMonths != null ? String(device.maintenanceCycleMonths) : "",
     );
+    setState(device.state);
     setFieldErrors({});
   }, []);
 
   const openEdit = useCallback(
     async (device: DeviceInstanceDTO) => {
+      if (device.catalogPending) {
+        toast.error("Catalog model is under review — edit is locked until the model is released.");
+        return;
+      }
       setOpen(true);
       setLoading(true);
       try {
@@ -73,7 +81,8 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
     setBusy(true);
     setFieldErrors({});
     try {
-      if (!serialNumber.trim() && !udiDi.trim()) {
+      const identityLocked = state === "released" || state === "retired";
+      if (!identityLocked && !serialNumber.trim() && !udiDi.trim()) {
         setFieldErrors({
           serialNumber: "Provide a serial number or UDI-DI.",
           udiDi: "Provide a serial number or UDI-DI.",
@@ -81,19 +90,28 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
         return;
       }
       const cycleRaw = maintenanceCycleMonths.trim();
-      const body: UpdateDeviceInput = {
-        inventoryNumber: inventoryNumber.trim(),
-        serialNumber: serialNumber.trim() || null,
-        tradeName: tradeName.trim() || null,
-        modelName: modelName.trim() || null,
-        manufacturer: manufacturer.trim() || null,
-        udiDi: udiDi.trim() || null,
-        commissionedAt: purchaseYear.trim() || null,
-        responsibleUserId,
-        areaId: areaId || null,
-        room: room.trim() || null,
-        maintenanceCycleMonths: cycleRaw === "" ? null : Number(cycleRaw),
-      };
+      const body: UpdateDeviceInput = identityLocked
+        ? {
+            state,
+            responsibleUserId,
+            areaId: areaId || null,
+            room: room.trim() || null,
+            maintenanceCycleMonths: cycleRaw === "" ? null : Number(cycleRaw),
+          }
+        : {
+            state,
+            inventoryNumber: inventoryNumber.trim(),
+            serialNumber: serialNumber.trim() || null,
+            tradeName: tradeName.trim() || null,
+            modelName: modelName.trim() || null,
+            manufacturer: manufacturer.trim() || null,
+            udiDi: udiDi.trim() || null,
+            commissionedAt: purchaseYear.trim() || null,
+            responsibleUserId,
+            areaId: areaId || null,
+            room: room.trim() || null,
+            maintenanceCycleMonths: cycleRaw === "" ? null : Number(cycleRaw),
+          };
       const res = await api<{ device: DeviceInstanceDetailDTO }>(`/api/devices/${detail.id}`, {
         method: "PATCH",
         body: JSON.stringify(body),
@@ -108,6 +126,7 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
     }
   }, [
     detail,
+    state,
     inventoryNumber,
     serialNumber,
     tradeName,
@@ -169,6 +188,8 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
     setRoom,
     maintenanceCycleMonths,
     setMaintenanceCycleMonths,
+    state,
+    setState,
     completingMaintenance,
     markMaintenanceDone,
     openEdit,

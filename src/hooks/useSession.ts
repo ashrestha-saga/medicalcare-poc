@@ -7,8 +7,9 @@ import { useLogStore } from "@/store/logStore";
 import { useSessionStore } from "@/store/sessionStore";
 
 interface SessionResponse {
-  user: Omit<SessionUser, "tenantId"> | null;
+  user: SessionUser | null;
   tenantName?: string | null;
+  homePath?: string;
 }
 
 export type SignOutOptions = {
@@ -25,7 +26,14 @@ export function useSession() {
   const refresh = useCallback(async () => {
     try {
       const session = await api<SessionResponse>("/api/auth/session");
-      const next = session.user ? ({ ...session.user, tenantId: "" } as SessionUser) : null;
+      let next: SessionUser | null = null;
+      if (session.user) {
+        if (session.user.accountKind === "partner") {
+          next = session.user;
+        } else {
+          next = { ...session.user, accountKind: session.user.accountKind ?? "clinic", tenantId: "" };
+        }
+      }
       setSession(next, session.tenantName ?? session.user?.companyName ?? null);
     } catch {
       setSession(null);
@@ -40,8 +48,6 @@ export function useSession() {
     await api("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     useSessionStore.getState().signOutLocal();
     useLogStore.getState().log("auth", "Signed out");
-    // Full navigation replaces the current history entry so Back won't reopen
-    // the previous user's /requests (or other app) URL under a new session.
     if (opts?.redirectTo === null) return;
     const dest = opts?.redirectTo ?? "/login";
     if (typeof window !== "undefined") window.location.replace(dest);

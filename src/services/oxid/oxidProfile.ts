@@ -40,6 +40,7 @@ export function mapMeToSessionUser(profile: OxidMeProfile): SessionUser {
   return {
     id,
     name,
+    accountKind: "clinic",
     role: OXID_SESSION_ROLE,
     tenantId: DATA_TENANT_ID,
     companyName: profileCompany(profile),

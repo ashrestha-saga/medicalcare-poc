@@ -1,20 +1,23 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useLocationsList } from "@/components/hooks/locations/useLocationsList";
+import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { LocationsTable } from "./locations-table";
 
 /** Superadmin clinic site management — gated by locations:* permission slugs. */
 export function LocationsScreen() {
+  const t = useTranslations("pages.locations");
+  const tCommon = useTranslations("common");
   const list = useLocationsList();
 
   if (!list.canView) {
     return (
       <div className="p-work" data-testid="locations-denied">
         <main className="p-main">
-          <section className="p-devhead">
-            <h2>Locations</h2>
-            <p className="p-requests__sub">You don&apos;t have permission to view locations.</p>
-          </section>
+          <ListPageShell title={t("title")} description={tCommon("denied")}>
+            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
+          </ListPageShell>
         </main>
       </div>
     );
@@ -23,19 +26,9 @@ export function LocationsScreen() {
   return (
     <div className="p-work" data-testid="locations-page">
       <main className="p-main">
-        <div className="p-admin">
-          <section className="p-devhead p-admin__head">
-            <div className="p-admin__head-copy">
-              <h2>Locations</h2>
-              <p className="p-requests__sub">
-                Location → Area → Room. Maintain areas centrally so selection lists stay consistent (no five
-                spellings of the same station).
-              </p>
-            </div>
-          </section>
-
+        <ListPageShell title={t("title")} description={t("description")}>
           <LocationsTable list={list} />
-        </div>
+        </ListPageShell>
       </main>
     </div>
   );

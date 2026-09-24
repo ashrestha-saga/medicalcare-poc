@@ -1,14 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { ROLES } from "@/constants/roles";
 import { DropdownFilter, FilterToolbar } from "@/components/features/shared/filters";
-
-const STATUS_OPTIONS = [
-  { value: "active", label: "Active", colorCode: "#2fd98a" },
-  { value: "inactive", label: "Inactive", colorCode: "#ff3366" },
-];
-
-const ROLE_OPTIONS = ROLES.map((r) => ({ value: r.value, label: r.label }));
 
 interface UsersFilterToolbarProps {
   roleFilter: string[] | null;
@@ -25,21 +20,36 @@ export function UsersFilterToolbar({
   onStatusChange,
   onClearAll,
 }: UsersFilterToolbarProps) {
+  const t = useTranslations("filters");
+  const tRoles = useTranslations("roles");
   const hasActiveFilters = Boolean(roleFilter?.length || statusFilter?.length);
+
+  const roleOptions = useMemo(
+    () => ROLES.map((r) => ({ value: r.value, label: tRoles(r.value) })),
+    [tRoles],
+  );
+
+  const statusOptions = useMemo(
+    () => [
+      { value: "active", label: t("active"), colorCode: "#2fd98a" },
+      { value: "inactive", label: t("inactive"), colorCode: "#ff3366" },
+    ],
+    [t],
+  );
 
   return (
     <FilterToolbar hasActiveFilters={hasActiveFilters} onClearAll={onClearAll}>
       <DropdownFilter
-        label="Role"
+        label={t("role")}
         value={roleFilter}
-        options={ROLE_OPTIONS}
+        options={roleOptions}
         onChange={onRoleChange}
         multiple
       />
       <DropdownFilter
-        label="Status"
+        label={t("status")}
         value={statusFilter}
-        options={STATUS_OPTIONS}
+        options={statusOptions}
         onChange={onStatusChange}
         multiple
       />

@@ -11,7 +11,7 @@ const cycleMonthsSchema = z
 /** POST /api/devices — inventarize a catalog/BEUDAMED model as a tenant DeviceInstance. */
 export const createDeviceSchema = z.object({
   modelId: z.string().trim().min(1),
-  serialNumber: z.string().trim().min(1, "Seriennummer ist erforderlich.").max(128),
+  serialNumber: z.string().trim().min(1, "Serial number is required.").max(128),
   responsibleUserId: z.string().trim().min(1).nullable().optional(),
   /** @deprecated Prefer responsibleUserId — kept for backward compatibility. */
   responsiblePerson: z.string().trim().max(128).nullable().optional(),
@@ -25,23 +25,18 @@ export const createDeviceSchema = z.object({
 
 export type CreateDeviceInput = z.infer<typeof createDeviceSchema>;
 
-/** Client-side inventarize form — serial required; inventarnummer is server-assigned. */
+/** Client-side inventarize form — serial required; inventarnummer is server-assigned.
+ * Maintenance cycle is not collected here (initial registration / duties set it later).
+ */
 export const inventarizeFormSchema = z.object({
-  serialNumber: z.string().trim().min(1, "Seriennummer ist erforderlich.").max(128),
+  serialNumber: z.string().trim().min(1, "Serial number is required.").max(128),
   responsibleUserId: z.string().trim().min(1).optional(),
   commissionedAt: z
     .string()
     .trim()
     .optional()
     .refine((v) => !v || /^\d{4}$/.test(v) || !Number.isNaN(Date.parse(v)), {
-      message: "Ungültiges Anschaffungsjahr.",
-    }),
-  maintenanceCycleMonths: z
-    .string()
-    .trim()
-    .optional()
-    .refine((v) => !v || (/^\d+$/.test(v) && Number(v) >= 1 && Number(v) <= 120), {
-      message: "Maintenance cycle must be 1–120 months.",
+      message: "Invalid year of acquisition.",
     }),
 });
 
@@ -60,6 +55,8 @@ export const updateDeviceSchema = z
     /** ISO date or year (YYYY) → stored as commissionedAt. */
     commissionedAt: z.string().trim().nullable().optional(),
     maintenanceCycleMonths: cycleMonthsSchema,
+    /** Instance lifecycle: draft | review | released | retired */
+    state: z.enum(["draft", "review", "released", "retired"]).optional(),
     /** Linked DeviceModel fields (apply to all instances of the model). */
     tradeName: z.string().trim().max(200).nullable().optional(),
     modelName: z.string().trim().max(200).nullable().optional(),

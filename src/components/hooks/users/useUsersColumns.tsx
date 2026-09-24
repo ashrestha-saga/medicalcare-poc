@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronsUpDown, KeyRound, Pencil, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { AdminUserDTO } from "@/interfaces";
 import { roleLabel } from "@/constants/roles";
 import { Badge } from "@/components/ui/badge";
@@ -40,25 +41,27 @@ function SortHeader({
 
 export function useUsersColumns(actions: UsersTableActions): ColumnDef<AdminUserDTO>[] {
   const { canUpdate, canDelete, canResetPassword, onEdit, onResetPassword, onDelete } = actions;
+  const t = useTranslations("table.users");
+  const tTable = useTranslations("table");
 
   return useMemo(
     () => [
       {
         accessorKey: "name",
         id: "name",
-        header: ({ column }) => <SortHeader label="Name" column={column} />,
+        header: ({ column }) => <SortHeader label={t("name")} column={column} />,
         cell: ({ row }) => <span className="font-medium text-foreground">{row.original.name}</span>,
       },
       {
         accessorKey: "email",
         id: "email",
-        header: ({ column }) => <SortHeader label="Email" column={column} />,
+        header: ({ column }) => <SortHeader label={t("email")} column={column} />,
         cell: ({ row }) => <span className="text-muted-foreground">{row.original.email}</span>,
       },
       {
         accessorKey: "role",
         id: "role",
-        header: ({ column }) => <SortHeader label="Role" column={column} />,
+        header: ({ column }) => <SortHeader label={t("role")} column={column} />,
         cell: ({ row }) => roleLabel(row.original.role),
         filterFn: (row, _id, value: string[]) => {
           if (!value?.length) return true;
@@ -68,7 +71,7 @@ export function useUsersColumns(actions: UsersTableActions): ColumnDef<AdminUser
       {
         accessorKey: "active",
         id: "status",
-        header: ({ column }) => <SortHeader label="Status" column={column} />,
+        header: ({ column }) => <SortHeader label={t("status")} column={column} />,
         cell: ({ row }) =>
           row.original.active ? (
             <Badge variant="success">Active</Badge>
@@ -85,7 +88,7 @@ export function useUsersColumns(actions: UsersTableActions): ColumnDef<AdminUser
         id: "actions",
         enableHiding: false,
         enableSorting: false,
-        header: () => <span className="sr-only">Actions</span>,
+        header: () => <span className="sr-only">{tTable("actions")}</span>,
         meta: { className: "w-[1%] whitespace-nowrap text-right" },
         cell: ({ row }) => {
           const user = row.original;
@@ -152,6 +155,6 @@ export function useUsersColumns(actions: UsersTableActions): ColumnDef<AdminUser
         },
       },
     ],
-    [canUpdate, canDelete, canResetPassword, onEdit, onResetPassword, onDelete],
+    [canUpdate, canDelete, canResetPassword, onEdit, onResetPassword, onDelete, t, tTable],
   );
 }

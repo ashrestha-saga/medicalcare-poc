@@ -1,36 +1,26 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useRequestsList } from "@/components/hooks/requests";
-import { RequestDetail } from "./RequestDetail";
+import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { RequestsTable } from "./requests-table";
 
-/** Service request history, open queue, and start/complete maintenance. */
+/** Service request list — open a row to view `/requests/[reference]`. */
 export function RequestsScreen() {
+  const t = useTranslations("pages.requests");
+  const router = useRouter();
   const list = useRequestsList();
 
   return (
     <div className="p-work" data-testid="requests-page">
       <main className="p-main">
-        <div className="p-admin">
-          {list.selected ? (
-            <RequestDetail
-              request={list.selected}
-              canWork={list.canWork}
-              onBack={list.clearSelection}
-              onUpdated={list.applyUpdated}
-            />
-          ) : (
-            <>
-              <section className="p-devhead p-admin__head">
-                <div className="p-admin__head-copy">
-                  <h2>Requests</h2>
-                  <p className="p-requests__sub">History and open maintenance work</p>
-                </div>
-              </section>
-              <RequestsTable list={list} onSelect={list.selectRequest} />
-            </>
-          )}
-        </div>
+        <ListPageShell title={t("title")} description={t("description")}>
+          <RequestsTable
+            list={list}
+            onSelect={(request) => router.push(`/requests/${encodeURIComponent(request.reference)}`)}
+          />
+        </ListPageShell>
       </main>
     </div>
   );

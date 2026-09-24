@@ -1,41 +1,17 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from "vitest";
 import { INSPECTION_TYPES } from "@/constants/inspectionTypes";
-import { proposalSuggestedCodes, useRequestStore } from "./requestStore";
+import { useRequestStore } from "./requestStore";
 import { useScanStore } from "./scanStore";
 
-const verified = { annex1: true, annex2: true, softwareClass: null, radiation: false, confidence: "verified" as const, source: "t" };
-
-describe("requestStore — FA-403 pre-selection rules", () => {
+describe("requestStore — manual service type", () => {
   beforeEach(() => useRequestStore.getState().resetForm());
 
-  it("maps proposal flags to inspection codes", () => {
-    expect(proposalSuggestedCodes(verified)).toEqual(["STK", "MTK"]);
-    expect(proposalSuggestedCodes({ ...verified, annex1: false, annex2: null, softwareClass: "IIb", radiation: true })).toEqual(["SOFTWARE", "RADIATION"]);
-    expect(proposalSuggestedCodes(null)).toEqual([]);
-  });
-
-  it("verified pre-selects and requires confirmation", () => {
-    useRequestStore.getState().applyProposal(verified);
-    const f = useRequestStore.getState().form;
-    expect(f.selectedTypes).toEqual(["STK", "MTK"]);
-    expect(f.serviceType).toBe("STK");
-    expect(f.proposalConfirmed).toBe(false);
-  });
-
-  it("derived and guess do NOT pre-select", () => {
-    useRequestStore.getState().applyProposal({ ...verified, confidence: "derived" });
-    expect(useRequestStore.getState().form.selectedTypes).toEqual([]);
-    useRequestStore.getState().applyProposal({ ...verified, confidence: "guess" });
-    expect(useRequestStore.getState().form.selectedTypes).toEqual([]);
-  });
-
-  it("the master inspection list is never mutated by a proposal (AC #6)", () => {
+  it("patches service type without mutating the master inspection list", () => {
     const before = INSPECTION_TYPES.map((t) => t.code);
-    useRequestStore.getState().applyProposal(verified);
-    useRequestStore.getState().toggleType("OTHER");
+    useRequestStore.getState().patch({ serviceType: "STK" });
+    expect(useRequestStore.getState().form.serviceType).toBe("STK");
     expect(INSPECTION_TYPES.map((t) => t.code)).toEqual(before);
-    expect(Object.isFrozen(INSPECTION_TYPES) || Array.isArray(INSPECTION_TYPES)).toBe(true);
   });
 
   it("keeps one idempotency key for the life of a form and mints a new one on reset", () => {

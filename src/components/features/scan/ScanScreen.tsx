@@ -41,14 +41,14 @@ export function ScanScreen({ showCamera = true }: { showCamera?: boolean }) {
           </div>
           <button type="button" className="p-manualbtn" onClick={startManualEntry} data-testid="manual-entry-open">
             <KeypadIcon />
-            Nummer eingeben
+            Enter number
           </button>
-          <div className="p-camhint">Geräteetikett in den Rahmen halten</div>
+          <div className="p-camhint">Hold the device label in the frame</div>
         </div>
       ) : (
         <div className="p-wait">
-          <strong>Bereit zum Scannen</strong>
-          <p>Etikett scannen, um Service zu beauftragen oder Ersatzteile zu bestellen.</p>
+          <strong>Ready to scan</strong>
+          <p>Scan a label to request service or order spare parts.</p>
           {lastError && <p className="p-err">{lastError}</p>}
         </div>
       )}

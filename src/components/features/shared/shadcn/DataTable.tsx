@@ -139,9 +139,9 @@ export function DataTable<TData, TValue>({
         />
       )}
 
-      <div className="rounded-md border border-border bg-card/40">
+      <div className="rounded-md border border-border bg-card">
         <Table>
-          <TableHeader className={headerSticky ? "sticky top-0 z-10 bg-card" : undefined}>
+          <TableHeader className={cn("bg-card", headerSticky && "sticky top-0 z-10")}>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
                 {headerGroup.headers.map((header) => {

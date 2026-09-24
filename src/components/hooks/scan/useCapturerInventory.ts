@@ -29,7 +29,7 @@ export function useCapturerInventory(enabled = true) {
         const res = await api<{ devices: DeviceInstanceDTO[] }>(`/api/devices${qs}`);
         setDevices(res.devices);
       } catch (err) {
-        toast.error(err instanceof ApiError ? err.message : "Bestand konnte nicht geladen werden.");
+        toast.error(err instanceof ApiError ? err.message : "Could not load inventory.");
         setDevices([]);
       } finally {
         setLoading(false);
@@ -66,7 +66,7 @@ export function useCapturerInventory(enabled = true) {
       const res = await api<{ device: DeviceInstanceDetailDTO }>(`/api/devices/${device.id}`);
       setSelected(res.device);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gerät konnte nicht geladen werden.");
+      toast.error(err instanceof ApiError ? err.message : "Could not load device.");
     } finally {
       setDetailLoading(false);
     }

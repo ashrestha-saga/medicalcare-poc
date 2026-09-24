@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import type { RequestScope } from "@/interfaces";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { useSessionStore } from "@/store/sessionStore";
@@ -9,6 +10,7 @@ import { useSessionStore } from "@/store/sessionStore";
  * Permission-derived request UI capabilities (UX only — API still enforces).
  */
 export function useRequestCapabilities() {
+  const t = useTranslations("filters");
   const role = useSessionStore((s) => s.user?.role);
   const { checkPermission } = usePermissions();
   const canWork = checkPermission("requests:transition");
@@ -16,11 +18,11 @@ export function useRequestCapabilities() {
   const canViewAll = checkPermission("requests:view-all");
 
   const scopes = useMemo(() => {
-    const list: { id: RequestScope; label: string }[] = [{ id: "mine", label: "Mine" }];
-    if (canViewOpen) list.push({ id: "open", label: "Open" });
-    if (canViewAll) list.push({ id: "all", label: "All" });
+    const list: { id: RequestScope; label: string }[] = [{ id: "mine", label: t("scopeMine") }];
+    if (canViewOpen) list.push({ id: "open", label: t("scopeOpen") });
+    if (canViewAll) list.push({ id: "all", label: t("scopeAll") });
     return list;
-  }, [canViewOpen, canViewAll]);
+  }, [canViewOpen, canViewAll, t]);
 
   const defaultScope: RequestScope = canViewOpen ? "open" : "mine";
 

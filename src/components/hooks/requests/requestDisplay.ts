@@ -1,28 +1,29 @@
 import type { RequestStateTone } from "@/interfaces";
-import { STARTABLE_REQUEST_STATES } from "@/constants/serviceRequest";
+import {
+  STARTABLE_REQUEST_STATES,
+  serviceRequestStateTone,
+} from "@/constants/serviceRequest";
+import { formatDateTime } from "@/lib/format";
+import type { AppLocale } from "@/lib/locale";
 
 export type { RequestScope, RequestStateTone } from "@/interfaces";
 export { STARTABLE_REQUEST_STATES as STARTABLE_STATES };
+export {
+  SERVICE_REQUEST_STATE_BADGES,
+  SERVICE_REQUEST_STATE_LABELS,
+  serviceRequestStateBadge,
+  serviceRequestStateLabel,
+  serviceRequestStateTone,
+} from "@/constants/serviceRequest";
 
-export function formatWhen(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
+/** Prefer `formatDateTime(iso, locale)` from `@/lib/format` for new call sites. */
+export function formatWhen(iso: string, locale: AppLocale = "en"): string {
+  return formatDateTime(iso, locale);
 }
 
+/** @deprecated Prefer `serviceRequestStateTone` from constants. */
 export function stateTone(state: string): RequestStateTone {
-  if (state === "in_progress") return "work";
-  if (state === "completed") return "done";
-  if ((STARTABLE_REQUEST_STATES as readonly string[]).includes(state)) return "open";
-  return "other";
+  return serviceRequestStateTone(state);
 }
 
 export function isStartable(state: string): boolean {

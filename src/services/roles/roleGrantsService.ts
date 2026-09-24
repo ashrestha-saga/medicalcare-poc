@@ -19,7 +19,10 @@ let cache: Map<UserRole, readonly PermissionSlug[]> | null = null;
 /** RoleGrant delegate — cast keeps editors happy when Prisma Client types lag generate. */
 type RoleGrantStore = {
   count: () => Promise<number>;
-  createMany: (args: { data: { role: string; permission: string }[] }) => Promise<unknown>;
+  createMany: (args: {
+    data: { role: string; permission: string }[];
+    skipDuplicates?: boolean;
+  }) => Promise<unknown>;
   findMany: (args: {
     select: { role: true; permission: true };
   }) => Promise<{ role: string; permission: string }[]>;
@@ -48,11 +51,22 @@ function defaultRows(): { role: string; permission: string }[] {
 export async function seedRoleGrantsIfEmpty(client: PrismaClient = prisma): Promise<number> {
   const grants = roleGrantStore(client);
   const count = await grants.count();
-  if (count > 0) return 0;
+  if (count > 0) {
+    await ensureDefaultPermissionGrants(client);
+    return 0;
+  }
   const data = defaultRows();
   if (data.length === 0) return 0;
   await grants.createMany({ data });
   return data.length;
+}
+
+/** Add newly introduced default slugs without wiping custom RoleGrant rows. */
+export async function ensureDefaultPermissionGrants(client: PrismaClient = prisma): Promise<void> {
+  const grants = roleGrantStore(client);
+  const data = defaultRows();
+  if (data.length === 0) return;
+  await grants.createMany({ data, skipDuplicates: true });
 }
 
 async function loadCacheFromDb(): Promise<Map<UserRole, readonly PermissionSlug[]>> {
@@ -100,10 +114,14 @@ export const roleGrantsService = {
 
     const counts = await prisma.user.groupBy({
       by: ["role"],
-      where: { tenantId: ctx.tenantId },
+      where: { tenantId: ctx.tenantId, accountKind: "clinic", role: { not: null } },
       _count: { _all: true },
     });
-    const countByRole = new Map(counts.map((c) => [c.role, c._count._all]));
+    const countByRole = new Map(
+      counts
+        .filter((c): c is typeof c & { role: string } => c.role != null)
+        .map((c) => [c.role, c._count._all]),
+    );
 
     return ROLES.map((r) => ({
       value: r.value,
@@ -153,7 +171,7 @@ export const roleGrantsService = {
     await ensureRoleGrantCache();
 
     const counts = await prisma.user.count({
-      where: { tenantId: ctx.tenantId, role },
+      where: { tenantId: ctx.tenantId, accountKind: "clinic", role },
     });
     const label = ROLES.find((r) => r.value === role)?.label ?? role;
     return {

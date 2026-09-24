@@ -1,17 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 import type { RequestScope } from "@/interfaces";
 import { DropdownFilter, FilterToolbar } from "@/components/features/shared/filters";
-
-const STATE_OPTIONS = [
-  { value: "captured", label: "Captured", colorCode: "#93a6b4" },
-  { value: "queued", label: "Queued", colorCode: "#1e7fe0" },
-  { value: "transmitted", label: "Transmitted", colorCode: "#1e7fe0" },
-  { value: "acknowledged", label: "Acknowledged", colorCode: "#1e7fe0" },
-  { value: "in_progress", label: "In progress", colorCode: "#f5a524" },
-  { value: "completed", label: "Completed", colorCode: "#2fd98a" },
-  { value: "rejected", label: "Rejected", colorCode: "#ff3366" },
-];
+import { SERVICE_REQUEST_STATE_FILTER_OPTIONS } from "@/constants/serviceRequest";
 
 interface RequestsFilterToolbarProps {
   scopes: { id: RequestScope; label: string }[];
@@ -30,12 +23,23 @@ export function RequestsFilterToolbar({
   onStateChange,
   onClearAll,
 }: RequestsFilterToolbarProps) {
+  const t = useTranslations("filters");
+  const tStatus = useTranslations("status");
   const hasActiveFilters = Boolean(stateFilter?.length);
+
+  const statusOptions = useMemo(
+    () =>
+      SERVICE_REQUEST_STATE_FILTER_OPTIONS.map((o) => ({
+        ...o,
+        label: tStatus.has(o.value) ? tStatus(o.value) : o.label,
+      })),
+    [tStatus],
+  );
 
   return (
     <FilterToolbar hasActiveFilters={hasActiveFilters} onClearAll={onClearAll}>
       <DropdownFilter
-        label="Scope"
+        label={t("scope")}
         value={scope}
         options={scopes.map((s) => ({ value: s.id, label: s.label }))}
         onChange={(value) => {
@@ -44,9 +48,9 @@ export function RequestsFilterToolbar({
         }}
       />
       <DropdownFilter
-        label="Status"
+        label={t("status")}
         value={stateFilter}
-        options={STATE_OPTIONS}
+        options={statusOptions}
         onChange={onStateChange}
         multiple
       />

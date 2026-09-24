@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useTranslations } from "next-intl";
 import type { CatalogModelFormState, CatalogModelWriteDTO } from "@/interfaces";
 import { ApiError } from "@/lib/http/apiClient";
 import { toast } from "@/store/toastStore";
@@ -61,6 +62,7 @@ export function useCatalogModelForm({
   onOpenChange: (open: boolean) => void;
   onSubmit: (input: CatalogModelWriteDTO) => Promise<void>;
 }) {
+  const t = useTranslations("pages.catalog");
   const [form, setForm] = useState<CatalogModelFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
 
@@ -81,12 +83,12 @@ export function useCatalogModelForm({
         await onSubmit(toCatalogModelWriteDTO(form));
         onOpenChange(false);
       } catch (err) {
-        toast.error(err instanceof ApiError ? err.message : "Save failed.");
+        toast.error(err instanceof ApiError ? err.message : t("toastSaveFailed"));
       } finally {
         setSaving(false);
       }
     },
-    [form, onOpenChange, onSubmit],
+    [form, onOpenChange, onSubmit, t],
   );
 
   return { form, saving, setField, handleSubmit };

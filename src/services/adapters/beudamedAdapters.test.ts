@@ -59,4 +59,19 @@ describe("mapBeudamedToDeviceModel", () => {
     expect(model.modelName).toBe("AS-1");
     expect(model.gmdnCode).toBe("40761");
   });
+
+  it("falls back to UDI when name fields are missing", () => {
+    const model = mapBeudamedToDeviceModel(
+      {
+        id: "06970401810666",
+        provider: "eudamed",
+        type: "device",
+        primary_di: "06970401810666",
+        manufacturer_name: "Acme Med",
+      },
+      "06970401810666",
+      at,
+    );
+    expect(model.tradeName).toBe("06970401810666");
+  });
 });

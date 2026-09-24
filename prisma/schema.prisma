@@ -1,4 +1,4 @@
-// DeviceCare data model — derived from Requirements Spec v8, Section 6.
+// DeviceCare data model — derived from Requirements Spec v8 + Erstanlage (MPBetreibV).
 //
 // PROVIDER NOTE
 // Target database is MySQL. Fields marked `// JSON` hold serialized JSON as
@@ -19,31 +19,49 @@ generator client {
 // ---------------------------------------------------------------------------
 
 model Tenant {
-  id                String                 @id @default(cuid())
-  name              String
-  createdAt         DateTime               @default(now())
-  users             User[]
-  sites             Site[]
-  instances         DeviceInstance[]
-  captured          CapturedArticle[]
-  requests          ServiceRequest[]
-  orderRequests     OrderRequest[]
-  dispatchTargets   DispatchTarget[]
-  externalCalls     ExternalCallLog[]
-  oxidConnection    TenantOxidConnection?
-  maintenanceEvents MaintenanceEvent[]
+  id                  String                   @id @default(cuid())
+  name                String
+  createdAt           DateTime                 @default(now())
+  users               User[]
+  sites               Site[]
+  instances           DeviceInstance[]
+  captured            CapturedArticle[]
+  requests            ServiceRequest[]
+  orderRequests       OrderRequest[]
+  dispatchTargets     DispatchTarget[]
+  externalCalls       ExternalCallLog[]
+  oxidConnection      TenantOxidConnection?
+  maintenanceEvents   MaintenanceEvent[]
+  releaseSnapshots    DeviceReleaseSnapshot[]
+  deviceDuties        DeviceDuty[]
+  deviceUnitEvents    DeviceUnitEvent[]
+  dutyPerformances    DutyPerformance[]
+  executorOrgs        ExecutorOrg[]
+  serviceContracts    ServiceContract[]
+  trainingEvents      TrainingEvent[]
+  trainingRecords     TrainingRecord[]
 }
 
-/// Clinic staff — DeviceCare login (not OXID identity).
+/// Login identity. Clinic staff belong to one tenant. Partner staff belong to an organisation.
 model User {
   id           String   @id @default(cuid())
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  email        String
+  /** Set for clinic accounts. Null for partner accounts. */
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  email        String   @unique
   name         String
-  role         String // superadmin | device_admin | security_officer | user
+  /** Clinic role. Null for partner accounts (role lives on OrgMembership). */
+  role         String? // superadmin | device_admin | security_officer | user
+  /** clinic | partner — which login door accepts this account. */
+  accountKind  String   @default("clinic")
   passwordHash String
   active       Boolean  @default(true)
+  jobTitle     String?
+  homeAreaId   String?
+  homeArea     Area?    @relation("UserHomeArea", fields: [homeAreaId], references: [id])
+  employedFrom DateTime? @db.Date
+  employedTo   DateTime? @db.Date
+  anonymisedAt DateTime?
   /** TOTP MFA — secret stored AES-GCM encrypted (base64 payload). */
   totpEnabled      Boolean   @default(false)
   totpSecretEnc    String?  @db.Text
@@ -60,10 +78,13 @@ model User {
   oxidConnectionsMade  TenantOxidConnection[] @relation("OxidConnectedBy")
   totpChallenges       TotpChallenge[]
   responsibleDevices   DeviceInstance[]       @relation("DeviceResponsibleUser")
+  createdInstances     DeviceInstance[]       @relation("DeviceCreatedBy")
+  orgMemberships       OrgMembership[]
+  trainingRecords      TrainingRecord[]
 
-  @@unique([tenantId, email])
   @@index([tenantId])
-  @@index([email])
+  @@index([accountKind])
+  @@index([homeAreaId])
 }
 
 /// Short-lived login challenge after password OK when TOTP is enabled.
@@ -100,14 +121,16 @@ model TenantOxidConnection {
 }
 
 model Site {
-  id              String  @id @default(cuid())
-  tenantId        String
-  name            String
-  code            String? // short site identifier (e.g. BONN-A)
-  address         String? @db.Text // physical / deployment address
-  deliveryAddress String? @db.Text // goods receiving — spare parts go here
-  tenant          Tenant  @relation(fields: [tenantId], references: [id])
-  areas           Area[]
+  id                        String                     @id @default(cuid())
+  tenantId                  String
+  name                      String
+  code                      String? // short site identifier (e.g. BONN-A)
+  address                   String?                    @db.Text
+  deliveryAddress           String?                    @db.Text
+  tenant                    Tenant                     @relation(fields: [tenantId], references: [id])
+  areas                     Area[]
+  headcounts                SiteHeadcount[]
+  safetyOfficerAppointments SafetyOfficerAppointment[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -119,6 +142,34 @@ model Area {
   name      String
   site      Site             @relation(fields: [siteId], references: [id])
   instances DeviceInstance[]
+  homeUsers User[]           @relation("UserHomeArea")
+
+  @@index([siteId])
+}
+
+model SiteHeadcount {
+  id         String   @id @default(cuid())
+  siteId     String
+  site       Site     @relation(fields: [siteId], references: [id])
+  validFrom  DateTime @db.Date
+  validTo    DateTime? @db.Date
+  headcount  Int
+  recordedBy String
+  recordedAt DateTime @default(now())
+
+  @@index([siteId])
+}
+
+model SafetyOfficerAppointment {
+  id               String    @id @default(cuid())
+  siteId           String
+  site             Site      @relation(fields: [siteId], references: [id])
+  personName       String
+  functionalEmail  String?
+  appointedFrom    DateTime  @db.Date
+  appointedTo      DateTime? @db.Date
+  publishedAt      DateTime? @db.Date
+  documentRef      String?
 
   @@index([siteId])
 }
@@ -128,41 +179,41 @@ model Area {
 // ---------------------------------------------------------------------------
 
 model DeviceModel {
-  id                      String                   @id @default(cuid())
-  basicUdiDi              String?                  @unique
-  udiDi                   String?
-  gtins                   String? @db.Text // JSON string[]
-  manufacturer            String?
-  manufacturerSrn         String?
-  tradeName               String?
-  modelName               String?
-  riskClass               String?
-  emdnCode                String?
-  gmdnCode                String?
-  source                  String // manual | catalog | beudamed
-  sourceFetchedAt         DateTime?
-  version                 Int                      @default(1)
-  state                   String                   @default("draft") // draft | review | released
-  /** Default maintenance interval in months for new inventory copies. */
+  id                     String                     @id @default(cuid())
+  basicUdiDi             String?                    @unique
+  udiDi                  String?
+  gtins                  String?                    @db.Text // JSON string[]
+  manufacturer           String?
+  manufacturerSrn        String?
+  tradeName              String?
+  modelName              String?
+  riskClass              String?
+  emdnCode               String?
+  gmdnCode               String?
+  productSeries          String?
+  source                 String // manual | catalog | beudamed | wizard
+  sourceFetchedAt        DateTime?
+  version                Int                        @default(1)
+  state                  String                     @default("draft") // draft | review | released
   maintenanceCycleMonths Int?
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  instances               DeviceInstance[]
-  externalRecords         ExternalSourceRecord[]
-  classificationProposals ClassificationProposal[]
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  instances              DeviceInstance[]
+  externalRecords        ExternalSourceRecord[]
+  classifications        DeviceModelClassification[]
+  trainingEvents         TrainingEvent[]
 
   @@index([udiDi])
   @@index([manufacturer, modelName])
 }
 
-// FA-103 / SS-201 — raw external payload, versioned by fetchedAt
 model ExternalSourceRecord {
   id            String      @id @default(cuid())
   deviceModelId String
   deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [id])
   source        String // "beudamed" | "oxid"
-  identifier    String // the identifier that was queried (udiDi / gtin)
-  payload       String @db.LongText // JSON — raw external response, never sent to the browser
+  identifier    String
+  payload       String      @db.LongText
   fetchedAt     DateTime
 
   @@index([source, identifier, fetchedAt])
@@ -170,50 +221,61 @@ model ExternalSourceRecord {
 }
 
 model DeviceInstance {
-  id                     String             @id @default(cuid())
+  id                     String                   @id @default(cuid())
   tenantId               String
-  tenant                 Tenant             @relation(fields: [tenantId], references: [id])
+  tenant                 Tenant                   @relation(fields: [tenantId], references: [id])
   inventoryNumber        String
   serialNumber           String?
+  udiDi                  String?
   modelId                String?
-  model                  DeviceModel?       @relation(fields: [modelId], references: [id])
+  model                  DeviceModel?             @relation(fields: [modelId], references: [id])
   areaId                 String?
-  area                   Area?              @relation(fields: [areaId], references: [id])
+  area                   Area?                    @relation(fields: [areaId], references: [id])
   room                   String?
   commissionedAt         DateTime?
-  /** Denormalized display name for lists/labels. */
   responsiblePerson      String?
-  /** Preferred: link to tenant user (e.g. device_admin). */
   responsibleUserId      String?
-  responsibleUser        User?              @relation("DeviceResponsibleUser", fields: [responsibleUserId], references: [id])
-  classificationId       String?            @unique
-  classification         Classification?    @relation(fields: [classificationId], references: [id])
-  /** Copied from model at inventarize; may be overridden per unit. */
+  responsibleUser        User?                    @relation("DeviceResponsibleUser", fields: [responsibleUserId], references: [id])
+  /** draft | review | released | retired */
+  state                  String                   @default("draft")
+  productKindCode        String?
+  source                 String                   @default("wizard") // wizard | manual | import | scan | external
+  legacyMedgvGroup1      Boolean                  @default(false)
+  aedExemption           Boolean                  @default(false)
+  /** Wizard Merkmale blob before/after freeze (JSON). */
+  characteristicsJson    String?                  @db.LongText
+  parentInstanceId       String?
+  parentInstance         DeviceInstance?          @relation("DeviceAccessory", fields: [parentInstanceId], references: [id])
+  childInstances         DeviceInstance[]         @relation("DeviceAccessory")
+  retiredAt              DateTime?
+  mergedIntoId           String?
+  createdByUserId        String?
+  createdByUser          User?                    @relation("DeviceCreatedBy", fields: [createdByUserId], references: [id])
   maintenanceCycleMonths Int?
-  /** Start of current period — usually commissionedAt or createdAt. */
   maintenanceAnchorAt    DateTime?
-  /** When maintenance was last marked done. */
   lastMaintainedAt       DateTime?
-  /** Next due = (lastMaintainedAt ?? maintenanceAnchorAt) + cycle months. */
   nextMaintenanceDueAt   DateTime?
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
   maintenanceEvents      MaintenanceEvent[]
+  releaseSnapshots       DeviceReleaseSnapshot[]
+  duties                 DeviceDuty[]
+  unitEvents             DeviceUnitEvent[]
+  reprocessingProfile    DeviceReprocessingProfile?
 
   @@unique([tenantId, inventoryNumber])
   @@index([tenantId, serialNumber])
   @@index([tenantId, nextMaintenanceDueAt])
+  @@index([tenantId, state])
   @@index([responsibleUserId])
 }
 
-/// Audit log for maintenance schedule changes (completion, cycle edits, etc.).
 model MaintenanceEvent {
   id               String         @id @default(cuid())
   tenantId         String
   tenant           Tenant         @relation(fields: [tenantId], references: [id])
   deviceInstanceId String
   deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
-  /// completed | skipped | rescheduled | cycle_changed
   kind             String
   performedAt      DateTime
   previousDueAt    DateTime?
@@ -227,7 +289,6 @@ model MaintenanceEvent {
   @@index([tenantId, performedAt])
 }
 
-// DAT-302a — service-only subject created by stage 4 manual capture
 model CapturedArticle {
   id                    String   @id @default(cuid())
   tenantId              String
@@ -240,59 +301,381 @@ model CapturedArticle {
   nameplateAttachmentId String?
   capturedBy            String?
   capturedAt            DateTime @default(now())
-  serviceOnly           Boolean  @default(true) // MUST be enforced server-side, see DAT-302a
+  serviceOnly           Boolean  @default(true)
 
   @@index([tenantId])
 }
 
 // ---------------------------------------------------------------------------
-// Classification (FA-400..404) — a suggestion, never a determination
+// Regulatory reference data (cross-tenant, seeded)
 // ---------------------------------------------------------------------------
 
-model Classification {
-  id                     String          @id @default(cuid())
-  annex1                 Boolean?
-  annex2                 Boolean?
-  softwareClass          String? // null | IIb | III | C | D
-  radiation              Boolean?
-  confirmedBy            String?
-  confirmedAt            DateTime?
-  proposalId             String?
-  overriddenFromProposal Boolean         @default(false)
-  instance               DeviceInstance?
+model RefRuleSet {
+  id              String                        @id
+  code            String
+  title           String
+  legalBasis      String
+  versionLabel    String
+  validFrom       DateTime                      @db.Date
+  validTo         DateTime?                     @db.Date
+  sourceNote      String?                       @db.Text
+  inspectionTypes RefInspectionType[]
+  annex2Items     RefAnnex2Item[]
+  reprocClasses   RefReprocessingClass[]
+  reprocEquipment RefReprocessingEquipmentType[]
+  radiationApps   RefRadiationApplication[]
+  constancyObjects RefConstancyObject[]
+  trainingTypes   RefTrainingType[]
+  classifications DeviceModelClassification[]
+
+  @@unique([code, versionLabel])
 }
 
-model ClassificationRule {
-  id            String    @id @default(cuid())
-  matchType     String // emdn | gmdn | basicUdiDi | manufacturerModel
-  matchValue    String
-  annex1        Boolean?
-  annex2        Boolean?
-  softwareClass String?
-  radiation     Boolean?
-  confidence    String // verified | derived | guess
-  source        String
-  validFrom     DateTime?
-  validTo       DateTime?
-  createdAt     DateTime  @default(now())
-
-  @@index([matchType, matchValue])
+model RefInspectionType {
+  code             String      @id
+  ruleSetId        String
+  ruleSet          RefRuleSet  @relation(fields: [ruleSetId], references: [id])
+  label            String
+  legalBasis       String
+  deadlineAnchor   String // month_end | year_end | exact_day | event | interval | process | permanent
+  defaultInterval  Int?
+  intervalUnit     String? // months | years
+  evidenceHint     String?     @db.Text
+  duties           DeviceDuty[]
 }
 
-model ClassificationProposal {
-  id            String      @id @default(cuid())
-  deviceModelId String
-  deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [id])
-  ruleId        String?
-  annex1        Boolean?
-  annex2        Boolean?
-  softwareClass String?
-  radiation     Boolean?
-  confidence    String
-  source        String
-  createdAt     DateTime    @default(now())
+model RefAnnex2Item {
+  id               String   @id
+  ruleSetId        String
+  ruleSet          RefRuleSet @relation(fields: [ruleSetId], references: [id])
+  itemNo           String
+  parentItemNo     String?
+  label            String   @db.Text
+  restriction      String?  @db.Text
+  isGroup          Boolean  @default(false)
+  intervalYears    Int?
+  conditionText    String?  @db.Text
+  matchTerms       String   @db.Text // JSON string[] — app default "[]"
+  matchExclude     String   @db.Text // JSON string[] — app default "[]"
+  matchConfidence  String   @default("derived")
+  reviewFlag       String?
+  classifications  DeviceModelClassification[]
+
+  @@index([ruleSetId, itemNo])
+}
+
+model RefProductKind {
+  code      String @id
+  label     String
+  hint      String?
+  sortGroup String
+  shows     String @db.Text // JSON string[]
+  blocks    String @db.Text // JSON string[]
+  presets   String @db.Text // JSON object
+}
+
+model RefReprocessingClass {
+  code            String @id
+  ruleSetId       String
+  ruleSet         RefRuleSet @relation(fields: [ruleSetId], references: [id])
+  label           String
+  requiresQmsCert Boolean @default(false)
+  note            String? @db.Text
+  profiles        DeviceReprocessingProfile[]
+}
+
+model RefReprocessingEquipmentType {
+  code                String @id
+  ruleSetId           String
+  ruleSet             RefRuleSet @relation(fields: [ruleSetId], references: [id])
+  label               String
+  equipmentStandard   String
+  validationStandard  String
+  revalidationMonths  Int
+  intervalDisputed    Boolean @default(false)
+  intervalSource      String  @db.Text
+  routineChecks       String  @db.Text // JSON string[]
+  releaseRule         String? @db.Text
+}
+
+model RefRadiationApplication {
+  code                  String @id
+  ruleSetId             String
+  ruleSet               RefRuleSet @relation(fields: [ruleSetId], references: [id])
+  label                 String
+  defaultAuthorisation  String // notification | licence
+  medicalBoardNote      String? @db.Text
+}
+
+model RefConstancyObject {
+  code            String @id
+  ruleSetId       String
+  ruleSet         RefRuleSet @relation(fields: [ruleSetId], references: [id])
+  label           String
+  defaultCadence  String
+  duties          DeviceDuty[]
+}
+
+model RefTrainingType {
+  code            String @id
+  ruleSetId       String
+  ruleSet         RefRuleSet @relation(fields: [ruleSetId], references: [id])
+  label           String
+  legalBasis      String
+  subjectKind     String // model | activity
+  validityMonths  Int?
+  chainAllowed    Boolean @default(false)
+  note            String? @db.Text
+  trainingEvents  TrainingEvent[]
+}
+
+// ---------------------------------------------------------------------------
+// Model classification (historised) + release freeze
+// ---------------------------------------------------------------------------
+
+model DeviceModelClassification {
+  id             String       @id @default(cuid())
+  deviceModelId  String
+  deviceModel    DeviceModel  @relation(fields: [deviceModelId], references: [id])
+  validFrom      DateTime     @default(now())
+  validTo        DateTime?
+  stk            Boolean      @default(false)
+  mtkItemId      String?
+  mtkItem        RefAnnex2Item? @relation(fields: [mtkItemId], references: [id])
+  radiation      Boolean      @default(false)
+  softwareClass  String?
+  confidence     String // verified | derived | guess
+  evidenceText   String?      @db.Text
+  ruleSetId      String
+  ruleSet        RefRuleSet   @relation(fields: [ruleSetId], references: [id])
+  confirmedBy    String?
+  confirmedAt    DateTime?
+  snapshots      DeviceReleaseSnapshot[]
 
   @@index([deviceModelId])
+  @@index([deviceModelId, validTo])
+}
+
+model DeviceReleaseSnapshot {
+  id               String                    @id @default(cuid())
+  tenantId         String
+  tenant           Tenant                    @relation(fields: [tenantId], references: [id])
+  deviceInstanceId String
+  deviceInstance   DeviceInstance            @relation(fields: [deviceInstanceId], references: [id])
+  releasedAt       DateTime                  @default(now())
+  releasedBy       String
+  ruleSetIds       String                    @db.Text // JSON string[]
+  classificationId String?
+  classification   DeviceModelClassification? @relation(fields: [classificationId], references: [id])
+  characteristics  String                    @db.LongText // JSON
+  derivedDuties    String                    @db.LongText // JSON
+  prerequisites    String                    @db.LongText // JSON
+  appVersion       String
+  duties           DeviceDuty[]
+
+  @@index([deviceInstanceId, releasedAt])
+  @@index([tenantId])
+}
+
+model DeviceDuty {
+  id                  String                 @id @default(cuid())
+  tenantId            String
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id])
+  deviceInstanceId    String
+  deviceInstance      DeviceInstance         @relation(fields: [deviceInstanceId], references: [id])
+  snapshotId          String
+  snapshot            DeviceReleaseSnapshot  @relation(fields: [snapshotId], references: [id])
+  dutyKey             String // wartung | stk | mtk | …
+  inspectionTypeCode  String
+  inspectionType      RefInspectionType      @relation(fields: [inspectionTypeCode], references: [code])
+  deadlineAnchor      String
+  intervalValue       Int?
+  intervalUnit        String?
+  cadenceLabel        String?
+  constancyObjectCode String?
+  constancyObject     RefConstancyObject?    @relation(fields: [constancyObjectCode], references: [code])
+  basisText           String                 @db.Text
+  confidence          String
+  applicable          Boolean                @default(true)
+  notApplicableReason String?                @db.Text
+  referenceDate       DateTime               @db.Date
+  /** Computed from referenceDate + interval + deadlineAnchor; null for event/process/permanent. */
+  dueAt               DateTime?              @db.Date
+  lastCompletedAt     DateTime?
+  lastNotifiedAt      DateTime?
+  /** Reminder stage last sent (T-90 | T-30 | T-7 | due | overdue) — unused until cron. */
+  notifyStage         String?
+  suspendedAt         DateTime?
+  title               String?
+  evidenceHint        String?                @db.Text
+  serviceRequests     ServiceRequest[]
+  performances        DutyPerformance[]
+
+  @@index([deviceInstanceId])
+  @@index([tenantId])
+  @@index([snapshotId])
+  @@index([tenantId, suspendedAt, dueAt])
+}
+
+/** FA-715 — completion history that rolls the next due date. */
+model DutyPerformance {
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  deviceDutyId     String
+  deviceDuty       DeviceDuty     @relation(fields: [deviceDutyId], references: [id])
+  serviceRequestId String?
+  serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
+  performedAt      DateTime       @db.Date
+  result           String         @default("passed") // passed | passed_with_conditions | failed
+  note             String?        @db.Text
+  performedBy      String
+  source           String         @default("assignment") // assignment | manual | import
+  recordedAt       DateTime       @default(now())
+
+  @@index([deviceDutyId, performedAt])
+  @@index([tenantId])
+  @@index([serviceRequestId])
+}
+
+/// Partner company (MSR, RTS). Global — not copied per clinic.
+model Organisation {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  contact     String?
+  /** MySQL DATE cannot default to CURRENT_TIMESTAMP — set in app/seed. */
+  activeFrom  DateTime @db.Date
+  activeTo    DateTime? @db.Date
+  memberships OrgMembership[]
+  contracts   ServiceContract[]
+
+  @@index([activeTo])
+}
+
+/// A partner user at one organisation. Clinic users do not get a row here.
+model OrgMembership {
+  id             String       @id @default(cuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  /** inspector | admin | order */
+  appRole        String
+  /** MySQL DATE cannot default to CURRENT_TIMESTAMP — set in app/seed. */
+  validFrom      DateTime     @db.Date
+  validTo        DateTime?    @db.Date
+
+  @@unique([organisationId, userId])
+  @@index([userId])
+}
+
+/// Live link that lets a partner organisation open one clinic.
+model ServiceContract {
+  id             String       @id @default(cuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  validFrom      DateTime     @db.Date
+  validTo        DateTime?    @db.Date
+  /** JSON string[] — inventory | due-dates | inspection */
+  scope          String       @db.Text
+
+  @@unique([tenantId, organisationId])
+  @@index([organisationId])
+}
+
+/// Schulungstermin — one event, many individual training_record proofs.
+model TrainingEvent {
+  id                       String   @id @default(cuid())
+  tenantId                 String
+  tenant                   Tenant   @relation(fields: [tenantId], references: [id])
+  trainingTypeCode         String
+  trainingType             RefTrainingType @relation(fields: [trainingTypeCode], references: [code])
+  /** Exactly one of subjectModelId | subjectActivity (enforced in app). */
+  subjectModelId           String?
+  subjectModel             DeviceModel? @relation(fields: [subjectModelId], references: [id])
+  subjectActivity          String?
+  heldOn                   DateTime @db.Date
+  location                 String?
+  instructorName           String
+  instructorQualification  String
+  instructorExternal       Boolean  @default(false)
+  basisDocument            String
+  /** individual | group */
+  mode                     String
+  recordedBy               String
+  recordedAt               DateTime @default(now())
+  records                  TrainingRecord[]
+
+  @@index([tenantId, heldOn])
+  @@index([trainingTypeCode])
+  @@index([subjectModelId])
+}
+
+/// Einzelnachweis je clinic staff User (ops.person mapped onto User).
+model TrainingRecord {
+  id          String        @id @default(cuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  eventId     String
+  event       TrainingEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  /** Clinic staff subject — accountKind=clinic, tenant-scoped. Never a partner User. */
+  personId    String
+  person      User          @relation(fields: [personId], references: [id])
+  confirmedAt DateTime      @default(now())
+  validUntil  DateTime?     @db.Date
+
+  @@unique([eventId, personId])
+  @@index([tenantId])
+  @@index([personId, validUntil])
+}
+
+/** FA-713 — in-house executor still stored per clinic. External partners use Organisation. */
+model ExecutorOrg {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  code      String // O-MSR | O-RTS | O-INT
+  name      String
+  kind      String // external | internal
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  requests  ServiceRequest[]
+  dispatchTargets DispatchTarget[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model DeviceUnitEvent {
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  deviceInstanceId String
+  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
+  occurredAt       DateTime       @default(now())
+  actor            String
+  action           String
+  fromState        String?
+  toState          String?
+  note             String?        @db.Text
+
+  @@index([deviceInstanceId, occurredAt])
+  @@index([tenantId])
+}
+
+model DeviceReprocessingProfile {
+  deviceInstanceId String                 @id
+  deviceInstance   DeviceInstance         @relation(fields: [deviceInstanceId], references: [id])
+  tenantId         String
+  classCode        String
+  reprocessingClass RefReprocessingClass  @relation(fields: [classCode], references: [code])
+  outsourced       Boolean                @default(false)
+  contractor       String?
+  assessedBy       String
+  assessedAt       DateTime               @default(now())
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +686,7 @@ model ServiceRequest {
   id              String           @id @default(cuid())
   reference       String           @unique
   idempotencyKey  String           @unique
-  fingerprint     String // hash of the business payload; detects key reuse with a different body (23.1)
+  fingerprint     String
   tenantId        String
   tenant          Tenant           @relation(fields: [tenantId], references: [id])
   subjectType     String // instance | model | captured
@@ -311,25 +694,42 @@ model ServiceRequest {
   serviceType     String
   priority        String?
   note            String?          @db.Text
-  raisedBy        String? // denormalized display name at create time
+  raisedBy        String?
   raisedById      String?
   raisedByUser    User?            @relation(fields: [raisedById], references: [id])
   siteId          String?
-  locationText    String           @db.Text // location of use — FA-500
+  locationText    String           @db.Text
   accessHint      String?          @db.Text
   contact         String?
-  deliveryAddress String           @db.Text // separate from locationText — FA-503
-  classification  String?          @db.Text // JSON — { proposed, selected, confirmed, overridden }
+  deliveryAddress String           @db.Text
+  /** Optional legacy JSON; no longer driven by a proposal engine. */
+  classification  String?          @db.Text
   correlationId   String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   state           String           @default("captured")
+  /** FA-710 — due_date | app */
+  source          String           @default("app")
+  /** When created from a Fälligkeit (FA-702). */
+  dutyId          String?
+  duty            DeviceDuty?      @relation(fields: [dutyId], references: [id])
+  /** FA-713 — allocated executor organisation. */
+  executorOrgId   String?
+  executorOrg     ExecutorOrg?     @relation(fields: [executorOrgId], references: [id])
+  allocatedAt     DateTime?
+  allocatedBy     String?
+  /** FA-714 — set on transmit; allocation becomes immutable. */
+  transmittedAt   DateTime?
   statusEvents    StatusEvent[]
   attachments     Attachment[]
   dispatchRecords DispatchRecord[]
+  performances    DutyPerformance[]
 
   @@index([tenantId, createdAt])
   @@index([raisedById])
+  @@index([dutyId])
+  @@index([executorOrgId])
+  @@index([tenantId, source, state])
 }
 
 model StatusEvent {
@@ -349,19 +749,17 @@ model Attachment {
   id               String         @id @default(cuid())
   serviceRequestId String
   serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
-  kind             String // nameplate | fault_photo
-  url              String         @db.Text // "/api/attachments/<blobId>" or an external https URL
+  kind             String
+  url              String         @db.Text
   createdAt        DateTime       @default(now())
 
   @@index([serviceRequestId])
 }
 
-// Photo bytes (already downscaled to ≤1600px client-side, NFA-803). There is no
-// object storage in the pilot environment, so the data URL is kept inline.
 model AttachmentBlob {
   id        String   @id @default(cuid())
   tenantId  String
-  kind      String // nameplate | fault_photo
+  kind      String
   dataUrl   String   @db.LongText
   createdAt DateTime @default(now())
 
@@ -369,20 +767,24 @@ model AttachmentBlob {
 }
 
 model DispatchTarget {
-  id          String  @id @default(cuid())
-  tenantId    String
-  tenant      Tenant  @relation(fields: [tenantId], references: [id])
-  type        String // oxid | erp | webhook | mail
-  name        String
-  endpoint    String? @db.Text
-  auth        String? @db.Text // JSON
-  mapping     String? @db.Text // JSON
-  enabled     Boolean @default(true)
-  retryPolicy String? @db.Text // JSON
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  /** Owning executor — each org has its own mail / API endpoints. */
+  executorOrgId String?
+  executorOrg   ExecutorOrg? @relation(fields: [executorOrgId], references: [id])
+  type          String
+  name          String
+  endpoint      String?      @db.Text
+  auth          String?      @db.Text
+  mapping       String?      @db.Text
+  enabled       Boolean      @default(true)
+  retryPolicy   String?      @db.Text
 
   dispatchRecords DispatchRecord[]
 
   @@index([tenantId, enabled])
+  @@index([executorOrgId, enabled])
 }
 
 model DispatchRecord {
@@ -391,21 +793,17 @@ model DispatchRecord {
   serviceRequest   ServiceRequest  @relation(fields: [serviceRequestId], references: [id])
   targetId         String?
   targetRef        DispatchTarget? @relation(fields: [targetId], references: [id])
-  target           String // denormalized target type/name for diagnostics
+  target           String
   timestamp        DateTime        @default(now())
   success          Boolean         @default(false)
   httpStatus       Int?
-  response         String?         @db.Text // JSON — sanitized, never raw credentials
+  response         String?         @db.Text
   error            String?         @db.Text
   attemptCount     Int             @default(1)
   correlationId    String?
 
   @@index([serviceRequestId])
 }
-
-// ---------------------------------------------------------------------------
-// Spare-parts order requests (Section 37) — separate from ServiceRequest
-// ---------------------------------------------------------------------------
 
 model OrderRequest {
   id              String      @id @default(cuid())
@@ -414,14 +812,14 @@ model OrderRequest {
   fingerprint     String
   tenantId        String
   tenant          Tenant      @relation(fields: [tenantId], references: [id])
-  raisedBy        String? // denormalized display name
+  raisedBy        String?
   raisedById      String?
   raisedByUser    User?       @relation(fields: [raisedById], references: [id])
-  subjectType     String? // instance | model | captured
+  subjectType     String?
   subjectId       String?
   deliveryAddress String      @db.Text
   note            String?     @db.Text
-  approvalState   String      @default("pending_approval") // pending_approval | approved | rejected
+  approvalState   String      @default("pending_approval")
   state           String      @default("captured")
   correlationId   String?
   createdAt       DateTime    @default(now())
@@ -445,17 +843,13 @@ model OrderItem {
   @@index([orderRequestId])
 }
 
-// ---------------------------------------------------------------------------
-// Observability — NFA-807: every external query is logged
-// ---------------------------------------------------------------------------
-
 model ExternalCallLog {
   id             String   @id @default(cuid())
   tenantId       String?
   tenant         Tenant?  @relation(fields: [tenantId], references: [id])
-  system         String // beudamed | oxid
+  system         String
   operation      String
-  identifierHash String // sha256 of the identifier, never the raw value
+  identifierHash String
   correlationId  String?
   startedAt      DateTime @default(now())
   durationMs     Int
@@ -468,15 +862,10 @@ model ExternalCallLog {
   @@index([tenantId, startedAt])
 }
 
-// ---------------------------------------------------------------------------
-// Phase B — DB-backed role → permission grants (editable by superadmin)
-// ---------------------------------------------------------------------------
-
-/// Global grant: role slug (User.role) → permission slug.
 model RoleGrant {
   id         String   @id @default(cuid())
-  role       String // superadmin | device_admin | security_officer | user
-  permission String // e.g. inventory:view
+  role       String
+  permission String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

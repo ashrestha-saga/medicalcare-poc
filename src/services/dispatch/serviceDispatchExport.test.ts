@@ -21,15 +21,15 @@ describe("serviceDispatchExport helpers", () => {
     });
   });
 
-  it("formats Kunde and Herkunft labels", () => {
+  it("formats customer and origin labels", () => {
     expect(formatKundeLine({ customerNumber: "KD-40218", companyName: "Klinikum Nord" })).toBe(
       "KD-40218 Klinikum Nord",
     );
-    expect(herkunftLabel("catalog")).toBe("Artikelstamm (GTIN/UDI)");
-    expect(herkunftLabel("inventory")).toBe("Gerätebestand");
+    expect(herkunftLabel("catalog")).toBe("Article master (GTIN/UDI)");
+    expect(herkunftLabel("inventory")).toBe("Equipment inventory");
   });
 
-  it("formats email An / Betreff / body", () => {
+  it("formats email to / subject / body", () => {
     const exportBody: ServiceDispatchExport = {
       reference: "SR-2026-4182",
       customer: "KD-40218",
@@ -41,7 +41,7 @@ describe("serviceDispatchExport helpers", () => {
       location: null,
       service: "STK",
       note: null,
-      classification: { confirmed: false, note: "keine Modelldaten" },
+      classification: { confirmed: false, note: "no model data" },
       site: "Klinikum Nord · Haus A",
       area: "Station 3B",
       room: "room2",
@@ -66,18 +66,18 @@ describe("serviceDispatchExport helpers", () => {
     });
 
     expect(email.to).toBe("service@plusorder.de");
-    expect(email.subject).toBe("Serviceanforderung SR-2026-4182 — STK");
-    expect(email.body).toContain("Gerät:  Absauggerät VacuMed 30");
-    expect(email.body).toContain("Kennung:      4038653014446");
-    expect(email.body).not.toContain("Inventarnummer:");
-    expect(email.body).toContain("Standort:     null");
-    expect(email.body).toContain("Leistung:     STK");
-    expect(email.body).toContain("Kunde:    KD-40218 Klinikum Nord");
-    expect(email.body).toContain("Melder:      M. Ortmann");
-    expect(email.body).toContain("Herkunft:  Artikelstamm (GTIN/UDI)");
-    expect(email.body).toContain("Einsatzort:  Klinikum Nord · Haus A · Station 3B · room2");
-    expect(email.body).toContain("Lieferanschrift: Warenannahme Haus A · Materiallager EG");
-    expect(email.body).not.toContain("Lieferung:");
+    expect(email.subject).toBe("Service request SR-2026-4182 — STK");
+    expect(email.body).toContain("Device:  Absauggerät VacuMed 30");
+    expect(email.body).toContain("Identifier:      4038653014446");
+    expect(email.body).not.toContain("Inventory No.:");
+    expect(email.body).toContain("Location:     null");
+    expect(email.body).toContain("Service:     STK");
+    expect(email.body).toContain("Customer:    KD-40218 Klinikum Nord");
+    expect(email.body).toContain("Reporter:      M. Ortmann");
+    expect(email.body).toContain("Origin:  Article master (GTIN/UDI)");
+    expect(email.body).toContain("Place of use:  Klinikum Nord · Haus A · Station 3B · room2");
+    expect(email.body).toContain("Delivery address: Warenannahme Haus A · Materiallager EG");
+    expect(email.body).not.toContain("Delivery:");
     expect(email.html).toContain("Service Request");
     expect(email.html).toContain("Absauggerät VacuMed 30");
     expect(email.html).toContain("KD-40218 Klinikum Nord");
@@ -118,9 +118,9 @@ describe("serviceDispatchExport helpers", () => {
     };
 
     const email = formatServiceRequestEmail(exportBody, "tech@example.com");
-    expect(email.body).toContain("Inventarnummer: INV-10001");
-    expect(email.body).toContain("Seriennummer:   SN-10001");
-    expect(email.body).toContain("Herkunft:  Gerätebestand");
+    expect(email.body).toContain("Inventory No.: INV-10001");
+    expect(email.body).toContain("Serial No.:   SN-10001");
+    expect(email.body).toContain("Origin:  Equipment inventory");
     expect(email.html).toContain("Inventory No.");
     expect(email.html).toContain("INV-10001");
     expect(email.html).toContain("Serial No.");

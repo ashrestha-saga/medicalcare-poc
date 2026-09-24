@@ -8,7 +8,7 @@ function toOption(row: {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: string | null;
   active: boolean;
 }): UserOptionDTO {
   const role = (USER_ROLES.includes(row.role as UserRole) ? row.role : "user") as UserRole;
@@ -39,6 +39,7 @@ export const userOptionsService = {
     const rows = await prisma.user.findMany({
       where: {
         tenantId: ctx.tenantId,
+        accountKind: "clinic",
         ...(activeFilter !== undefined ? { active: activeFilter } : {}),
         ...(roles?.length ? { role: { in: roles } } : {}),
         ...(query.excludeIds?.length ? { id: { notIn: query.excludeIds } } : {}),
@@ -62,7 +63,7 @@ export const userOptionsService = {
   ): Promise<{ id: string; name: string } | null> {
     if (!userId?.trim()) return null;
     const row = await prisma.user.findFirst({
-      where: { id: userId.trim(), tenantId },
+      where: { id: userId.trim(), tenantId, accountKind: "clinic", active: true },
       select: { id: true, name: true },
     });
     return row;

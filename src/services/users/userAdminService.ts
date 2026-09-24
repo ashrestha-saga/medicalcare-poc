@@ -7,11 +7,14 @@ import { hashPassword, verifyPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import type { CreateUserInput, ResetUserPasswordInput, UpdateUserInput } from "@/schemas/user";
 
+const clinicStaff = (tenantId: string) =>
+  ({ tenantId, accountKind: "clinic" as const });
+
 function toAdminUserDTO(row: {
   id: string;
   email: string;
   name: string;
-  role: string;
+  role: string | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -34,7 +37,9 @@ export const userAdminService = {
     const needle = q?.trim().toLowerCase();
     const rows = await prisma.user.findMany({
       where: {
-        tenantId: ctx.tenantId,
+        ...clinicStaff(ctx.tenantId),
+        // Training staff subjects (ops.person) use staff-* emails — not login accounts.
+        NOT: { email: { startsWith: "staff-" } },
         ...(needle
           ? {
               OR: [
@@ -54,14 +59,14 @@ export const userAdminService = {
     requirePermission(ctx, "users:create");
     const email = input.email.trim().toLowerCase();
     const existing = await prisma.user.findFirst({
-      where: { tenantId: ctx.tenantId, email },
+      where: { email },
       select: { id: true },
     });
     if (existing) throw conflict("A user with this email already exists.");
 
     const row = await prisma.user.create({
       data: {
-        tenantId: ctx.tenantId,
+        ...clinicStaff(ctx.tenantId),
         email,
         name: input.name.trim(),
         role: input.role,
@@ -75,7 +80,7 @@ export const userAdminService = {
   async update(ctx: TenantContext, userId: string, input: UpdateUserInput): Promise<AdminUserDTO> {
     requirePermission(ctx, "users:update");
     const row = await prisma.user.findFirst({
-      where: { id: userId, tenantId: ctx.tenantId },
+      where: { id: userId, ...clinicStaff(ctx.tenantId) },
     });
     if (!row) throw notFound("User not found.");
 
@@ -87,7 +92,7 @@ export const userAdminService = {
     if (row.role === "superadmin" && input.role !== "superadmin") {
       const otherAdmins = await prisma.user.count({
         where: {
-          tenantId: ctx.tenantId,
+          ...clinicStaff(ctx.tenantId),
           role: "superadmin",
           active: true,
           id: { not: row.id },
@@ -101,7 +106,7 @@ export const userAdminService = {
     if (row.role === "superadmin" && row.active && !input.active) {
       const otherAdmins = await prisma.user.count({
         where: {
-          tenantId: ctx.tenantId,
+          ...clinicStaff(ctx.tenantId),
           role: "superadmin",
           active: true,
           id: { not: row.id },
@@ -117,6 +122,8 @@ export const userAdminService = {
       data: {
         name: input.name.trim(),
         role: input.role,
+        accountKind: "clinic",
+        tenantId: ctx.tenantId,
         active: input.active,
       },
     });
@@ -128,14 +135,14 @@ export const userAdminService = {
     if (userId === ctx.user.id) throw unprocessable("You cannot delete your own account.");
 
     const row = await prisma.user.findFirst({
-      where: { id: userId, tenantId: ctx.tenantId },
+      where: { id: userId, ...clinicStaff(ctx.tenantId) },
     });
     if (!row) throw notFound("User not found.");
 
     if (row.role === "superadmin" && row.active) {
       const otherAdmins = await prisma.user.count({
         where: {
-          tenantId: ctx.tenantId,
+          ...clinicStaff(ctx.tenantId),
           role: "superadmin",
           active: true,
           id: { not: row.id },
@@ -152,7 +159,7 @@ export const userAdminService = {
   async resetPassword(ctx: TenantContext, userId: string, input: ResetUserPasswordInput): Promise<void> {
     requirePermission(ctx, "users:resetpassword");
     const admin = await prisma.user.findFirst({
-      where: { id: ctx.user.id, tenantId: ctx.tenantId },
+      where: { id: ctx.user.id, ...clinicStaff(ctx.tenantId) },
       select: { passwordHash: true },
     });
     if (!admin || !verifyPassword(input.adminPassword, admin.passwordHash)) {
@@ -160,7 +167,7 @@ export const userAdminService = {
     }
 
     const row = await prisma.user.findFirst({
-      where: { id: userId, tenantId: ctx.tenantId },
+      where: { id: userId, ...clinicStaff(ctx.tenantId) },
       select: { id: true },
     });
     if (!row) throw notFound("User not found.");
@@ -171,4 +178,3 @@ export const userAdminService = {
     });
   },
 };
-

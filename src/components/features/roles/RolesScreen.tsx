@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { SUPERADMIN_LOCKED_PERMISSIONS } from "@/constants/permissions";
 import { useRolesCatalog } from "@/components/hooks/users/useRolesCatalog";
+import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/Loading";
@@ -142,6 +144,8 @@ function RoleEditor({
 
 /** DB-backed role catalog — editable with roles:update (Phase B). */
 export function RolesScreen() {
+  const t = useTranslations("pages.roles");
+  const tCommon = useTranslations("common");
   const {
     roles,
     allPermissions,
@@ -156,10 +160,9 @@ export function RolesScreen() {
     return (
       <div className="p-work" data-testid="roles-denied">
         <main className="p-main">
-          <section className="p-devhead">
-            <h2>Roles</h2>
-            <p className="p-requests__sub">You don&apos;t have permission to view roles.</p>
-          </section>
+          <ListPageShell title={t("title")} description={tCommon("denied")}>
+            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
+          </ListPageShell>
         </main>
       </div>
     );
@@ -168,22 +171,13 @@ export function RolesScreen() {
   return (
     <div className="p-work" data-testid="roles-page">
       <main className="p-main">
-        <div className="p-admin">
-          <section className="p-devhead p-admin__head">
-            <h2>Roles</h2>
-            <p className="p-requests__sub">
-              {canUpdate
-                ? "Edit which permission slugs each fixed role receives. Changes apply on next capability refresh."
-                : "Fixed roles and their permission slugs."}
-            </p>
-          </section>
-
+        <ListPageShell title={t("title")} description={t("description")}>
           {loading ? (
             <div className="p-wait">
               <Spinner />
             </div>
           ) : (
-            <ul className="p-admin__list" data-testid="roles-list">
+            <ul className="p-admin__list !px-0 !pb-0" data-testid="roles-list">
               {roles.map((r) => (
                 <RoleEditor
                   key={r.value}
@@ -196,7 +190,7 @@ export function RolesScreen() {
               ))}
             </ul>
           )}
-        </div>
+        </ListPageShell>
       </main>
     </div>
   );

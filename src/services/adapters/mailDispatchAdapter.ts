@@ -27,7 +27,7 @@ export const mailDispatchAdapter: DispatchAdapter = {
     const attachments = await loadMailAttachments(payload.request.id, payload.tenantId);
     const text =
       attachments.length > 0
-        ? `${body}\n\nFotos: ${attachments.length} Datei(en) als Anhang`
+        ? `${body}\n\nPhotos: ${attachments.length} file(s) attached`
         : body;
     const htmlWithPhotos =
       attachments.length > 0

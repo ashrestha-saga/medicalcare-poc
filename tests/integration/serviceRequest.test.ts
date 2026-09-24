@@ -9,7 +9,13 @@ import { serviceRequestService } from "@/services/requests/serviceRequestService
 
 const ctx: TenantContext = {
   tenantId: "demo-tenant",
-  user: { id: "user-tech-1", name: "Anna Technik", role: "device_admin", tenantId: "demo-tenant" },
+  user: {
+    id: "user-tech-1",
+    name: "Anna Technik",
+    accountKind: "clinic",
+    role: "device_admin",
+    tenantId: "demo-tenant",
+  },
   correlationId: "sr-test",
 };
 
@@ -30,9 +36,19 @@ const base = () =>
 let failingTargetId: string | null = null;
 
 beforeAll(async () => {
-  // AC-E2E-07 — a second target that always fails, next to the succeeding mail/oxid targets.
+  // AC-E2E-07 — flaky channel on the in-house org (app create auto-allocates O-INT).
+  const intOrg = await prisma.executorOrg.findFirst({
+    where: { tenantId: "demo-tenant", code: "O-INT" },
+  });
   const t = await prisma.dispatchTarget.create({
-    data: { tenantId: "demo-tenant", type: "webhook", name: "Flaky ERP", endpoint: "mock://fail", enabled: true },
+    data: {
+      tenantId: "demo-tenant",
+      executorOrgId: intOrg?.id ?? null,
+      type: "webhook",
+      name: "Flaky ERP",
+      endpoint: "mock://fail",
+      enabled: true,
+    },
   });
   failingTargetId = t.id;
 });
@@ -90,20 +106,11 @@ describe("service requests — Phase 5 (AC #4, #7, #8, #11, #12)", () => {
     await expect(serviceRequestService.create({ ...input, note: "materially different" }, ctx)).rejects.toMatchObject({ status: 409 });
   });
 
-  it("verified proposal must be confirmed → 422, confirmed passes (FA-402/404, AC #4)", async () => {
-    const proposed = { annex1: true, annex2: false, softwareClass: null, radiation: false, confidence: "verified" as const, source: "seed" };
-    const unconfirmed = { ...base(), classification: { proposed, selected: [0], confirmed: false, overridden: false } };
-    await expect(serviceRequestService.create(unconfirmed, ctx)).rejects.toMatchObject({ status: 422, message: "Please confirm the suggested inspection type." });
-    const ok = await serviceRequestService.create({ ...unconfirmed, idempotencyKey: key("ok"), classification: { ...unconfirmed.classification, confirmed: true } }, ctx);
-    expect(ok.created).toBe(true);
-    expect(ok.request.classification?.confirmed).toBe(true);
-  });
-
-  it("derived proposal never blocks sending (AC #5)", async () => {
-    const proposed = { annex1: true, annex2: null, softwareClass: null, radiation: false, confidence: "derived" as const, source: "seed" };
-    const r = await serviceRequestService.create({ ...base(), serviceType: "DGUV", classification: { proposed, selected: [2], confirmed: false, overridden: true } }, ctx);
+  it("accepts create without classification payload (manual service type)", async () => {
+    const r = await serviceRequestService.create({ ...base(), serviceType: "DGUV" }, ctx);
     expect(r.created).toBe(true);
     expect(r.request.serviceType).toBe("DGUV");
+    expect(r.request.classification).toBeNull();
   });
 
   it("rejects an empty room / location and an empty delivery address server-side", async () => {
@@ -142,10 +149,107 @@ describe("service requests — Phase 5 (AC #4, #7, #8, #11, #12)", () => {
 
   it("status feedback appends a StatusEvent; unknown reference → 404 (FA-601/602)", async () => {
     const { request } = await serviceRequestService.create(base(), ctx);
-    const updated = await serviceRequestService.applyStatusFeedback(request.reference, { state: "acknowledged", source: "oxid", externalReference: "OXID-1" });
+    const updated = await serviceRequestService.applyStatusFeedback(request.reference, {
+      state: "acknowledged",
+      source: "oxid",
+      externalReference: "OXID-1",
+    });
     expect(updated.state).toBe("acknowledged");
     expect(updated.statusEvents.at(-1)).toMatchObject({ state: "acknowledged", source: "oxid" });
-    await expect(serviceRequestService.applyStatusFeedback("SR-00000000-NOPE", { state: "completed", source: "oxid" })).rejects.toBeInstanceOf(AppError);
+    await expect(
+      serviceRequestService.applyStatusFeedback("SR-00000000-NOPE", { state: "completed", source: "oxid" }),
+    ).rejects.toBeInstanceOf(AppError);
+  });
+
+  it("deferDispatch skips auto-transmit; allocate → transmit locks executor (FA-713/714)", async () => {
+    const executors = await serviceRequestService.listExecutors(ctx);
+    expect(executors.map((e) => e.code).sort()).toEqual(["O-INT", "O-MSR", "O-RTS"]);
+    const internal = executors.find((e) => e.code === "O-INT");
+    expect(internal).toBeTruthy();
+
+    const { request, created } = await serviceRequestService.create(
+      { ...base(), idempotencyKey: key("defer"), deferDispatch: true, source: "due_date" },
+      ctx,
+    );
+    expect(created).toBe(true);
+    expect(request.state).toBe("captured");
+    expect(request.transmittedAt).toBeNull();
+    expect(request.allocationLocked).toBe(false);
+    expect(request.source).toBe("due_date");
+
+    const allocated = await serviceRequestService.allocate(
+      request.reference,
+      { executorOrgId: internal!.id },
+      ctx,
+    );
+    expect(allocated.executorOrgId).toBe(internal!.id);
+    expect(allocated.executorOrg?.code).toBe("O-INT");
+    expect(allocated.allocatedBy).toBe("Anna Technik");
+    expect(allocated.allocationLocked).toBe(false);
+
+    const transmitted = await serviceRequestService.transmit(request.reference, ctx);
+    expect(transmitted.state).toBe("transmitted");
+    expect(transmitted.allocationLocked).toBe(true);
+    expect(transmitted.transmittedAt).toBeTruthy();
+
+    await expect(
+      serviceRequestService.allocate(request.reference, { executorOrgId: internal!.id }, ctx),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it("transmit to O-MSR only hits that org's enabled channels", async () => {
+    const msr = (await serviceRequestService.listExecutors(ctx)).find((e) => e.code === "O-MSR")!;
+    const { request } = await serviceRequestService.create(
+      { ...base(), idempotencyKey: key("msr-tx"), deferDispatch: true, source: "due_date" },
+      ctx,
+    );
+    await serviceRequestService.allocate(request.reference, { executorOrgId: msr.id }, ctx);
+    const transmitted = await serviceRequestService.transmit(request.reference, ctx);
+    expect(transmitted.allocationLocked).toBe(true);
+    const records = await prisma.dispatchRecord.findMany({ where: { serviceRequestId: request.id } });
+    expect(records.length).toBeGreaterThanOrEqual(1);
+    expect(records.every((r) => r.target.startsWith("mail:MSR") || r.target.startsWith("webhook:MSR"))).toBe(
+      true,
+    );
+    expect(records.some((r) => r.target.includes("RTS") || r.target.includes("OXID"))).toBe(false);
+  });
+
+  it("completing a duty-linked assignment writes DutyPerformance and rolls dueAt (FA-715)", async () => {
+    const duty = await prisma.deviceDuty.findFirst({
+      where: { tenantId: "demo-tenant", applicable: true, suspendedAt: null },
+      orderBy: { dueAt: "asc" },
+    });
+    if (!duty) return; // seed may lack released duties in some environments
+
+    const internal = (await serviceRequestService.listExecutors(ctx)).find((e) => e.code === "O-INT")!;
+    const { request } = await serviceRequestService.create(
+      {
+        ...base(),
+        idempotencyKey: key("duty-complete"),
+        subjectId: duty.deviceInstanceId,
+        dutyId: duty.id,
+        source: "due_date",
+        deferDispatch: true,
+      },
+      ctx,
+    );
+    await serviceRequestService.allocate(request.reference, { executorOrgId: internal.id }, ctx);
+    await serviceRequestService.transmit(request.reference, ctx);
+    await serviceRequestService.transition(request.reference, { state: "in_progress" }, ctx);
+    await serviceRequestService.transition(
+      request.reference,
+      { state: "completed", note: "STK passed — visual + electrical OK" },
+      ctx,
+    );
+
+    const performances = await prisma.dutyPerformance.findMany({
+      where: { deviceDutyId: duty.id, serviceRequestId: request.id },
+    });
+    expect(performances).toHaveLength(1);
+    expect(performances[0]?.performedBy).toBe("Anna Technik");
+
+    const refreshed = await prisma.deviceDuty.findUnique({ where: { id: duty.id } });
+    expect(refreshed?.lastCompletedAt).toBeTruthy();
   });
 });
 

@@ -1,11 +1,22 @@
+import type { PartnerAppRole } from "./management";
+
 export type UserRole = "superadmin" | "device_admin" | "security_officer" | "user";
+
+export type AccountKind = "clinic" | "partner";
 
 export interface SessionUser {
   id: string;
   name: string;
-  role: UserRole;
-  /** Internal data scope for Prisma rows (not shown in the UI). */
-  tenantId: string;
+  accountKind: AccountKind;
+  /** Clinic role. Required when accountKind is clinic. */
+  role?: UserRole;
+  /** Clinic tenant scope. Required when accountKind is clinic. */
+  tenantId?: string;
+  /** Partner organisation. Required when accountKind is partner. */
+  organisationId?: string;
+  organisationName?: string;
+  /** Partner membership role: admin | inspector | order. */
+  appRole?: PartnerAppRole | string;
   /** OXID company name shown in the account bar (replaces seeded tenant labels). */
   companyName?: string | null;
   /** OXID customer number (`custnr`) when signed in via OAuth. */
@@ -14,9 +25,39 @@ export interface SessionUser {
   deliveryLine?: string | null;
 }
 
+export type ClinicSessionUser = SessionUser & {
+  accountKind: "clinic";
+  role: UserRole;
+  tenantId: string;
+};
+
+export type PartnerSessionUser = SessionUser & {
+  accountKind: "partner";
+  organisationId: string;
+  organisationName: string;
+  appRole: PartnerAppRole | string;
+};
+
 /** Resolved on the server from the signed session cookie — never from the request body. */
 export interface TenantContext {
   tenantId: string;
-  user: SessionUser;
+  user: ClinicSessionUser;
   correlationId: string;
 }
+
+/** Partner session scope — organisation, not clinic tenant. */
+export interface PartnerContext {
+  organisationId: string;
+  user: PartnerSessionUser;
+  correlationId: string;
+}
+
+export function isClinicSession(user: SessionUser | null | undefined): user is ClinicSessionUser {
+  // Client session omits tenantId (blanked to ""); cookie still has it for server APIs.
+  return Boolean(user && user.accountKind !== "partner" && user.role);
+}
+
+export function isPartnerSession(user: SessionUser | null | undefined): user is PartnerSessionUser {
+  return Boolean(user && user.accountKind === "partner" && (user.organisationId || user.organisationName));
+}
+

@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { createServiceRequestSchema } from "./serviceRequest";
 import { captureRequestSchema, resolveRequestSchema } from "./resolve";
 import { createOrderRequestSchema } from "./orderRequest";
-import { assertClassificationGate, requestFingerprint } from "@/services/requests/serviceRequestService";
-import { AppError } from "@/lib/errors";
+import { completeDutySchema, commitRegistrationSchema, registrationPreviewSchema } from "./registration";
+import { createDutyAssignmentSchema, dueDatesQuerySchema } from "./dueDates";
+import { requestFingerprint } from "@/services/requests/serviceRequestService";
 
 const valid = {
   idempotencyKey: "11111111-2222-3333-4444-555555555555",
@@ -54,26 +55,6 @@ describe("request validation — Section 16", () => {
   });
 });
 
-describe("classification gate — FA-402/404", () => {
-  const proposed = { annex1: true, annex2: false, softwareClass: null, radiation: false, confidence: "verified" as const, source: "t" };
-
-  it("verified + unconfirmed → 422", () => {
-    expect(() => assertClassificationGate({ proposed, selected: [0], confirmed: false, overridden: false })).toThrowError(AppError);
-    try {
-      assertClassificationGate({ proposed, selected: [0], confirmed: false, overridden: false });
-    } catch (e) {
-      expect((e as AppError).status).toBe(422);
-      expect((e as AppError).message).toBe("Please confirm the suggested inspection type.");
-    }
-  });
-
-  it("verified + confirmed passes; derived never blocks; no proposal never blocks", () => {
-    expect(() => assertClassificationGate({ proposed, selected: [0], confirmed: true, overridden: false })).not.toThrow();
-    expect(() => assertClassificationGate({ proposed: { ...proposed, confidence: "derived" }, selected: [], confirmed: false, overridden: false })).not.toThrow();
-    expect(() => assertClassificationGate(undefined)).not.toThrow();
-  });
-});
-
 describe("idempotency fingerprint — 23.1", () => {
   const input = createServiceRequestSchema.parse(valid);
   it("is stable across key order and transport noise, but changes with business fields", () => {
@@ -82,5 +63,44 @@ describe("idempotency fingerprint — 23.1", () => {
     const c = requestFingerprint({ ...input, note: "now with a note" });
     expect(a).toBe(b);
     expect(a).not.toBe(c);
+  });
+});
+
+describe("completeDutySchema", () => {
+  it("accepts an empty body (performedAt defaults server-side)", () => {
+    expect(completeDutySchema.safeParse({}).success).toBe(true);
+  });
+
+  it("rejects an overlong note", () => {
+    expect(completeDutySchema.safeParse({ note: "x".repeat(2001) }).success).toBe(false);
+  });
+});
+
+describe("registration preview and commit schemas", () => {
+  it("preview requires a product kind", () => {
+    expect(registrationPreviewSchema.safeParse({ characteristics: { produktart: "infusor" } }).success).toBe(
+      true,
+    );
+    expect(registrationPreviewSchema.safeParse({ characteristics: { produktart: "" } }).success).toBe(false);
+  });
+
+  it("commit requires characteristics and accepts an optional inventarize draftId", () => {
+    const body = {
+      tradeName: "Pump",
+      manufacturer: "Acme",
+      serialNumber: "SN-1",
+      characteristics: { produktart: "infusor" },
+      checks: {},
+    };
+    expect(commitRegistrationSchema.safeParse(body).success).toBe(true);
+    expect(commitRegistrationSchema.safeParse({ ...body, draftId: "inst-1" }).success).toBe(true);
+    expect(commitRegistrationSchema.safeParse({ ...body, characteristics: {} }).success).toBe(false);
+  });
+});
+
+describe("dueDates schemas", () => {
+  it("accepts an empty query and assignment body", () => {
+    expect(dueDatesQuerySchema.safeParse({}).success).toBe(true);
+    expect(createDutyAssignmentSchema.safeParse({}).success).toBe(true);
   });
 });

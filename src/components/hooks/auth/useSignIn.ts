@@ -2,18 +2,20 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 import type { LoginApiResponse, LoginResponse } from "@/interfaces";
-import { AUTH_HOME } from "@/constants/authRoutes";
+import { AUTH_HOME, PARTNER_HOME } from "@/constants/authRoutes";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { loginSchema, totpVerifySchema } from "@/schemas/auth";
 import { zodFieldErrors } from "@/schemas/formErrors";
 import { useLogStore } from "@/store/logStore";
 import { toast } from "@/store/toastStore";
 
+type Door = "clinic" | "partner";
+
 /**
- * Clinic email/password sign-in → optional TOTP → hard navigate to home.
+ * Email/password sign-in → optional TOTP (clinic) → hard navigate to home.
  */
-export function useSignIn() {
-  const [email, setEmail] = useState("anna@demo.local");
+export function useSignIn(door: Door = "clinic") {
+  const [email, setEmail] = useState(door === "partner" ? "k.adler@msr.example" : "anna@demo.local");
   const [password, setPassword] = useState("demo");
   const [code, setCode] = useState("");
   const [needs2fa, setNeeds2fa] = useState(false);
@@ -21,14 +23,18 @@ export function useSignIn() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const finishLogin = useCallback((res: LoginResponse) => {
-    useLogStore.getState().log("auth", `Signed in as ${res.user.name} (${res.user.role})`);
-    window.location.replace(AUTH_HOME);
-  }, []);
+    const label = res.user.accountKind === "partner" ? res.user.appRole : res.user.role;
+    useLogStore.getState().log("auth", `Signed in as ${res.user.name} (${label ?? "user"})`);
+    const dest =
+      res.homePath ??
+      (res.user.accountKind === "partner" || door === "partner" ? PARTNER_HOME : AUTH_HOME);
+    window.location.replace(dest);
+  }, [door]);
 
   const submitPassword = useCallback(
     async (e: FormEvent) => {
       e.preventDefault();
-      const parsed = loginSchema.safeParse({ email, password });
+      const parsed = loginSchema.safeParse({ email, password, door });
       if (!parsed.success) {
         setFieldErrors(zodFieldErrors(parsed.error));
         return;
@@ -52,7 +58,7 @@ export function useSignIn() {
         setBusy(false);
       }
     },
-    [email, password, finishLogin],
+    [email, password, door, finishLogin],
   );
 
   const submitTotp = useCallback(
@@ -86,6 +92,7 @@ export function useSignIn() {
   }, []);
 
   return {
+    door,
     email,
     setEmail,
     password,

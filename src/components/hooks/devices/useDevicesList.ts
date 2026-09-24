@@ -63,6 +63,27 @@ export function useDevicesList() {
     setDevices((prev) => prev.map((d) => (d.id === device.id ? device : d)));
   }, []);
 
+  const [completingDutyId, setCompletingDutyId] = useState<string | null>(null);
+
+  const completeDuty = useCallback(
+    async (dutyId: string) => {
+      setCompletingDutyId(dutyId);
+      try {
+        const res = await api<{ device: DeviceInstanceDetailDTO }>(`/api/duties/${dutyId}/complete`, {
+          method: "POST",
+          body: JSON.stringify({}),
+        });
+        toast.success("Duty marked done; next due date updated.");
+        applyUpdated(res.device);
+      } catch (err) {
+        toast.error(err instanceof ApiError ? err.message : "Could not complete duty.");
+      } finally {
+        setCompletingDutyId(null);
+      }
+    },
+    [applyUpdated],
+  );
+
   return {
     devices,
     q,
@@ -76,5 +97,7 @@ export function useDevicesList() {
     clearSelection: () => setSelected(null),
     detailLoading,
     applyUpdated,
+    completingDutyId,
+    completeDuty,
   };
 }

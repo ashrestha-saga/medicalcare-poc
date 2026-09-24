@@ -18,7 +18,6 @@ export function useResolve() {
   const resolved = useScanStore((s) => s.resolved);
   const resolveFailed = useScanStore((s) => s.resolveFailed);
   const resetForm = useRequestStore((s) => s.resetForm);
-  const applyProposal = useRequestStore((s) => s.applyProposal);
   const prefillLocation = useRequestStore((s) => s.prefillLocation);
   const inFlight = useRef(false);
 
@@ -38,10 +37,9 @@ export function useResolve() {
         const result = await api<ResolveResponse>("/api/resolve", { method: "POST", body: JSON.stringify(requestBody) });
         log(
           "resolve",
-          `Response stage=${result.stage} source=${result.source.system}${result.source.cached ? " (cached)" : ""}${result.model ? ` model=${result.model.tradeName ?? result.model.id}` : ""}${result.device ? ` device=${result.device.id}` : ""}${result.classificationProposal ? ` proposal=${result.classificationProposal.confidence}` : ""}`,
+          `Response stage=${result.stage} source=${result.source.system}${result.source.cached ? " (cached)" : ""}${result.model ? ` model=${result.model.tradeName ?? result.model.id}` : ""}${result.device ? ` device=${result.device.id}` : ""}`,
         );
         resetForm();
-        applyProposal(result.classificationProposal);
         if (result.device?.location) {
           prefillLocation({
             siteId: result.device.location.siteId,
@@ -71,7 +69,7 @@ export function useResolve() {
         inFlight.current = false;
       }
     },
-    [startResolving, resolved, resolveFailed, resetForm, applyProposal, prefillLocation],
+    [startResolving, resolved, resolveFailed, resetForm, prefillLocation],
   );
 
   return { resolve };

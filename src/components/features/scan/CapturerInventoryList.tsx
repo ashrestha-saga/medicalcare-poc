@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { DeviceInstanceDTO } from "@/interfaces";
 import {
   deviceDisplayName,
@@ -17,25 +18,27 @@ export function CapturerInventoryList({
   inventory: InventoryApi;
   onClose?: () => void;
 }) {
+  const t = useTranslations("capturer");
+  const tCommon = useTranslations("common");
   const { devices, loading, keywordInput, setKeyword, openDevice, detailLoading } = inventory;
 
   return (
     <div className="p-bestand" data-testid="capturer-inventory">
       <header className="p-bestand__head">
         <div>
-          <h2>Bestandsverzeichnis</h2>
-          <p className="p-bestand__sub">§ 14 MPBetreibV</p>
+          <h2>{t("inventoryTitle")}</h2>
+          <p className="p-bestand__sub">{t("inventoryLegal")}</p>
         </div>
         <div className="p-bestand__head-actions">
           <span className="p-bestand__count" data-testid="capturer-inventory-count">
-            {devices.length} Gerät{devices.length === 1 ? "" : "e"}
+            {t("deviceCount", { count: devices.length })}
           </span>
           {onClose && (
             <button
               type="button"
               className="p-bestand-detail__close"
               onClick={onClose}
-              aria-label="Schließen"
+              aria-label={tCommon("close")}
               data-testid="capturer-inventory-close"
             >
               ×
@@ -49,16 +52,16 @@ export function CapturerInventoryList({
           type="search"
           value={keywordInput}
           onChange={(e) => setKeyword(e.target.value)}
-          placeholder="Suchen"
+          placeholder={t("searchPlaceholder")}
           data-testid="capturer-inventory-search"
-          aria-label="Bestand durchsuchen"
+          aria-label={t("searchAria")}
         />
       </div>
 
       {loading ? (
-        <p className="p-bestand__empty">Bestand wird geladen…</p>
+        <p className="p-bestand__empty">{t("loading")}</p>
       ) : devices.length === 0 ? (
-        <p className="p-bestand__empty">Keine Geräte gefunden.</p>
+        <p className="p-bestand__empty">{t("empty")}</p>
       ) : (
         <ul className="p-bestand__list">
           {devices.map((device) => (
@@ -67,6 +70,7 @@ export function CapturerInventoryList({
               device={device}
               busy={detailLoading}
               onOpen={() => void openDevice(device)}
+              openLabel={t("open")}
             />
           ))}
         </ul>
@@ -79,10 +83,12 @@ function InventoryRow({
   device,
   busy,
   onOpen,
+  openLabel,
 }: {
   device: DeviceInstanceDTO;
   busy: boolean;
   onOpen: () => void;
+  openLabel: string;
 }) {
   const tags = deviceInspectionTags(device);
   return (
@@ -111,7 +117,7 @@ function InventoryRow({
         disabled={busy}
         data-testid="capturer-inventory-open"
       >
-        Öffnen
+        {openLabel}
       </button>
     </li>
   );

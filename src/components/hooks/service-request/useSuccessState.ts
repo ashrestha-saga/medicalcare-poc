@@ -11,7 +11,7 @@ export function channelLabel(target: string): string {
   const type = target.split(":")[0] ?? target;
   switch (type) {
     case "mail":
-      return "E-Mail";
+      return "Email";
     case "oxid":
       return "OXID API";
     case "webhook":
@@ -22,12 +22,12 @@ export function channelLabel(target: string): string {
 }
 
 export function dispatchHeadline(records: DispatchRecordDTO[]): string {
-  if (records.length === 0) return "Serviceanfrage gespeichert";
+  if (records.length === 0) return "Service request saved";
   const ok = records.filter((r) => r.success).length;
   const fail = records.length - ok;
-  if (fail === 0) return "Serviceanfrage übermittelt";
-  if (ok === 0) return "Serviceanfrage gespeichert — Versand fehlgeschlagen";
-  return "Serviceanfrage gespeichert — teilweise übermittelt";
+  if (fail === 0) return "Service request transmitted";
+  if (ok === 0) return "Service request saved — dispatch failed";
+  return "Service request saved — partially transmitted";
 }
 
 export function serviceRequestStateLabel(state: string): string {
@@ -100,10 +100,10 @@ export function useSuccessState() {
   const title = !success
     ? ""
     : isQueued
-      ? "Lokal gespeichert"
+      ? "Saved locally"
       : isService
         ? dispatchHeadline(records)
-        : "Bestellanfrage übermittelt";
+        : "Order request transmitted";
 
   const checkTone =
     isQueued || (dispatchSummary && dispatchSummary.fail > 0 && dispatchSummary.ok === 0)

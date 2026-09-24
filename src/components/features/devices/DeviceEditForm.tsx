@@ -43,13 +43,12 @@ function classificationSummary(form: EditorApi): string {
   const c = form.detail?.modelClassification;
   if (!c) return "No model classification on file.";
   const parts = [
-    c.softwareClass,
+    c.softwareClass ? `SW ${c.softwareClass}` : null,
     c.annex1 ? "Annex 1" : null,
     c.annex2 ? "Annex 2" : null,
     c.radiation ? "Radiation" : null,
-    c.confidence,
   ].filter(Boolean);
-  return parts.length ? parts.join(" · ") : "Documented on model";
+  return parts.length ? parts.join(" · ") : "—";
 }
 
 export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
@@ -66,9 +65,10 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
   );
 
   const title = form.detail?.tradeName ?? form.detail?.modelName ?? form.detail?.inventoryNumber ?? "Device";
+  const identityLocked = form.state === "released" || form.state === "retired";
   const meta = [
     form.detail?.inventoryNumber,
-    form.detail?.modelState,
+    form.state,
     form.detail?.modelSource,
     form.detail?.commissionedAt
       ? new Date(form.detail.commissionedAt).toLocaleDateString("de-DE")
@@ -92,6 +92,12 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
         </Button>
         <h2 data-testid="device-edit-title">{title}</h2>
         <p className="p-requests__sub">{meta || "Edit device record"}</p>
+        {identityLocked && (
+          <p className="mt-2 text-sm text-muted-foreground" data-testid="device-identity-locked">
+            Released — identity is immutable. Responsible person, site, and maintenance
+            can still be updated.
+          </p>
+        )}
       </section>
 
       {form.loading || !form.detail ? (
@@ -120,7 +126,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                 id="device-designation"
                 value={form.tradeName}
                 onChange={(e) => form.setTradeName(e.target.value)}
-                disabled={form.busy || !form.detail.modelId}
+                disabled={form.busy || identityLocked || !form.detail.modelId}
                 data-testid="device-trade-name"
               />
             </div>
@@ -134,7 +140,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                   id="device-type"
                   value={form.modelName}
                   onChange={(e) => form.setModelName(e.target.value)}
-                  disabled={form.busy || !form.detail.modelId}
+                  disabled={form.busy || identityLocked || !form.detail.modelId}
                   data-testid="device-model-name"
                 />
               </div>
@@ -146,7 +152,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                   id="device-manufacturer"
                   value={form.manufacturer}
                   onChange={(e) => form.setManufacturer(e.target.value)}
-                  disabled={form.busy || !form.detail.modelId}
+                  disabled={form.busy || identityLocked || !form.detail.modelId}
                   data-testid="device-manufacturer"
                 />
               </div>
@@ -159,7 +165,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                   id="device-serial"
                   value={form.serialNumber}
                   onChange={(e) => form.setSerialNumber(e.target.value)}
-                  disabled={form.busy}
+                  disabled={form.busy || identityLocked}
                   data-testid="device-serial"
                 />
                 {form.fieldErrors.serialNumber && (
@@ -172,7 +178,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                   id="device-udi"
                   value={form.udiDi}
                   onChange={(e) => form.setUdiDi(e.target.value)}
-                  disabled={form.busy || !form.detail.modelId}
+                  disabled={form.busy || identityLocked || !form.detail.modelId}
                   data-testid="device-udi"
                 />
                 {form.fieldErrors.udiDi && (
@@ -194,7 +200,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                   inputMode="numeric"
                   value={form.purchaseYear}
                   onChange={(e) => form.setPurchaseYear(e.target.value)}
-                  disabled={form.busy}
+                  disabled={form.busy || identityLocked}
                   data-testid="device-year"
                 />
               </div>
@@ -238,7 +244,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                   id="device-inv"
                   value={form.inventoryNumber}
                   onChange={(e) => form.setInventoryNumber(e.target.value)}
-                  disabled={form.busy}
+                  disabled={form.busy || identityLocked}
                   data-testid="device-inventory-number"
                 />
               </div>
@@ -257,6 +263,29 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
+                <Label>State</Label>
+                <Select
+                  value={form.state}
+                  onValueChange={(v) => form.setState(v as typeof form.state)}
+                  disabled={form.busy}
+                >
+                  <SelectTrigger data-testid="device-state">
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
+                    <SelectItem value="released">Released</SelectItem>
+                    <SelectItem value="retired">Retired</SelectItem>
+                  </SelectContent>
+                </Select>
+                {form.state !== "released" && form.state !== "retired" ? (
+                  <p className="text-xs text-muted-foreground">
+                    Not yet released — complete registration or set Released here.
+                  </p>
+                ) : null}
+              </div>
+              <div className="grid gap-2">
                 <Label htmlFor="device-cycle">Maintenance cycle (months)</Label>
                 <Input
                   id="device-cycle"
@@ -270,19 +299,20 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                   data-testid="device-maintenance-cycle"
                 />
               </div>
-              <div className="grid gap-2">
-                <Label>Next due</Label>
-                <Input
-                  value={
-                    form.detail.nextMaintenanceDueAt
-                      ? new Date(form.detail.nextMaintenanceDueAt).toLocaleDateString("de-DE")
-                      : "—"
-                  }
-                  readOnly
-                  disabled
-                  data-testid="device-next-due"
-                />
-              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Next due</Label>
+              <Input
+                value={
+                  form.detail.nextMaintenanceDueAt
+                    ? new Date(form.detail.nextMaintenanceDueAt).toLocaleDateString("de-DE")
+                    : "—"
+                }
+                readOnly
+                disabled
+                data-testid="device-next-due"
+              />
             </div>
 
             <div className="flex flex-wrap gap-2 pt-2">
@@ -329,7 +359,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                     : "Link a device model to inherit classification."}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Not editable here — classification always comes from the model.
+                  Not editable here — edit classification in the catalog.
                 </p>
                 {modelHref && (
                   <Button asChild type="button" variant="outline" size="sm" className="mt-1 h-8 w-full">
