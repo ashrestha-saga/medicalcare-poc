@@ -148,7 +148,9 @@ export const draftService = {
 
     if (input.characteristics) {
       const conflicts = characteristicConflicts(characteristics, {
-        purchaseYear: input.purchaseYear ?? row.purchaseYear,
+        purchaseYear:
+          input.purchaseYear ??
+          (row.commissionedAt ? row.commissionedAt.getUTCFullYear() : null),
       });
       if (conflicts.length) {
         throw unprocessable(conflicts.join(" · "), { field: "characteristics", conflicts });

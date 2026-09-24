@@ -169,7 +169,7 @@ export const releaseService = {
     return this.previewFromPayload(ctx, {
       characteristics: parseCharacteristics(row.characteristicsJson),
       areaId: row.areaId,
-      purchaseYear: row.purchaseYear,
+      purchaseYear: row.commissionedAt ? row.commissionedAt.getUTCFullYear() : null,
     });
   },
 
@@ -199,7 +199,7 @@ export const releaseService = {
 
     const characteristics = parseCharacteristics(row.characteristicsJson);
     const conflicts = characteristicConflicts(characteristics, {
-      purchaseYear: row.purchaseYear,
+      purchaseYear: row.commissionedAt ? row.commissionedAt.getUTCFullYear() : null,
     });
     if (conflicts.length) {
       throw unprocessable(conflicts.join(" · "), { field: "characteristics", conflicts });
