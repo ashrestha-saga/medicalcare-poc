@@ -1,0 +1,398 @@
+// ===========================================================================
+// DeviceCare — Schemaerweiterung Bestand Backoffice (design provenance)
+//
+// Implemented through C1–C5 in live prisma/schema.prisma (enums DutyCategory,
+// DeadlineAnchor, Confidence, FieldState, EvidenceKind; Ref* extensions;
+// RefCommissioningPrerequisite; DeviceEvidence → AttachmentBlob;
+// DeviceClarification; DeviceDuty baseline/reference; ReprocessingOnDevice;
+// DeviceModelClassification characteristics/fieldStates/decisions).
+// This file remains the design source — do not treat it as the live schema.
+//
+// Additiv zu schema.prisma (MySQL). Erzeugt aus dem Stand
+// devicecare-bestand-backoffice-v18.html und den Befunden der
+// Pflichtenlogik-Prüfung vom 27.09.2026.
+// ===========================================================================
+
+
+// ---------------------------------------------------------------------------
+// 1 · Enums (SCH-03)
+//
+// Das Schema enthält heute NULL Enums; 36 Felder tragen einen Zustand als
+// freien String mit den erlaubten Werten im Kommentar daneben. An
+// DeviceInstance.state und ServiceRequest.state hängen Zustandsübergänge
+// UND Berechtigungen — eine Prüfung, die eine Zeichenkette zerlegt, geht
+// bei fehlerhaftem Inhalt undefiniert aus.
+//
+// Vorrang in dieser Reihenfolge. Die Werte sind die, die heute in den
+// Kommentaren stehen, plus die hier neu benötigten.
+// ---------------------------------------------------------------------------
+
+enum DeviceState {
+  draft        // erfasst, Einstufung oder Nachweis offen — KEINE Pflichten
+  review       // vorgelegt
+  released     // freigegeben, Pflichten erzeugt
+  retired      // ausgesondert
+}
+
+enum DutyCategory {
+  inspection   // erzeugt einen Termin und ein Protokoll, braucht einen Prüfkatalog
+  operating    // laufende oder ereignisbezogene Betriebspflicht ohne Prüfung
+}
+
+enum DeadlineAnchor {
+  exact_day    // taggenau — Instandhaltung
+  month_end    // mit Ablauf des Monats — STK, IT-Sicherheitsüberprüfung
+  year_end     // mit Ablauf des Jahres — MTK (§ 15 Absatz 5)
+  event        // ereignisbezogen — Abnahmeprüfung, Installationsprüfung
+  interval     // festgelegter Takt — Konstanzprüfung
+  process      // prozessbegleitend — Aufbereitung
+  permanent    // dauerhaft — Netzanbindung
+  reference    // gilt über einen Verweis auf ein anderes Gerät (AUF-01)
+  none         // nicht einschlägig — trägt keine Frist
+}
+
+enum Confidence {
+  verified      // am Rechtstext oder an der Norm belegt
+  responsible   // von einer benannten Person entschieden, mit Protokoll
+  determination // Festlegung des Betreibers oder Vorbelegung, noch zu bestätigen
+  derived       // maschinell abgeleitet, von niemandem verantwortet
+  not_applicable
+}
+
+enum FieldState {
+  open         // noch nicht bearbeitet
+  proposed     // System hat vorgeschlagen, niemand bestätigt
+  confirmed    // Vorschlag bestätigt
+  chosen       // selbst gewählt, abweichend vom Vorschlag
+  deferred     // ausdrücklich zur Klärung vorgemerkt (ERF-01)
+}
+
+enum EvidenceKind {
+  confirmation     // Bestätigung genügt
+  document         // ein Dokument muss am Datensatz hängen
+  third_party      // Protokoll einer akkreditierten Stelle — nicht selbst bestätigbar
+}
+
+
+// ---------------------------------------------------------------------------
+// 2 · Referenzdaten — Ergänzungen an vorhandenen Modellen
+// ---------------------------------------------------------------------------
+
+// RefInspectionType  (+4 Felder)
+//
+// REF-10: Fünf der dreizehn Prüfarten hatten im Mockup überhaupt keine
+// Frist hinterlegt; der Rückfall lieferte stillschweigend "keine Frist".
+// Nicht hinterlegt und nicht fällig sahen gleich aus. Und die Fristen
+// trugen kein Vertrauen, während die Kataloge längst ein
+// Entwurfskennzeichen tragen — eine falsche Frist ist mindestens so
+// folgenreich wie ein falscher Grenzwert.
+//
+// P4: Fünf der sechzehn Pflichtarten sind keine Prüfungen. Ohne
+// `category` meldet die Abfrage "Pflicht ohne Prüfkatalog" sie dauerhaft
+// als Lücke — eine Lückenliste, die immer fünf Einträge hat, wird nicht
+// mehr gelesen.
+//
+// model RefInspectionType {
+//   category         DutyCategory    @default(inspection)
+//   confidence       Confidence      @default(derived)
+//   sourceRef        String?         // "§ 12 Absatz 2 MPBetreibV"
+//   deadlineAnchor   DeadlineAnchor  // heute String
+// }
+
+
+// RefReprocessingClass  (+2 Felder)
+//
+// AUF-01: § 8 verlangt ein validiertes Verfahren für Produkte, die
+// bestimmungsgemäß keimarm oder steril zur Anwendung kommen. "Unkritisch"
+// heißt Kontakt nur mit intakter Haut — genau die Grenze. Heute trägt die
+// Klasse `requiresQmsCert`, aber nichts über das validierte Verfahren;
+// der Unterschied steht nur im Fließtext der `note` und wirkt auf keine
+// Ableitung. Folge im Mockup: Eine Blutdruckmanschette verlangte einen
+// Validierungsbericht und eine Chargenfreigabe.
+//
+// model RefReprocessingClass {
+//   requiresValidatedProcess  Boolean  @default(true)
+//   evidence                  String?  // Nachweis je Klasse, heute für alle gleich
+// }
+
+
+// RefRadiationApplication  (+2 Felder)
+//
+// P5: Die Konstanzprüfung zitierte "QS-RL Röntgendiagnostik" auch in der
+// Strahlentherapie und der Nuklearmedizin. Eine falsche Fundstelle an
+// einer richtigen Pflicht ist schwerer zu entdecken als eine fehlende
+// Pflicht. Und § 88 StrlSchV richtet sich an Röntgeneinrichtungen und
+// Störstrahler — für den Umgang mit radioaktiven Stoffen wurde eine
+// Fünfjahresfrist erzeugt, die dort nicht belegt ist.
+//
+// model RefRadiationApplication {
+//   qualityGuideline        String?  // "QS-RL Röntgendiagnostik"
+//   expertInspectionApplies Boolean  @default(true)   // § 88 einschlägig
+// }
+
+
+// RefAnnex2Item  (+2 Felder)
+//
+// Sieben der elf Ziffern sind in diesem Projekt nicht am amtlichen Text
+// bestätigt worden. Sie gehören gekennzeichnet, nicht stillschweigend
+// als belegt geführt.
+//
+// model RefAnnex2Item {
+//   confidence  Confidence  @default(derived)
+//   sourceRef   String?     // "Anlage 2 Nr. 1.5.2 — längere Frist vermutet"
+// }
+
+
+// ---------------------------------------------------------------------------
+// 3 · Voraussetzungen vor der Inbetriebnahme — NEU
+//
+// Die Liste existiert heute nur im Anwendungscode des Assistenten. Sie
+// entscheidet über die Freigabe und gehört damit in die Referenzdaten:
+// sie ändert sich, und an einem Datensatz muss erkennbar bleiben, nach
+// welcher Fassung freigegeben wurde.
+// ---------------------------------------------------------------------------
+
+model RefCommissioningPrerequisite {
+  id            String        @id @default(cuid())
+  ruleSetId     String
+  ruleSet       RefRuleSet    @relation(fields: [ruleSetId], references: [id])
+  code          String        // bmps | ga | einweisung | abn | anzeige | instpr | eigenval | …
+  label         String
+  legalBasis    String
+  note          String?       @db.Text
+  mandatory     Boolean       @default(true)
+
+  // ERF-05: Drei Nachweisarten statt einer. Für `third_party` gibt es im
+  // Assistenten bewusst KEIN Bedienelement — ein Häkchen des Betreibers
+  // wäre eine Erklärung über eine Leistung, die ein Dritter erbracht
+  // haben muss.
+  evidenceKind  EvidenceKind  @default(confirmation)
+
+  // Merkmalsbedingung, unter der die Voraussetzung greift. Als Ausdruck
+  // über den Merkmalen, nicht als Produktart — eine Produktart kann
+  // mehrere Merkmale tragen.
+  appliesWhen   String        @db.Text
+
+  releaseLevel  Int           @default(1)  // 1 Selbstfreigabe, 2 Nachweis, 3 Drittprotokoll
+
+  @@unique([ruleSetId, code])
+}
+
+
+// ---------------------------------------------------------------------------
+// 4 · Einstufung am Modell — Ergänzungen
+//
+// ERF-02 / BST-01: DeviceModelClassification trägt heute vier Merker —
+// stk, mtkItemId, radiation, softwareClass. Der Erstanlage-Assistent
+// erhebt rund sechzehn pflichtrelevante Merkmale. Die übrigen landen in
+// DeviceInstance.characteristicsJson, also AM EXEMPLAR.
+//
+// Das ist für die instanzabhängigen Merkmale richtig — aedExemption,
+// legacyMedgvGroup1 und die Aufbereitungseinstufung gehören dorthin.
+// Für die modellabhängigen ist es der Grund, warum die Wiederverwendung
+// nicht trägt: Das zweite baugleiche Gerät beantwortet alles erneut.
+//
+// Und genau daran hängt die Rechnung, die die Eigenerfassung durch
+// Betreiberpersonal erst tragbar macht: Eine Klinik mit 1.400 Geräten hat
+// vielleicht 200 Modelle. Trägt der Katalog die Einstufung, sind 200
+// Fragen zu klären statt 1.400.
+//
+// model DeviceModelClassification {
+//   productKindCode  String?            // Produktart — heute nur am Exemplar
+//   characteristics  String   @db.Text  // JSON, die modellabhängigen Merkmale
+//   fieldStates      String   @db.Text  // JSON: je Merkmal ein FieldState
+//   decisions        String   @db.Text  // JSON: Wert, Vorschlag, Person, Zeit
+//   deferredFields   String?  @db.Text  // JSON-Array der offengelassenen
+//   confidence       Confidence         // heute String: verified|derived|guess
+// }
+//
+// Zur confidence: Das Architekturpapier sagt, die Freigabe bestätige mit
+// `confidence=verified`, die gated release sei der Beleg. Das ist eine
+// vertretbare Position, aber sie wirft zwei verschiedene Dinge zusammen.
+// "Verified" heißt am Rechtstext belegt. Eine Erstanlage ist etwas
+// anderes und nicht weniger wert: Eine benannte Person hat entschieden,
+// mit der Rechtsgrundlage an jeder Frage und einem Entscheidungsprotokoll.
+// Dafür ist `responsible` der genaue Wert. Eine EMDN-Ableitung hat
+// niemand verantwortet, eine Erstanlage schon.
+
+
+// ---------------------------------------------------------------------------
+// 5 · Klärfall — NEU
+//
+// ERF-01/ERF-09: Der Assistent erzwang eine Entscheidung. Ohne Produktart
+// kein Weiterkommen, jeder Vorschlag bestätigt oder beantwortet. Für wen
+// es weiß, ist das gute Führung. Für wen es nicht weiß, erzeugt es eine
+// zuversichtliche falsche Antwort — und die ist schlechter als ein
+// offener Punkt, weil sie wie eine Entscheidung aussieht.
+//
+// Der Zustand `draft` ist im Schema vorhanden und wird vom Assistenten
+// nicht erreicht. Dieses Modell ist, was ihn erreichbar macht.
+//
+// Grundsatz: Lücken dürfen sichtbar sein, Falschangaben nicht unsichtbar.
+// ---------------------------------------------------------------------------
+
+model DeviceClarification {
+  id               String        @id @default(cuid())
+  tenantId         String
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  deviceInstanceId String
+  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
+
+  kind             String        // classification | evidence | duplicate | mandatory_field
+  field            String?       // bei classification: das offengelassene Merkmal
+  prerequisiteCode String?       // bei evidence: die offene Voraussetzung
+  label            String
+
+  deferredBy       String        // wer offengelassen hat — ein offener Punkt
+  deferredAt       DateTime      // ohne Urheber ist ein Vorwurf an niemanden
+  resolvedBy       String?
+  resolvedAt       DateTime?
+  resolutionNote   String?       @db.Text
+
+  @@index([tenantId, deviceInstanceId])
+  @@index([tenantId, resolvedAt])
+}
+
+
+// ---------------------------------------------------------------------------
+// 6 · Nachweis am Gerät — NEU
+//
+// ERF-05: Für Freigabestufe 2 genügt keine Bestätigung, sondern ein
+// Dokument. Für Stufe 3 auch kein Dokument des Betreibers, sondern das
+// Protokoll einer akkreditierten Stelle.
+//
+// Attachment existiert bereits und kann die Datei tragen; was fehlt, ist
+// die Zuordnung zu einer Voraussetzung und die Herkunft.
+// ---------------------------------------------------------------------------
+
+model DeviceEvidence {
+  id               String        @id @default(cuid())
+  tenantId         String
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  deviceInstanceId String
+  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
+
+  prerequisiteCode String        // FK-Wert auf RefCommissioningPrerequisite.code
+  evidenceKind     EvidenceKind
+
+  attachmentId     String?       // das Dokument
+  attachment       Attachment?   @relation(fields: [attachmentId], references: [id])
+
+  // Bei third_party: der Protokolldatensatz aus dem Prüfpartner-Zugang.
+  // Ohne ihn ist die Voraussetzung nicht erfüllbar — und zwar durch
+  // keinen Weg, den der Betreiber allein gehen kann.
+  externalRecordRef String?
+  issuedBy          String?      // die akkreditierte Stelle
+  issuedAt          DateTime?
+  validUntil        DateTime?
+
+  recordedBy        String
+  recordedAt        DateTime     @default(now())
+
+  @@unique([deviceInstanceId, prerequisiteCode])
+  @@index([tenantId, validUntil])
+}
+
+
+// ---------------------------------------------------------------------------
+// 7 · Pflichten — Ergänzungen an DeviceDuty
+//
+// Das Modell ist gut gebaut: applicable, notApplicableReason, confidence,
+// deadlineAnchor, suspendedAt, Bezug auf den Snapshot. Vier Felder fehlen.
+//
+// P4  category       Prüfpflicht oder Betriebspflicht
+// P7  setsBaseline / requiresBaseline
+//     Der Hinweis der Abnahmeprüfung sagt: "Legt die Bezugswerte für alle
+//     Konstanzprüfungen fest — ohne sie ist keine Konstanzprüfung
+//     möglich." Im Datensatz stand davon nichts. Nichts hinderte eine
+//     Konstanzprüfung daran, gegen Bezugswerte abgeschlossen zu werden,
+//     die es nicht gibt. Im Prüfpartner ist dieselbe Abhängigkeit längst
+//     ein Feld am Katalog; an der Pflicht fehlte sie.
+// AUF-01 referenceDeviceId
+//     Die Validierung ist eine Pflicht des Aufbereitungsgerätes. Das
+//     aufbereitete Produkt trägt einen VERWEIS darauf, keine eigene
+//     Pflicht mit eigener Frist. 400 Produkte an drei Geräten ergaben
+//     sonst 400 Validierungspflichten statt drei.
+//
+// model DeviceDuty {
+//   category          DutyCategory
+//   setsBaseline      Boolean  @default(false)
+//   requiresBaseline  Boolean  @default(false)
+//   referenceDeviceId String?
+//   referenceDevice   DeviceInstance? @relation("DutyReference", fields: [referenceDeviceId], references: [id])
+//   deadlineAnchor    DeadlineAnchor  // heute String
+//   confidence        Confidence      // heute String
+// }
+//
+// REGEL, die aus P1 folgt und in die Erzeugung gehört, nicht in die
+// Anzeige: Eine Pflicht mit applicable = false trägt KEINE Frist, keinen
+// Anker außer `none` und kein Vertrauen außer `not_applicable`. Vorher
+// blieb die Frist stehen — wer sie liest, ohne applicable zu prüfen,
+// erzeugt eine Fälligkeit für eine Pflicht, die es nicht gibt. 97 von 184
+// geprüften Merkmalskombinationen waren davon betroffen.
+
+
+// ---------------------------------------------------------------------------
+// 8 · Aufbereitung: die Kopplung zum Gerät — NEU
+//
+// AUF-01: DeviceReprocessingProfile trägt heute classCode, outsourced und
+// contractor. Was fehlt, ist der Verweis auf die Geräte, auf denen
+// tatsächlich aufbereitet wird — und zwar auf EXEMPLARE des Bestands,
+// nicht auf Gerätearten.
+//
+// Daran hängen drei Richtungen:
+//   · ob der Verweis überhaupt auflösbar ist,
+//   · der abgeleitete Validierungsstand am Produkt,
+//   · die Rückwärtssuche vom Gerät zu dem, was darauf läuft — im
+//     Rückrufsfall die einzige Frage.
+// ---------------------------------------------------------------------------
+
+model ReprocessingOnDevice {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  profileDeviceId     String   // das aufbereitete Produkt
+  equipmentDeviceId   String   // das Aufbereitungsgerät, ein echtes Exemplar
+
+  profileDevice       DeviceInstance @relation("ReprocessedItem", fields: [profileDeviceId], references: [id])
+  equipmentDevice     DeviceInstance @relation("ReprocessingEquipment", fields: [equipmentDeviceId], references: [id])
+
+  recordedBy          String
+  recordedAt          DateTime @default(now())
+
+  @@unique([profileDeviceId, equipmentDeviceId])
+  @@index([tenantId, equipmentDeviceId])
+}
+//
+// REGELN:
+//  · Die Validierungspflicht entsteht NUR am Gerät, nie am aufbereiteten
+//    Produkt.
+//  · Der Validierungsstand eines Produktes wird ABGELEITET, nicht
+//    gespeichert — sonst gibt es zwei Wahrheiten.
+//  · requiresValidatedProcess = false (unkritisch): Ein Eintrag hier
+//    bleibt zulässig, erzeugt aber keine Pflicht dieses Produktes.
+//  · outsourced = true zusammen mit einem Eintrag hier ist ein
+//    Widerspruch: entweder eigene Geräte oder beauftragte Aufbereitung.
+//    Für dasselbe Produkt nicht beides.
+
+
+// ---------------------------------------------------------------------------
+// 9 · Gerät — Ergänzungen an DeviceInstance
+//
+// model DeviceInstance {
+//   state         DeviceState   // heute String: draft | review | released
+//   releaseLevel  Int?          // 1..3, aus den Merkmalen abgeleitet (ERF-04)
+//   clarifications DeviceClarification[]
+//   evidence       DeviceEvidence[]
+//   reprocessedOn  ReprocessingOnDevice[] @relation("ReprocessedItem")
+//   usedForReprocessing ReprocessingOnDevice[] @relation("ReprocessingEquipment")
+//   referencingDuties   DeviceDuty[]  @relation("DutyReference")
+// }
+//
+// Die Freigabestufe wird aus den MERKMALEN abgeleitet und nicht der
+// Produktart zugeordnet — sonst ließe sie sich durch die Wahl einer
+// anderen Karte senken. Bei mehreren zutreffenden Merkmalen gilt die
+// höchste:
+//    istAufbGeraet                      → 3
+//    strahlung                          → 2
+//    software mit Klasse ≠ keine        → 2
+//    sonst                              → 1

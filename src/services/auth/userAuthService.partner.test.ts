@@ -5,6 +5,7 @@ import { isClinicSession, isPartnerSession, type SessionUser } from "@/interface
 vi.mock("@/lib/prisma", () => {
   const user = {
     findFirst: vi.fn(),
+    update: vi.fn().mockResolvedValue({}),
   };
   const orgMembership = {
     findFirst: vi.fn(),

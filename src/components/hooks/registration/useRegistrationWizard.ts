@@ -26,6 +26,7 @@ import {
   buildDecisionProtocol,
   confirmAllSuggestions,
   confirmSuggestion,
+  deferField,
   emptyCharacteristics,
   formatUnansweredMessage,
   hydrateAnswerMeta,
@@ -33,6 +34,9 @@ import {
   unansweredVisibleFields,
   type DecisionProtocolEntry,
 } from "@/services/registration/answerMeta";
+import { mergeModelPrefill } from "@/services/registration/modelCharacteristics";
+import { openMandatoryPrerequisites } from "@/services/registration/prerequisites";
+import { computeReleaseLevel } from "@/services/registration/deriveDuties";
 import {
   acknowledgeCheckRule,
   evaluateCheckRules,
@@ -137,12 +141,30 @@ export function useRegistrationWizard(initialDraftId?: string) {
         areaId: draft.areaId ?? "",
         room: draft.room ?? "",
       });
-      setMerkmale(
-        draft.characteristics?.produktart
+      setMerkmale(() => {
+        const base = draft.characteristics?.produktart
           ? hydrateAnswerMeta(draft.characteristics)
-          : emptyCharacteristics(),
-      );
-      if (draft.characteristics?.produktart) {
+          : emptyCharacteristics();
+        // C4 — prefill model-owned fields from open classification when draft has none yet.
+        if (
+          !draft.characteristics?.produktart &&
+          draft.modelClassificationPrefill?.produktart
+        ) {
+          return hydrateAnswerMeta(
+            mergeModelPrefill(base, draft.modelClassificationPrefill),
+          );
+        }
+        if (
+          draft.characteristics?.produktart &&
+          draft.modelClassificationPrefill &&
+          draft.modelClassificationFieldStates
+        ) {
+          // Confirmed model fields already present — keep instance answers; wizard shows them as confirmed.
+          return base;
+        }
+        return base;
+      });
+      if (draft.characteristics?.produktart || draft.modelClassificationPrefill?.produktart) {
         setMaxStep(2);
         setStep(2);
       }
@@ -370,8 +392,128 @@ export function useRegistrationWizard(initialDraftId?: string) {
   );
 
   const openMandatory = useMemo(
-    () => prerequisites.filter((p) => p.pflicht && !p.erfuellt && !checks[p.k]),
-    [prerequisites, checks],
+    () =>
+      openMandatoryPrerequisites(prerequisites, checks, {
+        releaseLevel: computeReleaseLevel(merkmale),
+        requireEvidence: computeReleaseLevel(merkmale) >= 2,
+      }),
+    [prerequisites, checks, merkmale],
+  );
+
+  const deferAndSave = useCallback(
+    async (field: string, label: string) => {
+      setError(null);
+      setBusy(true);
+      try {
+        const next = deferField(merkmale, field, actorName);
+        setMerkmale(next);
+        const year = Number(form.purchaseYear);
+        const payload = {
+          tradeName: form.tradeName,
+          manufacturer: form.manufacturer,
+          modelName: form.modelName || form.tradeName,
+          serialNumber: form.serialNumber || null,
+          udiDi: form.udiDi || null,
+          inventoryNumber: form.inventoryNumber || null,
+          purchaseYear: Number.isFinite(year) ? year : null,
+          responsiblePerson: form.responsiblePerson || null,
+          responsibleUserId: form.responsibleUserId || null,
+          areaId: form.areaId || null,
+          room: form.room || null,
+          productKindCode: next.produktart,
+          characteristics: next,
+          keepDraft: true,
+          clarifications: [
+            { kind: "classification", field, label: label || `Deferred: ${field}` },
+          ],
+        };
+        if (draftId) {
+          await api(`/api/registration/drafts/${draftId}`, {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+          });
+        } else {
+          const res = await api<{ draft: { id: string } }>("/api/registration/drafts", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+          setDraftId(res.draft.id);
+        }
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "Could not save deferred draft");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [merkmale, actorName, form, draftId],
+  );
+
+  const uploadEvidence = useCallback(
+    async (code: string, file: File) => {
+      if (!draftId) {
+        setError("Save identity first so evidence can be attached to the draft.");
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("Read failed"));
+          reader.readAsDataURL(file);
+        });
+        await api(`/api/registration/drafts/${draftId}/evidence`, {
+          method: "POST",
+          body: JSON.stringify({
+            prerequisiteCode: code,
+            evidenceKind: "document",
+            dataUrl,
+          }),
+        });
+        setPrerequisites((prev) =>
+          prev.map((p) =>
+            p.k === code ? { ...p, evidenceId: "uploaded", erfuellt: true } : p,
+          ),
+        );
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "Evidence upload failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [draftId],
+  );
+
+  const setExternalEvidence = useCallback(
+    async (code: string, ref: string) => {
+      if (!draftId) {
+        setError("Save identity first so evidence can be attached to the draft.");
+        return;
+      }
+      setBusy(true);
+      setError(null);
+      try {
+        await api(`/api/registration/drafts/${draftId}/evidence`, {
+          method: "POST",
+          body: JSON.stringify({
+            prerequisiteCode: code,
+            evidenceKind: "third_party",
+            externalRecordRef: ref,
+          }),
+        });
+        setPrerequisites((prev) =>
+          prev.map((p) =>
+            p.k === code ? { ...p, evidenceId: "external", erfuellt: true } : p,
+          ),
+        );
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "Could not record external evidence");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [draftId],
   );
 
   const kindGroups = useMemo(() => {
@@ -407,6 +549,7 @@ export function useRegistrationWizard(initialDraftId?: string) {
     answer,
     confirmField,
     confirmAllPending,
+    deferAndSave,
     answerAnlage2,
     answerMessung,
     answerMessungVariante,
@@ -424,6 +567,8 @@ export function useRegistrationWizard(initialDraftId?: string) {
     prerequisites,
     checks,
     setChecks,
+    uploadEvidence,
+    setExternalEvidence,
     error,
     busy,
     selectedAnnex2,

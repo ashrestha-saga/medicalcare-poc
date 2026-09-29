@@ -11,7 +11,9 @@ import type {
   TrainingSummaryDTO,
   TrainingTypeOptionDTO,
 } from "@/interfaces";
+import { actorFromTenant } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { recordAudit } from "@/services/audit/auditService";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import type { CreateTrainingEventInput } from "@/schemas/training";
@@ -428,6 +430,14 @@ export const trainingService = {
       return event;
     });
 
+    await recordAudit({
+      actor: actorFromTenant(ctx),
+      resource: "training",
+      resourceId: created.id,
+      action: "create",
+      summary: `Recorded training ${type.code} for ${uniquePersonIds.length} participant(s)`,
+      after: { trainingTypeCode: type.code, personCount: uniquePersonIds.length, heldOn: heldOn.toISOString() },
+    });
     return { event: mapEvent(created) };
   },
 };

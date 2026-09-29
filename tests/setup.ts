@@ -23,3 +23,9 @@ process.env.BEUDAMED_ADAPTER_MODE = "stub";
 process.env.BEUDAMED_CACHE_TTL_DAYS = "90";
 process.env.BEUDAMED_TIMEOUT_MS = "300";
 process.env.SMTP_DISABLE = "true";
+process.env.CRON_SECRET = process.env.CRON_SECRET || "test-cron-secret";
+
+// SEC-01 — integration/unit tests use prisma without a request gate; bypass by default.
+// Isolation tests opt into runWithTenant explicitly.
+import { bindTenantBypass } from "../src/lib/auth/tenantStore";
+bindTenantBypass();

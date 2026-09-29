@@ -36,14 +36,19 @@ export function annex2MetaByItemNo(itemNo: string): Annex2JsonRule | null {
   return list?.[0] ?? null;
 }
 
-export function parseJsonStringArray(raw: string | null | undefined): string[] {
-  if (!raw) return [];
-  try {
-    const v = JSON.parse(raw) as unknown;
-    return Array.isArray(v) ? v.map(String) : [];
-  } catch {
-    return [];
+/** Accept Prisma Json arrays or legacy stringified JSON. */
+export function parseJsonStringArray(raw: unknown): string[] {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw === "string") {
+    try {
+      const v = JSON.parse(raw) as unknown;
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch {
+      return [];
+    }
   }
+  return [];
 }
 
 /** Mock accessory templates (probes etc.) — same as backoffice v14. */

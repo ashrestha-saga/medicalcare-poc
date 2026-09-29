@@ -1,4 +1,4 @@
-import type { UserRole } from "./session";
+import type { AccountKind, UserRole } from "./session";
 
 /** Runtime capability key — `resource:action`. */
 export type PermissionSlug =
@@ -18,6 +18,7 @@ export type PermissionSlug =
   | "account:security"
   | "settings:view"
   | "settings:oxid"
+  | "settings:smtp"
   | "users:view"
   | "users:create"
   | "users:update"
@@ -30,7 +31,22 @@ export type PermissionSlug =
   | "roles:view"
   | "roles:update"
   | "management:view"
-  | "training:view";
+  | "training:view"
+  | "audit:view"
+  | "audit:export"
+  | "console:nav"
+  | "console:customers:view"
+  | "console:customers:create"
+  | "console:contracts:update"
+  | "console:contracts:lifecycle"
+  | "console:due-dates:view"
+  | "console:requests:view"
+  | "console:staff:view"
+  | "console:staff:invite"
+  | "console:organisation:view"
+  | "console:audit:view"
+  | "console:settings:view"
+  | "console:settings:smtp";
 
 export type MenuModuleId =
   | "inventory"
@@ -45,7 +61,15 @@ export type MenuModuleId =
   | "roles"
   | "settings"
   | "security"
-  | "management";
+  | "management"
+  | "activity"
+  | "console-customers"
+  | "console-due-dates"
+  | "console-requests"
+  | "console-staff"
+  | "console-organisation"
+  | "console-activity"
+  | "console-settings";
 
 export interface MenuModule {
   id: MenuModuleId;
@@ -53,10 +77,13 @@ export interface MenuModule {
   /** App path for this module. */
   href: string;
   slug: PermissionSlug;
+  /** Console nav group (ops | org). Clinic modules omit this. */
+  group?: "ops" | "org";
 }
 
 export interface CapabilitiesResponse {
-  role: UserRole;
+  role: UserRole | string;
+  accountKind?: AccountKind;
   permissions: PermissionSlug[];
   menu: MenuModule[];
 }
@@ -68,6 +95,17 @@ export interface AdminUserDTO {
   name: string;
   role: UserRole;
   active: boolean;
+  /** active | inactive for users; invited for pending UserInvitation rows. */
+  status: "active" | "inactive" | "invited";
+  /**
+   * Per-user permission snapshot. null ⇒ follows RoleGrant for `role`.
+   * For invited rows: snapshot from invitation, or null for role-only.
+   */
+  permissions: PermissionSlug[] | null;
+  /** Set when status === "invited". */
+  invitationId?: string | null;
+  /** Invite expiry ISO string when status === "invited". */
+  expiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

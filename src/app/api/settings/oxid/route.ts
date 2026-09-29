@@ -1,4 +1,4 @@
-import { requirePermission, requireTenantContext } from "@/lib/auth/tenantContext";
+import { requirePermission, requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse, downstreamUnavailable } from "@/lib/errors";
 import { hasPermission } from "@/constants/permissions";
 import { oxidAuthService } from "@/services/oxid/oxidAuthService";
@@ -9,11 +9,12 @@ export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    const status = await tenantOxidService.getPublicStatus(ctx.tenantId);
-    return Response.json({
-      ...status,
-      canManage: hasPermission(ctx.user.role, "settings:oxid"),
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      const status = await tenantOxidService.getPublicStatus(ctx.tenantId);
+      return Response.json({
+        ...status,
+        canManage: hasPermission(ctx.user.role, "settings:oxid") });
     });
   } catch (error) {
     return errorResponse(error, correlationId);
@@ -25,15 +26,16 @@ export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    requirePermission(ctx, "settings:oxid");
-    if (!oxidAuthService.isConfigured()) throw downstreamUnavailable("OXID is not configured on the server.");
-    const authorizeUrl = oxidAuthService.beginTenantConnect({
-      tenantId: ctx.tenantId,
-      adminUserId: ctx.user.id,
-      returnTo: "/settings",
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      requirePermission(ctx, "settings:oxid");
+      if (!oxidAuthService.isConfigured()) throw downstreamUnavailable("OXID is not configured on the server.");
+      const authorizeUrl = oxidAuthService.beginTenantConnect({
+        tenantId: ctx.tenantId,
+        adminUserId: ctx.user.id,
+        returnTo: "/settings" });
+      return Response.json({ authorizeUrl });
     });
-    return Response.json({ authorizeUrl });
   } catch (error) {
     return errorResponse(error, correlationId);
   }
@@ -44,10 +46,12 @@ export async function DELETE(req: Request) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    requirePermission(ctx, "settings:oxid");
-    const status = await tenantOxidService.disconnect(ctx.tenantId);
-    return Response.json({ ...status, canManage: true });
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      requirePermission(ctx, "settings:oxid");
+      const status = await tenantOxidService.disconnect(ctx.tenantId);
+      return Response.json({ ...status, canManage: true });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

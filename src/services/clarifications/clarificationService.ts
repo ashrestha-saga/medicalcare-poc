@@ -2,10 +2,11 @@ import type {
   ClarificationItemDTO,
   ClarificationsResponse,
   ClarificationSummaryDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { evaluateClarificationIssues, maxSeverity } from "@/lib/clarifications/rules";
+import { notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 
 function buildSummary(items: ClarificationItemDTO[]): ClarificationSummaryDTO {
@@ -23,9 +24,10 @@ function buildSummary(items: ClarificationItemDTO[]): ClarificationSummaryDTO {
 
 /**
  * Tenant inventory data-quality list for superadmin / device_admin.
+ * Unions computed inventory issues with open DeviceClarification rows (C3).
  */
 export const clarificationService = {
-  async list(ctx: TenantContext): Promise<ClarificationsResponse> {
+  async list(ctx: TenantWorkContext): Promise<ClarificationsResponse> {
     requirePermission(ctx, "clarifications:view");
 
     const rows = await prisma.deviceInstance.findMany({
@@ -38,6 +40,7 @@ export const clarificationService = {
         },
         area: { include: { site: true } },
         responsibleUser: { select: { id: true, name: true } },
+        clarifications: { where: { resolvedAt: null } },
       },
       orderBy: [{ inventoryNumber: "asc" }],
     });
@@ -78,6 +81,14 @@ export const clarificationService = {
         duplicateSerialInventoryNumbers: duplicatePeers,
       });
 
+      for (const c of row.clarifications) {
+        issues.push({
+          code: c.kind === "duplicate" ? "duplicate_serial" : "derived_classification",
+          label: `${c.label} (deferred by ${c.deferredBy})`,
+          severity: c.kind === "evidence" ? "high" : "medium",
+        });
+      }
+
       if (issues.length === 0) continue;
 
       const locationParts = [row.area?.site?.name, row.area?.name, row.room].filter(Boolean);
@@ -99,10 +110,17 @@ export const clarificationService = {
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
         sourceLabel: row.model?.source ?? null,
+        deferredClarifications: row.clarifications.map((c) => ({
+          id: c.id,
+          kind: c.kind,
+          field: c.field,
+          label: c.label,
+          deferredBy: c.deferredBy,
+          deferredAt: c.deferredAt.toISOString(),
+        })),
       });
     }
 
-    // High severity first, then inventory number.
     items.sort((a, b) => {
       const rank = { high: 0, medium: 1, low: 2 } as const;
       const d = rank[a.severity] - rank[b.severity];
@@ -111,5 +129,37 @@ export const clarificationService = {
     });
 
     return { summary: buildSummary(items), items };
+  },
+
+  async resolve(
+    ctx: TenantWorkContext,
+    clarificationId: string,
+    input?: { note?: string | null },
+  ) {
+    requirePermission(ctx, "clarifications:view");
+    // Resolving needs inventory update rights in practice; reuse clarifications:view + check admin.
+    requirePermission(ctx, "inventory:update");
+
+    const row = await prisma.deviceClarification.findFirst({
+      where: { id: clarificationId, tenantId: ctx.tenantId },
+    });
+    if (!row) throw notFound("Clarification not found.");
+    if (row.resolvedAt) throw unprocessable("Already resolved.");
+
+    const updated = await prisma.deviceClarification.update({
+      where: { id: row.id },
+      data: {
+        resolvedBy: ctx.user.name,
+        resolvedAt: new Date(),
+        resolutionNote: input?.note?.trim() || null,
+      },
+    });
+
+    return {
+      id: updated.id,
+      resolvedBy: updated.resolvedBy,
+      resolvedAt: updated.resolvedAt?.toISOString() ?? null,
+      resolutionNote: updated.resolutionNote,
+    };
   },
 };

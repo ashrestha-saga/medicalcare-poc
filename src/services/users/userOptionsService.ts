@@ -1,4 +1,4 @@
-import type { TenantContext, UserOptionDTO, UserOptionsQuery } from "@/interfaces";
+import type { TenantWorkContext, UserOptionDTO, UserOptionsQuery } from "@/interfaces";
 import type { UserRole } from "@/interfaces/session";
 import { USER_ROLES } from "@/constants/roles";
 import { requirePermission } from "@/lib/auth/tenantContext";
@@ -26,7 +26,7 @@ function toOption(row: {
  * Allowed for inventory + inventarize flows (not full users:view admin).
  */
 export const userOptionsService = {
-  async list(ctx: TenantContext, query: UserOptionsQuery = {}): Promise<UserOptionDTO[]> {
+  async list(ctx: TenantWorkContext, query: UserOptionsQuery = {}): Promise<UserOptionDTO[]> {
     requirePermission(ctx, "inventory:view", "inventory:update", "requests:create");
 
     const roles =

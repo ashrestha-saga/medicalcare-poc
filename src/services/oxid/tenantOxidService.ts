@@ -1,6 +1,9 @@
+import type { ActorContext } from "@/interfaces/audit";
 import type { OxidTokenSet } from "@/interfaces/external";
+import { decryptSecretOrPlain, encryptSecret } from "@/lib/crypto/secretBox";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { recordAudit } from "@/services/audit/auditService";
 
 export type TenantOxidPublicStatus = {
   configured: boolean;
@@ -43,6 +46,16 @@ function toPublic(row: {
   };
 }
 
+function encToken(value: string | undefined | null): string | null {
+  if (!value) return null;
+  return encryptSecret(value);
+}
+
+function decToken(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return decryptSecretOrPlain(value);
+}
+
 export const tenantOxidService = {
   async getPublicStatus(tenantId: string): Promise<TenantOxidPublicStatus> {
     const row = await prisma.tenantOxidConnection.findUnique({ where: { tenantId } });
@@ -51,10 +64,11 @@ export const tenantOxidService = {
 
   async getTokens(tenantId: string): Promise<OxidTokenSet | null> {
     const row = await prisma.tenantOxidConnection.findUnique({ where: { tenantId } });
-    if (!row?.accessToken || row.status !== "connected") return null;
+    const access = decToken(row?.accessTokenEnc);
+    if (!access || row?.status !== "connected") return null;
     return {
-      accessToken: row.accessToken,
-      refreshToken: row.refreshToken ?? undefined,
+      accessToken: access,
+      refreshToken: decToken(row.refreshTokenEnc) ?? undefined,
       expiresAt: row.expiresAt?.getTime() ?? 0,
       tokenType: "Bearer",
     };
@@ -72,8 +86,8 @@ export const tenantOxidService = {
       where: { tenantId: input.tenantId },
       create: {
         tenantId: input.tenantId,
-        accessToken: input.tokens.accessToken,
-        refreshToken: input.tokens.refreshToken ?? null,
+        accessTokenEnc: encToken(input.tokens.accessToken),
+        refreshTokenEnc: encToken(input.tokens.refreshToken ?? null),
         expiresAt: input.tokens.expiresAt ? new Date(input.tokens.expiresAt) : null,
         customerNumber: input.customerNumber ?? null,
         companyName: input.companyName ?? null,
@@ -84,8 +98,8 @@ export const tenantOxidService = {
         connectedByUserId: input.connectedByUserId,
       },
       update: {
-        accessToken: input.tokens.accessToken,
-        refreshToken: input.tokens.refreshToken ?? null,
+        accessTokenEnc: encToken(input.tokens.accessToken),
+        refreshTokenEnc: encToken(input.tokens.refreshToken ?? null),
         expiresAt: input.tokens.expiresAt ? new Date(input.tokens.expiresAt) : null,
         customerNumber: input.customerNumber ?? null,
         companyName: input.companyName ?? null,
@@ -97,6 +111,26 @@ export const tenantOxidService = {
       },
     });
     logger.info("oxid.tenant.connected", { tenantId: input.tenantId, by: input.connectedByUserId });
+    await recordAudit({
+      actor: {
+        tenantId: input.tenantId,
+        actorUserId: input.connectedByUserId,
+        actorKind: "clinic",
+        actorRole: null,
+        actorName: input.connectedByUserId,
+        organisationId: null,
+        organisationName: null,
+        serviceContractId: null,
+        correlationId: null,
+        ip: null,
+        userAgent: null,
+      },
+      resource: "oxid",
+      resourceId: input.tenantId,
+      action: "connect",
+      summary: "Connected OXID shop",
+      after: { customerNumber: input.customerNumber ?? null, companyName: input.companyName ?? null },
+    });
     return toPublic(row);
   },
 
@@ -104,8 +138,8 @@ export const tenantOxidService = {
     await prisma.tenantOxidConnection.update({
       where: { tenantId },
       data: {
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken ?? null,
+        accessTokenEnc: encToken(tokens.accessToken),
+        refreshTokenEnc: encToken(tokens.refreshToken ?? null),
         expiresAt: tokens.expiresAt ? new Date(tokens.expiresAt) : null,
         status: "connected",
         lastError: null,
@@ -113,14 +147,14 @@ export const tenantOxidService = {
     });
   },
 
-  async disconnect(tenantId: string): Promise<TenantOxidPublicStatus> {
+  async disconnect(tenantId: string, actor?: ActorContext): Promise<TenantOxidPublicStatus> {
     const existing = await prisma.tenantOxidConnection.findUnique({ where: { tenantId } });
     if (!existing) return toPublic(null);
     const row = await prisma.tenantOxidConnection.update({
       where: { tenantId },
       data: {
-        accessToken: null,
-        refreshToken: null,
+        accessTokenEnc: null,
+        refreshTokenEnc: null,
         expiresAt: null,
         status: "disconnected",
         lastError: null,
@@ -129,6 +163,25 @@ export const tenantOxidService = {
       },
     });
     logger.info("oxid.tenant.disconnected", { tenantId });
+    await recordAudit({
+      actor: actor ?? {
+        tenantId,
+        actorUserId: existing.connectedByUserId,
+        actorKind: "clinic",
+        actorRole: null,
+        actorName: existing.connectedByUserId ?? "clinic",
+        organisationId: null,
+        organisationName: null,
+        serviceContractId: null,
+        correlationId: null,
+        ip: null,
+        userAgent: null,
+      },
+      resource: "oxid",
+      resourceId: tenantId,
+      action: "disconnect",
+      summary: "Disconnected OXID shop",
+    });
     return toPublic(row);
   },
 

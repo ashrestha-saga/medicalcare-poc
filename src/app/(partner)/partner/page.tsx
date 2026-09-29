@@ -1,6 +1,6 @@
-import { PartnerHomeScreen } from "@/components/features/partner/PartnerHomeScreen";
+import { redirect } from "next/navigation";
 
-/** /partner — organisation people + contracted clinics. */
-export default function PartnerHomePage() {
-  return <PartnerHomeScreen />;
+/** /partner — operator console lands on customers. */
+export default function PartnerIndexPage() {
+  redirect("/partner/customers");
 }

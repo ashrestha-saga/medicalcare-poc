@@ -1,5 +1,7 @@
-import type { SiteDTO, TenantContext } from "@/interfaces";
+import type { SiteDTO, TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { changedFields, recordAudit } from "@/services/audit/auditService";
 import { conflict, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import type { CreateSiteInput, UpdateSiteInput } from "@/schemas/site";
@@ -41,7 +43,7 @@ async function assertUniqueCode(tenantId: string, code: string | null, excludeId
   if (existing) throw conflict("A location with this identifier already exists.");
 }
 
-async function syncAreas(siteId: string, areaNames: string[]) {
+async function syncAreas(siteId: string, tenantId: string, areaNames: string[]) {
   const desired = [...new Set(areaNames.map((n) => n.trim()).filter(Boolean))];
   const existing = await prisma.area.findMany({
     where: { siteId },
@@ -57,7 +59,7 @@ async function syncAreas(siteId: string, areaNames: string[]) {
         await prisma.area.update({ where: { id: hit.id }, data: { name } });
       }
     } else {
-      const created = await prisma.area.create({ data: { siteId, name } });
+      const created = await prisma.area.create({ data: { siteId, tenantId, name } });
       keepIds.add(created.id);
     }
   }
@@ -93,7 +95,7 @@ export const locationService = {
     return (rows as unknown as SiteListRow[]).map(mapSite);
   },
 
-  async list(ctx: TenantContext, q?: string): Promise<SiteDTO[]> {
+  async list(ctx: TenantWorkContext, q?: string): Promise<SiteDTO[]> {
     requirePermission(ctx, "locations:view");
     const needle = q?.trim().toLowerCase();
     const where = {
@@ -117,7 +119,7 @@ export const locationService = {
     return (rows as unknown as SiteListRow[]).map(mapSite);
   },
 
-  async create(ctx: TenantContext, input: CreateSiteInput): Promise<SiteDTO> {
+  async create(ctx: TenantWorkContext, input: CreateSiteInput): Promise<SiteDTO> {
     requirePermission(ctx, "locations:create");
     await assertUniqueCode(ctx.tenantId, input.code);
     const data = {
@@ -129,16 +131,24 @@ export const locationService = {
     } as Prisma.SiteUncheckedCreateInput;
     const row = await prisma.site.create({ data });
     if (input.areaNames?.length) {
-      await syncAreas(row.id, input.areaNames);
+      await syncAreas(row.id, ctx.tenantId, input.areaNames);
     }
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "site",
+      resourceId: row.id,
+      action: "create",
+      summary: `Created location ${input.name.trim()}`,
+      after: { name: input.name.trim(), code: input.code, areaNames: input.areaNames ?? [] },
+    });
     return loadSite(row.id, ctx.tenantId);
   },
 
-  async update(ctx: TenantContext, siteId: string, input: UpdateSiteInput): Promise<SiteDTO> {
+  async update(ctx: TenantWorkContext, siteId: string, input: UpdateSiteInput): Promise<SiteDTO> {
     requirePermission(ctx, "locations:update");
     const existing = await prisma.site.findFirst({
       where: { id: siteId, tenantId: ctx.tenantId },
-      select: { id: true },
+      include: { areas: { select: { name: true } } },
     });
     if (!existing) throw notFound("Location not found.");
 
@@ -153,11 +163,36 @@ export const locationService = {
       where: { id: siteId },
       data,
     });
-    await syncAreas(siteId, input.areaNames ?? []);
+    await syncAreas(siteId, ctx.tenantId, input.areaNames ?? []);
+    const diff = changedFields(
+      {
+        name: existing.name,
+        code: existing.code,
+        address: existing.address,
+        deliveryAddress: existing.deliveryAddress,
+        areaNames: existing.areas.map((a) => a.name),
+      },
+      {
+        name: input.name.trim(),
+        code: input.code,
+        address: input.address,
+        deliveryAddress: input.deliveryAddress,
+        areaNames: input.areaNames ?? [],
+      },
+    );
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "site",
+      resourceId: siteId,
+      action: "update",
+      summary: `Updated location ${input.name.trim()}`,
+      before: diff?.before,
+      after: diff?.after,
+    });
     return loadSite(siteId, ctx.tenantId);
   },
 
-  async remove(ctx: TenantContext, siteId: string): Promise<void> {
+  async remove(ctx: TenantWorkContext, siteId: string): Promise<void> {
     requirePermission(ctx, "locations:delete");
     const row = await prisma.site.findFirst({
       where: { id: siteId, tenantId: ctx.tenantId },
@@ -174,5 +209,13 @@ export const locationService = {
 
     await prisma.area.deleteMany({ where: { siteId } });
     await prisma.site.delete({ where: { id: siteId } });
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "site",
+      resourceId: siteId,
+      action: "delete",
+      summary: `Deleted location ${row.name}`,
+      before: { name: row.name, code: row.code, areaNames: row.areas.map((a) => a.name) },
+    });
   },
 };

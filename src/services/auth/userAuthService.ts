@@ -1,6 +1,7 @@
 import type { ClinicSessionUser, PartnerSessionUser, SessionUser, UserRole } from "@/interfaces/session";
 import type { PartnerAppRole } from "@/interfaces/management";
 import { DEFAULT_USER_ROLE, USER_ROLES } from "@/constants/roles";
+import { env } from "@/lib/env";
 import { unauthorized } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
@@ -64,22 +65,60 @@ async function activeMembershipFor(userId: string, now: Date) {
   });
 }
 
+function isLocked(lockedUntil: Date | null | undefined, now = new Date()): boolean {
+  return Boolean(lockedUntil && lockedUntil.getTime() > now.getTime());
+}
+
+async function registerFailedLogin(userId: string, attempts: number, lockedUntil: Date | null) {
+  const nextAttempts = attempts + 1;
+  const threshold = env.auth.maxFailedLogins;
+  const data: { failedLoginAttempts: number; lockedUntil?: Date } = {
+    failedLoginAttempts: nextAttempts,
+  };
+  if (nextAttempts >= threshold) {
+    data.lockedUntil = new Date(Date.now() + env.auth.lockoutMinutes * 60_000);
+  }
+  await prisma.user.update({ where: { id: userId }, data });
+  return {
+    locked: Boolean(data.lockedUntil) || isLocked(lockedUntil),
+    attempts: nextAttempts,
+  };
+}
+
+async function clearLockout(userId: string) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { failedLoginAttempts: 0, lockedUntil: null },
+  });
+}
+
 export const userAuthService = {
   async authenticate(
     email: string,
     password: string,
-  ): Promise<{ user: ClinicSessionUser; tenantName: string; totpEnabled: boolean }> {
+  ): Promise<{ user: ClinicSessionUser; tenantName: string; totpEnabled: boolean; locked?: boolean }> {
     const normalized = email.trim().toLowerCase();
     const row = await prisma.user.findFirst({
-      where: { email: normalized, active: true, accountKind: "clinic" },
+      where: { email: normalized, accountKind: "clinic" },
       include: { tenant: { select: { name: true } } },
     });
-    if (!row || !verifyPassword(password, row.passwordHash)) {
+    if (!row || !row.active) {
+      throw unauthorized("Invalid email or password.");
+    }
+    if (isLocked(row.lockedUntil)) {
+      throw unauthorized("Account temporarily locked. Try again later.");
+    }
+    if (!verifyPassword(password, row.passwordHash)) {
+      const result = await registerFailedLogin(row.id, row.failedLoginAttempts, row.lockedUntil);
+      if (result.locked) {
+        throw unauthorized("Account temporarily locked. Try again later.");
+      }
       throw unauthorized("Invalid email or password.");
     }
     if (!row.tenantId || !row.role || !row.tenant) {
       throw unauthorized("Clinic account is incomplete.");
     }
+    await clearLockout(row.id);
     const user = toClinicSessionUser({
       id: row.id,
       name: row.name,
@@ -100,9 +139,19 @@ export const userAuthService = {
   ): Promise<{ user: PartnerSessionUser; organisationName: string }> {
     const normalized = email.trim().toLowerCase();
     const row = await prisma.user.findFirst({
-      where: { email: normalized, active: true, accountKind: "partner" },
+      where: { email: normalized, accountKind: "partner" },
     });
-    if (!row || !verifyPassword(password, row.passwordHash)) {
+    if (!row || !row.active) {
+      throw unauthorized("Invalid email or password.");
+    }
+    if (isLocked(row.lockedUntil)) {
+      throw unauthorized("Account temporarily locked. Try again later.");
+    }
+    if (!verifyPassword(password, row.passwordHash)) {
+      const result = await registerFailedLogin(row.id, row.failedLoginAttempts, row.lockedUntil);
+      if (result.locked) {
+        throw unauthorized("Account temporarily locked. Try again later.");
+      }
       throw unauthorized("Invalid email or password.");
     }
 
@@ -111,6 +160,7 @@ export const userAuthService = {
       throw unauthorized("No active organisation membership for this account.");
     }
 
+    await clearLockout(row.id);
     const user = toPartnerSessionUser({
       id: row.id,
       name: row.name,
@@ -147,6 +197,14 @@ export const userAuthService = {
       role: row.role,
       tenantId: row.tenantId,
       tenant: row.tenant,
+    });
+  },
+
+  /** SEC-03 — bump so existing cookies with older iat are rejected. */
+  async revokeSessions(userId: string): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { sessionsValidFrom: new Date() },
     });
   },
 };

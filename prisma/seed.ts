@@ -70,8 +70,13 @@ export async function seed(prisma: PrismaClient) {
 
   const tenant = await prisma.tenant.upsert({
     where: { id: SEED.tenantId },
-    update: { name: "Demo Clinic" },
-    create: { id: SEED.tenantId, name: "Demo Clinic" },
+    update: { name: "Demo Clinic", code: "T-KLN", operatingModel: "institution_operated" },
+    create: {
+      id: SEED.tenantId,
+      name: "Demo Clinic",
+      code: "T-KLN",
+      operatingModel: "institution_operated",
+    },
   });
 
   const demoHash = hashPassword("demo");
@@ -141,18 +146,18 @@ export async function seed(prisma: PrismaClient) {
 
   await prisma.area.upsert({
     where: { id: SEED.areas.bonnIcu },
-    update: {},
-    create: { id: SEED.areas.bonnIcu, siteId: SEED.sites.bonn, name: "ICU" },
+    update: { tenantId: SEED.tenantId },
+    create: { id: SEED.areas.bonnIcu, tenantId: SEED.tenantId, siteId: SEED.sites.bonn, name: "ICU" },
   });
   await prisma.area.upsert({
     where: { id: SEED.areas.bonnRadiology },
-    update: {},
-    create: { id: SEED.areas.bonnRadiology, siteId: SEED.sites.bonn, name: "Radiology" },
+    update: { tenantId: SEED.tenantId },
+    create: { id: SEED.areas.bonnRadiology, tenantId: SEED.tenantId, siteId: SEED.sites.bonn, name: "Radiology" },
   });
   await prisma.area.upsert({
     where: { id: SEED.areas.cologneOr },
-    update: {},
-    create: { id: SEED.areas.cologneOr, siteId: SEED.sites.cologne, name: "Operating Room" },
+    update: { tenantId: SEED.tenantId },
+    create: { id: SEED.areas.cologneOr, tenantId: SEED.tenantId, siteId: SEED.sites.cologne, name: "Operating Room" },
   });
 
   await prisma.deviceModel.upsert({
@@ -218,6 +223,7 @@ export async function seed(prisma: PrismaClient) {
   await prisma.siteHeadcount.deleteMany({ where: { siteId: { in: [SEED.sites.bonn, SEED.sites.cologne] } } });
   await prisma.siteHeadcount.create({
     data: {
+      tenantId: SEED.tenantId,
       siteId: SEED.sites.bonn,
       validFrom: new Date("2024-01-01"),
       headcount: 18,
@@ -226,6 +232,7 @@ export async function seed(prisma: PrismaClient) {
   });
   await prisma.siteHeadcount.create({
     data: {
+      tenantId: SEED.tenantId,
       siteId: SEED.sites.cologne,
       validFrom: new Date("2024-01-01"),
       headcount: 12,
@@ -295,12 +302,13 @@ export async function seed(prisma: PrismaClient) {
 
   await prisma.deviceModelClassification.updateMany({
     where: { deviceModelId: { in: [SEED.models.pumpX200, SEED.models.monitorM10] }, validTo: null },
-    data: { validTo: new Date() },
+    data: { validTo: new Date(), openClassificationKey: null },
   });
   await prisma.deviceModelClassification.upsert({
     where: { id: SEED.classifications.pump },
     update: {
       deviceModelId: SEED.models.pumpX200,
+      openClassificationKey: SEED.models.pumpX200,
       stk: true,
       radiation: false,
       softwareClass: null,
@@ -314,6 +322,7 @@ export async function seed(prisma: PrismaClient) {
     create: {
       id: SEED.classifications.pump,
       deviceModelId: SEED.models.pumpX200,
+      openClassificationKey: SEED.models.pumpX200,
       stk: true,
       radiation: false,
       softwareClass: null,
@@ -328,6 +337,7 @@ export async function seed(prisma: PrismaClient) {
     where: { id: SEED.classifications.monitor },
     update: {
       deviceModelId: SEED.models.monitorM10,
+      openClassificationKey: SEED.models.monitorM10,
       stk: true,
       radiation: false,
       softwareClass: null,
@@ -339,6 +349,7 @@ export async function seed(prisma: PrismaClient) {
     create: {
       id: SEED.classifications.monitor,
       deviceModelId: SEED.models.monitorM10,
+      openClassificationKey: SEED.models.monitorM10,
       stk: true,
       radiation: false,
       softwareClass: null,

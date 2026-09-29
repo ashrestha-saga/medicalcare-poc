@@ -316,11 +316,13 @@ export async function seedHandoverInventory(
     await prisma.area.upsert({
       where: { id },
       update: {
+        tenantId,
         siteId: asString(row.site_id)!,
         name: asString(row.name)!,
       },
       create: {
         id,
+        tenantId,
         siteId: asString(row.site_id)!,
         name: asString(row.name)!,
       },
@@ -337,6 +339,7 @@ export async function seedHandoverInventory(
     await prisma.siteHeadcount.create({
       data: {
         id: asString(row.id)!,
+        tenantId,
         siteId: asString(row.site_id)!,
         validFrom: asDate(row.valid_from)!,
         headcount: asInt(row.headcount)!,
@@ -349,6 +352,7 @@ export async function seedHandoverInventory(
     await prisma.safetyOfficerAppointment.create({
       data: {
         id: asString(row.id)!,
+        tenantId,
         siteId: asString(row.site_id)!,
         personName: asString(row.person_name)!,
         functionalEmail: asString(row.functional_email),
@@ -446,7 +450,7 @@ export async function seedHandoverInventory(
         instructorQualification: asString(row.instructor_qualification)!,
         instructorExternal: asBool(row.instructor_external),
         basisDocument: asString(row.basis_document)!,
-        mode: asString(row.mode) ?? "group",
+        mode: (asString(row.mode) ?? "group") as "individual" | "group",
         recordedBy: asString(row.recorded_by) ?? "Testdaten",
         recordedAt: new Date(),
       },
@@ -469,17 +473,21 @@ export async function seedHandoverInventory(
   for (const row of classifications) {
     const id = asString(row.id)!;
     const mtkItemId = resolveAnnexId(row.mtk_item_id);
+    const deviceModelId = asString(row.model_id)!;
+    const validTo = asDate(row.valid_to);
+    const openKey = validTo ? null : deviceModelId;
     await prisma.deviceModelClassification.upsert({
       where: { id },
       update: {
-        deviceModelId: asString(row.model_id)!,
+        deviceModelId,
+        openClassificationKey: openKey,
         validFrom: asDate(row.valid_from) ?? new Date("2025-01-01T00:00:00.000Z"),
-        validTo: asDate(row.valid_to),
+        validTo,
         stk: asBool(row.stk),
         mtkItemId,
         radiation: asBool(row.radiation),
         softwareClass: asString(row.software_class),
-        confidence: asString(row.confidence) ?? "derived",
+        confidence: (asString(row.confidence) ?? "derived") as "derived",
         evidenceText: asString(row.evidence_text),
         ruleSetId: resolveRuleSetId(row.rule_set_id),
         confirmedBy: asString(row.confirmed_by),
@@ -487,14 +495,15 @@ export async function seedHandoverInventory(
       },
       create: {
         id,
-        deviceModelId: asString(row.model_id)!,
+        deviceModelId,
+        openClassificationKey: openKey,
         validFrom: asDate(row.valid_from) ?? new Date("2025-01-01T00:00:00.000Z"),
-        validTo: asDate(row.valid_to),
+        validTo,
         stk: asBool(row.stk),
         mtkItemId,
         radiation: asBool(row.radiation),
         softwareClass: asString(row.software_class),
-        confidence: asString(row.confidence) ?? "derived",
+        confidence: (asString(row.confidence) ?? "derived") as "derived",
         evidenceText: asString(row.evidence_text),
         ruleSetId: resolveRuleSetId(row.rule_set_id),
         confirmedBy: asString(row.confirmed_by),
@@ -505,25 +514,34 @@ export async function seedHandoverInventory(
 
   const roots = units.filter((r) => r.parent_unit_id == null);
   const children = units.filter((r) => r.parent_unit_id != null);
+  /** SCH-01 — first wins; later duplicate (tenant, model, serial) get serial cleared. */
+  const seenSerialKeys = new Set<string>();
   for (const row of [...roots, ...children]) {
     const id = asString(row.id)!;
     const purchaseYear = asInt(row.purchase_year);
     const commissionedAt =
       purchaseYear != null ? new Date(Date.UTC(purchaseYear, 0, 1)) : null;
+    const modelId = asString(row.model_id);
+    let serialNumber = asString(row.serial_no);
+    if (serialNumber && modelId) {
+      const key = `${tenantId}::${modelId}::${serialNumber.toLowerCase()}`;
+      if (seenSerialKeys.has(key)) serialNumber = null;
+      else seenSerialKeys.add(key);
+    }
     await prisma.deviceInstance.upsert({
       where: { id },
       update: {
         tenantId,
         inventoryNumber: asString(row.asset_no)!,
-        serialNumber: asString(row.serial_no),
+        serialNumber,
         udiDi: asString(row.udi_di),
-        modelId: asString(row.model_id),
+        modelId,
         areaId: asString(row.area_id),
         room: asString(row.room),
         commissionedAt,
         responsiblePerson: asString(row.responsible_person),
         productKindCode: asString(row.product_kind_code),
-        state: asString(row.state) ?? "draft",
+        state: (asString(row.state) ?? "draft") as "draft" | "review" | "released" | "retired",
         source: asString(row.source) ?? "wizard",
         legacyMedgvGroup1: asBool(row.legacy_medgv_group1),
         aedExemption: asBool(row.aed_exemption),
@@ -535,15 +553,15 @@ export async function seedHandoverInventory(
         id,
         tenantId,
         inventoryNumber: asString(row.asset_no)!,
-        serialNumber: asString(row.serial_no),
+        serialNumber,
         udiDi: asString(row.udi_di),
-        modelId: asString(row.model_id),
+        modelId,
         areaId: asString(row.area_id),
         room: asString(row.room),
         commissionedAt,
         responsiblePerson: asString(row.responsible_person),
         productKindCode: asString(row.product_kind_code),
-        state: asString(row.state) ?? "draft",
+        state: (asString(row.state) ?? "draft") as "draft" | "review" | "released" | "retired",
         source: asString(row.source) ?? "wizard",
         legacyMedgvGroup1: asBool(row.legacy_medgv_group1),
         aedExemption: asBool(row.aed_exemption),
@@ -615,7 +633,16 @@ export async function seedHandoverInventory(
     const referenceDate = asDate(row.reference_date)!;
     const intervalValue = asInt(row.interval_value);
     const intervalUnit = asString(row.interval_unit);
-    const deadlineAnchor = asString(row.deadline_anchor)!;
+    const deadlineAnchor = asString(row.deadline_anchor)! as
+      | "exact_day"
+      | "month_end"
+      | "year_end"
+      | "event"
+      | "interval"
+      | "process"
+      | "permanent"
+      | "reference"
+      | "none";
     const dueAt = computeDutyDueAt({
       deadlineAnchor,
       referenceDate,
@@ -637,7 +664,7 @@ export async function seedHandoverInventory(
         cadenceLabel: asString(row.cadence_label),
         constancyObjectCode: constancyObject,
         basisText: asString(row.basis_text) ?? "",
-        confidence: asString(row.confidence) ?? "derived",
+        confidence: (asString(row.confidence) ?? "derived") as "derived",
         applicable: row.applicable == null ? true : asBool(row.applicable),
         notApplicableReason: asString(row.not_applicable_reason),
         referenceDate,
@@ -657,7 +684,7 @@ export async function seedHandoverInventory(
         cadenceLabel: asString(row.cadence_label),
         constancyObjectCode: constancyObject,
         basisText: asString(row.basis_text) ?? "",
-        confidence: asString(row.confidence) ?? "derived",
+        confidence: (asString(row.confidence) ?? "derived") as "derived",
         applicable: row.applicable == null ? true : asBool(row.applicable),
         notApplicableReason: asString(row.not_applicable_reason),
         referenceDate,

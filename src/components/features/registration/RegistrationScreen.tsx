@@ -71,6 +71,8 @@ export function RegistrationScreen({ draftId }: RegistrationScreenProps) {
                 busy={w.busy}
                 onBack={() => w.setStep(3)}
                 onRelease={w.release}
+                onUploadEvidence={w.uploadEvidence}
+                onExternalRef={w.setExternalEvidence}
               />
             ) : null}
           </div>

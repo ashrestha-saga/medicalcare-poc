@@ -114,6 +114,74 @@ describe("deriveDuties", () => {
     const stk = duties.find((d) => d.id === "stk")!;
     expect(stk.einschlaegig).toBe(false);
   });
+
+  it("marks Abnahme as baseline and Konstanz as requiring baseline", () => {
+    const duties = deriveDuties({
+      characteristics: {
+        produktart: "bildgebung",
+        strahlung: true,
+        konstanz: [{ k: "aufnahme", intervall: "monatlich" }],
+      },
+    });
+    expect(duties.find((d) => d.id === "abnahme")?.setsBaseline).toBe(true);
+    expect(duties.find((d) => d.id === "konstanz-aufnahme")?.requiresBaseline).toBe(true);
+    expect(duties.find((d) => d.id === "wartung")?.category).toBe("operating");
+  });
+
+  it("uses radiation ref for QS guideline and §88 applicability (P5)", () => {
+    const nuklear = deriveDuties({
+      characteristics: { produktart: "nuklear", strahlung: true, strahlenArt: "nuklear" },
+      radiationRef: {
+        code: "nuklear",
+        qualityGuideline: "QS-RL Nuklearmedizin",
+        expertInspectionApplies: false,
+      },
+    });
+    const sv = nuklear.find((d) => d.id === "sv")!;
+    expect(sv.einschlaegig).toBe(false);
+    expect(nuklear.find((d) => d.id === "abnahme")?.grund).toContain("QS-RL Nuklearmedizin");
+  });
+
+  it("puts validation due only on equipment, not on products with aufbGeraete (AUF-01)", () => {
+    const product = deriveDuties({
+      characteristics: {
+        produktart: "instrument",
+        aufbereitung: true,
+        aufbKlasse: "kritisch-a",
+        aufbGeraete: ["rdg", "klein"],
+      },
+      requiresValidatedProcess: true,
+    });
+    expect(product.some((d) => d.id.startsWith("val-") && d.deadlineAnchor === "year_end")).toBe(
+      false,
+    );
+    expect(product.find((d) => d.id === "val-ref-pending")?.einschlaegig).toBe(false);
+
+    const linked = deriveDuties({
+      characteristics: {
+        produktart: "instrument",
+        aufbereitung: true,
+        aufbKlasse: "kritisch-a",
+        aufbGeraete: ["rdg"],
+      },
+      linkedEquipmentDeviceIds: ["equip-1"],
+      requiresValidatedProcess: true,
+    });
+    const ref = linked.find((d) => d.id === "val-ref-equip-1")!;
+    expect(ref.einschlaegig).toBe(true);
+    expect(ref.deadlineAnchor).toBe("reference");
+    expect(ref.referenceDeviceId).toBe("equip-1");
+
+    const equipment = deriveDuties({
+      characteristics: {
+        produktart: "aufbereitungsgeraet",
+        istAufbGeraet: true,
+        eigenTyp: "rdg",
+      },
+    });
+    expect(equipment.find((d) => d.id === "eigen-val")?.einschlaegig).toBe(true);
+    expect(equipment.find((d) => d.id === "eigen-val")?.deadlineAnchor).toBe("year_end");
+  });
 });
 
 describe("dueDate", () => {
@@ -135,12 +203,14 @@ describe("dueDate", () => {
     expect(due?.toISOString().slice(0, 10)).toBe("2024-02-29");
   });
 
-  it("returns null for event/process/permanent/interval", () => {
+  it("returns null for event/process/permanent/interval/none/reference", () => {
     const base = new Date(Date.UTC(2024, 0, 1));
     expect(dueDate("event", base, 12, "months")).toBeNull();
     expect(dueDate("process", base, 12, "months")).toBeNull();
     expect(dueDate("permanent", base, 12, "months")).toBeNull();
     expect(dueDate("interval", base, 12, "months")).toBeNull();
+    expect(dueDate("none", base, 12, "months")).toBeNull();
+    expect(dueDate("reference", base, 12, "months")).toBeNull();
   });
 });
 
@@ -186,5 +256,16 @@ describe("prerequisites", () => {
     });
     const open = openMandatoryPrerequisites(items, { ga: true, einweisung: true, wartungsplan: true });
     expect(open.some((o) => o.k === "bmps")).toBe(true);
+  });
+
+  it("never treats third_party as checkbox-satisfied", () => {
+    const items = buildPrerequisites(
+      { produktart: "bildgebung", strahlung: true, strahlenArt: "roentgen" },
+      null,
+    );
+    const abn = items.find((i) => i.k === "abn")!;
+    expect(abn.evidenceKind).toBe("third_party");
+    const open = openMandatoryPrerequisites(items, { abn: true }, { releaseLevel: 3, requireEvidence: true });
+    expect(open.some((i) => i.k === "abn")).toBe(true);
   });
 });

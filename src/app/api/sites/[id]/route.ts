@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { updateSiteSchema } from "@/schemas/site";
 import { locationService } from "@/services/location/locationService";
@@ -10,12 +10,14 @@ export async function PATCH(req: Request, { params }: Params) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    const { id } = await params;
-    const input = updateSiteSchema.parse(await req.json());
-    const site = await locationService.update(ctx, id, input);
-    return Response.json({ site }, { headers: { "x-correlation-id": ctx.correlationId } });
-  } catch (error) {
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      const { id } = await params;
+      const input = updateSiteSchema.parse(await req.json());
+      const site = await locationService.update(ctx, id, input);
+      return Response.json({ site }, { headers: { "x-correlation-id": ctx.correlationId } });
+    });
+} catch (error) {
     return errorResponse(error, correlationId);
   }
 }
@@ -25,11 +27,13 @@ export async function DELETE(req: Request, { params }: Params) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    const { id } = await params;
-    await locationService.remove(ctx, id);
-    return Response.json({ ok: true }, { headers: { "x-correlation-id": ctx.correlationId } });
-  } catch (error) {
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      const { id } = await params;
+      await locationService.remove(ctx, id);
+      return Response.json({ ok: true }, { headers: { "x-correlation-id": ctx.correlationId } });
+    });
+} catch (error) {
     return errorResponse(error, correlationId);
   }
 }

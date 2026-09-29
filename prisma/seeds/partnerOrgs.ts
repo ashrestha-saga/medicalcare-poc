@@ -60,7 +60,18 @@ const ORGANISATIONS = [
 /** Klinikum Nord contract: bestand / fristen / pruefung, still open. */
 const MSR_ID = "1f0f2544-0dc8-5869-9c13-85f741e48258";
 const RTS_ID = "7a48a751-3e3a-5edb-abfa-95ef550e6249";
+const KLN_ID = "5c7c8e35-11ff-58f7-814f-bc94c9481bd1";
 const KLN_CONTRACT_ID = "d6223305-9759-5d99-bac4-670ea0292f2f";
+
+const ORG_CAPACITIES: { organisationId: string; role: string; id: string }[] = [
+  { id: "orole-msr-provider", organisationId: MSR_ID, role: "service_provider" },
+  { id: "orole-msr-inspect", organisationId: MSR_ID, role: "inspection_partner" },
+  { id: "orole-rts-inspect", organisationId: RTS_ID, role: "inspection_partner" },
+  { id: "orole-kln-inst", organisationId: KLN_ID, role: "institution" },
+  { id: "orole-prx-inst", organisationId: "0830a493-a1ba-5a5e-aa82-16ce74b894ee", role: "institution" },
+  { id: "orole-mvz-inst", organisationId: "3fbe41da-61c9-5a20-a01d-c12631739a1a", role: "institution" },
+  { id: "orole-zah-inst", organisationId: "4521dff7-03c1-5815-98c4-2d8eb624838b", role: "institution" },
+];
 
 /** Testdaten memberships with login subject — mapped to partner User + OrgMembership. */
 const PARTNER_USERS = [
@@ -99,7 +110,13 @@ const PARTNER_USERS = [
 export async function seedPartnerOrgs(
   prisma: PrismaClient,
   tenantId: string,
-): Promise<{ organisations: number; serviceContracts: number; partnerUsers: number; memberships: number }> {
+): Promise<{
+  organisations: number;
+  organisationRoles: number;
+  serviceContracts: number;
+  partnerUsers: number;
+  memberships: number;
+}> {
   for (const org of ORGANISATIONS) {
     await prisma.organisation.upsert({
       where: { id: org.id },
@@ -119,6 +136,26 @@ export async function seedPartnerOrgs(
     });
   }
 
+  const grantedFrom = new Date("2020-01-01T00:00:00.000Z");
+  for (const cap of ORG_CAPACITIES) {
+    await prisma.organisationRole.upsert({
+      where: { organisationId_role: { organisationId: cap.organisationId, role: cap.role } },
+      update: { grantedFrom, grantedTo: null },
+      create: {
+        id: cap.id,
+        organisationId: cap.organisationId,
+        role: cap.role,
+        grantedFrom,
+        grantedTo: null,
+      },
+    });
+  }
+
+  await prisma.tenant.update({
+    where: { id: tenantId },
+    data: { institutionOrgId: KLN_ID, code: "T-KLN", operatingModel: "institution_operated" },
+  });
+
   const scope = JSON.stringify(["inventory", "due-dates", "inspection"]);
   const validFrom = new Date("2024-01-01T00:00:00.000Z");
 
@@ -127,6 +164,9 @@ export async function seedPartnerOrgs(
     update: {
       validFrom,
       validTo: null,
+      terminatedAt: null,
+      suspendedAt: null,
+      billingRef: "KTO-4711",
       scope,
     },
     create: {
@@ -135,6 +175,9 @@ export async function seedPartnerOrgs(
       organisationId: MSR_ID,
       validFrom,
       validTo: null,
+      terminatedAt: null,
+      suspendedAt: null,
+      billingRef: "KTO-4711",
       scope,
     },
   });
@@ -188,6 +231,7 @@ export async function seedPartnerOrgs(
 
   return {
     organisations: ORGANISATIONS.length,
+    organisationRoles: ORG_CAPACITIES.length,
     serviceContracts: 1,
     partnerUsers: PARTNER_USERS.length,
     memberships: PARTNER_USERS.length,

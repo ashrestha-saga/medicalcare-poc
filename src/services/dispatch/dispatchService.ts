@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import { mailDispatchAdapter, webhookDispatchAdapter } from "@/services/adapters/mailDispatchAdapter";
 import { oxidHttpDispatchAdapter } from "@/services/adapters/oxidHttpAdapter";
 import { oxidMockDispatchAdapter } from "@/services/adapters/oxidMockAdapter";
+import { enqueueDispatchFailure } from "@/services/jobs/dispatchOutboxEnqueue";
 import { toDispatchTargetDTO } from "@/services/shared/mappers";
 import {
   buildServiceDispatchExport,
@@ -43,6 +44,10 @@ export type DispatchOptions = {
    * e.g. assignment transmit after allocate.
    */
   updateState?: boolean;
+  /** Limit dispatch to these target ids (outbox worker). */
+  targetIds?: string[];
+  /** When true, do not enqueue failures into DispatchOutbox (outbox worker). */
+  skipOutboxEnqueue?: boolean;
 };
 
 export function createDispatchService(registry: Map<string, DispatchAdapter> = buildRegistry()) {
@@ -64,6 +69,7 @@ export function createDispatchService(registry: Map<string, DispatchAdapter> = b
           tenantId,
           enabled: true,
           executorOrgId: options.executorOrgId,
+          ...(options.targetIds?.length ? { id: { in: options.targetIds } } : {}),
         },
       });
 
@@ -118,6 +124,7 @@ export function createDispatchService(registry: Map<string, DispatchAdapter> = b
 
         await prisma.dispatchRecord.create({
           data: {
+            tenantId,
             serviceRequestId: request.id,
             targetId: target.id,
             target: `${target.type}:${target.name}`,
@@ -129,6 +136,17 @@ export function createDispatchService(registry: Map<string, DispatchAdapter> = b
             correlationId,
           },
         });
+
+        if (!result.success && !options.skipOutboxEnqueue) {
+          await enqueueDispatchFailure({
+            tenantId,
+            serviceRequestId: request.id,
+            targetId: target.id,
+            correlationId,
+            error: result.error,
+          });
+        }
+
         logger.info("dispatch.result", {
           correlationId,
           target: target.type,
@@ -144,6 +162,7 @@ export function createDispatchService(registry: Map<string, DispatchAdapter> = b
           prisma.serviceRequest.update({ where: { id: request.id }, data: { state: "transmitted" } }),
           prisma.statusEvent.create({
             data: {
+              tenantId,
               serviceRequestId: request.id,
               state: "transmitted",
               source: "devicecare",

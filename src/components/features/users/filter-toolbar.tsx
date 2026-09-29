@@ -32,6 +32,7 @@ export function UsersFilterToolbar({
   const statusOptions = useMemo(
     () => [
       { value: "active", label: t("active"), colorCode: "#2fd98a" },
+      { value: "invited", label: "Invited", colorCode: "#e2b04a" },
       { value: "inactive", label: t("inactive"), colorCode: "#ff3366" },
     ],
     [t],

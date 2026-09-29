@@ -26,8 +26,27 @@ export const env = {
       return str("SESSION_SECRET", "insecure-dev-session-secret");
     },
   },
+  /** Shared secret for cron job routes (`Authorization: Bearer …`). Required in production. */
+  cron: {
+    get secret() {
+      return str("CRON_SECRET");
+    },
+    get configured() {
+      return Boolean(this.secret);
+    },
+  },
+  auth: {
+    /** Failed password attempts before lockout. */
+    get maxFailedLogins() {
+      return int("AUTH_MAX_FAILED_LOGINS", 5);
+    },
+    /** Lockout duration in minutes after threshold. */
+    get lockoutMinutes() {
+      return int("AUTH_LOCKOUT_MINUTES", 15);
+    },
+  },
   totp: {
-    /** AES-256 key material for encrypting TOTP secrets (falls back to SESSION_SECRET). */
+    /** AES-256 key material for encrypting TOTP / OXID secrets (falls back to SESSION_SECRET). */
     get encryptionKey() {
       return str("TOTP_ENCRYPTION_KEY", str("SESSION_SECRET", "insecure-dev-session-secret"));
     },
@@ -90,8 +109,8 @@ export const env = {
     },
   },
   /**
-   * Optional platform-wide SMTP fallback when a mail DispatchTarget has no auth JSON.
-   * Prefer per-tenant settings on DispatchTarget.auth.
+   * Optional platform-wide SMTP fallback when owner SmtpSettings (and mail
+   * DispatchTarget.auth) are unset. Prefer Settings → SMTP per clinic / org.
    */
   smtp: {
     get host() {

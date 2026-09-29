@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { serviceRequestService } from "@/services/requests/serviceRequestService";
 
@@ -9,13 +9,15 @@ export async function POST(req: Request, ctx: RouteContext) {
   let correlationId: string | undefined;
   try {
     const auth = await requireTenantContext(req);
-    correlationId = auth.correlationId;
-    const { reference } = await ctx.params;
-    const request = await serviceRequestService.transmit(reference, auth);
-    return Response.json(
-      { request },
-      { headers: { "x-correlation-id": auth.correlationId } },
-    );
+    return await withTenantStore(auth, async () => {
+      correlationId = auth.correlationId;
+      const { reference } = await ctx.params;
+      const request = await serviceRequestService.transmit(reference, auth);
+      return Response.json(
+        { request },
+        { headers: { "x-correlation-id": auth.correlationId } },
+      );
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

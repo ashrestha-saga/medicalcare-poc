@@ -12,6 +12,7 @@ import {
 import type { CapabilitiesResponse, PermissionSlug } from "@/interfaces/permissions";
 import { canAccessPath, resolvePathPermission } from "@/constants/permissions";
 import { api } from "@/lib/http/apiClient";
+import { useActingTenantStore } from "@/store/actingTenantStore";
 
 interface PermissionContextValue {
   permissionsLoading: boolean;
@@ -28,6 +29,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
   const [permissionData, setPermissionData] = useState<CapabilitiesResponse | null>(null);
   const [permissionsLoading, setPermissionsLoading] = useState(true);
   const [tick, setTick] = useState(0);
+  const actingTenantId = useActingTenantStore((s) => s.tenantId);
 
   useEffect(() => {
     let cancelled = false;
@@ -47,7 +49,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [tick]);
+  }, [tick, actingTenantId]);
 
   const slugSet = useMemo(() => new Set(permissionData?.permissions ?? []), [permissionData]);
 

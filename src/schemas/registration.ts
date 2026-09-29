@@ -24,6 +24,17 @@ const draftIdentityFields = {
   room: z.string().trim().max(128).nullable().optional(),
   productKindCode: z.string().trim().max(64).nullable().optional(),
   characteristics: z.record(z.string(), z.unknown()).optional(),
+  keepDraft: z.boolean().optional(),
+  clarifications: z
+    .array(
+      z.object({
+        kind: z.string().trim().min(1),
+        field: z.string().trim().nullable().optional(),
+        prerequisiteCode: z.string().trim().nullable().optional(),
+        label: z.string().trim().min(1).max(500),
+      }),
+    )
+    .optional(),
 };
 
 export const createRegistrationDraftSchema = z.object(draftIdentityFields);
@@ -42,11 +53,22 @@ export const updateRegistrationDraftSchema = z.object({
   room: z.string().trim().max(128).nullable().optional(),
   productKindCode: z.string().trim().max(64).nullable().optional(),
   characteristics: z.record(z.string(), z.unknown()).optional(),
+  keepDraft: z.boolean().optional(),
+  clarifications: z
+    .array(
+      z.object({
+        kind: z.string().trim().min(1),
+        field: z.string().trim().nullable().optional(),
+        prerequisiteCode: z.string().trim().nullable().optional(),
+        label: z.string().trim().min(1).max(500),
+      }),
+    )
+    .optional(),
 });
 
 export const releaseRegistrationDraftSchema = z.object({
   checks: z.record(z.string(), z.boolean()).default({}),
-  classificationConfidence: z.enum(["verified", "derived", "guess"]).optional(),
+  classificationConfidence: z.enum(["verified", "responsible", "derived", "guess"]).optional(),
   evidenceText: z.string().trim().max(2000).nullable().optional(),
 });
 
@@ -71,7 +93,7 @@ export const commitRegistrationSchema = z.object({
     })
     .passthrough(),
   checks: z.record(z.string(), z.boolean()).default({}),
-  classificationConfidence: z.enum(["verified", "derived", "guess"]).optional(),
+  classificationConfidence: z.enum(["verified", "responsible", "derived", "guess"]).optional(),
   evidenceText: z.string().trim().max(2000).nullable().optional(),
 });
 
@@ -92,7 +114,7 @@ export const reclassifyApplySchema = z.object({
     .passthrough(),
   checks: z.record(z.string(), z.boolean()).default({}),
   acknowledgeImpact: z.literal(true),
-  classificationConfidence: z.enum(["verified", "derived", "guess"]).optional(),
+  classificationConfidence: z.enum(["verified", "responsible", "derived", "guess"]).optional(),
   evidenceText: z.string().trim().max(2000).nullable().optional(),
 });
 

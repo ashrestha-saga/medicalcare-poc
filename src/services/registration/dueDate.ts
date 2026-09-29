@@ -11,7 +11,9 @@ export type DeadlineAnchor =
   | "event"
   | "interval"
   | "process"
-  | "permanent";
+  | "permanent"
+  | "reference"
+  | "none";
 
 export function intervalUnitFromEinheits(einheit: string | null | undefined): "months" | "years" | null {
   if (einheit === "Monate" || einheit === "months") return "months";
@@ -25,6 +27,7 @@ export function dueDate(
   intervalValue: number | null | undefined,
   intervalUnit: string | null | undefined,
 ): Date | null {
+  if (anchor === "none" || anchor === "reference") return null;
   if (intervalValue == null || !intervalUnit) return null;
   if (anchor === "event" || anchor === "process" || anchor === "permanent" || anchor === "interval") {
     return null;

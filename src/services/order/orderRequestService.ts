@@ -1,6 +1,8 @@
 import { Prisma } from "@prisma/client";
-import type { CreateOrderRequestResult, OrderRequestDTO, TenantContext } from "@/interfaces";
+import type { CreateOrderRequestResult, OrderRequestDTO, TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { recordAudit } from "@/services/audit/auditService";
 import { fingerprint, newReference } from "@/lib/crypto";
 import { conflict, unprocessable } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -27,7 +29,7 @@ export function orderFingerprint(input: CreateOrderRequestInput): string {
 }
 
 export const orderRequestService = {
-  async create(input: CreateOrderRequestInput, ctx: TenantContext): Promise<CreateOrderRequestResult> {
+  async create(input: CreateOrderRequestInput, ctx: TenantWorkContext): Promise<CreateOrderRequestResult> {
     requirePermission(ctx, "parts:request");
     const { tenantId, correlationId } = ctx;
     if (!input.deliveryAddress.trim()) throw unprocessable("Please enter the delivery address.", { field: "deliveryAddress" });
@@ -66,6 +68,7 @@ export const orderRequestService = {
             correlationId,
             items: {
               create: input.items.map((i) => ({
+                tenantId,
                 articleId: i.articleId ?? null,
                 articleNumber: i.articleNumber,
                 description: i.description,
@@ -86,7 +89,17 @@ export const orderRequestService = {
         throw error;
       });
 
-    if (outcome.created) logger.info("order_request.created", { correlationId, reference: outcome.row.reference, tenantId });
+    if (outcome.created) {
+      logger.info("order_request.created", { correlationId, reference: outcome.row.reference, tenantId });
+      await recordAudit({
+        actor: actorFromContext(ctx),
+        resource: "order",
+        resourceId: outcome.row.id,
+        action: "create",
+        summary: `Created order request ${outcome.row.reference}`,
+        after: { reference: outcome.row.reference, itemCount: outcome.row.items.length },
+      });
+    }
     return { order: toOrderRequestDTO(outcome.row), created: outcome.created };
   },
 

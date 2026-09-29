@@ -1,19 +1,13 @@
 import nodemailer from "nodemailer";
-import type { DispatchAdapter, DispatchResult, DispatchTargetDTO } from "@/interfaces";
-import { env } from "@/lib/env";
+import type { DispatchAdapter, DispatchResult } from "@/interfaces";
 import { errorMessage, logger } from "@/lib/logger";
-import { parseSmtpAuth, type SmtpAuthConfig } from "@/lib/smtp";
 import { loadMailAttachments } from "@/services/dispatch/mailAttachments";
-
-function resolveSmtp(target: DispatchTargetDTO): SmtpAuthConfig | null {
-  return parseSmtpAuth(target.auth) ?? env.smtp.asAuth;
-}
+import { resolveSmtp } from "@/services/mail/resolveSmtp";
 
 /**
  * Mail dispatch target.
- * Uses per-tenant SMTP from DispatchTarget.auth when present, else env SMTP_*.
- * Recipient (An:) is target.endpoint. Subject/body come from the formatted export.
- * Photos from the service request are attached when present.
+ * SMTP: DispatchTarget.auth → SmtpSettings(tenant) → platform env.
+ * Recipient (An:) is target.endpoint.
  */
 export const mailDispatchAdapter: DispatchAdapter = {
   type: "mail",
@@ -23,7 +17,8 @@ export const mailDispatchAdapter: DispatchAdapter = {
       return { success: false, error: "mail target has no recipient" };
     }
     const { subject, body, html } = payload.email;
-    const smtp = resolveSmtp(target);
+    const resolved = await resolveSmtp({ tenantId: payload.tenantId }, target.auth);
+    const smtp = resolved.config;
     const attachments = await loadMailAttachments(payload.request.id, payload.tenantId);
     const text =
       attachments.length > 0
@@ -37,17 +32,19 @@ export const mailDispatchAdapter: DispatchAdapter = {
           )
         : html;
 
+    const simulated = !smtp;
     logger.info("dispatch.mail", {
       correlationId: payload.correlationId,
       to,
       subject,
       reference: payload.request.reference,
       smtpHost: smtp?.host ?? null,
+      smtpSource: resolved.source,
       attachmentCount: attachments.length,
-      simulated: !smtp || env.smtp.disabled,
+      simulated,
     });
 
-    if (!smtp || env.smtp.disabled) {
+    if (simulated) {
       return {
         success: true,
         response: {
@@ -57,7 +54,12 @@ export const mailDispatchAdapter: DispatchAdapter = {
           html: htmlWithPhotos,
           attachmentCount: attachments.length,
           simulated: true,
-          reason: !smtp ? "no_smtp_config" : "smtp_disabled",
+          source: resolved.source,
+          reason: resolved.forcedSimulate
+            ? "smtp_disabled"
+            : resolved.source === "none"
+              ? "no_smtp_config"
+              : "simulated",
         },
       };
     }
@@ -86,6 +88,7 @@ export const mailDispatchAdapter: DispatchAdapter = {
           messageId: info.messageId ?? null,
           attachmentCount: attachments.length,
           simulated: false,
+          source: resolved.source,
         },
       };
     } catch (error) {

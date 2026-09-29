@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { updateDeviceSchema } from "@/schemas/device";
 import { deviceInventoryService } from "@/services/inventory/deviceInventoryService";
@@ -10,10 +10,12 @@ export async function GET(req: Request, ctx: RouteContext) {
   let correlationId: string | undefined;
   try {
     const auth = await requireTenantContext(req);
-    correlationId = auth.correlationId;
-    const { id } = await ctx.params;
-    const device = await deviceInventoryService.get(auth, id);
-    return Response.json({ device }, { headers: { "x-correlation-id": auth.correlationId } });
+    return await withTenantStore(auth, async () => {
+      correlationId = auth.correlationId;
+      const { id } = await ctx.params;
+      const device = await deviceInventoryService.get(auth, id);
+      return Response.json({ device }, { headers: { "x-correlation-id": auth.correlationId } });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }
@@ -24,11 +26,13 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   let correlationId: string | undefined;
   try {
     const auth = await requireTenantContext(req);
-    correlationId = auth.correlationId;
-    const { id } = await ctx.params;
-    const input = updateDeviceSchema.parse(await req.json());
-    const device = await deviceInventoryService.update(auth, id, input);
-    return Response.json({ device }, { headers: { "x-correlation-id": auth.correlationId } });
+    return await withTenantStore(auth, async () => {
+      correlationId = auth.correlationId;
+      const { id } = await ctx.params;
+      const input = updateDeviceSchema.parse(await req.json());
+      const device = await deviceInventoryService.update(auth, id, input);
+      return Response.json({ device }, { headers: { "x-correlation-id": auth.correlationId } });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

@@ -8,6 +8,7 @@ import { formatDateTime } from "@/lib/format";
 import type { AppLocale } from "@/lib/locale";
 import { LanguagePanel } from "./LanguagePanel";
 import { ThemeAppearancePanel } from "./ThemeAppearancePanel";
+import { SmtpSettingsPanel } from "./SmtpSettingsPanel";
 
 export function SettingsScreen() {
   const t = useTranslations("settings");
@@ -33,6 +34,7 @@ export function SettingsScreen() {
           <div className="p-settings__body">
             <LanguagePanel />
             <ThemeAppearancePanel />
+            <SmtpSettingsPanel />
 
             <section className="p-settings__panel">
               <p className="p-sec-title">{t("oxidTitle")}</p>

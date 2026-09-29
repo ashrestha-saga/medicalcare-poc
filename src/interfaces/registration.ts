@@ -62,7 +62,14 @@ export interface RegistrationAnnex2Ref {
 export interface RegistrationRefBundle {
   annex2: RegistrationAnnex2Ref[];
   constancy: { code: string; label: string; defaultCadence: string }[];
-  reprocessing: { code: string; label: string; requiresQmsCert: boolean; note: string | null }[];
+  reprocessing: {
+    code: string;
+    label: string;
+    requiresQmsCert: boolean;
+    requiresValidatedProcess?: boolean;
+    evidence?: string | null;
+    note: string | null;
+  }[];
   equipment: {
     code: string;
     label: string;
@@ -79,6 +86,8 @@ export interface RegistrationRefBundle {
     label: string;
     defaultAuthorisation: string;
     medicalBoardNote: string | null;
+    qualityGuideline?: string | null;
+    expertInspectionApplies?: boolean;
   }[];
   zubehoerTemplates: { t: string; klasse: string }[];
 }
@@ -97,6 +106,19 @@ export interface RegistrationDraftDTO {
   room: string | null;
   purchaseYear: number | null;
   model: { tradeName: string | null; manufacturer: string | null; modelName: string | null } | null;
+  /** C4 — model-owned Merkmale from open classification. */
+  modelClassificationPrefill?: RegistrationCharacteristics | null;
+  modelClassificationConfidence?: string | null;
+  modelClassificationFieldStates?: Record<string, string> | null;
+  openClarifications?: {
+    id: string;
+    kind: string;
+    field: string | null;
+    prerequisiteCode: string | null;
+    label: string;
+    deferredBy: string;
+    deferredAt: string;
+  }[];
 }
 
 export interface RegistrationScreenProps {

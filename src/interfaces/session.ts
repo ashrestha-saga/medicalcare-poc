@@ -1,4 +1,6 @@
+import type { ActorContext, RequestMeta } from "./audit";
 import type { PartnerAppRole } from "./management";
+import type { PermissionSlug } from "./permissions";
 
 export type UserRole = "superadmin" | "device_admin" | "security_officer" | "user";
 
@@ -38,18 +40,35 @@ export type PartnerSessionUser = SessionUser & {
   appRole: PartnerAppRole | string;
 };
 
+/** Shared tenant-scoped work (clinic session or partner-on-tenant). */
+export interface ActingContext {
+  tenantId: string;
+  user: ClinicSessionUser | PartnerSessionUser;
+  correlationId: string;
+  requestMeta?: RequestMeta;
+  permissions: readonly PermissionSlug[];
+  actor: ActorContext;
+}
+
 /** Resolved on the server from the signed session cookie — never from the request body. */
 export interface TenantContext {
   tenantId: string;
   user: ClinicSessionUser;
   correlationId: string;
+  requestMeta?: RequestMeta;
+  permissions?: readonly PermissionSlug[];
+  actor?: ActorContext;
 }
+
+/** Clinic reserved routes stay TenantContext; shared services accept either door. */
+export type TenantWorkContext = ActingContext | TenantContext;
 
 /** Partner session scope — organisation, not clinic tenant. */
 export interface PartnerContext {
   organisationId: string;
   user: PartnerSessionUser;
   correlationId: string;
+  requestMeta?: RequestMeta;
 }
 
 export function isClinicSession(user: SessionUser | null | undefined): user is ClinicSessionUser {

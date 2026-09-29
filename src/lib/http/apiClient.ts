@@ -1,4 +1,5 @@
-import { CORRELATION_HEADER } from "@/constants/session";
+import { ACTING_TENANT_HEADER, CORRELATION_HEADER } from "@/constants/session";
+import { useActingTenantStore } from "@/store/actingTenantStore";
 
 /**
  * Browser-side fetch helper. Adds the correlation id, parses the server's
@@ -34,6 +35,13 @@ export function newClientId(): string {
 export async function api<T>(path: string, init: RequestInit & { correlationId?: string } = {}): Promise<T> {
   const { correlationId, headers, ...rest } = init;
   const isFormData = typeof FormData !== "undefined" && rest.body instanceof FormData;
+  // Partner console must not send acting-tenant — capabilities/menu are console:*, not clinic.
+  const onPartnerConsole =
+    typeof window !== "undefined" && window.location.pathname.startsWith("/partner");
+  const actingTenantId =
+    typeof window !== "undefined" && !onPartnerConsole
+      ? useActingTenantStore.getState().tenantId
+      : null;
   let res: Response;
   try {
     res = await fetch(path, {
@@ -41,6 +49,7 @@ export async function api<T>(path: string, init: RequestInit & { correlationId?:
       headers: {
         ...(rest.body && !isFormData ? { "content-type": "application/json" } : {}),
         [CORRELATION_HEADER]: correlationId ?? newClientId(),
+        ...(actingTenantId ? { [ACTING_TENANT_HEADER]: actingTenantId } : {}),
         ...(headers ?? {}),
       },
     });

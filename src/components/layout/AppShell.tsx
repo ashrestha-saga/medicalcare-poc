@@ -10,6 +10,7 @@ import { useSessionStore } from "@/store/sessionStore";
 import { useSites } from "@/components/hooks/location/useSites";
 import { OfflineBar } from "@/components/ui/OfflineBar";
 import { LocaleToggle } from "@/components/features/shared/LocaleToggle";
+import { PartnerActingBar } from "@/components/layout/PartnerActingBar";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { api } from "@/lib/http/apiClient";
 import { useCapturerInventoryUi } from "@/store/capturerInventoryStore";
@@ -19,6 +20,7 @@ import {
   InventoryIcon,
   LocationsIcon,
   LogoutIcon,
+  ActivityIcon,
   ManagementIcon,
   MenuIcon,
   RegistrationIcon,
@@ -124,6 +126,7 @@ function NavIcon({ id }: { id: MenuModuleId }) {
   if (id === "locations") return <LocationsIcon />;
   if (id === "roles") return <RolesIcon />;
   if (id === "management") return <ManagementIcon />;
+  if (id === "activity") return <ActivityIcon />;
   if (id === "security") return <SecurityIcon />;
   if (id === "settings") return <SettingsIcon />;
   return <InventoryIcon />;
@@ -141,6 +144,7 @@ function isNavActive(id: MenuModuleId, pathname: string): boolean {
   if (id === "locations") return pathname.startsWith("/locations");
   if (id === "roles") return pathname.startsWith("/roles");
   if (id === "management") return pathname.startsWith("/management");
+  if (id === "activity") return pathname.startsWith("/activity");
   if (id === "security") return pathname.startsWith("/security");
   if (id === "settings") return pathname.startsWith("/settings");
   return false;
@@ -263,6 +267,7 @@ export function AppShell({
       )}
 
       <div className="p-screen-body">
+        <PartnerActingBar />
         <AccountBar
           subtitle={accountSubtitle}
           showLogout={!showNav}

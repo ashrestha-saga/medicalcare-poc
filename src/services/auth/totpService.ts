@@ -1,5 +1,7 @@
 import type { SessionUser, TenantContext } from "@/interfaces";
+import { actorFromTenant } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { recordAudit } from "@/services/audit/auditService";
 import {
   TOTP_CHALLENGE_TTL_SECONDS,
   TOTP_MAX_ATTEMPTS,
@@ -79,6 +81,25 @@ export const totpService = {
         data: { attempts: { increment: 1 } },
       });
       logger.warn("auth.2fa.fail", { userId: row.id, challengeId: challenge.id });
+      await recordAudit({
+        actor: {
+          tenantId: row.tenantId,
+          actorUserId: row.id,
+          actorKind: "clinic",
+          actorRole: row.role,
+          actorName: row.name,
+          organisationId: null,
+          organisationName: null,
+          serviceContractId: null,
+          correlationId: null,
+          ip: null,
+          userAgent: null,
+        },
+        resource: "session",
+        resourceId: row.id,
+        action: "login_failed",
+        summary: "Failed two-factor verification",
+      });
       throw unauthorized("Invalid authentication code.");
     }
 
@@ -169,6 +190,13 @@ export const totpService = {
       },
     });
     logger.info("auth.2fa.enabled", { userId: row.id });
+    await recordAudit({
+      actor: actorFromTenant(ctx),
+      resource: "user",
+      resourceId: row.id,
+      action: "enable_2fa",
+      summary: "Enabled two-factor authentication",
+    });
     return { backupCodes };
   },
 
@@ -220,6 +248,13 @@ export const totpService = {
     });
     await prisma.totpChallenge.deleteMany({ where: { userId: row.id } });
     logger.info("auth.2fa.disabled", { userId: row.id });
+    await recordAudit({
+      actor: actorFromTenant(ctx),
+      resource: "user",
+      resourceId: row.id,
+      action: "disable_2fa",
+      summary: "Disabled two-factor authentication",
+    });
   },
 
   /** Admin recovery — clears TOTP without code (users:resetpassword holders). */
@@ -241,5 +276,12 @@ export const totpService = {
     });
     await prisma.totpChallenge.deleteMany({ where: { userId: row.id } });
     logger.info("auth.2fa.admin_reset", { userId: row.id, actorId: ctx.user.id });
+    await recordAudit({
+      actor: actorFromTenant(ctx),
+      resource: "user",
+      resourceId: row.id,
+      action: "disable_2fa",
+      summary: "Admin reset two-factor authentication",
+    });
   },
 };

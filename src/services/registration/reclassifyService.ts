@@ -1,5 +1,7 @@
-import type { TenantContext } from "@/interfaces";
+import type { TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { recordAudit } from "@/services/audit/auditService";
 import { notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { computeNextMaintenanceDueAt } from "@/lib/maintenance/schedule";
@@ -110,12 +112,12 @@ export interface ReclassifyApplyInput {
   /** Admin must confirm model-wide impact. */
   acknowledgeImpact: boolean;
   /** Defaults to `verified` — the acknowledged apply is the Beleg. */
-  classificationConfidence?: "verified" | "derived" | "guess";
+  classificationConfidence?: "verified" | "responsible" | "derived" | "guess";
   evidenceText?: string | null;
 }
 
 export const reclassifyService = {
-  async getContext(ctx: TenantContext, modelId: string): Promise<ReclassifyContext> {
+  async getContext(ctx: TenantWorkContext, modelId: string): Promise<ReclassifyContext> {
     requirePermission(ctx, "catalog:update");
     const model = await prisma.deviceModel.findUnique({ where: { id: modelId } });
     if (!model) throw notFound("Model not found.");
@@ -172,7 +174,7 @@ export const reclassifyService = {
     };
   },
 
-  async derive(ctx: TenantContext, modelId: string, characteristics: RegistrationCharacteristics) {
+  async derive(ctx: TenantWorkContext, modelId: string, characteristics: RegistrationCharacteristics) {
     requirePermission(ctx, "catalog:update");
     const model = await prisma.deviceModel.findUnique({ where: { id: modelId } });
     if (!model) throw notFound("Model not found.");
@@ -222,7 +224,7 @@ export const reclassifyService = {
     return { duties, prerequisites, copyCount: instances, conflicts: [] as string[] };
   },
 
-  async apply(ctx: TenantContext, modelId: string, input: ReclassifyApplyInput) {
+  async apply(ctx: TenantWorkContext, modelId: string, input: ReclassifyApplyInput) {
     requirePermission(ctx, "catalog:update");
     if (!input.acknowledgeImpact) {
       throw unprocessable("Confirm that this change applies to all copies of the model.", {
@@ -295,12 +297,13 @@ export const reclassifyService = {
     const result = await prisma.$transaction(async (tx) => {
       await tx.deviceModelClassification.updateMany({
         where: { deviceModelId: modelId, validTo: null },
-        data: { validTo: now },
+        data: { validTo: now, openClassificationKey: null },
       });
 
       const classification = await tx.deviceModelClassification.create({
         data: {
           deviceModelId: modelId,
+          openClassificationKey: modelId,
           stk: Boolean(characteristics.anlage1 || characteristics.altgeraet),
           mtkItemId,
           radiation: Boolean(characteristics.strahlung),
@@ -430,6 +433,14 @@ export const reclassifyService = {
       };
     });
 
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "catalog_model",
+      resourceId: modelId,
+      action: "update",
+      summary: `Reclassified model (${result.updatedCopies} copies, ${result.reReleased} re-released)`,
+      after: { classificationId: result.classificationId, updatedCopies: result.updatedCopies },
+    });
     return {
       modelId,
       ...result,

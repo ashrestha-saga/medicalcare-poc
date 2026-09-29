@@ -30,6 +30,7 @@ describe("RBAC defaults & path guards", () => {
       "locations",
       "roles",
       "management",
+      "activity",
       "security",
       "settings",
     ]);
@@ -46,6 +47,8 @@ describe("RBAC defaults & path guards", () => {
     expect(hasPermission("device_admin", "duties:view")).toBe(true);
     expect(hasPermission("device_admin", "training:view")).toBe(true);
     expect(hasPermission("device_admin", "management:view")).toBe(true);
+    expect(hasPermission("device_admin", "audit:view")).toBe(true);
+    expect(hasPermission("device_admin", "audit:export")).toBe(false);
     expect(hasPermission("device_admin", "users:view")).toBe(false);
     expect(hasPermission("device_admin", "locations:view")).toBe(false);
     expect(hasPermission("device_admin", "roles:view")).toBe(false);
@@ -59,6 +62,7 @@ describe("RBAC defaults & path guards", () => {
       "clarifications",
       "requests",
       "management",
+      "activity",
       "security",
     ]);
   });
@@ -77,9 +81,11 @@ describe("RBAC defaults & path guards", () => {
     expect(hasPermission("user", "inventory:update")).toBe(false);
     expect(hasPermission("user", "requests:create")).toBe(true);
     expect(hasPermission("user", "account:security")).toBe(true);
+    expect(hasPermission("user", "audit:view")).toBe(false);
     expect(menuForRole("user")).toEqual([]);
 
     const granted = permissionsForRole("user");
+    expect(canAccessPath("/activity", granted)).toBe(false);
     expect(canAccessPath("/", granted)).toBe(true);
     expect(canAccessPath("/security", granted)).toBe(true);
     expect(canAccessPath("/requests", granted)).toBe(false);
@@ -115,6 +121,7 @@ describe("RBAC defaults & path guards", () => {
     expect(canAccessPath("/roles", staff)).toBe(false);
     expect(canAccessPath("/settings", staff)).toBe(false);
     expect(canAccessPath("/management", staff)).toBe(true);
+    expect(canAccessPath("/activity", staff)).toBe(true);
 
     const admin = permissionsForRole("superadmin");
     expect(canAccessPath("/users", admin)).toBe(true);
@@ -123,6 +130,7 @@ describe("RBAC defaults & path guards", () => {
     expect(canAccessPath("/settings", admin)).toBe(true);
     expect(canAccessPath("/due-dates", staff)).toBe(true);
     expect(canAccessPath("/management", admin)).toBe(true);
+    expect(canAccessPath("/activity", admin)).toBe(true);
   });
 
   it("resolveCapabilities mirrors seeded / default grants", async () => {
@@ -143,6 +151,9 @@ describe("RBAC defaults & path guards", () => {
     expect(adminCaps.permissions).toContain("roles:update");
     expect(adminCaps.permissions).toContain("duties:view");
     expect(adminCaps.permissions).toContain("management:view");
+    expect(adminCaps.permissions).toContain("audit:view");
+    expect(adminCaps.permissions).toContain("audit:export");
+    expect(adminCaps.menu.map((m) => m.id)).toContain("activity");
 
     const userCaps = await resolveCapabilities("user");
     expect(userCaps.menu).toEqual([]);

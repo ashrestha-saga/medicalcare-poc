@@ -1,11 +1,10 @@
 import * as XLSX from "xlsx";
-import { requirePermission, requireTenantContext } from "@/lib/auth/tenantContext";
+import { requirePermission, requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse, unprocessable } from "@/lib/errors";
 import {
   catalogModelSourceSchema,
   catalogModelStateSchema,
-  type UpdateCatalogModelInput,
-} from "@/schemas/catalogModel";
+  type UpdateCatalogModelInput } from "@/schemas/catalogModel";
 import { deviceModelCatalogService } from "@/services/catalog/deviceModelCatalogService";
 
 type RowPatch = UpdateCatalogModelInput & { _identity: boolean };
@@ -37,8 +36,7 @@ const HEADER_ALIASES: Record<string, keyof UpdateCatalogModelInput> = {
   gmdn_code: "gmdnCode",
   source: "source",
   state: "state",
-  status: "state",
-};
+  status: "state" };
 
 function normalizeHeader(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, " ");
@@ -106,37 +104,39 @@ export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    requirePermission(ctx, "catalog:update");
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      requirePermission(ctx, "catalog:update");
 
-    const form = await req.formData();
-    const file = form.get("file");
-    if (!(file instanceof File)) throw unprocessable("Expected multipart field `file`.");
+      const form = await req.formData();
+      const file = form.get("file");
+      if (!(file instanceof File)) throw unprocessable("Expected multipart field `file`.");
 
-    const name = file.name.toLowerCase();
-    if (!/\.(xlsx|xls|csv)$/.test(name)) {
-      throw unprocessable("Upload an Excel (.xlsx / .xls) or CSV file.");
-    }
+      const name = file.name.toLowerCase();
+      if (!/\.(xlsx|xls|csv)$/.test(name)) {
+        throw unprocessable("Upload an Excel (.xlsx / .xls) or CSV file.");
+      }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) throw unprocessable("Workbook has no sheets.");
-    const sheet = workbook.Sheets[sheetName];
-    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
-    if (!json.length) throw unprocessable("Sheet is empty.");
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const workbook = XLSX.read(buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) throw unprocessable("Workbook has no sheets.");
+      const sheet = workbook.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+      if (!json.length) throw unprocessable("Sheet is empty.");
 
-    const patches = json.map(mapRow).filter((r): r is RowPatch => Boolean(r));
-    if (!patches.length) {
-      throw unprocessable(
-        "No valid rows. Use headers like manufacturer, modelName, tradeName, basicUdiDi, udiDi, gtins, state.",
-      );
-    }
+      const patches = json.map(mapRow).filter((r): r is RowPatch => Boolean(r));
+      if (!patches.length) {
+        throw unprocessable(
+          "No valid rows. Use headers like manufacturer, modelName, tradeName, basicUdiDi, udiDi, gtins, state.",
+        );
+      }
 
-    const rows: UpdateCatalogModelInput[] = patches.map(({ _identity: _, ...patch }) => patch);
+      const rows: UpdateCatalogModelInput[] = patches.map(({ _identity: _, ...patch }) => patch);
 
-    const result = await deviceModelCatalogService.importRows(ctx, rows);
-    return Response.json({ result }, { headers: { "x-correlation-id": ctx.correlationId } });
+      const result = await deviceModelCatalogService.importRows(ctx, rows);
+      return Response.json({ result }, { headers: { "x-correlation-id": ctx.correlationId } });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

@@ -1,4 +1,4 @@
-import type { DueDateRowDTO, DueDatesBoardDTO, TenantContext } from "@/interfaces";
+import type { DueDateRowDTO, DueDatesBoardDTO, TenantWorkContext } from "@/interfaces";
 import { OPEN_REQUEST_STATES } from "@/constants/serviceRequest";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { notFound, unprocessable } from "@/lib/errors";
@@ -22,7 +22,7 @@ function deviceTitle(
 }
 
 export const dueDatesService = {
-  async listBoard(ctx: TenantContext): Promise<DueDatesBoardDTO> {
+  async listBoard(ctx: TenantWorkContext): Promise<DueDatesBoardDTO> {
     requirePermission(ctx, "duties:view");
 
     const rows = await prisma.deviceDuty.findMany({
@@ -133,7 +133,7 @@ export const dueDatesService = {
     return { summary, rows: mapped };
   },
 
-  async createAssignment(ctx: TenantContext, dutyId: string, input?: CreateDutyAssignmentInput) {
+  async createAssignment(ctx: TenantWorkContext, dutyId: string, input?: CreateDutyAssignmentInput) {
     requirePermission(ctx, "duties:view");
     requirePermission(ctx, "requests:create");
 

@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/Toaster";
 import { Loading } from "@/components/ui/Loading";
 import { PermissionProvider } from "@/lib/providers/PermissionProvider";
 import { useSessionStore } from "@/store/sessionStore";
+import { useActingTenantStore } from "@/store/actingTenantStore";
 import { PARTNER_HOME } from "@/constants/authRoutes";
 import { isPartnerSession } from "@/interfaces/session";
 
@@ -38,20 +39,38 @@ function useFormFactorState(): FormFactor {
   return form;
 }
 
+/** Partners may enter the clinic shell only while an acting tenant is set. */
 function BouncePartners({ children }: { children: ReactNode }) {
   const user = useSessionStore((s) => s.user);
   const status = useSessionStore((s) => s.status);
+  const actingTenantId = useActingTenantStore((s) => s.tenantId);
+  const hydrated = useActingTenantHydrated();
 
   useEffect(() => {
-    if (status === "signed-in" && isPartnerSession(user)) {
+    if (!hydrated) return;
+    if (status === "signed-in" && isPartnerSession(user) && !actingTenantId) {
       window.location.replace(PARTNER_HOME);
     }
-  }, [status, user]);
+  }, [status, user, actingTenantId, hydrated]);
 
-  if (status === "signed-in" && isPartnerSession(user)) {
+  if (!hydrated && status === "signed-in" && isPartnerSession(user)) {
+    return <Loading label="Restoring acting context…" />;
+  }
+
+  if (status === "signed-in" && isPartnerSession(user) && !actingTenantId) {
     return <Loading label="Opening partner portal…" />;
   }
   return <>{children}</>;
+}
+
+function useActingTenantHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(() => useActingTenantStore.persist.hasHydrated());
+  useEffect(() => {
+    const unsub = useActingTenantStore.persist.onFinishHydration(() => setHydrated(true));
+    setHydrated(useActingTenantStore.persist.hasHydrated());
+    return unsub;
+  }, []);
+  return hydrated;
 }
 
 function useAccountSubtitle(pathname: string): string | undefined {
@@ -64,6 +83,7 @@ function useAccountSubtitle(pathname: string): string | undefined {
   if (pathname.startsWith("/roles")) return t("subtitleRoles");
   if (pathname.startsWith("/settings")) return t("subtitleSettings");
   if (pathname.startsWith("/management")) return t("subtitleManagement");
+  if (pathname.startsWith("/activity")) return t("subtitleActivity");
   if (pathname.startsWith("/due-dates")) return t("subtitleDueDates");
   if (pathname.startsWith("/training")) return t("subtitleTraining");
   if (pathname.startsWith("/registration")) return t("subtitleRegistration");

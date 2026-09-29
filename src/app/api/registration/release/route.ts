@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { commitRegistrationSchema } from "@/schemas/registration";
 import { releaseService } from "@/services/registration/releaseService";
@@ -9,13 +9,14 @@ export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
     const session = await requireTenantContext(req);
-    correlationId = session.correlationId;
-    const input = commitRegistrationSchema.parse(await req.json());
-    const result = await releaseService.commit(session, {
-      ...input,
-      characteristics: input.characteristics as RegistrationCharacteristics,
+    return await withTenantStore(session, async () => {
+      correlationId = session.correlationId;
+      const input = commitRegistrationSchema.parse(await req.json());
+      const result = await releaseService.commit(session, {
+        ...input,
+        characteristics: input.characteristics as RegistrationCharacteristics });
+      return Response.json({ result }, { headers: { "x-correlation-id": session.correlationId } });
     });
-    return Response.json({ result }, { headers: { "x-correlation-id": session.correlationId } });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

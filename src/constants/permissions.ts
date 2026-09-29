@@ -20,6 +20,7 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "account:security",
   "settings:view",
   "settings:oxid",
+  "settings:smtp",
   "users:view",
   "users:create",
   "users:update",
@@ -33,6 +34,8 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "roles:update",
   "management:view",
   "training:view",
+  "audit:view",
+  "audit:export",
 ] as const;
 
 /** Staff who manage the service queue — includes the nav rail. */
@@ -62,7 +65,13 @@ const SERVICE_STAFF: readonly PermissionSlug[] = [
  */
 export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
   superadmin: ALL_PERMISSIONS,
-  device_admin: [...SERVICE_STAFF, "inventory:update", "catalog:update", "clarifications:view"],
+  device_admin: [
+    ...SERVICE_STAFF,
+    "inventory:update",
+    "catalog:update",
+    "clarifications:view",
+    "audit:view",
+  ],
   security_officer: [...SERVICE_STAFF, "requests:view-all"],
   // No shell:nav → Inventory-only chrome; /requests is blocked by RouteGuard.
   // /security is allowed without shell:nav (see canAccessPath).
@@ -79,6 +88,98 @@ export const SUPERADMIN_LOCKED_PERMISSIONS: readonly PermissionSlug[] = [
   "account:security",
 ] as const;
 
+/** Grouped permission catalog for the user create/edit matrix (mockup-aligned). */
+export const PERMISSION_GROUPS: readonly {
+  label: string;
+  critical?: boolean;
+  items: readonly { slug: PermissionSlug; description: string }[];
+}[] = [
+  {
+    label: "Account and navigation",
+    items: [
+      { slug: "account:security", description: "Own security settings, password and second factor" },
+      { slug: "shell:nav", description: "Access to the application and its navigation" },
+    ],
+  },
+  {
+    label: "Inventory",
+    items: [
+      { slug: "inventory:view", description: "View device inventory" },
+      { slug: "inventory:update", description: "Change and release device records" },
+      { slug: "clarifications:view", description: "View clarifications list" },
+      { slug: "duties:view", description: "View duties and due dates" },
+    ],
+  },
+  {
+    label: "Model catalog",
+    items: [
+      { slug: "catalog:view", description: "View model catalog" },
+      { slug: "catalog:update", description: "Maintain models and classifications" },
+    ],
+  },
+  {
+    label: "Locations",
+    items: [
+      { slug: "locations:view", description: "View sites and areas" },
+      { slug: "locations:create", description: "Create sites" },
+      { slug: "locations:update", description: "Update sites, headcount and officers" },
+      { slug: "locations:delete", description: "Remove sites" },
+    ],
+  },
+  {
+    label: "Requests and orders",
+    items: [
+      { slug: "requests:create", description: "Create service requests" },
+      { slug: "requests:view-mine", description: "View own requests" },
+      { slug: "requests:view-open", description: "View open facility requests" },
+      { slug: "requests:view-all", description: "View all requests, including closed" },
+      { slug: "requests:transition", description: "Transmit and advance request state" },
+      { slug: "parts:request", description: "Request spare parts" },
+    ],
+  },
+  {
+    label: "Training and management",
+    items: [
+      { slug: "training:view", description: "View training and instruction records" },
+      { slug: "management:view", description: "Management reports and overview" },
+    ],
+  },
+  {
+    label: "Users and roles",
+    critical: true,
+    items: [
+      { slug: "users:view", description: "View users" },
+      { slug: "users:create", description: "Create and invite users" },
+      { slug: "users:update", description: "Update users, role and permissions" },
+      { slug: "users:resetpassword", description: "Send password reset email" },
+      { slug: "users:delete", description: "Remove users" },
+      { slug: "roles:view", description: "View role catalog" },
+      { slug: "roles:update", description: "Change roles and their presets" },
+    ],
+  },
+  {
+    label: "Settings",
+    critical: true,
+    items: [
+      { slug: "settings:view", description: "View settings" },
+      { slug: "settings:oxid", description: "Configure shop interface" },
+      { slug: "settings:smtp", description: "Configure outbound SMTP for invitations and mail" },
+    ],
+  },
+  {
+    label: "Audit",
+    critical: true,
+    items: [
+      { slug: "audit:view", description: "View activity and audit trail" },
+      { slug: "audit:export", description: "Export audit events" },
+    ],
+  },
+] as const;
+
+export const CRITICAL_PERMISSIONS: ReadonlySet<PermissionSlug> = new Set(
+  PERMISSION_GROUPS.filter((g) => g.critical).flatMap((g) => g.items.map((i) => i.slug)),
+);
+
 /** Sidebar modules. Visibility = `shell:nav` + module slug. */
 export const MENU_MODULES: readonly MenuModule[] = [
   { id: "inventory", label: "Inventory", href: "/devices", slug: "inventory:view" },
@@ -92,6 +193,7 @@ export const MENU_MODULES: readonly MenuModule[] = [
   { id: "locations", label: "Locations", href: "/locations", slug: "locations:view" },
   { id: "roles", label: "Roles", href: "/roles", slug: "roles:view" },
   { id: "management", label: "Management", href: "/management", slug: "management:view" },
+  { id: "activity", label: "Activity", href: "/activity", slug: "audit:view" },
   { id: "security", label: "Security", href: "/security", slug: "account:security" },
   { id: "settings", label: "Settings", href: "/settings", slug: "settings:view" },
 ];
@@ -110,6 +212,7 @@ export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/locations": "locations:view",
   "/roles": "roles:view",
   "/management": "management:view",
+  "/activity": "audit:view",
   "/security": "account:security",
   "/settings": "settings:view",
 };
@@ -158,6 +261,7 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   if (pathname.startsWith("/locations")) return "locations:view";
   if (pathname.startsWith("/roles")) return "roles:view";
   if (pathname.startsWith("/management")) return "management:view";
+  if (pathname.startsWith("/activity")) return "audit:view";
   if (pathname.startsWith("/security")) return "account:security";
   if (pathname.startsWith("/settings")) return "settings:view";
   return null;

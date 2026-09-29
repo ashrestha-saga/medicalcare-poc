@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { AdminUserDTO } from "@/interfaces";
@@ -9,11 +10,8 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
 import { useUsersList } from "@/components/hooks/users/useUsersList";
 import { useUsersColumns } from "@/components/hooks/users/useUsersColumns";
-import { useResetPasswordForm, useUserForm } from "@/components/hooks/users/useUserForm";
 import { toast } from "@/store/toastStore";
 import { UsersFilterToolbar } from "../filter-toolbar";
-import { UserFormModal } from "../UserFormModal";
-import { ResetPasswordModal } from "../ResetPasswordModal";
 import { DeleteUserDialog } from "../DeleteUserDialog";
 
 type ListApi = ReturnType<typeof useUsersList>;
@@ -24,8 +22,6 @@ interface UsersTableProps {
 
 export function UsersTable({ list }: UsersTableProps) {
   const tFilters = useTranslations("filters");
-  const form = useUserForm(() => void list.refresh());
-  const reset = useResetPasswordForm(() => undefined);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [roleFilter, setRoleFilter] = useState<string[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<string[] | null>(null);
@@ -59,7 +55,7 @@ export function UsersTable({ list }: UsersTableProps) {
   }, [list]);
 
   const confirmDelete = useCallback(async () => {
-    if (!pendingDelete) return;
+    if (!pendingDelete || pendingDelete.status === "invited") return;
     setDeleting(true);
     try {
       await list.remove(pendingDelete.id);
@@ -75,18 +71,10 @@ export function UsersTable({ list }: UsersTableProps) {
     () => ({
       canUpdate: list.canUpdate,
       canDelete: list.canDelete,
-      canResetPassword: list.canResetPassword,
-      onEdit: form.openEdit,
-      onResetPassword: reset.openFor,
+      canCreate: list.canCreate,
       onDelete: setPendingDelete,
     }),
-    [
-      list.canUpdate,
-      list.canDelete,
-      list.canResetPassword,
-      form.openEdit,
-      reset.openFor,
-    ],
+    [list.canUpdate, list.canDelete, list.canCreate],
   );
 
   const columns = useUsersColumns(columnActions);
@@ -95,7 +83,7 @@ export function UsersTable({ list }: UsersTableProps) {
     return list.users.filter((u) => {
       if (roleFilter?.length && !roleFilter.includes(u.role)) return false;
       if (statusFilter?.length) {
-        const status = u.active ? "active" : "inactive";
+        const status = u.status ?? (u.active ? "active" : "inactive");
         if (!statusFilter.includes(status)) return false;
       }
       return true;
@@ -132,23 +120,17 @@ export function UsersTable({ list }: UsersTableProps) {
           searchPlaceholder={tFilters("searchUsers")}
           toolbarTrailing={
             list.canCreate ? (
-              <Button
-                type="button"
-                size="sm"
-                className="h-8"
-                onClick={form.openCreate}
-                data-testid="users-add"
-              >
-                <Plus className="h-4 w-4" />
-                Add user
+              <Button type="button" size="sm" className="h-8" asChild data-testid="users-add">
+                <Link href="/users/new">
+                  <Plus className="h-4 w-4" />
+                  Invite user
+                </Link>
               </Button>
             ) : null
           }
         />
       </div>
 
-      <UserFormModal form={form} />
-      <ResetPasswordModal form={reset} />
       <DeleteUserDialog
         user={pendingDelete}
         busy={deleting}

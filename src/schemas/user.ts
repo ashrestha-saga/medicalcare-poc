@@ -26,21 +26,11 @@ export const updateUserSchema = z.object({
   name: z.string().trim().min(1, "Please enter a name.").max(120),
   role: userRoleSchema,
   active: z.boolean(),
+  /** When set, replaces UserPermission rows. Omit to leave grants unchanged. Empty/equal-to-preset clears to pure role. */
+  permissions: z.array(z.string()).optional(),
 });
-
-export const resetUserPasswordSchema = z
-  .object({
-    adminPassword: z.string().min(1, "Enter your admin password."),
-    newPassword: passwordSchema,
-    confirmPassword: z.string().min(1, "Please confirm the new password."),
-  })
-  .refine((v) => v.newPassword === v.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
-export type ResetUserPasswordInput = z.infer<typeof resetUserPasswordSchema>;
 
 export type AssignableRole = UserRole;

@@ -12,7 +12,6 @@ export function useUsersList() {
   const canCreate = checkPermission("users:create");
   const canUpdate = checkPermission("users:update");
   const canDelete = checkPermission("users:delete");
-  const canResetPassword = checkPermission("users:resetpassword");
 
   const [users, setUsers] = useState<AdminUserDTO[]>([]);
   const [q, setQ] = useState("");
@@ -63,6 +62,5 @@ export function useUsersList() {
     canCreate,
     canUpdate,
     canDelete,
-    canResetPassword,
   };
 }

@@ -383,6 +383,8 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                     <p className="text-xs text-muted-foreground">
                       {formatWhen(event.at)}
                       {event.actor ? ` · ${event.actor}` : ""}
+                      {event.actorKind ? ` · ${event.actorKind}` : ""}
+                      {event.organisationName ? ` · ${event.organisationName}` : ""}
                     </p>
                   </li>
                 ))}

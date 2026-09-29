@@ -1,5 +1,7 @@
-import type { TenantContext } from "@/interfaces";
+import type { TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { changedFields, recordAudit } from "@/services/audit/auditService";
 import { conflict, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { allocateInventoryNumber } from "@/services/inventory/deviceInventoryService";
@@ -25,6 +27,15 @@ export interface DraftIdentityInput {
 export interface CreateDraftInput extends DraftIdentityInput {
   productKindCode?: string | null;
   characteristics?: RegistrationCharacteristics | null;
+  /** C3 — keep state=draft when deferring incomplete fields. */
+  keepDraft?: boolean;
+  /** C3 — open clarifications to persist with the draft. */
+  clarifications?: {
+    kind: string;
+    field?: string | null;
+    prerequisiteCode?: string | null;
+    label: string;
+  }[];
 }
 
 function parseCharacteristics(raw: string | null | undefined): RegistrationCharacteristics {
@@ -37,7 +48,7 @@ function parseCharacteristics(raw: string | null | undefined): RegistrationChara
 }
 
 export const draftService = {
-  async create(ctx: TenantContext, input: CreateDraftInput) {
+  async create(ctx: TenantWorkContext, input: CreateDraftInput) {
     requirePermission(ctx, "inventory:update");
     const tenantId = ctx.tenantId;
 
@@ -118,6 +129,23 @@ export const draftService = {
       },
     });
 
+    if (input.clarifications?.length) {
+      for (const c of input.clarifications) {
+        await prisma.deviceClarification.create({
+          data: {
+            tenantId,
+            deviceInstanceId: row.id,
+            kind: c.kind,
+            field: c.field ?? null,
+            prerequisiteCode: c.prerequisiteCode ?? null,
+            label: c.label,
+            deferredBy: ctx.user.name,
+            deferredAt: new Date(),
+          },
+        });
+      }
+    }
+
     await prisma.deviceUnitEvent.create({
       data: {
         tenantId,
@@ -129,10 +157,18 @@ export const draftService = {
       },
     });
 
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "device",
+      resourceId: row.id,
+      action: "create",
+      summary: `Created registration draft ${row.inventoryNumber}`,
+      after: { inventoryNumber: row.inventoryNumber, state: row.state },
+    });
     return { id: row.id, inventoryNumber: row.inventoryNumber, state: row.state };
   },
 
-  async update(ctx: TenantContext, id: string, input: CreateDraftInput) {
+  async update(ctx: TenantWorkContext, id: string, input: CreateDraftInput) {
     requirePermission(ctx, "inventory:update");
     const row = await prisma.deviceInstance.findFirst({
       where: { id, tenantId: ctx.tenantId },
@@ -211,9 +247,26 @@ export const draftService = {
               ? new Date(Date.UTC(input.purchaseYear, 0, 1))
               : null
             : undefined,
-        state: "review",
+        state: input.keepDraft ? "draft" : "review",
       },
     });
+
+    if (input.clarifications?.length) {
+      for (const c of input.clarifications) {
+        await prisma.deviceClarification.create({
+          data: {
+            tenantId: ctx.tenantId,
+            deviceInstanceId: updated.id,
+            kind: c.kind,
+            field: c.field ?? null,
+            prerequisiteCode: c.prerequisiteCode ?? null,
+            label: c.label,
+            deferredBy: ctx.user.name,
+            deferredAt: new Date(),
+          },
+        });
+      }
+    }
 
     if (input.tradeName || input.manufacturer || input.modelName) {
       if (updated.modelId) {
@@ -228,19 +281,64 @@ export const draftService = {
       }
     }
 
+    const diff = changedFields(
+      {
+        serialNumber: row.serialNumber,
+        areaId: row.areaId,
+        room: row.room,
+        state: row.state,
+        responsibleUserId: row.responsibleUserId,
+      },
+      {
+        serialNumber: updated.serialNumber,
+        areaId: updated.areaId,
+        room: updated.room,
+        state: updated.state,
+        responsibleUserId: updated.responsibleUserId,
+      },
+    );
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "device",
+      resourceId: updated.id,
+      action: "update",
+      summary: `Updated registration draft ${updated.inventoryNumber}`,
+      before: diff?.before,
+      after: diff?.after,
+    });
     return { id: updated.id, inventoryNumber: updated.inventoryNumber, state: updated.state };
   },
 
-  async get(ctx: TenantContext, id: string) {
+  async get(ctx: TenantWorkContext, id: string) {
     requirePermission(ctx, "inventory:view");
     const row = await prisma.deviceInstance.findFirst({
       where: { id, tenantId: ctx.tenantId },
       include: {
-        model: true,
+        model: {
+          include: {
+            classifications: {
+              where: { validTo: null },
+              orderBy: { validFrom: "desc" },
+              take: 1,
+            },
+          },
+        },
         area: { include: { site: true } },
+        clarifications: { where: { resolvedAt: null } },
       },
     });
     if (!row) throw notFound("Draft not found.");
+
+    const openCls = row.model?.classifications[0] ?? null;
+    let modelClassificationPrefill: RegistrationCharacteristics | null = null;
+    if (openCls?.characteristics) {
+      try {
+        modelClassificationPrefill = JSON.parse(openCls.characteristics) as RegistrationCharacteristics;
+      } catch {
+        modelClassificationPrefill = null;
+      }
+    }
+
     return {
       id: row.id,
       inventoryNumber: row.inventoryNumber,
@@ -263,6 +361,20 @@ export const draftService = {
             modelName: row.model.modelName,
           }
         : null,
+      modelClassificationPrefill,
+      modelClassificationConfidence: openCls?.confidence ?? null,
+      modelClassificationFieldStates: openCls?.fieldStates
+        ? (JSON.parse(openCls.fieldStates) as Record<string, string>)
+        : null,
+      openClarifications: row.clarifications.map((c) => ({
+        id: c.id,
+        kind: c.kind,
+        field: c.field,
+        prerequisiteCode: c.prerequisiteCode,
+        label: c.label,
+        deferredBy: c.deferredBy,
+        deferredAt: c.deferredAt.toISOString(),
+      })),
     };
   },
 };

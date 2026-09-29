@@ -14,7 +14,7 @@ export default defineConfig({
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "tests/**/*.test.ts"],
     exclude: ["e2e/**", "node_modules/**"],
     setupFiles: ["./tests/setup.ts"],
-    globalSetup: ["./tests/globalSetup.ts"],
+    globalSetup: process.env.VITEST_SKIP_DB ? [] : ["./tests/globalSetup.ts"],
     // Integration tests share one SQLite file; keep them serialized.
     fileParallelism: false,
   },

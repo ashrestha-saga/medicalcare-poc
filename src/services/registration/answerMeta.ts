@@ -15,8 +15,13 @@ function blockVisible(kind: ProductKindDTO | null, key: string, weitere: boolean
   return weitere;
 }
 
-/** FA-208 — only the last two count as answered. */
-export type AnswerState = "offen" | "vorschlag" | "vorschlag_bestaetigt" | "selbst_gewaehlt";
+/** FA-208 — only confirmed / chosen count as answered; deferred is explicit gap (ERF-01). */
+export type AnswerState =
+  | "offen"
+  | "vorschlag"
+  | "vorschlag_bestaetigt"
+  | "selbst_gewaehlt"
+  | "deferred";
 
 export interface FieldAnswerMeta {
   state: AnswerState;
@@ -113,6 +118,19 @@ export function emptyCharacteristics(): RegistrationCharacteristics {
 
 export function isAnswered(meta: FieldAnswerMeta | undefined): boolean {
   return meta?.state === "vorschlag_bestaetigt" || meta?.state === "selbst_gewaehlt";
+}
+
+/** ERF-01 — explicit deferral; device may stay draft with a DeviceClarification row. */
+export function isDeferred(meta: FieldAnswerMeta | undefined): boolean {
+  return meta?.state === "deferred";
+}
+
+export function deferField(
+  m: RegistrationCharacteristics,
+  field: string,
+  actor: string,
+): RegistrationCharacteristics {
+  return withMeta(m, field, stamp({ state: "deferred" }, actor));
 }
 
 export function fieldMeta(

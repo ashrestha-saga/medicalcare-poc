@@ -1,9 +1,12 @@
-import type { DeviceDutyDTO, DutyScheduleStatus, TenantContext } from "@/interfaces";
+import type { DeviceDutyDTO, DutyScheduleStatus, TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { recordAudit } from "@/services/audit/auditService";
 import { notFound, unprocessable } from "@/lib/errors";
 import { deriveMaintenanceStatus } from "@/lib/maintenance/schedule";
 import { prisma } from "@/lib/prisma";
 import { computeDutyDueAt } from "./dueDate";
+import { recordDutyCompletion } from "./recordDutyCompletion";
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 type DutyRow = {
@@ -90,7 +93,16 @@ function parsePerformedAt(raw: string | null | undefined): Date {
 /** After instance-level "mark maintenance done", roll the open Wartung duty in the same tx. */
 export async function syncWartungDutyOnComplete(
   tx: Prisma.TransactionClient,
-  args: { tenantId: string; deviceInstanceId: string; performedAt: Date },
+  args: {
+    tenantId: string;
+    deviceInstanceId: string;
+    performedAt: Date;
+    performedBy: string;
+    actorUserId?: string | null;
+    note?: string | null;
+    /** When true, MaintenanceEvent was already written by the caller — only DutyPerformance + duty roll. */
+    skipMaintenanceEvent?: boolean;
+  },
 ) {
   const wartung = await tx.deviceDuty.findFirst({
     where: {
@@ -102,25 +114,67 @@ export async function syncWartungDutyOnComplete(
     },
   });
   if (!wartung) return;
-  await tx.deviceDuty.update({
-    where: { id: wartung.id },
-    data: {
+
+  if (args.skipMaintenanceEvent) {
+    // Caller already wrote MaintenanceEvent + instance fields; still need DutyPerformance + duty roll.
+    const nextDue = computeDutyDueAt({
+      deadlineAnchor: wartung.deadlineAnchor,
+      referenceDate: wartung.referenceDate,
       lastCompletedAt: args.performedAt,
-      dueAt: computeDutyDueAt({
-        deadlineAnchor: wartung.deadlineAnchor,
-        referenceDate: wartung.referenceDate,
+      intervalValue: wartung.intervalValue,
+      intervalUnit: wartung.intervalUnit,
+    });
+    await tx.dutyPerformance.create({
+      data: {
+        tenantId: args.tenantId,
+        deviceDutyId: wartung.id,
+        performedAt: args.performedAt,
+        result: "passed",
+        note: args.note ?? null,
+        performedBy: args.performedBy,
+        source: "maintenance_complete",
+      },
+    });
+    await tx.deviceDuty.update({
+      where: { id: wartung.id },
+      data: {
         lastCompletedAt: args.performedAt,
-        intervalValue: wartung.intervalValue,
-        intervalUnit: wartung.intervalUnit,
-      }),
-      notifyStage: null,
-      lastNotifiedAt: null,
-    },
+        dueAt: nextDue,
+        notifyStage: null,
+        lastNotifiedAt: null,
+      },
+    });
+    await tx.deviceUnitEvent.create({
+      data: {
+        tenantId: args.tenantId,
+        deviceInstanceId: args.deviceInstanceId,
+        actor: args.performedBy,
+        action: "duty_complete",
+        note: [
+          wartung.title ?? wartung.dutyKey,
+          nextDue ? `next due ${nextDue.toISOString().slice(0, 10)}` : "no calendar due",
+          "via maintenance complete",
+        ]
+          .filter(Boolean)
+          .join(" — "),
+      },
+    });
+    return;
+  }
+
+  await recordDutyCompletion(tx, {
+    tenantId: args.tenantId,
+    duty: wartung,
+    performedAt: args.performedAt,
+    performedBy: args.performedBy,
+    actorUserId: args.actorUserId,
+    note: args.note,
+    source: "maintenance_complete",
   });
 }
 
 export const dutyService = {
-  async listForDevice(ctx: TenantContext, deviceId: string): Promise<DeviceDutyDTO[]> {
+  async listForDevice(ctx: TenantWorkContext, deviceId: string): Promise<DeviceDutyDTO[]> {
     requirePermission(ctx, "inventory:view");
     const device = await prisma.deviceInstance.findFirst({
       where: { id: deviceId, tenantId: ctx.tenantId },
@@ -131,7 +185,7 @@ export const dutyService = {
   },
 
   async listDue(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     query?: { before?: Date; limit?: number },
   ): Promise<DeviceDutyDTO[]> {
     requirePermission(ctx, "inventory:view");
@@ -156,7 +210,7 @@ export const dutyService = {
   },
 
   async complete(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     dutyId: string,
     input?: { performedAt?: string | null; note?: string | null },
   ): Promise<DeviceDutyDTO> {
@@ -168,80 +222,52 @@ export const dutyService = {
     if (existing.suspendedAt) throw unprocessable("This duty was superseded by a later classification.");
     if (!existing.applicable) throw unprocessable("This duty is not applicable.");
 
+    if (existing.requiresBaseline) {
+      const baseline = await prisma.deviceDuty.findFirst({
+        where: {
+          deviceInstanceId: existing.deviceInstanceId,
+          tenantId: ctx.tenantId,
+          setsBaseline: true,
+          applicable: true,
+          suspendedAt: null,
+        },
+        include: {
+          performances: { take: 1, orderBy: { performedAt: "desc" } },
+        },
+      });
+      const baselineDone =
+        Boolean(baseline?.lastCompletedAt) || (baseline?.performances?.length ?? 0) > 0;
+      if (!baselineDone) {
+        throw unprocessable(
+          "Constancy (or other baseline-dependent) duty cannot be completed before the acceptance / baseline duty has a recorded performance.",
+          { field: "requiresBaseline", code: "baseline_missing" },
+        );
+      }
+    }
+
     const performedAt = parsePerformedAt(input?.performedAt);
-    const nextDue = computeDutyDueAt({
-      deadlineAnchor: existing.deadlineAnchor,
-      referenceDate: existing.referenceDate,
-      lastCompletedAt: performedAt,
-      intervalValue: existing.intervalValue,
-      intervalUnit: existing.intervalUnit,
-    });
 
     const updated = await prisma.$transaction(async (tx) => {
-      const duty = await tx.deviceDuty.update({
-        where: { id: existing.id },
-        data: {
-          lastCompletedAt: performedAt,
-          dueAt: nextDue,
-          notifyStage: null,
-          lastNotifiedAt: null,
-        },
+      await recordDutyCompletion(tx, {
+        tenantId: ctx.tenantId,
+        duty: existing,
+        performedAt,
+        performedBy: ctx.user.name,
+        actorUserId: ctx.user.id,
+        note: input?.note?.trim() || null,
+        source: "duty_complete",
       });
-
-      await tx.deviceUnitEvent.create({
-        data: {
-          tenantId: ctx.tenantId,
-          deviceInstanceId: existing.deviceInstanceId,
-          actor: ctx.user.name,
-          action: "duty_complete",
-          note: [
-            existing.title ?? existing.dutyKey,
-            nextDue ? `next due ${nextDue.toISOString().slice(0, 10)}` : "no calendar due",
-            input?.note?.trim() || null,
-          ]
-            .filter(Boolean)
-            .join(" — "),
-        },
-      });
-
-      if (existing.dutyKey === "wartung") {
-        const instance = await tx.deviceInstance.findFirst({
-          where: { id: existing.deviceInstanceId, tenantId: ctx.tenantId },
-        });
-        if (instance) {
-          const cycleMonths =
-            existing.intervalUnit === "months"
-              ? existing.intervalValue
-              : existing.intervalUnit === "years" && existing.intervalValue != null
-                ? existing.intervalValue * 12
-                : instance.maintenanceCycleMonths;
-          await tx.deviceInstance.update({
-            where: { id: instance.id },
-            data: {
-              lastMaintainedAt: performedAt,
-              nextMaintenanceDueAt: nextDue,
-              ...(cycleMonths != null ? { maintenanceCycleMonths: cycleMonths } : {}),
-            },
-          });
-          await tx.maintenanceEvent.create({
-            data: {
-              tenantId: ctx.tenantId,
-              deviceInstanceId: instance.id,
-              kind: "completed",
-              performedAt,
-              previousDueAt: existing.dueAt,
-              nextDueAt: nextDue,
-              cycleMonths: cycleMonths ?? null,
-              note: input?.note?.trim() || null,
-              actorUserId: ctx.user.id,
-            },
-          });
-        }
-      }
-
-      return duty;
+      return tx.deviceDuty.findFirstOrThrow({ where: { id: existing.id } });
     });
 
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "duty",
+      resourceId: existing.id,
+      action: "complete",
+      summary: `Completed duty ${existing.title ?? existing.dutyKey}`,
+      after: { deviceInstanceId: existing.deviceInstanceId, nextDue: updated.dueAt?.toISOString() ?? null },
+    });
     return toDutyDTO(updated);
   },
 

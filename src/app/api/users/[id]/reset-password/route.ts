@@ -1,20 +1,20 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
-import { resetUserPasswordSchema } from "@/schemas/user";
-import { userAdminService } from "@/services/users/userAdminService";
+import { passwordResetService } from "@/services/users/passwordResetService";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** POST /api/users/[id]/reset-password — admin reset (users:resetpassword). */
+/** POST /api/users/[id]/reset-password — email reset link (users:resetpassword). */
 export async function POST(req: Request, { params }: Params) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    const { id } = await params;
-    const input = resetUserPasswordSchema.parse(await req.json());
-    await userAdminService.resetPassword(ctx, id, input);
-    return Response.json({ ok: true }, { headers: { "x-correlation-id": ctx.correlationId } });
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      const { id } = await params;
+      const reset = await passwordResetService.sendClinicReset(ctx, id);
+      return Response.json({ reset }, { headers: { "x-correlation-id": ctx.correlationId } });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

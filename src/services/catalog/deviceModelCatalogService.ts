@@ -5,8 +5,11 @@ import type {
   CatalogModelListItemDTO,
   CatalogSpreadRow,
   TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
+import { actorFromTenant } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { recordAudit } from "@/services/audit/auditService";
 import { conflict, notFound, unprocessable } from "@/lib/errors";
 import { parseJson } from "@/lib/json";
 import { prisma } from "@/lib/prisma";
@@ -142,7 +145,7 @@ function normalizeGtins(gtins: string[] | null | undefined): string | null {
 }
 
 export const deviceModelCatalogService = {
-  async list(ctx: TenantContext, q?: string): Promise<CatalogModelListItemDTO[]> {
+  async list(ctx: TenantWorkContext, q?: string): Promise<CatalogModelListItemDTO[]> {
     requirePermission(ctx, "catalog:view");
     const where: Prisma.DeviceModelWhereInput = q?.trim()
       ? {
@@ -164,7 +167,7 @@ export const deviceModelCatalogService = {
     return rows.map((r) => toListItem(r as ModelWithAggregates));
   },
 
-  async getById(ctx: TenantContext, id: string): Promise<CatalogModelDetailDTO> {
+  async getById(ctx: TenantWorkContext, id: string): Promise<CatalogModelDetailDTO> {
     requirePermission(ctx, "catalog:view");
     const row = await prisma.deviceModel.findUnique({
       where: { id },
@@ -197,6 +200,14 @@ export const deviceModelCatalogService = {
         maintenanceCycleMonths: input.maintenanceCycleMonths ?? null,
       },
       include: listIncludeForTenant(ctx.tenantId),
+    });
+    await recordAudit({
+      actor: actorFromTenant(ctx),
+      resource: "catalog_model",
+      resourceId: created.id,
+      action: "create",
+      summary: `Created catalog model ${created.tradeName || created.modelName || created.id}`,
+      after: { tradeName: created.tradeName, modelName: created.modelName, udiDi: created.udiDi },
     });
     return toListItem(created as ModelWithAggregates);
   },
@@ -247,7 +258,7 @@ export const deviceModelCatalogService = {
         if (prev) {
           await tx.deviceModelClassification.update({
             where: { id: prev.id },
-            data: { validTo: new Date() },
+            data: { validTo: new Date(), openClassificationKey: null },
           });
         }
 
@@ -260,6 +271,7 @@ export const deviceModelCatalogService = {
         await tx.deviceModelClassification.create({
           data: {
             deviceModelId: id,
+            openClassificationKey: id,
             stk: input.classification.annex1 ?? prev?.stk ?? false,
             radiation: input.classification.radiation ?? prev?.radiation ?? false,
             softwareClass:
@@ -275,6 +287,13 @@ export const deviceModelCatalogService = {
       }
     });
 
+    await recordAudit({
+      actor: actorFromTenant(ctx),
+      resource: "catalog_model",
+      resourceId: id,
+      action: "update",
+      summary: `Updated catalog model ${existing.tradeName || existing.modelName || id}`,
+    });
     return this.getById(ctx, id);
   },
 
@@ -349,6 +368,14 @@ export const deviceModelCatalogService = {
       }
     }
 
+    await recordAudit({
+      actor: actorFromTenant(ctx),
+      resource: "catalog_model",
+      resourceId: ctx.tenantId,
+      action: "import",
+      summary: `Imported catalog rows: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped`,
+      after: { created: result.created, updated: result.updated, skipped: result.skipped },
+    });
     return result;
   },
 };

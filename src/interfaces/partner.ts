@@ -15,6 +15,7 @@ export interface PartnerHomeDTO {
   organisationName: string;
   contact: string | null;
   myAppRole: PartnerAppRole | string;
+  roles: string[];
   people: ManagementPersonDTO[];
   clinics: PartnerContractedClinicDTO[];
 }

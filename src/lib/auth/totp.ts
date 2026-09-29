@@ -1,37 +1,19 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { generateSecret, generateSync, generateURI, verifySync } from "otplib";
 import { env } from "@/lib/env";
+import { decryptSecret, encryptSecret } from "@/lib/crypto/secretBox";
 import { hashPassword, verifyPassword } from "@/lib/password";
 
 const TOTP_EPOCH_TOLERANCE_SEC = 30;
 const BACKUP_CODE_COUNT = 10;
 
-function deriveAesKey(material: string): Buffer {
-  return createHash("sha256").update(material).digest();
-}
-
 /** Encrypt a TOTP secret for DB storage (`v1.<iv>.<tag>.<ciphertext>` hex). */
 export function encryptTotpSecret(plain: string, keyMaterial = env.totp.encryptionKey): string {
-  const key = deriveAesKey(keyMaterial);
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, iv);
-  const enc = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
-  const tag = cipher.getAuthTag();
-  return `v1.${iv.toString("hex")}.${tag.toString("hex")}.${enc.toString("hex")}`;
+  return encryptSecret(plain, keyMaterial);
 }
 
 export function decryptTotpSecret(payload: string, keyMaterial = env.totp.encryptionKey): string {
-  const [version, ivHex, tagHex, dataHex] = payload.split(".");
-  if (version !== "v1" || !ivHex || !tagHex || !dataHex) {
-    throw new Error("Invalid TOTP secret payload.");
-  }
-  const key = deriveAesKey(keyMaterial);
-  const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivHex, "hex"));
-  decipher.setAuthTag(Buffer.from(tagHex, "hex"));
-  return Buffer.concat([
-    decipher.update(Buffer.from(dataHex, "hex")),
-    decipher.final(),
-  ]).toString("utf8");
+  return decryptSecret(payload, keyMaterial);
 }
 
 export function createTotpSecret(): string {

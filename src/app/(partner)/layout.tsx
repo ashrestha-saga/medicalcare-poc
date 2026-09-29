@@ -2,9 +2,11 @@
 
 import { useEffect, type ReactNode } from "react";
 import { AuthGate } from "@/components/features/auth/AuthGate";
-import { PartnerShell } from "@/components/layout/PartnerShell";
+import { PartnerRouteGuard } from "@/components/guards/PartnerRouteGuard";
+import { ConsoleShell } from "@/components/layout/ConsoleShell";
 import { Toaster } from "@/components/ui/Toaster";
 import { Loading } from "@/components/ui/Loading";
+import { PermissionProvider } from "@/lib/providers/PermissionProvider";
 import { useSession } from "@/hooks/useSession";
 import { useSessionStore } from "@/store/sessionStore";
 import { isClinicSession, isPartnerSession } from "@/interfaces/session";
@@ -31,15 +33,17 @@ function PartnerGate({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** Partner route group — AuthGate + light shell (no clinic nav / RBAC). */
+/** Partner route group — AuthGate + console RBAC + shell. */
 export default function PartnerLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGate loginPath="/login/partner">
       <PartnerGate>
-        <PartnerShell>
-          {children}
-          <Toaster />
-        </PartnerShell>
+        <PermissionProvider>
+          <ConsoleShell>
+            <PartnerRouteGuard>{children}</PartnerRouteGuard>
+            <Toaster />
+          </ConsoleShell>
+        </PermissionProvider>
       </PartnerGate>
     </AuthGate>
   );

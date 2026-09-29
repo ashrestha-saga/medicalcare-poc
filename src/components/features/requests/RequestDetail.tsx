@@ -3,6 +3,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { RequestDetailProps } from "@/interfaces";
+import { AuditTimeline } from "@/components/features/audit/AuditTimeline";
+import { useResourceAudit } from "@/components/hooks/audit/useResourceAudit";
 import { Spinner } from "@/components/ui/Loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,6 +55,7 @@ export function RequestDetail({
   const subtitle = [request.serviceType, request.deviceName].filter(Boolean).join(" · ");
   const stateBadge = serviceRequestStateBadge(request.state);
   const selectDisabled = !canWork || !canAllocate || !allocationEditable || busy;
+  const audit = useResourceAudit("request", request.reference);
 
   return (
     <div className="space-y-4 px-4 pb-8 sm:px-[18px]" data-testid="request-detail">
@@ -184,6 +187,14 @@ export function RequestDetail({
             Accepted, scheduled and completed come from the contracted company&apos;s status
             callback.
           </p>
+          {audit.canView ? (
+            <div className="mt-4 border-t border-border pt-4" data-testid="assignment-audit">
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                Activity
+              </p>
+              <AuditTimeline events={audit.events} loading={audit.loading} />
+            </div>
+          ) : null}
           {request.source === "due_date" ? (
             <p className="mt-2 text-xs text-muted-foreground">
               <Link href="/due-dates" className="text-primary hover:underline">

@@ -153,7 +153,7 @@ export function createBeudamedService(deps: Deps = {}): BeudamedResolver {
             gmdnCode: mapped.gmdnCode,
             source: "beudamed",
             sourceFetchedAt: fetchedAt,
-            state: "review",
+            state: "review" as const,
           };
           const row = existing
             ? await tx.deviceModel.update({ where: { id: existing.id }, data: { ...data, version: { increment: 1 } } })

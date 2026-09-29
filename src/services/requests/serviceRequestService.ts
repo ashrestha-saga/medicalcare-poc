@@ -1,13 +1,16 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type ServiceRequestState } from "@prisma/client";
 import type {
   CreateServiceRequestResult,
   ExecutorOrgDTO,
   ServiceRequestDTO,
   StatusFeedbackDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { OPEN_REQUEST_STATES, STARTABLE_REQUEST_STATES } from "@/constants/serviceRequest";
+import { actorFromContext, actorSystem } from "@/lib/auth/actorContext";
+import { blobMetaFromDataUrl } from "@/lib/blobMeta";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { recordAudit } from "@/services/audit/auditService";
 import { fingerprint, newReference } from "@/lib/crypto";
 import { conflict, forbidden, notFound, unprocessable } from "@/lib/errors";
 import { logger } from "@/lib/logger";
@@ -20,6 +23,7 @@ import type {
 } from "@/schemas/serviceRequest";
 import { dispatchService } from "@/services/dispatch/dispatchService";
 import { computeDutyDueAt } from "@/services/registration/dueDate";
+import { recordDutyCompletion } from "@/services/registration/recordDutyCompletion";
 import {
   toServiceRequestDTO,
   type ServiceRequestWithRelations,
@@ -127,7 +131,7 @@ async function toDto(row: ServiceRequestWithRelations): Promise<ServiceRequestDT
   return toServiceRequestDTO(await attachDeviceContext(row));
 }
 
-/** FA-715 — roll duty due date and record performance when an assignment completes. */
+/** FA-715 / SCH-09 — roll duty via shared completion helper when an assignment completes. */
 async function writeDutyPerformanceOnComplete(args: {
   tenantId: string;
   dutyId: string;
@@ -141,51 +145,16 @@ async function writeDutyPerformanceOnComplete(args: {
   });
   if (!duty) return;
 
-  const performedAt = new Date();
-  const nextDue = computeDutyDueAt({
-    deadlineAnchor: duty.deadlineAnchor,
-    referenceDate: duty.referenceDate,
-    lastCompletedAt: performedAt,
-    intervalValue: duty.intervalValue,
-    intervalUnit: duty.intervalUnit,
-  });
-
   await prisma.$transaction(async (tx) => {
-    await tx.dutyPerformance.create({
-      data: {
-        tenantId: args.tenantId,
-        deviceDutyId: duty.id,
-        serviceRequestId: args.serviceRequestId,
-        performedAt,
-        result: "passed",
-        note: args.note,
-        performedBy: args.performedBy,
-        source: args.source,
-      },
-    });
-    await tx.deviceDuty.update({
-      where: { id: duty.id },
-      data: {
-        lastCompletedAt: performedAt,
-        dueAt: nextDue,
-        notifyStage: null,
-        lastNotifiedAt: null,
-      },
-    });
-    await tx.deviceUnitEvent.create({
-      data: {
-        tenantId: args.tenantId,
-        deviceInstanceId: duty.deviceInstanceId,
-        actor: args.performedBy,
-        action: "duty_complete",
-        note: [
-          duty.title ?? duty.dutyKey,
-          nextDue ? `next due ${nextDue.toISOString().slice(0, 10)}` : "no calendar due",
-          `via assignment`,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-      },
+    await recordDutyCompletion(tx, {
+      tenantId: args.tenantId,
+      duty,
+      performedAt: new Date(),
+      performedBy: args.performedBy,
+      note: args.note,
+      source: args.source,
+      serviceRequestId: args.serviceRequestId,
+      unitEventSuffix: "via assignment",
     });
   });
 }
@@ -195,7 +164,7 @@ export const serviceRequestService = {
    * Section 23 — creation is a transaction: request + first StatusEvent + attachments,
    * upserted on the idempotency key (SS-701).
    */
-  async create(input: CreateServiceRequestInput, ctx: TenantContext): Promise<CreateServiceRequestResult> {
+  async create(input: CreateServiceRequestInput, ctx: TenantWorkContext): Promise<CreateServiceRequestResult> {
     requirePermission(ctx, "requests:create");
     const { tenantId, correlationId } = ctx;
 
@@ -241,13 +210,21 @@ export const serviceRequestService = {
         }
 
         const blobs = await Promise.all(
-          (input.attachments ?? []).map((a) =>
-            a.url.startsWith("data:")
-              ? tx.attachmentBlob
-                  .create({ data: { tenantId, kind: a.kind, dataUrl: a.url } })
-                  .then((b) => ({ kind: a.kind, url: `/api/attachments/${b.id}` }))
-              : Promise.resolve({ kind: a.kind, url: a.url }),
-          ),
+          (input.attachments ?? []).map((a) => {
+            if (!a.url.startsWith("data:")) return Promise.resolve({ kind: a.kind, url: a.url });
+            const meta = blobMetaFromDataUrl(a.url);
+            return tx.attachmentBlob
+              .create({
+                data: {
+                  tenantId,
+                  kind: a.kind,
+                  dataUrl: a.url,
+                  contentType: meta.contentType,
+                  byteSize: meta.byteSize,
+                },
+              })
+              .then((b) => ({ kind: a.kind, url: `/api/attachments/${b.id}` }));
+          }),
         );
 
         const historyNote =
@@ -278,13 +255,14 @@ export const serviceRequestService = {
             dutyId: input.dutyId ?? null,
             statusEvents: {
               create: {
+                tenantId,
                 state: "captured",
                 source: "devicecare",
                 actor: ctx.user.name,
                 note: historyNote,
               },
             },
-            attachments: { create: blobs },
+            attachments: { create: blobs.map((b) => ({ ...b, tenantId })) },
           },
           include: includeAll,
         });
@@ -302,6 +280,17 @@ export const serviceRequestService = {
       });
 
     let dto = await toDto(outcome.row);
+
+    if (outcome.created) {
+      await recordAudit({
+        actor: actorFromContext(ctx),
+        resource: "request",
+        resourceId: dto.reference,
+        action: "create",
+        summary: `Created service request ${dto.reference}`,
+        after: { reference: dto.reference, serviceType: dto.serviceType, subjectId: input.subjectId },
+      });
+    }
 
     if (outcome.created && !deferDispatch) {
       logger.info("service_request.created", { correlationId, reference: dto.reference, tenantId });
@@ -337,6 +326,7 @@ export const serviceRequestService = {
             if (outcomes.length === 0) {
               await prisma.statusEvent.create({
                 data: {
+                  tenantId,
                   serviceRequestId: dto.id,
                   state: "transmitted",
                   source: "devicecare",
@@ -380,7 +370,7 @@ export const serviceRequestService = {
   },
 
   async list(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     opts: { scope: ServiceRequestListScope; state?: string; limit?: number } = { scope: "mine" },
   ): Promise<ServiceRequestDTO[]> {
     const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
@@ -391,13 +381,13 @@ export const serviceRequestService = {
       where.raisedById = ctx.user.id;
     } else if (opts.scope === "open") {
       requirePermission(ctx, "requests:view-open");
-      where.state = { in: [...OPEN_STATES] };
+      where.state = { in: [...OPEN_STATES] as Prisma.EnumServiceRequestStateFilter["in"] };
     } else if (opts.scope === "all") {
       requirePermission(ctx, "requests:view-all");
     }
 
     if (opts.state) {
-      where.state = opts.state;
+      where.state = opts.state as Prisma.EnumServiceRequestStateFilter;
     }
 
     const rows = await prisma.serviceRequest.findMany({
@@ -409,7 +399,7 @@ export const serviceRequestService = {
     return Promise.all(rows.map((r) => toDto(r)));
   },
 
-  async listExecutors(ctx: TenantContext): Promise<ExecutorOrgDTO[]> {
+  async listExecutors(ctx: TenantWorkContext): Promise<ExecutorOrgDTO[]> {
     requirePermission(ctx, "requests:view-mine");
     const rows = await prisma.executorOrg.findMany({
       where: { tenantId: ctx.tenantId, active: true },
@@ -428,7 +418,7 @@ export const serviceRequestService = {
   async allocate(
     reference: string,
     input: AllocateServiceRequestInput,
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
   ): Promise<ServiceRequestDTO> {
     requirePermission(ctx, "requests:transition");
     const existing = await prisma.serviceRequest.findFirst({
@@ -448,6 +438,7 @@ export const serviceRequestService = {
     const row = await prisma.$transaction(async (tx) => {
       await tx.statusEvent.create({
         data: {
+          tenantId: existing.tenantId,
           serviceRequestId: existing.id,
           state: existing.state,
           source: "devicecare",
@@ -466,11 +457,19 @@ export const serviceRequestService = {
       });
     });
 
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "request",
+      resourceId: reference,
+      action: "update",
+      summary: `Allocated ${reference} to ${org.name}`,
+      after: { executorOrgId: org.id, executorName: org.name },
+    });
     return toDto(row);
   },
 
   /** FA-714 — transmit to the allocated org's enabled channels and lock allocation. */
-  async transmit(reference: string, ctx: TenantContext): Promise<ServiceRequestDTO> {
+  async transmit(reference: string, ctx: TenantWorkContext): Promise<ServiceRequestDTO> {
     requirePermission(ctx, "requests:transition");
     const existing = await prisma.serviceRequest.findFirst({
       where: { reference, tenantId: ctx.tenantId },
@@ -530,6 +529,7 @@ export const serviceRequestService = {
     const row = await prisma.$transaction(async (tx) => {
       await tx.statusEvent.create({
         data: {
+          tenantId: existing.tenantId,
           serviceRequestId: existing.id,
           state: "transmitted",
           source: "devicecare",
@@ -544,6 +544,15 @@ export const serviceRequestService = {
       });
     });
 
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "request",
+      resourceId: reference,
+      action: "transition",
+      summary: `Transmitted ${reference}`,
+      before: { state: existing.state },
+      after: { state: "transmitted" },
+    });
     return toDto(row);
   },
 
@@ -554,13 +563,13 @@ export const serviceRequestService = {
   async transition(
     reference: string,
     input: TransitionServiceRequestInput,
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
   ): Promise<ServiceRequestDTO> {
     requirePermission(ctx, "requests:transition");
 
     const existing = await prisma.serviceRequest.findFirst({
       where: { reference, tenantId: ctx.tenantId },
-      select: { id: true, state: true, dutyId: true, executorOrgId: true },
+      select: { id: true, state: true, dutyId: true, executorOrgId: true, tenantId: true },
     });
     if (!existing) throw notFound(`Unknown service request reference ${reference}.`);
 
@@ -600,6 +609,7 @@ export const serviceRequestService = {
     const row = await prisma.$transaction(async (tx) => {
       await tx.statusEvent.create({
         data: {
+          tenantId: existing.tenantId,
           serviceRequestId: existing.id,
           state: to,
           source: "devicecare",
@@ -632,6 +642,15 @@ export const serviceRequestService = {
       to,
       actor: ctx.user.id,
     });
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "request",
+      resourceId: reference,
+      action: "transition",
+      summary: `Transitioned ${reference} from ${from} to ${to}`,
+      before: { state: from },
+      after: { state: to, note },
+    });
 
     return toDto(row);
   },
@@ -646,11 +665,13 @@ export const serviceRequestService = {
       select: { id: true, tenantId: true, dutyId: true },
     });
     if (!existing) throw notFound(`Unknown service request reference ${reference}.`);
+    const nextState = feedback.state as ServiceRequestState;
     const row = await prisma.$transaction(async (tx) => {
       await tx.statusEvent.create({
         data: {
+          tenantId: existing.tenantId,
           serviceRequestId: existing.id,
-          state: feedback.state,
+          state: nextState,
           source: feedback.source,
           actor: feedback.actor ?? null,
           note:
@@ -661,9 +682,21 @@ export const serviceRequestService = {
       });
       return tx.serviceRequest.update({
         where: { id: existing.id },
-        data: { state: feedback.state },
+        data: { state: nextState },
         include: includeAll,
       });
+    });
+
+    await recordAudit({
+      actor: actorSystem({
+        tenantId: existing.tenantId,
+        source: feedback.source,
+      }),
+      resource: "request",
+      resourceId: reference,
+      action: "transition",
+      summary: `External status ${feedback.state} on ${reference}`,
+      after: { state: feedback.state, source: feedback.source, actor: feedback.actor ?? null },
     });
 
     if (feedback.state === "completed" && existing.dutyId) {

@@ -3,9 +3,11 @@ import type {
   DeviceInstanceDTO,
   ModelClassificationDTO,
   ParsedIdentifier,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
+import { changedFields, recordAudit } from "@/services/audit/auditService";
 import { conflict, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { toDeviceInstanceDTO } from "@/services/shared/mappers";
@@ -106,6 +108,53 @@ async function resolveModelClassification(
   };
 }
 
+async function buildDeviceCourse(
+  row: NonNullable<Awaited<ReturnType<typeof loadInstance>>>,
+): Promise<DeviceInstanceDetailDTO["course"]> {
+  const [unitEvents, audits] = await Promise.all([
+    prisma.deviceUnitEvent.findMany({
+      where: { deviceInstanceId: row.id, tenantId: row.tenantId },
+      orderBy: { occurredAt: "asc" },
+    }),
+    prisma.auditEvent.findMany({
+      where: { tenantId: row.tenantId, resource: "device", resourceId: row.id },
+      orderBy: { occurredAt: "asc" },
+      take: 80,
+    }),
+  ]);
+
+  const course: DeviceInstanceDetailDTO["course"] = unitEvents.map((e) => ({
+    label: e.note?.trim() || e.action,
+    at: e.occurredAt.toISOString(),
+    actor: e.actor || null,
+    actorKind: null,
+    organisationName: null,
+  }));
+
+  for (const e of audits) {
+    course.push({
+      label: e.summary || e.action,
+      at: e.occurredAt.toISOString(),
+      actor: e.actorName,
+      actorKind: e.actorKind,
+      organisationName: e.organisationName,
+    });
+  }
+
+  if (course.length === 0) {
+    course.push({
+      label: "Created",
+      at: row.createdAt.toISOString(),
+      actor: null,
+      actorKind: null,
+      organisationName: null,
+    });
+  }
+
+  course.sort((a, b) => a.at.localeCompare(b.at));
+  return course;
+}
+
 async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstance>>>): Promise<DeviceInstanceDetailDTO> {
   const base = toDeviceInstanceDTO(row);
   const modelClassification = await resolveModelClassification(row.modelId);
@@ -122,31 +171,7 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
     modelState: (row.model?.state as DeviceInstanceDetailDTO["modelState"]) ?? null,
     modelMaintenanceCycleMonths: row.model?.maintenanceCycleMonths ?? null,
     modelClassification,
-    course: [
-      {
-        label: "Created",
-        at: row.createdAt.toISOString(),
-        actor: null,
-      },
-      ...(row.lastMaintainedAt
-        ? [
-            {
-              label: "Maintenance completed",
-              at: row.lastMaintainedAt.toISOString(),
-              actor: null,
-            },
-          ]
-        : []),
-      ...(row.updatedAt.getTime() !== row.createdAt.getTime()
-        ? [
-            {
-              label: "Last updated",
-              at: row.updatedAt.toISOString(),
-              actor: null,
-            },
-          ]
-        : []),
-    ],
+    course: await buildDeviceCourse(row),
     duties,
     nextObligationDueAt: nextObligationDueAt(duties),
   };
@@ -157,17 +182,17 @@ async function loadInstance(id: string, tenantId: string) {
 }
 
 export const deviceInventoryService: InventoryResolver & {
-  list(ctx: TenantContext, query?: DeviceListQuery): Promise<DeviceInstanceDTO[]>;
-  get(ctx: TenantContext, id: string): Promise<DeviceInstanceDetailDTO>;
+  list(ctx: TenantWorkContext, query?: DeviceListQuery): Promise<DeviceInstanceDTO[]>;
+  get(ctx: TenantWorkContext, id: string): Promise<DeviceInstanceDetailDTO>;
   findBySerial(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     serialNumber: string,
     modelId?: string | null,
   ): Promise<DeviceInstanceDTO | null>;
-  create(ctx: TenantContext, input: CreateDeviceInput): Promise<DeviceInstanceDetailDTO>;
-  update(ctx: TenantContext, id: string, input: UpdateDeviceInput): Promise<DeviceInstanceDetailDTO>;
+  create(ctx: TenantWorkContext, input: CreateDeviceInput): Promise<DeviceInstanceDetailDTO>;
+  update(ctx: TenantWorkContext, id: string, input: UpdateDeviceInput): Promise<DeviceInstanceDetailDTO>;
   completeMaintenance(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     id: string,
     input?: { performedAt?: string | null; note?: string | null },
   ): Promise<DeviceInstanceDetailDTO>;
@@ -349,6 +374,19 @@ export const deviceInventoryService: InventoryResolver & {
           },
           include,
         });
+      });
+      await recordAudit({
+        actor: actorFromContext(ctx),
+        resource: "device",
+        resourceId: created.id,
+        action: "create",
+        summary: `Created inventory ${created.inventoryNumber}`,
+        after: {
+          inventoryNumber: created.inventoryNumber,
+          serialNumber: created.serialNumber,
+          areaId: created.areaId,
+          state: created.state,
+        },
       });
       const detail = await toDetailDTO(created);
       return { ...detail, registrationPath: `/registration/${created.id}` };
@@ -566,6 +604,33 @@ export const deviceInventoryService: InventoryResolver & {
 
     const refreshed = await loadInstance(id, ctx.tenantId);
     if (!refreshed) throw notFound("Device not found.");
+    const diff = changedFields(
+      {
+        state: existing.state,
+        areaId: existing.areaId,
+        room: existing.room,
+        serialNumber: existing.serialNumber,
+        responsibleUserId: existing.responsibleUserId,
+        inventoryNumber: existing.inventoryNumber,
+      },
+      {
+        state: refreshed.state,
+        areaId: refreshed.areaId,
+        room: refreshed.room,
+        serialNumber: refreshed.serialNumber,
+        responsibleUserId: refreshed.responsibleUserId,
+        inventoryNumber: refreshed.inventoryNumber,
+      },
+    );
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "device",
+      resourceId: id,
+      action: "update",
+      summary: `Updated inventory ${refreshed.inventoryNumber}`,
+      before: diff?.before,
+      after: diff?.after,
+    });
     return toDetailDTO(refreshed);
   },
 
@@ -622,11 +687,23 @@ export const deviceInventoryService: InventoryResolver & {
         tenantId: ctx.tenantId,
         deviceInstanceId: id,
         performedAt,
+        performedBy: ctx.user.name,
+        actorUserId: ctx.user.id,
+        note: input?.note?.trim() || null,
+        skipMaintenanceEvent: true,
       });
     });
 
     const refreshed = await loadInstance(id, ctx.tenantId);
     if (!refreshed) throw notFound("Device not found.");
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "device",
+      resourceId: id,
+      action: "complete",
+      summary: `Completed maintenance for ${refreshed.inventoryNumber}`,
+      after: { performedAt: performedAt.toISOString(), nextDueAt: nextDueAt?.toISOString() ?? null },
+    });
     return toDetailDTO(refreshed);
   },
 };

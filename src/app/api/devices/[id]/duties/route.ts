@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { dutyService } from "@/services/registration/dutyService";
 
@@ -9,10 +9,12 @@ export async function GET(req: Request, ctx: RouteContext) {
   let correlationId: string | undefined;
   try {
     const auth = await requireTenantContext(req);
-    correlationId = auth.correlationId;
-    const { id } = await ctx.params;
-    const duties = await dutyService.listForDevice(auth, id);
-    return Response.json({ duties }, { headers: { "x-correlation-id": auth.correlationId } });
+    return await withTenantStore(auth, async () => {
+      correlationId = auth.correlationId;
+      const { id } = await ctx.params;
+      const duties = await dutyService.listForDevice(auth, id);
+      return Response.json({ duties }, { headers: { "x-correlation-id": auth.correlationId } });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

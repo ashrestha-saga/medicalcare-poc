@@ -4,6 +4,8 @@ Mobile-first web application for clinical technicians and nursing staff: scan or
 
 This document describes how the system works, the domain model, and the technical features available in the codebase.
 
+For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) (Wave 2 hygiene plus post–Wave 2: `RoleGrant.kind`, `UserPermission`, `SmtpSettings`, `PasswordResetToken`, invite permission snapshots).
+
 ---
 
 ## Table of contents
@@ -323,6 +325,8 @@ Downstream systems can push status via `POST .../status`. Staff can transition o
 
 Failures on one target do not roll back others. Export content for mail is built in `serviceDispatchExport.ts`.
 
+**SMTP resolution (owner-generic):** `SmtpSettings` stores outbound credentials per clinic `tenantId` or partner `organisationId` (password encrypted). Clinics configure under Settings → SMTP (`settings:smtp`). For mail dispatch: optional `DispatchTarget.auth` override → owner `SmtpSettings` → platform `SMTP_*` env → simulate. Invite mail uses owner settings (no target auth). `DispatchTarget.endpoint` remains the **recipient** address, not the SMTP identity.
+
 **Inventory subjects** include **Inventarnummer** and **Seriennummer** in plain-text and HTML email bodies when present. Catalog / capture subjects omit inventarnummer (none exists yet).
 
 ---
@@ -506,11 +510,14 @@ See `.env.example`. Important variables:
 | `DATABASE_URL` | Prisma MySQL connection string |
 | `TEST_DATABASE_URL` | Optional isolated MySQL DB for Vitest |
 | `SESSION_SECRET` | Sign session cookie (`openssl rand -hex 32`) |
-| `TOTP_ENCRYPTION_KEY` | Encrypt TOTP secrets (optional; defaults to session secret) |
+| `CRON_SECRET` | Bearer token for `POST /api/jobs/*` (required in production) |
+| `AUTH_MAX_FAILED_LOGINS` | Password lockout threshold (default 5) |
+| `AUTH_LOCKOUT_MINUTES` | Lockout duration (default 15) |
+| `TOTP_ENCRYPTION_KEY` | Encrypt TOTP / OXID secrets (optional; defaults to session secret) |
 | `TOTP_ISSUER` | Authenticator account label (default `DeviceCare`) |
 | `OXID_*` | OAuth client, authorize/token URLs, API base, redirect, scope, adapter mode |
 | `BEUDAMED_*` | API base/key, cache TTL, timeout, rate limits, adapter mode |
-| `SMTP_*` | Optional platform mail fallback (`SMTP_HOST`, `SMTP_FROM`, …) |
+| `SMTP_*` | Optional platform mail fallback when owner `SmtpSettings` (and target auth) are unset |
 | `PLAYWRIGHT_BASE_URL` | Point e2e at a running server |
 
 ---

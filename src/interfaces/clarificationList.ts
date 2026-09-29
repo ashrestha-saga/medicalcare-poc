@@ -35,6 +35,15 @@ export interface ClarificationItemDTO {
   createdAt: string;
   updatedAt: string;
   sourceLabel: string | null;
+  /** C3 — persisted DeviceClarification rows still open. */
+  deferredClarifications?: {
+    id: string;
+    kind: string;
+    field: string | null;
+    label: string;
+    deferredBy: string;
+    deferredAt: string;
+  }[];
 }
 
 export interface ClarificationSummaryDTO {

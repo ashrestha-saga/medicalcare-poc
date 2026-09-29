@@ -3,6 +3,7 @@
 import { useCallback, useEffect } from "react";
 import type { SessionUser } from "@/interfaces/session";
 import { api } from "@/lib/http/apiClient";
+import { useActingTenantStore } from "@/store/actingTenantStore";
 import { useLogStore } from "@/store/logStore";
 import { useSessionStore } from "@/store/sessionStore";
 
@@ -47,6 +48,7 @@ export function useSession() {
   const signOut = useCallback(async (opts?: SignOutOptions) => {
     await api("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     useSessionStore.getState().signOutLocal();
+    useActingTenantStore.getState().clearActingTenant();
     useLogStore.getState().log("auth", "Signed out");
     if (opts?.redirectTo === null) return;
     const dest = opts?.redirectTo ?? "/login";

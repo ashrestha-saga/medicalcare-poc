@@ -120,6 +120,15 @@ export function ManagementIcon() {
   );
 }
 
+export function ActivityIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 8v4.5l3 1.8" />
+    </svg>
+  );
+}
+
 export function TrainingIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>

@@ -87,6 +87,12 @@ export function PartnerHomeScreen() {
                     <dt>Your role</dt>
                     <dd>{ROLE_LABELS[data.myAppRole] ?? data.myAppRole}</dd>
                   </div>
+                  {data.roles.length > 0 ? (
+                    <div className="p-ext-row">
+                      <dt>Organisation roles</dt>
+                      <dd>{data.roles.join(", ")}</dd>
+                    </div>
+                  ) : null}
                 </dl>
               </section>
 

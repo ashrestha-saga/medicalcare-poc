@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import type { SessionUser } from "@/interfaces/session";
 import { env } from "@/lib/env";
+import { prisma } from "@/lib/prisma";
 import {
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,
@@ -31,8 +32,23 @@ export async function destroySession(): Promise<void> {
   store.delete(SESSION_COOKIE);
 }
 
+/**
+ * Read and validate the session cookie.
+ * SEC-03: rejects cookies issued before User.sessionsValidFrom, and inactive users.
+ */
 export async function readSession(): Promise<SessionUser | null> {
   const store = await cookies();
   const payload = decodeSessionToken(store.get(SESSION_COOKIE)?.value, env.session.secret);
-  return payload?.user ?? null;
+  if (!payload?.user?.id) return null;
+
+  const row = await prisma.user.findFirst({
+    where: { id: payload.user.id },
+    select: { active: true, sessionsValidFrom: true },
+  });
+  if (!row || !row.active) return null;
+  if (row.sessionsValidFrom) {
+    const iatMs = payload.iat * 1000;
+    if (iatMs < row.sessionsValidFrom.getTime()) return null;
+  }
+  return payload.user;
 }

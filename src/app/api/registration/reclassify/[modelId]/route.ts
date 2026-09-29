@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { reclassifyService } from "@/services/registration/reclassifyService";
 import { reclassifyApplySchema, reclassifyCharacteristicsSchema } from "@/schemas/registration";
@@ -11,10 +11,12 @@ export async function GET(req: Request, ctx: Ctx) {
   let correlationId: string | undefined;
   try {
     const session = await requireTenantContext(req);
-    correlationId = session.correlationId;
-    const { modelId } = await ctx.params;
-    const context = await reclassifyService.getContext(session, modelId);
-    return Response.json({ context }, { headers: { "x-correlation-id": session.correlationId } });
+    return await withTenantStore(session, async () => {
+      correlationId = session.correlationId;
+      const { modelId } = await ctx.params;
+      const context = await reclassifyService.getContext(session, modelId);
+      return Response.json({ context }, { headers: { "x-correlation-id": session.correlationId } });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }
@@ -25,17 +27,18 @@ export async function POST(req: Request, ctx: Ctx) {
   let correlationId: string | undefined;
   try {
     const session = await requireTenantContext(req);
-    correlationId = session.correlationId;
-    const { modelId } = await ctx.params;
-    const parsed = reclassifyApplySchema.parse(await req.json());
-    const result = await reclassifyService.apply(session, modelId, {
-      characteristics: parsed.characteristics as RegistrationCharacteristics,
-      checks: parsed.checks,
-      acknowledgeImpact: parsed.acknowledgeImpact,
-      classificationConfidence: parsed.classificationConfidence,
-      evidenceText: parsed.evidenceText,
+    return await withTenantStore(session, async () => {
+      correlationId = session.correlationId;
+      const { modelId } = await ctx.params;
+      const parsed = reclassifyApplySchema.parse(await req.json());
+      const result = await reclassifyService.apply(session, modelId, {
+        characteristics: parsed.characteristics as RegistrationCharacteristics,
+        checks: parsed.checks,
+        acknowledgeImpact: parsed.acknowledgeImpact,
+        classificationConfidence: parsed.classificationConfidence,
+        evidenceText: parsed.evidenceText });
+      return Response.json({ result }, { headers: { "x-correlation-id": session.correlationId } });
     });
-    return Response.json({ result }, { headers: { "x-correlation-id": session.correlationId } });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

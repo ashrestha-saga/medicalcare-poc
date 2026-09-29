@@ -191,6 +191,27 @@ export function DeviceDetail({
         </aside>
       </div>
 
+      {detail && detail.course.length > 0 && (
+        <div className="rounded-md border border-border bg-card/40 p-4" data-testid="device-course">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Course
+          </p>
+          <ul className="mt-3 space-y-3">
+            {detail.course.map((event, i) => (
+              <li key={`${event.label}-${event.at}-${i}`} className="border-l-2 border-border pl-3">
+                <p className="text-sm text-foreground">{event.label}</p>
+                <p className="text-xs text-muted-foreground">
+                  {formatDate(event.at)}
+                  {event.actor ? ` · ${event.actor}` : ""}
+                  {event.actorKind ? ` · ${event.actorKind}` : ""}
+                  {event.organisationName ? ` · ${event.organisationName}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {detail && (
         <DeviceDutiesPanel
           device={detail}

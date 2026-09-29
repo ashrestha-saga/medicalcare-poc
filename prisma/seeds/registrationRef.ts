@@ -54,6 +54,9 @@ const RULE_SETS = [
   },
 ] as const;
 
+const OPERATING = "operating" as const;
+const INSPECTION = "inspection" as const;
+
 const INSPECTION_TYPES: {
   code: string;
   ruleSetId: string;
@@ -63,6 +66,9 @@ const INSPECTION_TYPES: {
   defaultInterval: number | null;
   intervalUnit: string | null;
   evidenceHint: string;
+  category: "inspection" | "operating";
+  confidence: "verified" | "derived";
+  sourceRef: string | null;
 }[] = [
   {
     code: "MAINT",
@@ -73,6 +79,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Wartungsbericht, bei Anlage-1-Produkten Eintrag im Medizinproduktebuch",
+    category: OPERATING,
+    confidence: "derived",
+    sourceRef: "§ 7 MPBetreibV",
   },
   {
     code: "STK",
@@ -83,6 +92,9 @@ const INSPECTION_TYPES: {
     defaultInterval: 24,
     intervalUnit: "months",
     evidenceHint: "Protokoll, Eintrag im Medizinproduktebuch, Kennzeichnung am Produkt",
+    category: INSPECTION,
+    confidence: "derived",
+    sourceRef: "§ 12 MPBetreibV",
   },
   {
     code: "MTK",
@@ -93,6 +105,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Protokoll, Aufbewahrung bis zur naechsten MTK",
+    category: INSPECTION,
+    confidence: "verified",
+    sourceRef: "Anlage 2 MPBetreibV",
   },
   {
     code: "ACCEPT",
@@ -103,6 +118,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Pruefbericht mit Bezugswerten",
+    category: INSPECTION,
+    confidence: "verified",
+    sourceRef: "§ 115 StrlSchV",
   },
   {
     code: "CONSTANCY",
@@ -113,6 +131,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Aufzeichnung nach § 117 StrlSchV, mindestens zehn Jahre",
+    category: INSPECTION,
+    confidence: "derived",
+    sourceRef: "§ 116 StrlSchV",
   },
   {
     code: "EXPERT",
@@ -123,6 +144,9 @@ const INSPECTION_TYPES: {
     defaultInterval: 5,
     intervalUnit: "years",
     evidenceHint: "Bescheinigung des behoerdlich bestimmten Sachverstaendigen",
+    category: INSPECTION,
+    confidence: "verified",
+    sourceRef: "§ 88 Abs. 4 Nr. 1 StrlSchV",
   },
   {
     code: "MEDBOARD",
@@ -133,6 +157,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Angeforderte Aufnahmen und Aufzeichnungen",
+    category: INSPECTION,
+    confidence: "derived",
+    sourceRef: "§§ 128, 130 StrlSchV",
   },
   {
     code: "ITSEC",
@@ -143,6 +170,9 @@ const INSPECTION_TYPES: {
     defaultInterval: 24,
     intervalUnit: "months",
     evidenceHint: "Protokoll mit Datum und Ergebnis",
+    category: INSPECTION,
+    confidence: "verified",
+    sourceRef: "§ 17 MPBetreibV",
   },
   {
     code: "INSTALL",
@@ -153,6 +183,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Pruefnachweis vor Inbetriebnahme",
+    category: INSPECTION,
+    confidence: "verified",
+    sourceRef: "§ 17 MPBetreibV",
   },
   {
     code: "REPROC",
@@ -163,6 +196,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Validierungsbericht, Freigabeprotokolle je Charge",
+    category: OPERATING,
+    confidence: "derived",
+    sourceRef: "§ 8 MPBetreibV · KRINKO/BfArM",
   },
   {
     code: "REPROC_CTRL",
@@ -173,6 +209,9 @@ const INSPECTION_TYPES: {
     defaultInterval: 12,
     intervalUnit: "months",
     evidenceHint: "Dokumentation der eigenen Kontrolle",
+    category: OPERATING,
+    confidence: "verified",
+    sourceRef: "§ 8 MPBetreibV",
   },
   {
     code: "VALIDATION",
@@ -183,6 +222,9 @@ const INSPECTION_TYPES: {
     defaultInterval: 12,
     intervalUnit: "months",
     evidenceHint: "Validierungsbericht mit IQ, BQ und LQ",
+    category: INSPECTION,
+    confidence: "verified",
+    sourceRef: "DIN EN ISO 15883 / 17665",
   },
   {
     code: "SINGLE_USE",
@@ -193,6 +235,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Nachweis der Eignung des Verfahrens",
+    category: OPERATING,
+    confidence: "derived",
+    sourceRef: "§ 9 MPBetreibV",
   },
   {
     code: "NETWORK",
@@ -203,6 +248,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Dokumentierte Netzanbindung",
+    category: OPERATING,
+    confidence: "verified",
+    sourceRef: "§ 4 Abs. 6 MPBetreibV",
   },
   {
     code: "IMPLANT",
@@ -213,6 +261,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Dokumentation je Implantation",
+    category: INSPECTION,
+    confidence: "verified",
+    sourceRef: "§ 16 Abs. 2 · Anlage 3",
   },
   {
     code: "RADIOACTIVE",
@@ -223,6 +274,9 @@ const INSPECTION_TYPES: {
     defaultInterval: null,
     intervalUnit: null,
     evidenceHint: "Kontaminationsmessungen, Buchfuehrung ueber den Verbleib",
+    category: INSPECTION,
+    confidence: "derived",
+    sourceRef: "StrlSchG / StrlSchV",
   },
 ];
 
@@ -392,12 +446,32 @@ export async function seedRegistrationRef(prisma: PrismaClient): Promise<void> {
         ruleSetId: it.ruleSetId,
         label: it.label,
         legalBasis: it.legalBasis,
-        deadlineAnchor: it.deadlineAnchor,
+        deadlineAnchor: it.deadlineAnchor as
+          | "exact_day"
+          | "month_end"
+          | "year_end"
+          | "event"
+          | "interval"
+          | "process"
+          | "permanent",
         defaultInterval: it.defaultInterval,
         intervalUnit: it.intervalUnit,
         evidenceHint: it.evidenceHint,
+        category: it.category,
+        confidence: it.confidence,
+        sourceRef: it.sourceRef,
       },
-      create: it,
+      create: {
+        ...it,
+        deadlineAnchor: it.deadlineAnchor as
+          | "exact_day"
+          | "month_end"
+          | "year_end"
+          | "event"
+          | "interval"
+          | "process"
+          | "permanent",
+      },
     });
   }
 
@@ -416,8 +490,8 @@ export async function seedRegistrationRef(prisma: PrismaClient): Promise<void> {
         isGroup,
         intervalYears: r.fristJahre,
         conditionText: r.bedingung ?? null,
-        matchTerms: JSON.stringify(r.matchTerms ?? []),
-        matchExclude: JSON.stringify(r.matchExclude ?? []),
+        matchTerms: r.matchTerms ?? [],
+        matchExclude: r.matchExclude ?? [],
         matchConfidence: r.matchConfidence === "kuratiert" ? "derived" : (r.matchConfidence ?? "derived"),
       },
       create: {
@@ -430,20 +504,62 @@ export async function seedRegistrationRef(prisma: PrismaClient): Promise<void> {
         isGroup,
         intervalYears: r.fristJahre,
         conditionText: r.bedingung ?? null,
-        matchTerms: JSON.stringify(r.matchTerms ?? []),
-        matchExclude: JSON.stringify(r.matchExclude ?? []),
+        matchTerms: r.matchTerms ?? [],
+        matchExclude: r.matchExclude ?? [],
         matchConfidence: r.matchConfidence === "kuratiert" ? "derived" : (r.matchConfidence ?? "derived"),
       },
     });
   }
 
   const reproc = [
-    { code: "unkritisch", label: "Unkritisch — Kontakt nur mit intakter Haut", requiresQmsCert: false, note: "Reinigung und ggf. Desinfektion nach schriftlicher Arbeitsanweisung." },
-    { code: "semikritisch-a", label: "Semikritisch A — Kontakt mit Schleimhaut, ohne besondere Anforderungen", requiresQmsCert: false, note: "Validierte Reinigung und Desinfektion." },
-    { code: "semikritisch-b", label: "Semikritisch B — Kontakt mit Schleimhaut, mit besonderen Anforderungen", requiresQmsCert: false, note: "Validierte maschinelle Aufbereitung empfohlen." },
-    { code: "kritisch-a", label: "Kritisch A — Durchdringt Haut oder Schleimhaut, ohne besondere Anforderungen", requiresQmsCert: false, note: "Validierte Reinigung, Desinfektion und Sterilisation." },
-    { code: "kritisch-b", label: "Kritisch B — mit besonderen Anforderungen an die Aufbereitung", requiresQmsCert: true, note: "Zertifizierung des Qualitätsmanagementsystems durch eine benannte Stelle." },
-    { code: "kritisch-c", label: "Kritisch C — mit besonders hohen Anforderungen", requiresQmsCert: true, note: "Wie kritisch B, zusätzlich besonders hohe Anforderungen." },
+    {
+      code: "unkritisch",
+      label: "Unkritisch — Kontakt nur mit intakter Haut",
+      requiresQmsCert: false,
+      requiresValidatedProcess: false,
+      evidence: "Schriftliche Arbeitsanweisung reicht; kein validiertes Verfahren verlangt.",
+      note: "Reinigung und ggf. Desinfektion nach schriftlicher Arbeitsanweisung.",
+    },
+    {
+      code: "semikritisch-a",
+      label: "Semikritisch A — Kontakt mit Schleimhaut, ohne besondere Anforderungen",
+      requiresQmsCert: false,
+      requiresValidatedProcess: true,
+      evidence: "Validierungsbericht Reinigung/Desinfektion",
+      note: "Validierte Reinigung und Desinfektion.",
+    },
+    {
+      code: "semikritisch-b",
+      label: "Semikritisch B — Kontakt mit Schleimhaut, mit besonderen Anforderungen",
+      requiresQmsCert: false,
+      requiresValidatedProcess: true,
+      evidence: "Validierungsbericht maschinelle Aufbereitung",
+      note: "Validierte maschinelle Aufbereitung empfohlen.",
+    },
+    {
+      code: "kritisch-a",
+      label: "Kritisch A — Durchdringt Haut oder Schleimhaut, ohne besondere Anforderungen",
+      requiresQmsCert: false,
+      requiresValidatedProcess: true,
+      evidence: "Validierungsbericht Reinigung, Desinfektion und Sterilisation",
+      note: "Validierte Reinigung, Desinfektion und Sterilisation.",
+    },
+    {
+      code: "kritisch-b",
+      label: "Kritisch B — mit besonderen Anforderungen an die Aufbereitung",
+      requiresQmsCert: true,
+      requiresValidatedProcess: true,
+      evidence: "Validierungsbericht + QM-Zertifikat benannte Stelle",
+      note: "Zertifizierung des Qualitätsmanagementsystems durch eine benannte Stelle.",
+    },
+    {
+      code: "kritisch-c",
+      label: "Kritisch C — mit besonders hohen Anforderungen",
+      requiresQmsCert: true,
+      requiresValidatedProcess: true,
+      evidence: "Validierungsbericht + QM-Zertifikat; besonders hohe Anforderungen",
+      note: "Wie kritisch B, zusätzlich besonders hohe Anforderungen.",
+    },
   ];
   for (const c of reproc) {
     await prisma.refReprocessingClass.upsert({
@@ -511,9 +627,30 @@ export async function seedRegistrationRef(prisma: PrismaClient): Promise<void> {
   }
 
   for (const r of [
-    { code: "roentgen", label: "Röntgendiagnostik", defaultAuthorisation: "notification", medicalBoardNote: "in der Regel alle zwei bis drei Jahre" },
-    { code: "therapie", label: "Strahlentherapie", defaultAuthorisation: "licence", medicalBoardNote: "engmaschiger als in der Diagnostik" },
-    { code: "nuklear", label: "Nuklearmedizin — Umgang mit radioaktiven Stoffen", defaultAuthorisation: "licence", medicalBoardNote: "engmaschiger als in der Diagnostik" },
+    {
+      code: "roentgen",
+      label: "Röntgendiagnostik",
+      defaultAuthorisation: "notification",
+      medicalBoardNote: "in der Regel alle zwei bis drei Jahre",
+      qualityGuideline: "QS-RL Röntgendiagnostik",
+      expertInspectionApplies: true,
+    },
+    {
+      code: "therapie",
+      label: "Strahlentherapie",
+      defaultAuthorisation: "licence",
+      medicalBoardNote: "engmaschiger als in der Diagnostik",
+      qualityGuideline: "QS-RL Strahlentherapie",
+      expertInspectionApplies: true,
+    },
+    {
+      code: "nuklear",
+      label: "Nuklearmedizin — Umgang mit radioaktiven Stoffen",
+      defaultAuthorisation: "licence",
+      medicalBoardNote: "engmaschiger als in der Diagnostik",
+      qualityGuideline: "QS-RL Nuklearmedizin",
+      expertInspectionApplies: false,
+    },
   ]) {
     await prisma.refRadiationApplication.upsert({
       where: { code: r.code },
@@ -588,19 +725,70 @@ export async function seedRegistrationRef(prisma: PrismaClient): Promise<void> {
         label: pk.label,
         hint: pk.hint,
         sortGroup: pk.sortGroup,
-        shows: JSON.stringify(pk.shows),
-        blocks: JSON.stringify(pk.blocks),
-        presets: JSON.stringify(pk.presets),
+        shows: pk.shows,
+        blocks: pk.blocks,
+        presets: pk.presets,
       },
       create: {
         code: pk.code,
         label: pk.label,
         hint: pk.hint,
         sortGroup: pk.sortGroup,
-        shows: JSON.stringify(pk.shows),
-        blocks: JSON.stringify(pk.blocks),
-        presets: JSON.stringify(pk.presets),
+        shows: pk.shows,
+        blocks: pk.blocks,
+        presets: pk.presets,
       },
+    });
+  }
+
+  // C2 — commissioning prerequisites (ported from prerequisites.ts)
+  const prereqs: {
+    id: string;
+    code: string;
+    label: string;
+    legalBasis: string;
+    note: string;
+    mandatory: boolean;
+    evidenceKind: "confirmation" | "document" | "third_party";
+    appliesWhen: string;
+    releaseLevel: number;
+  }[] = [
+    { id: "prereq-bmps", code: "bmps", label: "Medical device safety officer", legalBasis: "§ 6 MPBetreibV", note: "The duty applies when the site has more than 20 regular employees.", mandatory: true, evidenceKind: "confirmation", appliesWhen: "true", releaseLevel: 1 },
+    { id: "prereq-ga", code: "ga", label: "Instructions for use available and accessible at all times", legalBasis: "§ 4 MPBetreibV", note: "Prerequisite for instruction and intended use.", mandatory: true, evidenceKind: "confirmation", appliesWhen: "true", releaseLevel: 1 },
+    { id: "prereq-einweisung", code: "einweisung", label: "Instruction in proper handling completed", legalBasis: "§ 4 Absatz 3 MPBetreibV", note: "Before first use by the operator.", mandatory: true, evidenceKind: "document", appliesWhen: "true", releaseLevel: 2 },
+    { id: "prereq-wartungsplan", code: "wartungsplan", label: "Manufacturer maintenance requirements available", legalBasis: "§ 7 MPBetreibV", note: "Basis for the maintenance duty.", mandatory: true, evidenceKind: "confirmation", appliesWhen: "true", releaseLevel: 1 },
+    { id: "prereq-bestand", code: "bestand", label: "Entry in the inventory register", legalBasis: "§ 14 MPBetreibV", note: "Created on release in this wizard.", mandatory: true, evidenceKind: "confirmation", appliesWhen: "true", releaseLevel: 1 },
+    { id: "prereq-mpb", code: "mpb", label: "Medical device logbook created", legalBasis: "§ 13 Absatz 1 MPBetreibV", note: "For products under Anlage 1 and Anlage 2.", mandatory: true, evidenceKind: "confirmation", appliesWhen: "aktiv_or_anlage2", releaseLevel: 1 },
+    { id: "prereq-anzeige", code: "anzeige", label: "Notification / licence under StrlSchG", legalBasis: "StrlSchG", note: "Regulatory prerequisite depending on the radiation application.", mandatory: true, evidenceKind: "document", appliesWhen: "strahlung", releaseLevel: 2 },
+    { id: "prereq-abn", code: "abn", label: "Acceptance test completed, reference values established", legalBasis: "§ 115 StrlSchV", note: "Without reference values, a constancy test is not possible.", mandatory: true, evidenceKind: "third_party", appliesWhen: "strahlung", releaseLevel: 3 },
+    { id: "prereq-ssb", code: "ssb", label: "Radiation protection supervisor and radiation protection officer appointed", legalBasis: "§§ 69, 70 StrlSchG", note: "Organisational prerequisite for radiation operations.", mandatory: true, evidenceKind: "confirmation", appliesWhen: "strahlung", releaseLevel: 2 },
+    { id: "prereq-fachkunde", code: "fachkunde", label: "Radiation protection expertise demonstrated", legalBasis: "§ 74 StrlSchG", note: "For the persons carrying out the work.", mandatory: true, evidenceKind: "document", appliesWhen: "strahlung", releaseLevel: 2 },
+    { id: "prereq-unterweisung", code: "unterweisung", label: "Instruction of working persons completed", legalBasis: "§ 63 StrlSchV", note: "Before starting work and recurring thereafter.", mandatory: true, evidenceKind: "confirmation", appliesWhen: "strahlung", releaseLevel: 2 },
+    { id: "prereq-ssanweisung", code: "ssanweisung", label: "Radiation protection instruction drawn up, radiation areas defined", legalBasis: "§ 45 StrlSchV", note: "Written requirement at the site.", mandatory: true, evidenceKind: "document", appliesWhen: "strahlung", releaseLevel: 2 },
+    { id: "prereq-arbeitsanw", code: "arbeitsanw", label: "Work instructions for the examinations performed", legalBasis: "§ 121 StrlSchV", note: "Per type of examination.", mandatory: true, evidenceKind: "document", appliesWhen: "strahlung", releaseLevel: 2 },
+    { id: "prereq-vorkommnis", code: "vorkommnis", label: "Procedure for detecting and handling incidents", legalBasis: "§ 130 StrlSchV", note: "Must be demonstrable to the medical board.", mandatory: true, evidenceKind: "document", appliesWhen: "strahlung", releaseLevel: 2 },
+    { id: "prereq-dosimetrie", code: "dosimetrie", label: "Personal dosimetry established for occupationally exposed persons", legalBasis: "StrlSchV", note: "According to facility size and exposure.", mandatory: false, evidenceKind: "confirmation", appliesWhen: "strahlung", releaseLevel: 2 },
+    { id: "prereq-instpr", code: "instpr", label: "Software installation check completed", legalBasis: "§ 17 MPBetreibV", note: "Operation only after installation check.", mandatory: true, evidenceKind: "document", appliesWhen: "software_class", releaseLevel: 2 },
+    { id: "prereq-sop", code: "sop", label: "Reprocessing work instruction and validation available", legalBasis: "§ 8 MPBetreibV", note: "Written procedure and validated process.", mandatory: true, evidenceKind: "document", appliesWhen: "aufbereitung", releaseLevel: 2 },
+    { id: "prereq-herstellerinfo", code: "herstellerinfo", label: "Manufacturer reprocessing information available", legalBasis: "DIN EN ISO 17664", note: "Manufacturer information on reprocessing.", mandatory: true, evidenceKind: "document", appliesWhen: "aufbereitung", releaseLevel: 2 },
+    { id: "prereq-vertrag", code: "vertrag", label: "Contract with the commissioned reprocessing provider available", legalBasis: "§ 8 MPBetreibV", note: "Responsibility remains with the operator.", mandatory: true, evidenceKind: "document", appliesWhen: "aufb_extern", releaseLevel: 2 },
+    { id: "prereq-sachkunde", code: "sachkunde", label: "Competence of reprocessing staff demonstrated", legalBasis: "§ 8 MPBetreibV · KRINKO/BfArM", note: "Scope depends on the classification.", mandatory: true, evidenceKind: "confirmation", appliesWhen: "aufbereitung", releaseLevel: 2 },
+    { id: "prereq-val-geraet", code: "val_geraet", label: "Valid validation report (equipment)", legalBasis: "§ 8 MPBetreibV", note: "Validation applies to the process, not only the device.", mandatory: true, evidenceKind: "third_party", appliesWhen: "aufb_geraete", releaseLevel: 3 },
+    { id: "prereq-val-eigen", code: "val_eigen", label: "Valid validation report for this reprocessing device", legalBasis: "§ 8 MPBetreibV", note: "This product itself carries the validation duty.", mandatory: true, evidenceKind: "third_party", appliesWhen: "ist_aufb_geraet", releaseLevel: 3 },
+  ];
+  for (const p of prereqs) {
+    await prisma.refCommissioningPrerequisite.upsert({
+      where: { ruleSetId_code: { ruleSetId: "rs-mpbetreibv", code: p.code } },
+      update: {
+        label: p.label,
+        legalBasis: p.legalBasis,
+        note: p.note,
+        mandatory: p.mandatory,
+        evidenceKind: p.evidenceKind,
+        appliesWhen: p.appliesWhen,
+        releaseLevel: p.releaseLevel,
+      },
+      create: { ...p, ruleSetId: "rs-mpbetreibv" },
     });
   }
 }

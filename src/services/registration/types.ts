@@ -59,7 +59,17 @@ export interface RegistrationCharacteristics {
   answerCounts?: AnswerCounts;
 }
 
-export type DutyConfidence = "verified" | "derived" | "n/a";
+/** Maps onto Prisma Confidence; `n/a` is legacy alias for not_applicable. */
+export type DutyConfidence =
+  | "verified"
+  | "responsible"
+  | "determination"
+  | "derived"
+  | "not_applicable"
+  | "guess"
+  | "n/a";
+
+export type DutyCategory = "inspection" | "operating";
 
 export interface DerivedDuty {
   id: string;
@@ -80,7 +90,14 @@ export interface DerivedDuty {
   constancyObjectCode?: string;
   routine?: string[];
   freigabe?: string;
+  category?: DutyCategory;
+  setsBaseline?: boolean;
+  requiresBaseline?: boolean;
+  /** AUF-01 — product duty that references an equipment instance. */
+  referenceDeviceId?: string | null;
 }
+
+export type EvidenceKind = "confirmation" | "document" | "third_party";
 
 export interface PrerequisiteItem {
   k: string;
@@ -90,4 +107,8 @@ export interface PrerequisiteItem {
   pflicht: boolean;
   /** Auto-satisfied from site data (e.g. § 6 MPSB). */
   erfuellt?: boolean;
+  evidenceKind?: EvidenceKind;
+  releaseLevel?: number;
+  /** Satisfied via DeviceEvidence (document / third_party). */
+  evidenceId?: string | null;
 }

@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { dutyService } from "@/services/registration/dutyService";
 
@@ -7,27 +7,28 @@ export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
     const auth = await requireTenantContext(req);
-    correlationId = auth.correlationId;
-    const url = new URL(req.url);
-    const beforeRaw = url.searchParams.get("before");
-    const limitRaw = url.searchParams.get("limit");
-    let before: Date | undefined;
-    if (beforeRaw) {
-      const parsed = new Date(beforeRaw);
-      if (Number.isNaN(parsed.getTime())) {
-        return Response.json(
-          { error: { code: "validation_error", message: "Invalid before date.", correlationId } },
-          { status: 400, headers: { "x-correlation-id": auth.correlationId } },
-        );
+    return await withTenantStore(auth, async () => {
+      correlationId = auth.correlationId;
+      const url = new URL(req.url);
+      const beforeRaw = url.searchParams.get("before");
+      const limitRaw = url.searchParams.get("limit");
+      let before: Date | undefined;
+      if (beforeRaw) {
+        const parsed = new Date(beforeRaw);
+        if (Number.isNaN(parsed.getTime())) {
+          return Response.json(
+            { error: { code: "validation_error", message: "Invalid before date.", correlationId } },
+            { status: 400, headers: { "x-correlation-id": auth.correlationId } },
+          );
+        }
+        before = parsed;
       }
-      before = parsed;
-    }
-    const limit = limitRaw ? Number(limitRaw) : undefined;
-    const duties = await dutyService.listDue(auth, {
-      before,
-      limit: Number.isFinite(limit) ? limit : undefined,
+      const limit = limitRaw ? Number(limitRaw) : undefined;
+      const duties = await dutyService.listDue(auth, {
+        before,
+        limit: Number.isFinite(limit) ? limit : undefined });
+      return Response.json({ duties }, { headers: { "x-correlation-id": auth.correlationId } });
     });
-    return Response.json({ duties }, { headers: { "x-correlation-id": auth.correlationId } });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

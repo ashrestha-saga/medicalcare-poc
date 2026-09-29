@@ -93,6 +93,8 @@ export interface DeviceCourseEventDTO {
   label: string;
   at: string;
   actor: string | null;
+  actorKind?: string | null;
+  organisationName?: string | null;
 }
 
 /** Detail payload for inventory view / admin edit. */

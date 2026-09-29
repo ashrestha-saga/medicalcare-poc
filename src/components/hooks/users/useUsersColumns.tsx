@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronsUpDown, KeyRound, Pencil, Trash2 } from "lucide-react";
+import { ChevronsUpDown, Pencil, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { AdminUserDTO } from "@/interfaces";
 import { roleLabel } from "@/constants/roles";
@@ -13,9 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 export interface UsersTableActions {
   canUpdate: boolean;
   canDelete: boolean;
-  canResetPassword: boolean;
-  onEdit: (user: AdminUserDTO) => void;
-  onResetPassword: (user: AdminUserDTO) => void;
+  canCreate: boolean;
   onDelete: (user: AdminUserDTO) => void;
 }
 
@@ -40,7 +39,7 @@ function SortHeader({
 }
 
 export function useUsersColumns(actions: UsersTableActions): ColumnDef<AdminUserDTO>[] {
-  const { canUpdate, canDelete, canResetPassword, onEdit, onResetPassword, onDelete } = actions;
+  const { canUpdate, canDelete, canCreate, onDelete } = actions;
   const t = useTranslations("table.users");
   const tTable = useTranslations("table");
 
@@ -72,15 +71,20 @@ export function useUsersColumns(actions: UsersTableActions): ColumnDef<AdminUser
         accessorKey: "active",
         id: "status",
         header: ({ column }) => <SortHeader label={t("status")} column={column} />,
-        cell: ({ row }) =>
-          row.original.active ? (
+        cell: ({ row }) => {
+          const status = row.original.status ?? (row.original.active ? "active" : "inactive");
+          if (status === "invited") {
+            return <Badge variant="warning">Invited</Badge>;
+          }
+          return status === "active" ? (
             <Badge variant="success">Active</Badge>
           ) : (
             <Badge variant="destructive">Inactive</Badge>
-          ),
+          );
+        },
         filterFn: (row, _id, value: string[]) => {
           if (!value?.length) return true;
-          const status = row.original.active ? "active" : "inactive";
+          const status = row.original.status ?? (row.original.active ? "active" : "inactive");
           return value.includes(status);
         },
       },
@@ -92,46 +96,33 @@ export function useUsersColumns(actions: UsersTableActions): ColumnDef<AdminUser
         meta: { className: "w-[1%] whitespace-nowrap text-right" },
         cell: ({ row }) => {
           const user = row.original;
+          const href = `/users/${encodeURIComponent(user.id)}`;
+          const canOpen =
+            canUpdate || (user.status === "invited" && (canCreate || canDelete));
           return (
             <TooltipProvider delayDuration={200}>
               <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                {canUpdate && (
+                {canOpen && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-[var(--accent)] hover:bg-[rgba(30,127,224,0.14)] hover:text-[var(--accent)]"
-                        onClick={() => onEdit(user)}
+                        className="h-8 w-8 text-primary hover:bg-primary/10 hover:text-primary"
+                        asChild
                         data-testid="user-edit"
                         aria-label={`Edit ${user.name}`}
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Link href={href}>
+                          <Pencil className="h-4 w-4" />
+                        </Link>
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Edit</TooltipContent>
                   </Tooltip>
                 )}
-                {canResetPassword && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-[var(--warn)] hover:bg-[rgba(245,165,36,0.14)] hover:text-[var(--warn)]"
-                        onClick={() => onResetPassword(user)}
-                        data-testid="user-reset"
-                        aria-label={`Reset password for ${user.name}`}
-                      >
-                        <KeyRound className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Reset password</TooltipContent>
-                  </Tooltip>
-                )}
-                {canDelete && (
+                {canDelete && user.status !== "invited" && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -155,6 +146,6 @@ export function useUsersColumns(actions: UsersTableActions): ColumnDef<AdminUser
         },
       },
     ],
-    [canUpdate, canDelete, canResetPassword, onEdit, onResetPassword, onDelete, t, tTable],
+    [canUpdate, canDelete, canCreate, onDelete, t, tTable],
   );
 }

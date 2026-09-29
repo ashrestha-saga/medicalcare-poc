@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { updateCatalogModelSchema } from "@/schemas/catalogModel";
 import { deviceModelCatalogService } from "@/services/catalog/deviceModelCatalogService";
@@ -10,10 +10,12 @@ export async function GET(_req: Request, context: RouteContext) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(_req);
-    correlationId = ctx.correlationId;
-    const { id } = await context.params;
-    const model = await deviceModelCatalogService.getById(ctx, id);
-    return Response.json({ model }, { headers: { "x-correlation-id": ctx.correlationId } });
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      const { id } = await context.params;
+      const model = await deviceModelCatalogService.getById(ctx, id);
+      return Response.json({ model }, { headers: { "x-correlation-id": ctx.correlationId } });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }
@@ -24,11 +26,13 @@ export async function PATCH(req: Request, context: RouteContext) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    const { id } = await context.params;
-    const input = updateCatalogModelSchema.parse(await req.json());
-    const model = await deviceModelCatalogService.update(ctx, id, input);
-    return Response.json({ model }, { headers: { "x-correlation-id": ctx.correlationId } });
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      const { id } = await context.params;
+      const input = updateCatalogModelSchema.parse(await req.json());
+      const model = await deviceModelCatalogService.update(ctx, id, input);
+      return Response.json({ model }, { headers: { "x-correlation-id": ctx.correlationId } });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

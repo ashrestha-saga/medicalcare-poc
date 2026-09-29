@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse, notFound } from "@/lib/errors";
 import { serviceRequestService } from "@/services/requests/serviceRequestService";
 
@@ -7,11 +7,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ referenc
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    const { reference } = await params;
-    const request = await serviceRequestService.getByReference(reference, ctx.tenantId);
-    if (!request) throw notFound(`Unknown service request reference ${reference}.`);
-    return Response.json(request);
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      const { reference } = await params;
+      const request = await serviceRequestService.getByReference(reference, ctx.tenantId);
+      if (!request) throw notFound(`Unknown service request reference ${reference}.`);
+      return Response.json(request);
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

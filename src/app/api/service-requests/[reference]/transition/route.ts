@@ -1,4 +1,4 @@
-import { requireTenantContext } from "@/lib/auth/tenantContext";
+import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { transitionServiceRequestSchema } from "@/schemas/serviceRequest";
 import { serviceRequestService } from "@/services/requests/serviceRequestService";
@@ -11,11 +11,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ referen
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
-    correlationId = ctx.correlationId;
-    const { reference } = await params;
-    const input = transitionServiceRequestSchema.parse(await req.json());
-    const request = await serviceRequestService.transition(reference, input, ctx);
-    return Response.json(request, { headers: { "x-correlation-id": ctx.correlationId } });
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      const { reference } = await params;
+      const input = transitionServiceRequestSchema.parse(await req.json());
+      const request = await serviceRequestService.transition(reference, input, ctx);
+      return Response.json(request, { headers: { "x-correlation-id": ctx.correlationId } });
+    });
   } catch (error) {
     return errorResponse(error, correlationId);
   }

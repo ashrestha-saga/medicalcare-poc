@@ -5,22 +5,32 @@ import type { ProductKindDTO } from "./productKindTypes";
 export type { ProductKindDTO } from "./productKindTypes";
 export { applyProductKindPresets, blockVisible } from "./productKindLogic";
 
-function parseJsonArray(raw: string): string[] {
-  try {
-    const v = JSON.parse(raw) as unknown;
-    return Array.isArray(v) ? v.map(String) : [];
-  } catch {
-    return [];
+function parseJsonArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.map(String);
+  if (typeof raw === "string") {
+    try {
+      const v = JSON.parse(raw) as unknown;
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch {
+      return [];
+    }
   }
+  return [];
 }
 
-function parseJsonObject(raw: string): Record<string, unknown> {
-  try {
-    const v = JSON.parse(raw) as unknown;
-    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-  } catch {
-    return {};
+function parseJsonObject(raw: unknown): Record<string, unknown> {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
   }
+  if (typeof raw === "string") {
+    try {
+      const v = JSON.parse(raw) as unknown;
+      return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
 }
 
 export function toProductKindDTO(row: RefProductKind): ProductKindDTO {
