@@ -10,7 +10,13 @@ export const ORG_ROLES = [
 
 export type OrganisationRoleSlug = (typeof ORG_ROLES)[number];
 
-export const CONTRACT_SCOPE_TOKENS = ["inventory", "due-dates", "inspection"] as const;
+export const CONTRACT_SCOPE_TOKENS = [
+  "inventory",
+  "due-dates",
+  "inspection",
+  "reprocessing",
+  "training",
+] as const;
 export type ContractScopeToken = (typeof CONTRACT_SCOPE_TOKENS)[number];
 
 const SCOPE_ALIASES: Record<string, ContractScopeToken> = {
@@ -21,6 +27,10 @@ const SCOPE_ALIASES: Record<string, ContractScopeToken> = {
   inspection: "inspection",
   pruefung: "inspection",
   prüfung: "inspection",
+  reprocessing: "reprocessing",
+  aufbereitung: "reprocessing",
+  training: "training",
+  schulung: "training",
 };
 
 const INVENTORY_SCOPE: readonly PermissionSlug[] = [
@@ -45,10 +55,22 @@ const INSPECTION_SCOPE: readonly PermissionSlug[] = [
   "parts:request",
 ];
 
+/** Reprocessing scope: inventory + clarifications visibility (no clinic training). */
+const REPROCESSING_SCOPE: readonly PermissionSlug[] = [
+  "inventory:view",
+  "clarifications:view",
+  "locations:view",
+];
+
+/** Training scope is commercial only — acting still strips training:view. */
+const TRAINING_SCOPE: readonly PermissionSlug[] = [];
+
 export const SCOPE_PERMISSIONS: Record<ContractScopeToken, readonly PermissionSlug[]> = {
   inventory: INVENTORY_SCOPE,
   "due-dates": DUE_DATES_SCOPE,
   inspection: INSPECTION_SCOPE,
+  reprocessing: REPROCESSING_SCOPE,
+  training: TRAINING_SCOPE,
 };
 
 export const PARTNER_FORBIDDEN_PERMISSIONS: readonly PermissionSlug[] = [
@@ -121,8 +143,14 @@ export const ALL_CONSOLE_PERMISSIONS: readonly PermissionSlug[] = [
   "console:contracts:lifecycle",
   "console:due-dates:view",
   "console:requests:view",
+  "console:disposition:view",
+  "console:disposition:assign",
+  "console:assignments:view",
   "console:staff:view",
   "console:staff:invite",
+  "console:staff:assign",
+  "console:external:view",
+  "console:external:manage",
   "console:organisation:view",
   "console:audit:view",
   "console:settings:view",
@@ -134,6 +162,8 @@ const CONSOLE_VIEW_BASE: readonly PermissionSlug[] = [
   "console:customers:view",
   "console:due-dates:view",
   "console:requests:view",
+  "console:disposition:view",
+  "console:assignments:view",
   "console:organisation:view",
   "console:audit:view",
 ];
@@ -141,12 +171,15 @@ const CONSOLE_VIEW_BASE: readonly PermissionSlug[] = [
 /** Operator-console grants by OrgMembership.appRole (no acting tenant). */
 export const CONSOLE_ROLE_PERMISSIONS: Record<PartnerAppRole, readonly PermissionSlug[]> = {
   admin: ALL_CONSOLE_PERMISSIONS,
-  inspector: CONSOLE_VIEW_BASE,
+  inspector: [...CONSOLE_VIEW_BASE],
   order: [
     "console:nav",
     "console:customers:view",
     "console:due-dates:view",
     "console:requests:view",
+    "console:disposition:view",
+    "console:disposition:assign",
+    "console:assignments:view",
   ],
 };
 
@@ -166,6 +199,27 @@ export const CONSOLE_MENU_MODULES: readonly MenuModule[] = [
     group: "ops",
   },
   {
+    id: "console-my-sites",
+    label: "My institutions",
+    href: "/partner/my-sites",
+    slug: "console:disposition:view",
+    group: "ops",
+  },
+  {
+    id: "console-disposition",
+    label: "Orders",
+    href: "/partner/disposition",
+    slug: "console:disposition:view",
+    group: "ops",
+  },
+  {
+    id: "console-assignments",
+    label: "Inspection orders",
+    href: "/partner/inspection-orders",
+    slug: "console:assignments:view",
+    group: "ops",
+  },
+  {
     id: "console-requests",
     label: "Service requests",
     href: "/partner/requests",
@@ -177,6 +231,13 @@ export const CONSOLE_MENU_MODULES: readonly MenuModule[] = [
     label: "Staff",
     href: "/partner/staff",
     slug: "console:staff:view",
+    group: "org",
+  },
+  {
+    id: "console-external",
+    label: "External inspectors",
+    href: "/partner/external-inspectors",
+    slug: "console:external:view",
     group: "org",
   },
   {
@@ -208,8 +269,12 @@ export const CONSOLE_PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/partner/customers": "console:customers:view",
   "/partner/customers/new": "console:customers:create",
   "/partner/due-dates": "console:due-dates:view",
+  "/partner/my-sites": "console:disposition:view",
+  "/partner/disposition": "console:disposition:view",
+  "/partner/inspection-orders": "console:assignments:view",
   "/partner/requests": "console:requests:view",
   "/partner/staff": "console:staff:view",
+  "/partner/external-inspectors": "console:external:view",
   "/partner/organisation": "console:organisation:view",
   "/partner/activity": "console:audit:view",
   "/partner/settings": "console:settings:view",
@@ -270,7 +335,10 @@ export function resolveConsolePathPermission(path: string): PermissionSlug | nul
   const pathname = bare.length > 1 && bare.endsWith("/") ? bare.slice(0, -1) : bare;
   if (CONSOLE_PATH_PERMISSION_MAP[pathname]) return CONSOLE_PATH_PERMISSION_MAP[pathname];
   if (pathname.startsWith("/partner/customers/")) return "console:customers:view";
+  if (pathname.startsWith("/partner/my-sites/")) return "console:disposition:view";
   if (pathname.startsWith("/partner/staff/")) return "console:staff:view";
+  if (pathname.startsWith("/partner/external-inspectors/")) return "console:external:view";
+  if (pathname.startsWith("/partner/disposition/")) return "console:disposition:view";
   if (pathname.startsWith("/partner/")) return null;
   return null;
 }

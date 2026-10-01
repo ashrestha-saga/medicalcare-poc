@@ -6,7 +6,7 @@ import { notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { computeNextMaintenanceDueAt } from "@/lib/maintenance/schedule";
 import { characteristicConflicts } from "./conflicts";
-import { computeReleaseLevel, deriveDuties, type Annex2Lookup } from "./deriveDuties";
+import { computeReleaseLevel, deriveDuties, stkFlagFromDuties, type Annex2Lookup } from "./deriveDuties";
 import { annex2MetaById } from "./annex2Meta";
 import { writeDuty } from "./writeDuty";
 import { draftService, type CreateDraftInput } from "./draftService";
@@ -142,6 +142,11 @@ async function resolveAnnex2(characteristics: RegistrationCharacteristics): Prom
         hinweis: meta?.hinweis ?? item.conditionText,
         verfahren: meta?.verfahren ?? null,
         wahlweiseNach: meta?.wahlweiseNach ?? null,
+        confidence:
+          item.confidence === "verified" || item.confidence === "derived"
+            ? item.confidence
+            : meta?.confidence ?? "derived",
+        sourceRef: item.sourceRef ?? meta?.sourceRef ?? null,
       };
     }
   }
@@ -161,6 +166,11 @@ async function resolveAnnex2(characteristics: RegistrationCharacteristics): Prom
       hinweis: meta?.hinweis ?? item.conditionText,
       verfahren: meta?.verfahren ?? null,
       wahlweiseNach: meta?.wahlweiseNach ?? null,
+      confidence:
+        item.confidence === "verified" || item.confidence === "derived"
+          ? item.confidence
+          : meta?.confidence ?? "derived",
+      sourceRef: item.sourceRef ?? meta?.sourceRef ?? null,
     };
   }
   return null;
@@ -200,7 +210,7 @@ export const releaseService = {
     let requiresValidatedProcess = true;
     if (input.deviceInstanceId) {
       const links = await prisma.reprocessingOnDevice.findMany({
-        where: { tenantId: ctx.tenantId, profileDeviceId: input.deviceInstanceId },
+        where: { tenantId: ctx.tenantId, profileDeviceId: input.deviceInstanceId, validTo: null },
         select: { equipmentDeviceId: true },
       });
       linkedEquipmentDeviceIds = links.map((l) => l.equipmentDeviceId);
@@ -397,7 +407,7 @@ export const releaseService = {
               data: {
                 deviceModelId: row.modelId,
                 openClassificationKey: row.modelId,
-                stk: Boolean(characteristics.anlage1 || characteristics.altgeraet),
+                stk: stkFlagFromDuties(preview.duties),
                 mtkItemId,
                 radiation: Boolean(characteristics.strahlung),
                 softwareClass:
@@ -453,7 +463,7 @@ export const releaseService = {
       if (characteristics.aufbereitung && characteristics.aufbKlasse) {
         if (characteristics.aufbExtern) {
           const links = await tx.reprocessingOnDevice.count({
-            where: { profileDeviceId: row.id, tenantId },
+            where: { profileDeviceId: row.id, tenantId, validTo: null },
           });
           if (links > 0) {
             throw unprocessable(

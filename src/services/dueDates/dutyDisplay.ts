@@ -38,6 +38,7 @@ export function deadlineAnchorLabel(anchor: string): string {
 
 export function confidenceLabel(confidence: string): string {
   if (confidence === "verified") return "evidenced";
-  if (confidence === "guess") return "guessed";
+  // Legacy `guess` reads as derived (SWOT: deprecation without silent drift).
+  if (confidence === "guess" || confidence === "derived") return "derived";
   return confidence;
 }

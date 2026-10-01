@@ -21,6 +21,7 @@ export const MODEL_OWNED_FIELDS = [
   "swKlasse",
   "wartungIntervall",
   "wartungQuelle",
+  "wartungBegruendung",
   "wartungExtern",
   "energie",
   "vernetzt",

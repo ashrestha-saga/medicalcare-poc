@@ -1,11 +1,13 @@
 import type { Prisma } from "@prisma/client";
-import { computeDutyDueAt, intervalUnitFromEinheits } from "./dueDate";
+import { computeDutyDueAt } from "./dueDate";
+import { canonicalDutyKey, toIntervalUnit } from "./dutyKeys";
 import type { DerivedDuty } from "./types";
 
 function mapConfidence(vertrauen: DerivedDuty["vertrauen"], applicable: boolean): string {
   if (!applicable || vertrauen === "n/a" || vertrauen === "not_applicable") {
     return "not_applicable";
   }
+  if (vertrauen === "guess") return "derived";
   return vertrauen;
 }
 
@@ -27,6 +29,7 @@ export async function writeDuty(
 ) {
   const d = args.duty;
   const applicable = d.einschlaegig;
+  const dutyKey = canonicalDutyKey(d.id);
 
   if (!applicable) {
     await tx.deviceDuty.create({
@@ -34,7 +37,7 @@ export async function writeDuty(
         tenantId: args.tenantId,
         deviceInstanceId: args.deviceInstanceId,
         snapshotId: args.snapshotId,
-        dutyKey: d.id,
+        dutyKey,
         inspectionTypeCode: d.inspectionTypeCode,
         deadlineAnchor: "none",
         intervalValue: null,
@@ -58,19 +61,31 @@ export async function writeDuty(
     return;
   }
 
-  const intervalUnit = intervalUnitFromEinheits(d.einheit);
+  const intervalUnit = toIntervalUnit(d.einheit);
   const dueBase =
     d.id === "wartung" && args.lastMaintainedAt ? args.lastMaintainedAt : args.referenceDate;
-  const anchor = d.deadlineAnchor === "reference" || d.deadlineAnchor === "none" ? d.deadlineAnchor : d.deadlineAnchor;
+  const anchor =
+    d.deadlineAnchor === "reference" || d.deadlineAnchor === "none"
+      ? d.deadlineAnchor
+      : d.deadlineAnchor;
 
   await tx.deviceDuty.create({
     data: {
       tenantId: args.tenantId,
       deviceInstanceId: args.deviceInstanceId,
       snapshotId: args.snapshotId,
-      dutyKey: d.id,
+      dutyKey,
       inspectionTypeCode: d.inspectionTypeCode,
-      deadlineAnchor: anchor as "exact_day" | "month_end" | "year_end" | "event" | "interval" | "process" | "permanent" | "reference" | "none",
+      deadlineAnchor: anchor as
+        | "exact_day"
+        | "month_end"
+        | "year_end"
+        | "event"
+        | "interval"
+        | "process"
+        | "permanent"
+        | "reference"
+        | "none",
       intervalValue: d.frist,
       intervalUnit,
       cadenceLabel: d.intervall ?? null,
@@ -81,8 +96,7 @@ export async function writeDuty(
         | "responsible"
         | "determination"
         | "derived"
-        | "not_applicable"
-        | "guess",
+        | "not_applicable",
       applicable: true,
       notApplicableReason: null,
       referenceDate: args.referenceDate,

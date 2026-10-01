@@ -41,8 +41,14 @@ export type PermissionSlug =
   | "console:contracts:lifecycle"
   | "console:due-dates:view"
   | "console:requests:view"
+  | "console:disposition:view"
+  | "console:disposition:assign"
+  | "console:assignments:view"
   | "console:staff:view"
   | "console:staff:invite"
+  | "console:staff:assign"
+  | "console:external:view"
+  | "console:external:manage"
   | "console:organisation:view"
   | "console:audit:view"
   | "console:settings:view"
@@ -66,7 +72,11 @@ export type MenuModuleId =
   | "console-customers"
   | "console-due-dates"
   | "console-requests"
+  | "console-disposition"
+  | "console-my-sites"
+  | "console-assignments"
   | "console-staff"
+  | "console-external"
   | "console-organisation"
   | "console-activity"
   | "console-settings";
@@ -77,8 +87,8 @@ export interface MenuModule {
   /** App path for this module. */
   href: string;
   slug: PermissionSlug;
-  /** Console nav group (ops | org). Clinic modules omit this. */
-  group?: "ops" | "org";
+  /** Nav section: clinic work | master | output; console ops | org. */
+  group?: "work" | "master" | "output" | "ops" | "org";
 }
 
 export interface CapabilitiesResponse {

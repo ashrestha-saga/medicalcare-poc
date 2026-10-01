@@ -3,6 +3,7 @@
  * Pure — calculates, decides nothing.
  */
 import { addMonthsUtc } from "@/lib/maintenance/schedule";
+import { toIntervalUnit } from "./dutyKeys";
 
 export type DeadlineAnchor =
   | "month_end"
@@ -16,9 +17,7 @@ export type DeadlineAnchor =
   | "none";
 
 export function intervalUnitFromEinheits(einheit: string | null | undefined): "months" | "years" | null {
-  if (einheit === "Monate" || einheit === "months") return "months";
-  if (einheit === "Jahre" || einheit === "years") return "years";
-  return null;
+  return toIntervalUnit(einheit);
 }
 
 export function dueDate(

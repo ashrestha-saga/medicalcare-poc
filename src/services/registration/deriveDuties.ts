@@ -11,7 +11,19 @@ const REPROC_LABEL: Record<string, { t: string; n: string; zert: boolean }> = {
 
 const EQUIP: Record<
   string,
-  { t: string; valNorm: string; reVal: number; reValEinheit: string; reValQuelle: string; divergent: boolean; routine: string[]; freigabe: string; hinweis?: string }
+  {
+    t: string;
+    valNorm: string;
+    reVal: number;
+    reValEinheit: string;
+    reValQuelle: string;
+    /** Interval confidence — recommendation-only or disputed sources → derived. */
+    confidence: "verified" | "derived";
+    divergent: boolean;
+    routine: string[];
+    freigabe: string;
+    hinweis?: string;
+  }
 > = {
   rdg: {
     t: "Washer-disinfector (RDG)",
@@ -19,6 +31,7 @@ const EQUIP: Record<
     reVal: 12,
     reValEinheit: "months",
     reValQuelle: "at least annually",
+    confidence: "verified",
     divergent: false,
     routine: ["Daily: visual inspection", "Per batch: process record"],
     freigabe: "Batch release by a competent person",
@@ -29,6 +42,7 @@ const EQUIP: Record<
     reVal: 12,
     reValEinheit: "months",
     reValQuelle: "mostly annually (sources differ)",
+    confidence: "derived",
     divergent: true,
     routine: ["Daily: vacuum and helix/Bowie-Dick test"],
     freigabe: "Batch release after record and indicator",
@@ -39,6 +53,7 @@ const EQUIP: Record<
     reVal: 12,
     reValEinheit: "months",
     reValQuelle: "recommended annually",
+    confidence: "derived",
     divergent: false,
     routine: ["Daily: vacuum and Bowie-Dick test"],
     freigabe: "Batch release documented",
@@ -49,6 +64,7 @@ const EQUIP: Record<
     reVal: 12,
     reValEinheit: "months",
     reValQuelle: "renewed performance qualification",
+    confidence: "derived",
     divergent: false,
     routine: ["Daily: seal integrity check"],
     freigabe: "Visual check before start of work",
@@ -69,19 +85,36 @@ const OPERATING_KEYS = new Set([
   "aufb-extern",
   "einmal",
   "netz",
+  "impl",
 ]);
 
 function dutyCategory(id: string): DutyCategory {
-  if (OPERATING_KEYS.has(id) || id.startsWith("zub-")) return "operating";
+  if (OPERATING_KEYS.has(id) || id.startsWith("zub-") || id.startsWith("val-ref-")) {
+    return "operating";
+  }
   return "inspection";
 }
 
+/**
+ * P1: non-applicable duties carry no interval, anchor `none`, confidence `n/a`.
+ * Applied at derivation time so preview and persistence agree.
+ */
 function withMeta(d: DerivedDuty): DerivedDuty {
-  return {
+  const base: DerivedDuty = {
     ...d,
     category: d.category ?? dutyCategory(d.id),
     setsBaseline: d.setsBaseline ?? false,
     requiresBaseline: d.requiresBaseline ?? false,
+  };
+  if (base.einschlaegig) return base;
+  return {
+    ...base,
+    frist: null,
+    einheit: null,
+    bezug: "entfaellt",
+    deadlineAnchor: "none",
+    vertrauen: "n/a",
+    intervall: undefined,
   };
 }
 
@@ -94,6 +127,9 @@ export interface Annex2Lookup {
   hinweis?: string | null;
   verfahren?: string | null;
   wahlweiseNach?: string[] | null;
+  /** Interval evidence — only four Anlage-2 numbers are statute-confirmed. */
+  confidence?: "verified" | "derived" | null;
+  sourceRef?: string | null;
 }
 
 /** P5 — radiation application reference (quality guideline / §88). */
@@ -130,73 +166,73 @@ export function deriveDuties({
 }: DeriveDutiesInput): DerivedDuty[] {
   const out: DerivedDuty[] = [];
 
+  // P3 — implants do not carry a maintenance calendar duty; IFU interval is a determination.
+  const wartungApplicable = !m.implantat;
   out.push(
     withMeta({
       id: "wartung",
       art: "Maintenance",
       titel: "Maintenance per manufacturer specification",
       grund: "§ 7 MPBetreibV",
-      einschlaegig: true,
-      frist: m.wartungIntervall ?? 12,
-      einheit: "months",
-      bezug: "tag",
+      einschlaegig: wartungApplicable,
+      frist: wartungApplicable ? (m.wartungIntervall ?? 12) : null,
+      einheit: wartungApplicable ? "months" : null,
+      bezug: wartungApplicable ? "tag" : "entfaellt",
       nachweis: "Maintenance report; medical device logbook entry for Anlage 1 products",
       zustaendig: m.wartungExtern ? "Commissioned service partner" : "Competent person at the facility",
-      vertrauen: m.wartungQuelle === "hersteller" ? "verified" : "derived",
-      hinweis:
-        (m.wartungQuelle === "hersteller"
-          ? "Interval from the manufacturer's instructions for use. "
-          : "No manufacturer interval on file — set by the operator and must be justified. ") +
-        "Unlike STK and MTK, the maintenance deadline is exact to the day.",
+      vertrauen: wartungApplicable ? "determination" : "n/a",
+      hinweis: m.implantat
+        ? "Implants are not subject to a recurring maintenance duty under § 7 in this sense."
+        : (m.wartungQuelle === "hersteller"
+            ? "Interval from the manufacturer's instructions for use (operator determination until confirmed). "
+            : "No manufacturer interval on file — set by the operator and must be justified. ") +
+          "Unlike STK and MTK, the maintenance deadline is exact to the day.",
       inspectionTypeCode: "MAINT",
-      deadlineAnchor: "exact_day",
+      deadlineAnchor: wartungApplicable ? "exact_day" : "none",
       category: "operating",
     }),
   );
 
-  if (m.altgeraet) {
-    out.push(
-      withMeta({
-        id: "stk-medgv",
-        art: "STK",
-        titel: "Safety inspection — legacy device",
-        grund: "§ 12 MPBetreibV · MedGV Gruppe 1",
-        einschlaegig: true,
-        frist: 24,
-        einheit: "months",
-        bezug: "monatsende",
-        nachweis: "Protocol, medical device logbook entry, labelling on the product",
-        zustaendig: "Competent person or service partner",
-        vertrauen: "derived",
-        hinweis: "Placed on the market before the MPG applied (MedGV Gruppe 1).",
-        inspectionTypeCode: "STK",
-        deadlineAnchor: "month_end",
-      }),
-    );
-  }
-
-  if (m.aktiv) {
-    const applicable = Boolean(m.anlage1) && !m.aedAusnahme;
+  // P2 — one STK duty; Anlage 1 and MedGV grounds share the same row.
+  // AED exemption (mockup): turns STK off entirely, including MedGV/Altgerät.
+  const hasAnlage1Ground = Boolean(m.aktiv && m.anlage1);
+  const hasMedgvGround = Boolean(m.altgeraet);
+  const stkApplicable =
+    !m.aedAusnahme && (hasAnlage1Ground || hasMedgvGround);
+  if (m.aktiv || m.altgeraet) {
+    const grounds = ["§ 12 MPBetreibV"];
+    if (hasAnlage1Ground) grounds.push("Anlage 1");
+    if (hasMedgvGround) grounds.push("MedGV Gruppe 1");
     out.push(
       withMeta({
         id: "stk",
         art: "STK",
-        titel: "Safety inspection",
-        grund: "§ 12 MPBetreibV" + (m.anlage1 ? " · Anlage 1" : ""),
-        einschlaegig: applicable,
-        frist: 24,
-        einheit: "months",
-        bezug: "monatsende",
+        titel: hasMedgvGround && !hasAnlage1Ground ? "Safety inspection — legacy device" : "Safety inspection",
+        grund: grounds.join(" · "),
+        einschlaegig: stkApplicable,
+        frist: stkApplicable ? 24 : null,
+        einheit: stkApplicable ? "months" : null,
+        bezug: stkApplicable ? "monatsende" : "entfaellt",
         nachweis: "Protocol, medical device logbook entry, labelling on the product",
         zustaendig: "Competent person or service partner",
-        vertrauen: applicable ? "derived" : "n/a",
+        vertrauen: stkApplicable ? "verified" : "n/a",
         hinweis: m.aedAusnahme
           ? "AED in public space with self-test — exempt from STK when visual checks are documented."
-          : m.anlage1
-            ? "Interval per manufacturer, at latest every 24 months at month end."
-            : "Not classified as an Anlage 1 product.",
+          : stkApplicable
+            ? [
+                hasAnlage1Ground
+                  ? "Interval per manufacturer, at latest every 24 months at month end."
+                  : null,
+                hasMedgvGround ? "Placed on the market before the MPG applied (MedGV Gruppe 1)." : null,
+                hasAnlage1Ground && hasMedgvGround
+                  ? "Both grounds apply — Anlage 1 and MedGV Gruppe 1. One inspection, one deadline."
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : "Not classified as an Anlage 1 product and not a MedGV Gruppe 1 legacy device.",
         inspectionTypeCode: "STK",
-        deadlineAnchor: "month_end",
+        deadlineAnchor: stkApplicable ? "month_end" : "none",
       }),
     );
   }
@@ -214,19 +250,20 @@ export function deriveDuties({
       : z?.itemNo === "1.5.3" && m.anlage2Verfahren === "1.5.1"
         ? 2
         : z?.intervalYears ?? null;
+  const mtkApplicable = Boolean(z) && !(z?.itemNo === "1.5.3" && !m.anlage2Verfahren);
   out.push(
     withMeta({
       id: "mtk",
       art: "MTK",
       titel: "Metrological inspection",
       grund: "§ 15 MPBetreibV · Anlage 2" + (z ? ` Nr. ${z.itemNo}` : ""),
-      einschlaegig: Boolean(z) && !(z?.itemNo === "1.5.3" && !m.anlage2Verfahren),
+      einschlaegig: mtkApplicable,
       frist: mtkFrist,
       einheit: "years",
       bezug: "jahresende",
       nachweis: "Protocol; retain until the next MTK",
       zustaendig: "Metrologically competent person or verification authority",
-      vertrauen: z && !(z.itemNo === "1.5.3" && !m.anlage2Verfahren) ? "verified" : "n/a",
+      vertrauen: mtkApplicable ? (z?.confidence === "derived" ? "derived" : "verified") : "n/a",
       hinweis: z
         ? [
             z.hinweis,
@@ -352,7 +389,7 @@ export function deriveDuties({
           bezug: "dauerhaft",
           nachweis: "Contamination measurements; records of retention and disposal",
           zustaendig: "Radiation protection officer",
-          vertrauen: "derived",
+          vertrauen: "verified",
           hinweis: "Nuclear medicine: handling of radioactive substances.",
           inspectionTypeCode: "RADIOACTIVE",
           deadlineAnchor: "permanent",
@@ -431,15 +468,15 @@ export function deriveDuties({
           id: "aufb-extern",
           art: "Control",
           titel: "Control of commissioned reprocessing",
-          grund: "§ 8 MPBetreibV",
+          grund: "§ 8 MPBetreibV — interval to be set by the operator",
           einschlaegig: true,
           frist: 12,
           einheit: "months",
           bezug: "jahresende",
           nachweis: "Documentation of the operator's own control",
           zustaendig: "Operator",
-          vertrauen: "verified",
-          hinweis: "Responsibility does not transfer with commissioning.",
+          vertrauen: "determination",
+          hinweis: "Responsibility does not transfer with commissioning. § 8 requires control of the commissioned body; the twelve-month cadence is an operator determination.",
           inspectionTypeCode: "REPROC_CTRL",
           deadlineAnchor: "year_end",
           category: "operating",
@@ -450,25 +487,29 @@ export function deriveDuties({
     // AUF-01: do NOT emit validation calendar duties on the product for aufbGeraete.
     // Validation lives on the equipment exemplar. Products get reference rows when linked.
     if (requiresValidatedProcess && linkedEquipmentDeviceIds.length > 0 && !m.istAufbGeraet) {
+      const equipmentKind = m.aufbGeraete?.[0];
+      const eg = equipmentKind ? EQUIP[equipmentKind] : undefined;
       for (const equipmentId of linkedEquipmentDeviceIds) {
         out.push(
           withMeta({
             id: `val-ref-${equipmentId}`,
             art: "Validation (reference)",
             titel: "Validation — referenced reprocessing equipment",
-            grund: "§ 8 MPBetreibV · AUF-01",
+            grund: eg
+              ? `${eg.valNorm} · Leitlinie DGKH/DGSV/AKI · § 8 MPBetreibV`
+              : "§ 8 MPBetreibV · AUF-01",
             einschlaegig: true,
             frist: null,
             einheit: null,
             bezug: "referenz",
             nachweis: "See validation duty on the linked reprocessing equipment",
             zustaendig: "Accredited validation service provider (on equipment)",
-            vertrauen: "derived",
+            vertrauen: eg?.confidence ?? "derived",
             hinweis:
               "Validation due date is carried by the linked equipment instance, not by this product.",
             inspectionTypeCode: "VALIDATION",
             deadlineAnchor: "reference",
-            category: "inspection",
+            category: "operating",
             referenceDeviceId: equipmentId,
           }),
         );
@@ -492,13 +533,14 @@ export function deriveDuties({
             "Validation duties belong on reprocessing equipment instances. Link equipment before relying on a product validation status.",
           inspectionTypeCode: "VALIDATION",
           deadlineAnchor: "none",
-          category: "inspection",
+          category: "operating",
         }),
       );
     }
   }
 
   // AUF-01 — validation calendar duty only on the equipment device itself.
+  // Product decision (30.09.): repeat PQ / validation uses year_end (not exact_day).
   if (m.istAufbGeraet && m.eigenTyp) {
     const eg = EQUIP[m.eigenTyp];
     if (eg) {
@@ -514,7 +556,7 @@ export function deriveDuties({
           bezug: "jahresende",
           nachweis: "Validation report with IQ, OQ and PQ",
           zustaendig: "Accredited validation service provider",
-          vertrauen: eg.divergent ? "derived" : "verified",
+          vertrauen: eg.confidence,
           hinweis: `This product is itself the reprocessing device. ${eg.reValQuelle}.`,
           inspectionTypeCode: "VALIDATION",
           deadlineAnchor: "year_end",
@@ -649,4 +691,12 @@ export function computeReleaseLevel(m: RegistrationCharacteristics): number {
   if (m.strahlung) level = Math.max(level, 2);
   if (m.istAufbGeraet) level = Math.max(level, 3);
   return level;
+}
+
+/** SWOT — classification.stk must follow deriveDuties (AED exemption included), not a second expression. */
+export function stkFlagFromDuties(
+  duties: ReadonlyArray<Pick<DerivedDuty, "id" | "einschlaegig">>,
+): boolean {
+  const stk = duties.find((d) => d.id === "stk");
+  return Boolean(stk?.einschlaegig);
 }

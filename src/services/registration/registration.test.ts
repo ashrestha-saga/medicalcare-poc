@@ -6,9 +6,10 @@ import {
   openCheckMessages,
 } from "./checkRules";
 import { characteristicConflicts } from "./conflicts";
-import { deriveDuties } from "./deriveDuties";
+import { deriveDuties, stkFlagFromDuties } from "./deriveDuties";
 import { computeDutyDueAt, dueDate, intervalUnitFromEinheits } from "./dueDate";
-import { buildPrerequisites, openMandatoryPrerequisites } from "./prerequisites";
+import { buildPrerequisites, evaluatesAppliesWhen, openMandatoryPrerequisites } from "./prerequisites";
+import { isReprocessingEquipmentDevice } from "./reprocessingLinkService";
 import type { RegistrationCharacteristics } from "./types";
 
 describe("characteristicConflicts", () => {
@@ -40,14 +41,71 @@ describe("characteristicConflicts", () => {
 describe("deriveDuties", () => {
   it("always includes maintenance", () => {
     const duties = deriveDuties({ characteristics: { produktart: "sonstiges" } });
-    expect(duties.some((d) => d.id === "wartung" && d.einschlaegig)).toBe(true);
+    const wartung = duties.find((d) => d.id === "wartung")!;
+    expect(wartung.einschlaegig).toBe(true);
+    expect(wartung.vertrauen).toBe("determination");
+    expect(wartung.category).toBe("operating");
   });
 
-  it("keeps MTK row when not applicable", () => {
+  it("keeps MTK row when not applicable (P1 clears interval/anchor)", () => {
     const duties = deriveDuties({ characteristics: { produktart: "sonstiges", aktiv: true } });
     const mtk = duties.find((d) => d.id === "mtk");
     expect(mtk).toBeTruthy();
     expect(mtk!.einschlaegig).toBe(false);
+    expect(mtk!.deadlineAnchor).toBe("none");
+    expect(mtk!.frist).toBeNull();
+    expect(mtk!.vertrauen).toBe("n/a");
+  });
+
+  it("does not apply maintenance to implants (P3)", () => {
+    const duties = deriveDuties({
+      characteristics: { produktart: "implantat", implantat: true },
+    });
+    const wartung = duties.find((d) => d.id === "wartung")!;
+    expect(wartung.einschlaegig).toBe(false);
+    expect(wartung.deadlineAnchor).toBe("none");
+    expect(wartung.vertrauen).toBe("n/a");
+  });
+
+  it("merges Anlage 1 and MedGV into one STK duty (P2)", () => {
+    const both = deriveDuties({
+      characteristics: {
+        produktart: "bildgebung",
+        aktiv: true,
+        anlage1: true,
+        altgeraet: true,
+      },
+    });
+    expect(both.filter((d) => d.id === "stk" || d.id === "stk-medgv")).toHaveLength(1);
+    const stk = both.find((d) => d.id === "stk")!;
+    expect(stk.einschlaegig).toBe(true);
+    expect(stk.grund).toContain("Anlage 1");
+    expect(stk.grund).toContain("MedGV");
+
+    const legacyOnly = deriveDuties({
+      characteristics: { produktart: "bildgebung", altgeraet: true },
+    });
+    expect(legacyOnly.find((d) => d.id === "stk")?.einschlaegig).toBe(true);
+    expect(legacyOnly.some((d) => d.id === "stk-medgv")).toBe(false);
+  });
+
+  it("AED exemption turns STK off even with MedGV/Altgerät (mockup)", () => {
+    const duties = deriveDuties({
+      characteristics: {
+        produktart: "aktiv-therapie",
+        aktiv: true,
+        anlage1: true,
+        altgeraet: true,
+        aedAusnahme: true,
+      },
+    });
+    const stk = duties.find((d) => d.id === "stk")!;
+    expect(stk.einschlaegig).toBe(false);
+    expect(stk.deadlineAnchor).toBe("none");
+    expect(stk.frist).toBeNull();
+    expect(stk.grund).toContain("Anlage 1");
+    expect(stk.grund).toContain("MedGV");
+    expect(stkFlagFromDuties(duties)).toBe(false);
   });
 
   it("requires verfahren choice for Anlage 2 1.5.3", () => {
@@ -98,7 +156,13 @@ describe("deriveDuties", () => {
   it("uses year_end for MTK with annex2 interval", () => {
     const duties = deriveDuties({
       characteristics: { produktart: "messgeraet", aktiv: true },
-      annex2: { itemNo: "1.3", label: "NIBP", intervalYears: 2, isGroup: false },
+      annex2: {
+        itemNo: "1.3",
+        label: "NIBP",
+        intervalYears: 2,
+        isGroup: false,
+        confidence: "verified",
+      },
     });
     const mtk = duties.find((d) => d.id === "mtk")!;
     expect(mtk.einschlaegig).toBe(true);
@@ -107,12 +171,58 @@ describe("deriveDuties", () => {
     expect(mtk.vertrauen).toBe("verified");
   });
 
+  it("marks unconfirmed Anlage-2 intervals as derived", () => {
+    const duties = deriveDuties({
+      characteristics: { produktart: "messgeraet", aktiv: true },
+      annex2: {
+        itemNo: "1.2.1",
+        label: "Elektrothermometer",
+        intervalYears: 2,
+        isGroup: false,
+        confidence: "derived",
+      },
+    });
+    expect(duties.find((d) => d.id === "mtk")?.vertrauen).toBe("derived");
+  });
+
+  it("marks STK and nuclear as verified; outsourced control as determination", () => {
+    const stk = deriveDuties({
+      characteristics: { produktart: "aktiv-therapie", aktiv: true, anlage1: true },
+    }).find((d) => d.id === "stk")!;
+    expect(stk.einschlaegig).toBe(true);
+    expect(stk.vertrauen).toBe("verified");
+
+    const nuklear = deriveDuties({
+      characteristics: { produktart: "nuklear", strahlung: true, strahlenArt: "nuklear" },
+      radiationRef: {
+        code: "nuklear",
+        qualityGuideline: "QS-RL Nuklearmedizin",
+        expertInspectionApplies: false,
+      },
+    }).find((d) => d.id === "nuklear")!;
+    expect(nuklear.vertrauen).toBe("verified");
+
+    const control = deriveDuties({
+      characteristics: {
+        produktart: "instrument",
+        aufbereitung: true,
+        aufbKlasse: "kritisch-a",
+        aufbExtern: true,
+      },
+      requiresValidatedProcess: true,
+    }).find((d) => d.id === "aufb-extern")!;
+    expect(control.vertrauen).toBe("determination");
+    expect(control.frist).toBe(12);
+  });
+
   it("does not apply STK without Anlage 1", () => {
     const duties = deriveDuties({
       characteristics: { produktart: "sonografie", aktiv: true, anlage1: false },
     });
     const stk = duties.find((d) => d.id === "stk")!;
     expect(stk.einschlaegig).toBe(false);
+    expect(stk.deadlineAnchor).toBe("none");
+    expect(stk.frist).toBeNull();
   });
 
   it("marks Abnahme as baseline and Konstanz as requiring baseline", () => {
@@ -139,6 +249,8 @@ describe("deriveDuties", () => {
     });
     const sv = nuklear.find((d) => d.id === "sv")!;
     expect(sv.einschlaegig).toBe(false);
+    expect(sv.deadlineAnchor).toBe("none");
+    expect(sv.frist).toBeNull();
     expect(nuklear.find((d) => d.id === "abnahme")?.grund).toContain("QS-RL Nuklearmedizin");
   });
 
@@ -171,6 +283,8 @@ describe("deriveDuties", () => {
     expect(ref.einschlaegig).toBe(true);
     expect(ref.deadlineAnchor).toBe("reference");
     expect(ref.referenceDeviceId).toBe("equip-1");
+    expect(ref.category).toBe("operating");
+    expect(ref.vertrauen).toBe("verified");
 
     const equipment = deriveDuties({
       characteristics: {
@@ -267,5 +381,61 @@ describe("prerequisites", () => {
     expect(abn.evidenceKind).toBe("third_party");
     const open = openMandatoryPrerequisites(items, { abn: true }, { releaseLevel: 3, requireEvidence: true });
     expect(open.some((i) => i.k === "abn")).toBe(true);
+  });
+});
+
+describe("evaluatesAppliesWhen", () => {
+  const base: RegistrationCharacteristics = { produktart: "bildgebung" };
+
+  it("supports true/false and named keys", () => {
+    expect(evaluatesAppliesWhen("true", base)).toBe(true);
+    expect(evaluatesAppliesWhen("false", base)).toBe(false);
+    expect(evaluatesAppliesWhen("strahlung", { ...base, strahlung: true })).toBe(true);
+    expect(evaluatesAppliesWhen("strahlung", base)).toBe(false);
+  });
+
+  it("supports == / != and boolean combinators", () => {
+    expect(evaluatesAppliesWhen("strahlenArt==roentgen", { ...base, strahlenArt: "roentgen" })).toBe(true);
+    expect(evaluatesAppliesWhen("strahlenArt!=nuklear", { ...base, strahlenArt: "roentgen" })).toBe(true);
+    expect(evaluatesAppliesWhen("strahlung && vernetzt", { ...base, strahlung: true, vernetzt: true })).toBe(
+      true,
+    );
+    expect(evaluatesAppliesWhen("strahlung || vernetzt", { ...base, vernetzt: true })).toBe(true);
+  });
+
+  it("supports reprocessing equipment keys", () => {
+    expect(
+      evaluatesAppliesWhen("ist_aufb_geraet", { ...base, istAufbGeraet: true, eigenTyp: "rdg" }),
+    ).toBe(true);
+    expect(evaluatesAppliesWhen("aufb_geraete", { ...base, aufbGeraete: ["rdg"] })).toBe(true);
+  });
+});
+
+describe("isReprocessingEquipmentDevice", () => {
+  it("accepts product kind aufbereitungsgeraet", () => {
+    expect(
+      isReprocessingEquipmentDevice({
+        productKindCode: "aufbereitungsgeraet",
+        characteristicsJson: null,
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts Merkmale istAufbGeraet + eigenTyp", () => {
+    expect(
+      isReprocessingEquipmentDevice({
+        productKindCode: "sonstiges",
+        characteristicsJson: JSON.stringify({ istAufbGeraet: true, eigenTyp: "rdg" }),
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects ordinary products", () => {
+    expect(
+      isReprocessingEquipmentDevice({
+        productKindCode: "instrument",
+        characteristicsJson: JSON.stringify({ aufbereitung: true, aufbKlasse: "kritisch-a" }),
+      }),
+    ).toBe(false);
   });
 });

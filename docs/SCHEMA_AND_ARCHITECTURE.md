@@ -75,7 +75,7 @@ Source of truth for tables: `prisma/schema.prisma` (provider: **MySQL**, `DATABA
 | `src/schemas/*` | Zod request/body schemas |
 | `src/constants/*` | Permissions, roles, routes |
 | `src/lib/*` | Session, GS1, crypto, offline queue, http client |
-| `src/store/*` | Client state machines (scan, PIN, offline, toast) |
+| `src/store/*` | Client state machines (scan, session, offline, toast) |
 | `prisma/` | Schema, migrations, seed |
 
 ### Runtime request path (typical)
@@ -118,9 +118,9 @@ Tenant (clinic) ── institutionOrgId? → Organisation (role=institution)
                               ├── OrgMembership.appRole ← User (partner)
                               └── SmtpSettings? (partner outbound mail)
 
-OrganisationRole: institution | service_provider | inspection_partner | platform_operator
+OrganisationRole / OrganisationCapacity: institution | service_provider | inspection_partner | platform_operator
 Partner User: tenantId=null, role=null, appRole on OrgMembership
-Clinic User:  tenantId set, role = superadmin | device_admin | security_officer | user
+Clinic User:  tenantId set, role = ClinicRole (superadmin | device_admin | security_officer | user)
 
 RoleGrant.kind: clinic | partner_console | partner_acting  (isolates clinic /roles from partner matrices)
 ```
@@ -137,7 +137,7 @@ RoleGrant.kind: clinic | partner_console | partner_acting  (isolates clinic /rol
 
 Each domain starts with a **quick-reference table**, then a longer write-up per model (purpose, key fields, where it runs). Canonical field list: `prisma/schema.prisma`.
 
-**Key enums (Prisma):** `DeviceState`, `ServiceRequestState`, `OutboxState`, `ReminderStatus`, `PartnerAppRole`, `RoleGrantKind`, `TrainingMode`, `OperatingModel`, plus Erstanlage enums `DutyCategory`, `DeadlineAnchor`, `Confidence`, `FieldState`, `EvidenceKind`.
+**Key enums (Prisma):** `DeviceState`, `ServiceRequestState`, `OutboxState`, `ReminderStatus`, `PartnerAppRole`, `RoleGrantKind`, `TrainingMode`, `OperatingModel`, `OrganisationCapacity`, `ClinicRole`, `DutyPerformanceResult`, `OrderApprovalState`, `OrderRequestState`, `DutyKey`, `IntervalUnit`, `TermMatchConfidence`, plus Erstanlage enums `DutyCategory`, `DeadlineAnchor`, `Confidence`, `FieldState`, `EvidenceKind`.
 
 ### 4.1 Tenancy & locations
 
@@ -416,6 +416,8 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 **In the app:** Written only on `POST /api/registration/release` (or reclassify apply). Parent of the `DeviceDuty` rows created in that freeze. Used for auditability — later UI must not silently mutate past freezes.
 
+**Snapshot vs living duty:** The snapshot answers “what applied at release”; `DeviceDuty` rows answer “what applies today” (`dueAt` rolls, `suspendedAt`, `notifyStage`). A difference between the two is expected. A rule-set correction must produce a **new** snapshot (via reclassify / re-release), not an in-place update of an old freeze.
+
 #### DeviceDuty
 
 **Purpose:** One frozen obligation on one instance (Wartung, STK, MTK, …). Holds interval, deadline anchor, computed `dueAt`, applicability, suspension, reminder stage placeholders, and links back to the snapshot.
@@ -447,9 +449,9 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 #### ReprocessingOnDevice
 
-**Purpose:** Links a product exemplar (`profileDeviceId`) to a reprocessing equipment exemplar (`equipmentDeviceId`) for AUF-01 validation references. Unique pair; tenant-scoped.
+**Purpose:** Links a product exemplar (`profileDeviceId`) to a reprocessing equipment exemplar (`equipmentDeviceId`) for AUF-01 validation references. Historised with `validFrom` / `validTo` (open row = `validTo` null); unlink closes the row so recall queries keep prior links. At most one open pair via unique `openLinkKey`. Tenant-scoped.
 
-**In the app:** CRUD under `/api/devices/[id]/reprocessing-links`. Validation calendar duties live on equipment; products get `referenceDeviceId` / anchor `reference`. Rejects outsourced profile + in-house links.
+**In the app:** CRUD under `/api/devices/[id]/reprocessing-links`. Validation calendar duties live on equipment; products get `referenceDeviceId` / anchor `reference`. Rejects outsourced profile + in-house links. Rejects equipment that is not a reprocessing device (`productKindCode=aufbereitungsgeraet` or Merkmale `istAufbGeraet` + `eigenTyp`).
 
 ---
 
@@ -683,15 +685,29 @@ Inventarize path: `POST /api/devices` → draft instance → `/registration/[id]
 
 **Draft defer (C3):** Incomplete Erstanlage may stay `state=draft` with `DeviceClarification` rows (`kind`, `field` / `prerequisiteCode`, deferredBy/At). Klärliste unions computed inventory issues with open clarifications (`POST /api/clarifications/[id]/resolve`). No release while classification|evidence clarifications remain open.
 
-**Model reuse (C4):** Model-owned Merkmale live on `DeviceModelClassification.characteristics` / `fieldStates` / `decisions` / `deferredFields`. Instance-owned (`aedExemption`, reprocessing class, site/room) stay on the instance. Second inventarize of the same model pre-fills from the open classification.
+**Model reuse (C4):** Model-owned Merkmale live on `DeviceModelClassification.characteristics` / `fieldStates` / `decisions` / `deferredFields`. Instance-owned (`aedExemption` / `aedAusnahme`, reprocessing class, site/room) stay on the instance. Second inventarize of the same model pre-fills from the open classification.
 
-**Reprocessing (C5):** `ReprocessingOnDevice` links product → equipment exemplars. Validation calendar duties only on equipment; products get `referenceDeviceId` / anchor `reference`. Reject outsourced profile + in-house links. Product validation status is derived from linked equipment performances.
+**AED (STK):** The AED layperson/public-space question (`aedAusnahme`) is shown only for product kinds `aktiv-therapie` and `sonstiges` (`showsAedExemptionQuestion`). When answered yes, STK is **not** applicable even if Anlage 1 or Altgerät would otherwise trigger it — one STK duty row, exemption wins. `DeviceModelClassification.stk` is set from that same derived duty (`stkFlagFromDuties`), not a second expression.
 
-**P1:** `applicable=false` ⇒ `deadlineAnchor=none`, `dueAt=null`, `confidence=not_applicable`. Abnahme sets baseline; Konstanz requires baseline before complete.
+**Reprocessing (C5):** `ReprocessingOnDevice` links product → equipment exemplars (`validFrom`/`validTo` history). At most one open row per pair via `openLinkKey`. Validation calendar duties only on equipment; products get `referenceDeviceId` / anchor `reference`. Reject outsourced profile + in-house links; reject non-equipment targets. Reclassify that drops equipment identity closes open equipment-side links. Product validation status is derived from linked equipment performances.
+
+**Duty derivation (`deriveDuties`) — fixture-aligned rules:**
+
+| Rule | Behaviour |
+|---|---|
+| **P1** | `applicable=false` ⇒ `deadlineAnchor=none`, no interval, `confidence=n/a` (`withMeta`) |
+| **P2** | Single STK duty; grounds = Anlage 1 and/or MedGV Altgerät, overridden by AED exemption |
+| **P3** | Wartung calendar duty skipped for implants; IFU interval is operator `determination` when applicable |
+| **P6** | Accessory (`zubehoer`) evidence follows its reprocessing class (`requiresValidatedProcess`), not a blanket validation duty |
+| **AUF-01** | Validation due lives on equipment (**`year_end`**, product decision 30.09.); products reference linked equipment |
+
+Abnahme sets baseline; Konstanz requires baseline before complete. Erstanlage release defaults classification `confidence=responsible`; reclassify apply defaults `verified`.
+
+**Product decision:** validation equipment deadline anchor is **`year_end`** (not `exact_day`). Still open: official Anlage-2 interval confirmation vs seeded match data.
 
 **Tables:** `DeviceInstance`, `DeviceModel`, `DeviceModelClassification`, `DeviceReleaseSnapshot`, `DeviceDuty`, `DeviceEvidence`, `DeviceClarification`, `ReprocessingOnDevice`, `Ref*` (incl. `RefCommissioningPrerequisite`), `DeviceUnitEvent`; prerequisites also use `SiteHeadcount` / `SafetyOfficerAppointment`.
 
-**Services:** `src/services/registration/*` (deriveDuties, prerequisites, writeDuty, evidence, reprocessingLink, release, draft).
+**Services:** `src/services/registration/*` (deriveDuties, prerequisites, writeDuty, evidence, reprocessingLink, release, draft). Fixture: `npm run test:pflichten` (`fixtures/pflichten/`, 222 cases / 1,197 duties).
 
 ### 5.3 Service request + dispatch
 
@@ -738,7 +754,7 @@ Partner path: same `User` row with `accountKind=partner` + `OrgMembership` + `Se
 |---|---|
 | `scanStore` | Resolve → classify → service/parts → success \| queued state machine |
 | `requestStore` | Draft request fields / cart |
-| `sessionStore` | Device PIN lock (local; not server auth) |
+| `sessionStore` | Client mirror of `/api/auth/session` (user / tenantName); no local PIN lock |
 | `offlineQueueStore` + `idb` | Queue failed submits; `replayQueue` mutex |
 | `themeStore` / `toastStore` / `logStore` | UX chrome |
 
@@ -782,6 +798,25 @@ Offline replay rules: 2xx remove · 409 mark synced · 400/404/422 keep with err
 | **Invite permissions** | `UserInvitation.permissions` JSON → `UserPermission` rows on redeem |
 | **SmtpSettings** | Owner-generic SMTP (`tenantId` xor `organisationId`); AES-GCM `passEnc` |
 | **PasswordResetToken** | Admin-triggered reset email + `/reset-password` redeem |
+
+### SWOT finishing (30.09.)
+
+| Item | Change |
+|---|---|
+| **ReprocessingOnDevice history** | `validFrom` / `validTo`; unlink closes the open row |
+| **Equipment invariant** | Link rejects non-reprocessing targets; reclassify closes stale equipment links |
+| **Open link uniqueness** | `openLinkKey` (`profileId:equipmentId`) unique while open — SCH-02 style |
+| **Enums** | `OrganisationCapacity`, `ClinicRole`, `DutyPerformanceResult`, `OrderApprovalState`, `OrderRequestState` |
+| **termMatchConfidence** | Renamed from `matchConfidence`; narrowed to `TermMatchConfidence` (`verified` \| `derived`) |
+| **DutyKey / IntervalUnit** | Persisted as Prisma enums; dynamic duty ids map via `canonicalDutyKey` |
+| **Confidence.guess** | Deprecated; write/read normalize to `derived` |
+| **Validation anchor** | Product decision: equipment validation stays **`year_end`** |
+| **OrderRequestState** | Create stamp only (`captured`); spare-parts lifecycle is `OrderApprovalState` |
+| **deriveDuties P1–P3 / P6** | NA meta; one STK; Wartung determination / implant N/A; accessory evidence by class |
+| **AED UI + STK** | Question only aktiv-therapie / sonstiges; exemption overrides Anlage1/Altgerät |
+| **Classification.stk** | Written from `stkFlagFromDuties(preview.duties)` — one expression with derivation |
+| **Client PIN lock** | Removed (`LockScreen` / idle PIN); `sessionStore` is session mirror only |
+| **Pflichten fixture** | `fixtures/pflichten/` + `npm run test:pflichten` — **222 cases / 1,197 duties** (v20) |
 
 ### Cron jobs (OPS-01 / OPS-02)
 

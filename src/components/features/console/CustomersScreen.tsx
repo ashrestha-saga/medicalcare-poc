@@ -9,10 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/Loading";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 
-const SCOPE_KEYS: Record<string, "scopeInventory" | "scopeDueDates" | "scopeInspection"> = {
+const SCOPE_KEYS: Record<
+  string,
+  "scopeInventory" | "scopeDueDates" | "scopeInspection" | "scopeReprocessing" | "scopeTraining"
+> = {
   inventory: "scopeInventory",
   "due-dates": "scopeDueDates",
   inspection: "scopeInspection",
+  reprocessing: "scopeReprocessing",
+  training: "scopeTraining",
 };
 
 export function CustomersScreen() {
@@ -49,7 +54,7 @@ export function CustomersScreen() {
             </Alert>
           ) : null}
           {!loading && data?.kpis ? (
-            <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="console-kpis">
+            <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6" data-testid="console-kpis">
               <Kpi label={t("kpiCustomers")} value={data.kpis.customersTotal} hint={t("kpiCustomersLive", { count: data.kpis.customersLive })} />
               <Kpi label={t("kpiDevices")} value={data.kpis.devicesManaged} hint={t("kpiDevicesHint")} />
               <Kpi
@@ -57,6 +62,18 @@ export function CustomersScreen() {
                 value={data.kpis.overdueDuties}
                 hint={t("kpiOverdueHint")}
                 warn={data.kpis.overdueDuties > 0}
+              />
+              <Kpi
+                label={t("kpiClarifications")}
+                value={data.kpis.openClarifications}
+                hint={t("kpiClarificationsHint")}
+                warn={data.kpis.openClarifications > 0}
+              />
+              <Kpi
+                label={t("kpiMpsb")}
+                value={data.kpis.openMpsb}
+                hint={t("kpiMpsbHint")}
+                warn={data.kpis.openMpsb > 0}
               />
               <Kpi label={t("kpiLive")} value={data.kpis.customersLive} hint={t("kpiLiveHint")} />
             </div>

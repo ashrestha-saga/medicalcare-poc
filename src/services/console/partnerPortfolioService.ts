@@ -1,12 +1,12 @@
 import type { PartnerContext } from "@/interfaces/session";
 import type { ConsoleDutyListDTO, ConsoleRequestListDTO } from "@/interfaces/console";
+import { dispositionDisplayState } from "@/services/console/dispositionService";
 import { runWithoutTenantAsync } from "@/lib/auth/tenantStore";
 import { prisma } from "@/lib/prisma";
 import { isLiveContract } from "@/services/access/partnerAccessService";
 
 async function liveTenantMap(organisationId: string) {
   const now = new Date();
-  // Always bypass — ServiceContract is tenant-scoped; callers also wrap, but this is safe alone.
   const contracts = await runWithoutTenantAsync(() =>
     prisma.serviceContract.findMany({
       where: { organisationId },
@@ -18,11 +18,18 @@ async function liveTenantMap(organisationId: string) {
 }
 
 export const partnerPortfolioService = {
-  async listDueDates(ctx: PartnerContext): Promise<ConsoleDutyListDTO> {
+  async listDueDates(
+    ctx: PartnerContext,
+    opts?: { overdueOnly?: boolean; tenantId?: string },
+  ): Promise<ConsoleDutyListDTO> {
     const now = new Date();
     return runWithoutTenantAsync(async () => {
       const tenants = await liveTenantMap(ctx.organisationId);
-      const tenantIds = [...tenants.keys()];
+      let tenantIds = [...tenants.keys()];
+      if (opts?.tenantId) {
+        if (!tenants.has(opts.tenantId)) return { rows: [] };
+        tenantIds = [opts.tenantId];
+      }
       if (tenantIds.length === 0) return { rows: [] };
 
       const duties = await prisma.deviceDuty.findMany({
@@ -30,7 +37,7 @@ export const partnerPortfolioService = {
           tenantId: { in: tenantIds },
           applicable: true,
           suspendedAt: null,
-          dueAt: { not: null },
+          dueAt: { not: null, ...(opts?.overdueOnly ? { lt: now } : {}) },
         },
         include: {
           deviceInstance: {
@@ -41,7 +48,7 @@ export const partnerPortfolioService = {
           },
         },
         orderBy: { dueAt: "asc" },
-        take: 200,
+        take: 500,
       });
 
       return {
@@ -79,6 +86,7 @@ export const partnerPortfolioService = {
         where: { tenantId: { in: tenantIds } },
         include: {
           executorOrg: { select: { name: true } },
+          assigneeUser: { select: { name: true } },
         },
         orderBy: { createdAt: "desc" },
         take: 200,
@@ -95,8 +103,14 @@ export const partnerPortfolioService = {
             deviceLabel: r.locationText || r.subjectId,
             serviceType: r.serviceType,
             state: r.state,
+            executorOrgId: r.executorOrgId,
             executorName: r.executorOrg?.name ?? null,
+            assigneeUserId: r.assigneeUserId,
+            assigneeName: r.assigneeUser?.name ?? null,
+            scheduledAt: r.scheduledAt ? r.scheduledAt.toISOString().slice(0, 10) : null,
+            displayState: dispositionDisplayState(r.state, r.assigneeUserId, r.scheduledAt),
             raisedAt: r.createdAt.toISOString(),
+            managed: true,
           };
         }),
       };

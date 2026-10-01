@@ -1,26 +1,21 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { usePartnerHome } from "@/components/hooks/partner/usePartnerHome";
 import { Spinner } from "@/components/ui/Loading";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-const SCOPE_LABELS: Record<string, string> = {
-  inventory: "Inventory",
-  "due-dates": "Due dates",
-  inspection: "Inspection",
+const CAPACITY_KEYS: Record<string, "capServiceProvider" | "capInspectionPartner" | "capPlatformOperator" | "capInstitution"> = {
+  service_provider: "capServiceProvider",
+  inspection_partner: "capInspectionPartner",
+  platform_operator: "capPlatformOperator",
+  institution: "capInstitution",
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Administration",
-  inspector: "Inspection partner",
-  order: "Scheduling",
-};
-
-const JOB_TITLE_LABELS: Record<string, string> = {
-  Betriebsleitung: "Operations management",
-  Medizintechnik: "Medical engineering",
-  Sachverständiger: "Expert assessor",
-  Disposition: "Scheduling",
+const APP_ROLE_KEYS: Record<string, "roleAdmin" | "roleInspector" | "roleOrder"> = {
+  admin: "roleAdmin",
+  inspector: "roleInspector",
+  order: "roleOrder",
 };
 
 function formatDate(iso: string): string {
@@ -29,13 +24,8 @@ function formatDate(iso: string): string {
   return `${d}.${m}.${y}`;
 }
 
-function contractPeriod(validFrom: string, validTo: string | null): string {
-  const from = formatDate(validFrom);
-  if (!validTo) return `${from} — no expiry`;
-  return `${from} — ${formatDate(validTo)}`;
-}
-
 export function PartnerHomeScreen() {
+  const t = useTranslations("console");
   const { data, error, loading } = usePartnerHome();
 
   return (
@@ -43,11 +33,8 @@ export function PartnerHomeScreen() {
       <main className="p-main">
         <div className="p-mgmt" data-testid="partner-home-screen">
           <section className="p-devhead p-mgmt__head">
-            <h2>Partner portal</h2>
-            <p className="p-mgmt__sub">
-              Your organisation, who has access for your company, and which clinics you are
-              contracted to serve.
-            </p>
+            <h2>{t("orgTitle")}</h2>
+            <p className="p-mgmt__sub">{t("orgIntro")}</p>
           </section>
 
           {loading ? (
@@ -67,84 +54,98 @@ export function PartnerHomeScreen() {
           {!loading && data ? (
             <>
               <section className="p-mgmt__panel" style={{ margin: "8px 18px 0" }}>
-                <p className="p-sec-title">Organisation</p>
+                <p className="p-sec-title">{t("orgCard")}</p>
                 <dl className="p-ext-dl p-mgmt__meta">
                   <div className="p-ext-row">
-                    <dt>Name</dt>
+                    <dt>{t("orgName")}</dt>
                     <dd>{data.organisationName}</dd>
                   </div>
                   <div className="p-ext-row">
-                    <dt>Code</dt>
+                    <dt>{t("orgCode")}</dt>
                     <dd>{data.organisationCode}</dd>
                   </div>
                   {data.contact ? (
                     <div className="p-ext-row">
-                      <dt>Contact</dt>
+                      <dt>{t("orgContact")}</dt>
                       <dd>{data.contact}</dd>
                     </div>
                   ) : null}
                   <div className="p-ext-row">
-                    <dt>Your role</dt>
-                    <dd>{ROLE_LABELS[data.myAppRole] ?? data.myAppRole}</dd>
+                    <dt>{t("orgYourRole")}</dt>
+                    <dd>{t(APP_ROLE_KEYS[data.myAppRole] ?? "roleInspector")}</dd>
                   </div>
                   {data.roles.length > 0 ? (
                     <div className="p-ext-row">
-                      <dt>Organisation roles</dt>
-                      <dd>{data.roles.join(", ")}</dd>
+                      <dt>{t("orgCapacities")}</dt>
+                      <dd>
+                        {data.roles
+                          .map((r) => t(CAPACITY_KEYS[r] ?? "capInstitution"))
+                          .join(", ")}
+                      </dd>
                     </div>
                   ) : null}
+                  <div className="p-ext-row">
+                    <dt>{t("orgLiveClinics")}</dt>
+                    <dd>{data.clinics.length}</dd>
+                  </div>
                 </dl>
+                {data.roles.includes("service_provider") && data.roles.includes("inspection_partner") ? (
+                  <p className="p-mgmt__hint" style={{ marginTop: 12 }}>
+                    {t("orgDualRoleNote")}
+                  </p>
+                ) : null}
               </section>
 
               <div className="p-mgmt__grid">
                 <section className="p-mgmt__panel">
-                  <p className="p-sec-title">People with access</p>
+                  <p className="p-sec-title">{t("orgPeople")}</p>
                   {data.people.length === 0 ? (
-                    <p className="p-mgmt__empty">No active partner people are assigned.</p>
+                    <p className="p-mgmt__empty">{t("orgPeopleEmpty")}</p>
                   ) : (
                     <ul className="p-mgmt__people" data-testid="partner-people">
-                      {data.people.map((person) => {
-                        const title = person.jobTitle
-                          ? (JOB_TITLE_LABELS[person.jobTitle] ?? person.jobTitle)
-                          : null;
-                        return (
-                          <li key={person.id} className="p-mgmt__person">
-                            <div>
-                              <b>{person.name}</b>
-                              {title ? <span>{title}</span> : null}
-                            </div>
-                            <em className="p-mgmt__role">{ROLE_LABELS[person.appRole] ?? person.appRole}</em>
-                          </li>
-                        );
-                      })}
+                      {data.people.map((person) => (
+                        <li key={person.id} className="p-mgmt__person">
+                          <div>
+                            <b>{person.name}</b>
+                            {person.jobTitle ? <span>{person.jobTitle}</span> : null}
+                          </div>
+                          <em className="p-mgmt__role">
+                            {t(APP_ROLE_KEYS[person.appRole] ?? "roleInspector")}
+                          </em>
+                        </li>
+                      ))}
                     </ul>
                   )}
-                  <p className="p-mgmt__hint">
-                    From your organisation&apos;s assignment. Clinics see the same list on their
-                    Management page.
-                  </p>
                 </section>
 
                 <section className="p-mgmt__panel">
-                  <p className="p-sec-title">Contracted clinics</p>
+                  <p className="p-sec-title">{t("orgClinics")}</p>
                   {data.clinics.length === 0 ? (
                     <p className="p-mgmt__empty" data-testid="partner-clinics-empty">
-                      No active service contracts for this organisation.
+                      {t("orgClinicsEmpty")}
                     </p>
                   ) : (
                     <ul className="p-mgmt__people" data-testid="partner-clinics">
                       {data.clinics.map((clinic) => (
-                        <li key={clinic.contractId} className="p-mgmt__person" style={{ flexDirection: "column", alignItems: "stretch" }}>
+                        <li
+                          key={clinic.contractId}
+                          className="p-mgmt__person"
+                          style={{ flexDirection: "column", alignItems: "stretch" }}
+                        >
                           <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                             <div>
                               <b>{clinic.tenantName}</b>
-                              <span>{contractPeriod(clinic.validFrom, clinic.validTo)}</span>
+                              <span>
+                                {formatDate(clinic.validFrom)}
+                                {" — "}
+                                {clinic.validTo ? formatDate(clinic.validTo) : t("openEnded")}
+                              </span>
                             </div>
                           </div>
                           {clinic.scope.length > 0 ? (
                             <ul className="p-mgmt__scope" style={{ marginTop: 10 }}>
                               {clinic.scope.map((s) => (
-                                <li key={s}>{SCOPE_LABELS[s] ?? s}</li>
+                                <li key={s}>{s}</li>
                               ))}
                             </ul>
                           ) : null}
@@ -152,12 +153,13 @@ export function PartnerHomeScreen() {
                       ))}
                     </ul>
                   )}
-                  <p className="p-mgmt__hint">
-                    Clinics open their data to you only while a contract is active. Opening clinic
-                    inventory from this portal is not part of this POC yet.
-                  </p>
                 </section>
               </div>
+
+              <section className="p-mgmt__panel" style={{ margin: "12px 18px 0" }}>
+                <p className="p-sec-title">{t("orgSperreTitle")}</p>
+                <p className="p-mgmt__hint">{t("orgSperreBody")}</p>
+              </section>
             </>
           ) : null}
         </div>

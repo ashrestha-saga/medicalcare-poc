@@ -11,6 +11,7 @@ import {
   MESSGROESSEN,
   messgroesseByKey,
   messgroesseNeedsVariante,
+  showsAedExemptionQuestion,
   zifferAus,
 } from "@/components/hooks/registration/registrationHelpers";
 import { kindDisplay, kindGroupColumns, kindGroupKey } from "./kindDisplay";
@@ -213,6 +214,7 @@ export function CharacteristicsStep({
                       if (!v) return;
                       answer("wartungQuelle", v as "hersteller" | "eigen");
                     }}
+                    data-testid="wartung-quelle"
                   >
                     <option value="">{t("select")}</option>
                     <option value="hersteller">{t("originManufacturer")}</option>
@@ -221,6 +223,32 @@ export function CharacteristicsStep({
                 </div>
               </SuggestableField>
             </div>
+            {merkmale.wartungQuelle === "eigen" ? (
+              <SuggestableField
+                label={fieldLabel("wartungBegruendung")}
+                meta={fieldMeta(merkmale, "wartungBegruendung")}
+              >
+                <div className="p-field">
+                  <textarea
+                    value={merkmale.wartungBegruendung ?? ""}
+                    placeholder={
+                      t.has("intervalJustificationPlaceholder")
+                        ? t("intervalJustificationPlaceholder")
+                        : "Why this interval — intensity of use, experience, missing manufacturer specification"
+                    }
+                    rows={3}
+                    onChange={(e) => answer("wartungBegruendung", e.target.value)}
+                    data-testid="wartung-begruendung"
+                    required
+                  />
+                  <p className="p-reg__hint p-reg__hint--warn">
+                    {t.has("intervalJustificationHint")
+                      ? t("intervalJustificationHint")
+                      : "A self-set interval without justification cannot be defended in an inspection."}
+                  </p>
+                </div>
+              </SuggestableField>
+            ) : null}
             {wartungSuggested ? (
               <ProposalBanner
                 onAccept={() => {
@@ -281,14 +309,16 @@ export function CharacteristicsStep({
                   merkmale={merkmale}
                   onAcknowledge={acknowledgeRule}
                 />
-                <YesNoAnswer
-                  label={fieldLabel("aedAusnahme")}
-                  value={merkmale.aedAusnahme}
-                  meta={fieldMeta(merkmale, "aedAusnahme")}
-                  onAnswer={(v) => answer("aedAusnahme", v)}
-                  onConfirm={() => confirmField("aedAusnahme")}
-                  disabled={merkmale.anlage1 !== true}
-                />
+                {showsAedExemptionQuestion(merkmale.produktart) ? (
+                  <YesNoAnswer
+                    label={fieldLabel("aedAusnahme")}
+                    value={merkmale.aedAusnahme}
+                    meta={fieldMeta(merkmale, "aedAusnahme")}
+                    onAnswer={(v) => answer("aedAusnahme", v)}
+                    onConfirm={() => confirmField("aedAusnahme")}
+                    disabled={merkmale.anlage1 !== true}
+                  />
+                ) : null}
               </div>
             ) : null}
           </div>

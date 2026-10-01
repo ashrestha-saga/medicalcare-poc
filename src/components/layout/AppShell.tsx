@@ -32,7 +32,13 @@ import {
   UsersIcon,
 } from "./navIcons";
 
-import type { FormFactor, MenuModuleId } from "@/interfaces";
+import type { FormFactor, MenuModule, MenuModuleId } from "@/interfaces";
+
+const CLINIC_NAV_GROUPS = [
+  { id: "work" as const, labelKey: "groupWork" as const },
+  { id: "master" as const, labelKey: "groupMaster" as const },
+  { id: "output" as const, labelKey: "groupOutput" as const },
+];
 
 function navItemClass(active: boolean): string {
   return ["p-nav__item", active ? "is-active" : ""].filter(Boolean).join(" ");
@@ -60,8 +66,6 @@ function AccountBar({
   const tRoles = useTranslations("roles");
   const user = useSessionStore((s) => s.user);
   const tenantName = useSessionStore((s) => s.tenantName);
-  const lock = useSessionStore((s) => s.lock);
-  const pinHash = useSessionStore((s) => s.pinHash);
   const sites = useSites();
   const site = sites[0];
   const area = site?.areas[0];
@@ -102,11 +106,6 @@ function AccountBar({
         {roleText}
       </span>
       <LocaleToggle />
-      {pinHash && (
-        <button type="button" className="k" onClick={lock} data-testid="lock-button">
-          {t("lock")}
-        </button>
-      )}
       {showLogout && (
         <button type="button" className="k" onClick={onSignOut} data-testid="sign-out" title={t("logout")}>
           {t("logout")}
@@ -150,6 +149,30 @@ function isNavActive(id: MenuModuleId, pathname: string): boolean {
   return false;
 }
 
+function NavLink({
+  item,
+  pathname,
+  label,
+}: {
+  item: MenuModule;
+  pathname: string;
+  label: string;
+}) {
+  const active = isNavActive(item.id, pathname);
+  return (
+    <Link
+      href={item.href}
+      className={navItemClass(active)}
+      aria-current={active ? "page" : undefined}
+      title={label}
+      data-testid={`nav-${item.id}`}
+    >
+      <NavIcon id={item.id} />
+      <span className="p-nav__label">{label}</span>
+    </Link>
+  );
+}
+
 /**
  * Shared authenticated chrome: collapsible left nav + account strip.
  * Nav rail requires `shell:nav`; without it, Logout lives in the account bar.
@@ -182,6 +205,13 @@ export function AppShell({
   const primary = menu.filter((m) => m.id !== "settings");
   const settingsItem = menu.find((m) => m.id === "settings");
   const settingsActive = Boolean(settingsItem && isNavActive("settings", pathname));
+  const grouped = CLINIC_NAV_GROUPS.map((g) => ({
+    ...g,
+    items: primary.filter((m) => m.group === g.id),
+  })).filter((g) => g.items.length > 0);
+  const ungrouped = primary.filter(
+    (m) => !m.group || !CLINIC_NAV_GROUPS.some((g) => g.id === m.group),
+  );
 
   useEffect(() => {
     if (!showCapturerInventory) return;
@@ -220,22 +250,27 @@ export function AppShell({
 
           <aside className="p-nav" aria-label={t("main")} data-testid="app-nav">
             <nav className="p-nav__primary">
-              {primary.map((item) => {
-                const active = isNavActive(item.id, pathname);
-                return (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    className={navItemClass(active)}
-                    aria-current={active ? "page" : undefined}
-                    title={t(item.id as "inventory")}
-                    data-testid={`nav-${item.id}`}
-                  >
-                    <NavIcon id={item.id} />
-                    <span className="p-nav__label">{t(item.id as "inventory")}</span>
-                  </Link>
-                );
-              })}
+              {grouped.map((g) => (
+                <div key={g.id} className="p-nav__group" data-testid={`nav-group-${g.id}`}>
+                  <p className="p-nav__group-label">{t(g.labelKey)}</p>
+                  {g.items.map((item) => (
+                    <NavLink
+                      key={item.id}
+                      item={item}
+                      pathname={pathname}
+                      label={t(item.id as "inventory")}
+                    />
+                  ))}
+                </div>
+              ))}
+              {ungrouped.map((item) => (
+                <NavLink
+                  key={item.id}
+                  item={item}
+                  pathname={pathname}
+                  label={t(item.id as "inventory")}
+                />
+              ))}
             </nav>
 
             <div className="p-nav__secondary">

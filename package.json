@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:pflichten": "tsx scripts/runPflichtenFixture.ts && python3 fixtures/pflichten/vergleich_pflichten.py --erwartung fixtures/pflichten/pflichten-erwartung.json --live fixtures/pflichten/ableitung.json",
     "test:e2e": "playwright test",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",

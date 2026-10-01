@@ -1,5 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
-import { injectSession, signInAndSkipPin } from "./auth";
+import { signInAs } from "./auth";
 import { SESSION_COOKIE, buildSessionToken } from "../src/lib/auth/sessionToken";
 import type { SessionUser } from "../src/interfaces/session";
 
@@ -31,11 +31,6 @@ async function resolveManually(page: Page, identifier: string) {
   await page.getByTestId("manual-entry-submit").click();
 }
 
-async function enterPin(page: Page, pin: string) {
-  await expect(page.getByLabel("0 of 4 digits entered")).toBeVisible();
-  for (const d of pin) await page.getByTestId(`pin-${d}`).click();
-}
-
 function sessionCookieHeader(user: SessionUser = TECH) {
   const secret = process.env.SESSION_SECRET || "insecure-dev-session-secret";
   return `${SESSION_COOKIE}=${buildSessionToken(user, secret)}`;
@@ -50,7 +45,7 @@ async function authedPost(request: APIRequestContext, path: string, data: unknow
 
 test.describe("AC-E2E-01 — scan → device → service request → reference", () => {
   test("known inventory device with a verified classification proposal", async ({ page }) => {
-    await signInAndSkipPin(page, TECH);
+    await signInAs(page, TECH);
     await resolveManually(page, "INV-10001");
 
     await expect(page.getByTestId("device-screen")).toBeVisible();
@@ -84,7 +79,7 @@ test.describe("AC-E2E-01 — scan → device → service request → reference",
   });
 
   test("catalog device with a derived proposal is not pre-selected (FA-206)", async ({ page }) => {
-    await signInAndSkipPin(page, NURSE);
+    await signInAs(page, NURSE);
     await resolveManually(page, "(01)04012345678918(21)SN-777");
 
     await expect(page.getByTestId("catalog-model-view")).toBeVisible();
@@ -108,7 +103,7 @@ test.describe("AC-E2E-01 — scan → device → service request → reference",
   });
 
   test("unknown identifier falls through to manual capture, which is service-only", async ({ page }) => {
-    await signInAndSkipPin(page, TECH);
+    await signInAs(page, TECH);
     await resolveManually(page, "04012345678956");
 
     await expect(page.getByTestId("manual-capture")).toBeVisible();
@@ -142,27 +137,5 @@ test.describe("Security", () => {
     });
     expect(spoofed.status()).toBe(200);
     expect((await spoofed.json()).device.id).toBe("instance-inv-10001");
-  });
-
-  test("PIN lock: unlock with the right PIN, sign out after three wrong attempts (SEC-901)", async ({ page }) => {
-    await injectSession(page.context(), TECH);
-    await page.goto("/");
-    await expect(page.getByTestId("pin-setup")).toBeVisible();
-    await enterPin(page, "1234");
-    await enterPin(page, "1234");
-    await expect(page.getByTestId("scan-screen")).toBeVisible();
-
-    await page.getByTestId("lock-button").click();
-    await expect(page.getByTestId("lock-screen")).toBeVisible();
-    await enterPin(page, "1234");
-    await expect(page.getByTestId("scan-screen")).toBeVisible();
-
-    await page.getByTestId("lock-button").click();
-    for (let i = 0; i < 3; i++) {
-      await enterPin(page, "0000");
-      if (i < 2) await expect(page.getByTestId("pin-error")).toBeVisible();
-    }
-    await expect(page.getByTestId("oxid-login")).toBeVisible();
-    await expect(page.getByText(/Too many wrong PIN attempts/)).toBeVisible();
   });
 });

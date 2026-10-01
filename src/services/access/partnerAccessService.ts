@@ -67,6 +67,14 @@ export async function assertPartnerManagesTenant(
     }
     if (!contract || !isLiveContract(contract, now)) throw forbidden();
 
+    // Non-admin: must have an explicit PartnerStaffAssignment for this tenant (fail closed).
+    if (membership.appRole !== "admin") {
+      const assignment = await prisma.partnerStaffAssignment.findFirst({
+        where: { membershipId: membership.id, tenantId },
+      });
+      if (!assignment) throw forbidden();
+    }
+
     return {
       contractId: contract.id,
       scope: parseContractScope(contract.scope),

@@ -8,11 +8,12 @@
  *
  * Training: ops.person → clinic User (staff subject); ops.training_* → TrainingEvent/Record.
  */
-import type { PrismaClient } from "@prisma/client";
+import type { DutyKey, IntervalUnit, PrismaClient } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { computeDutyDueAt } from "../../src/services/registration/dueDate";
+import { canonicalDutyKey } from "../../src/services/registration/dutyKeys";
 import { hashPassword } from "../../src/lib/password";
 
 const RULE_SET_BY_CODE: Record<string, string> = {
@@ -33,12 +34,12 @@ const DUTY_KEY_BY_INSPECTION: Record<string, string> = {
   MEDBOARD: "aerztl",
   ITSEC: "itsec",
   INSTALL: "install",
-  REPROC: "aufb",
-  REPROC_CTRL: "aufb-ctrl",
-  VALIDATION: "eigen-val",
-  SINGLE_USE: "einmal",
-  NETWORK: "netz",
-  IMPLANT: "implant",
+  REPROC: "aufbereitung",
+  REPROC_CTRL: "kontrolle",
+  VALIDATION: "validierung",
+  SINGLE_USE: "einmalprodukt",
+  NETWORK: "vernetzung",
+  IMPLANT: "implantat",
   RADIOACTIVE: "nuklear",
 };
 
@@ -236,11 +237,17 @@ function jsonText(v: unknown, fallback: string): string {
   return JSON.stringify(v);
 }
 
-function dutyKey(inspectionType: string, constancyObject: string | null): string {
+function dutyKey(inspectionType: string, constancyObject: string | null): DutyKey {
   if (inspectionType === "CONSTANCY" && constancyObject) {
-    return `konstanz-${constancyObject}`;
+    return canonicalDutyKey(`konstanz-${constancyObject}`);
   }
-  return DUTY_KEY_BY_INSPECTION[inspectionType] ?? inspectionType.toLowerCase();
+  const mapped = DUTY_KEY_BY_INSPECTION[inspectionType] ?? inspectionType.toLowerCase();
+  return canonicalDutyKey(mapped);
+}
+
+function asIntervalUnit(raw: string | null | undefined): IntervalUnit | null {
+  if (raw === "months" || raw === "years") return raw;
+  return null;
 }
 
 function eventId(unitId: string, action: string, index: number): string {
@@ -632,7 +639,7 @@ export async function seedHandoverInventory(
     const constancyObject = asString(row.constancy_object);
     const referenceDate = asDate(row.reference_date)!;
     const intervalValue = asInt(row.interval_value);
-    const intervalUnit = asString(row.interval_unit);
+    const intervalUnit = asIntervalUnit(asString(row.interval_unit));
     const deadlineAnchor = asString(row.deadline_anchor)! as
       | "exact_day"
       | "month_end"
@@ -707,7 +714,7 @@ export async function seedHandoverInventory(
         tenantId,
         deviceDutyId: dutyId,
         performedAt,
-        result: asString(row.result) ?? "passed",
+        result: (asString(row.result) as "passed" | "passed_with_conditions" | "failed" | null) ?? "passed",
         note,
         performedBy: asString(row.performed_by) ?? "Testdaten",
         source: "import",
@@ -717,7 +724,7 @@ export async function seedHandoverInventory(
         tenantId,
         deviceDutyId: dutyId,
         performedAt,
-        result: asString(row.result) ?? "passed",
+        result: (asString(row.result) as "passed" | "passed_with_conditions" | "failed" | null) ?? "passed",
         note,
         performedBy: asString(row.performed_by) ?? "Testdaten",
         source: "import",
@@ -739,7 +746,7 @@ export async function seedHandoverInventory(
           referenceDate,
           lastCompletedAt: performedAt,
           intervalValue: asInt(src.interval_value),
-          intervalUnit: asString(src.interval_unit),
+          intervalUnit: asIntervalUnit(asString(src.interval_unit)),
         }),
       },
     });

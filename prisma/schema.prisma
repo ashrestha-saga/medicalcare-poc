@@ -41,7 +41,44 @@ enum Confidence {
   determination
   derived
   not_applicable
+  /** @deprecated Prefer `derived`. Normalized to `derived` on read. */
   guess
+}
+
+/** Certainty of Anlage-2 term→device matching (narrower than Confidence). */
+enum TermMatchConfidence {
+  verified
+  derived
+}
+
+enum IntervalUnit {
+  months
+  years
+}
+
+/**
+ * Canonical duty keys persisted on DeviceDuty (dynamic ids like val-ref-* map here).
+ * Fixture join vocabulary — keep in sync with fixtures/pflichten/vergleich_pflichten.py.
+ */
+enum DutyKey {
+  wartung
+  stk
+  mtk
+  abnahme
+  konstanz
+  sv
+  aerztl
+  nuklear
+  itsec
+  install
+  aufbereitung
+  kontrolle
+  validierung
+  validierung_verweis
+  einmalprodukt
+  zubehoer
+  vernetzung
+  implantat
 }
 
 enum FieldState {
@@ -74,6 +111,7 @@ enum ServiceRequestState {
   queued
   transmitted
   acknowledged
+  scheduled
   in_progress
   completed
   rejected
@@ -115,6 +153,37 @@ enum OperatingModel {
   institution_operated
 }
 
+enum OrganisationCapacity {
+  institution
+  service_provider
+  inspection_partner
+  platform_operator
+}
+
+enum ClinicRole {
+  superadmin
+  device_admin
+  security_officer
+  user
+}
+
+enum DutyPerformanceResult {
+  passed
+  passed_with_conditions
+  failed
+}
+
+enum OrderApprovalState {
+  pending_approval
+  approved
+  rejected
+}
+
+enum OrderRequestState {
+  /** Create stamp only — spare-parts lifecycle is `OrderApprovalState`. */
+  captured
+}
+
 // ---------------------------------------------------------------------------
 // Tenancy and locations (FA-500..504, NFA-804)
 // ---------------------------------------------------------------------------
@@ -153,6 +222,7 @@ model Tenant {
   dutyPerformances    DutyPerformance[]
   executorOrgs        ExecutorOrg[]
   serviceContracts    ServiceContract[]
+  partnerStaffAssignments PartnerStaffAssignment[]
   trainingEvents      TrainingEvent[]
   trainingRecords     TrainingRecord[]
   auditEvents         AuditEvent[]
@@ -179,7 +249,7 @@ model User {
   email        String   @unique
   name         String
   /** Clinic role. Null for partner accounts (role lives on OrgMembership). */
-  role         String? // superadmin | device_admin | security_officer | user
+  role         ClinicRole?
   /** clinic | partner — which login door accepts this account. */
   accountKind  String   @default("clinic")
   passwordHash String
@@ -205,7 +275,8 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  serviceRequests      ServiceRequest[]
+  serviceRequests      ServiceRequest[]       @relation("ServiceRequestRaisedBy")
+  assignedRequests     ServiceRequest[]       @relation("ServiceRequestAssignee")
   orderRequests        OrderRequest[]
   oxidConnectionsMade  TenantOxidConnection[] @relation("OxidConnectedBy")
   totpChallenges       TotpChallenge[]
@@ -511,7 +582,7 @@ model RefInspectionType {
   legalBasis       String
   deadlineAnchor   DeadlineAnchor
   defaultInterval  Int?
-  intervalUnit     String? // months | years
+  intervalUnit     IntervalUnit?
   evidenceHint     String?        @db.Text
   category         DutyCategory   @default(inspection)
   confidence       Confidence     @default(derived)
@@ -532,7 +603,8 @@ model RefAnnex2Item {
   conditionText    String?    @db.Text
   matchTerms       Json
   matchExclude     Json
-  matchConfidence  String     @default("derived")
+  /** Certainty of the term→device matching (distinct from interval `confidence`). */
+  termMatchConfidence TermMatchConfidence @default(derived)
   reviewFlag       String?
   confidence       Confidence @default(derived)
   sourceRef        String?
@@ -697,12 +769,12 @@ model DeviceDuty {
   deviceInstance      DeviceInstance         @relation(fields: [deviceInstanceId], references: [id])
   snapshotId          String
   snapshot            DeviceReleaseSnapshot  @relation(fields: [snapshotId], references: [id])
-  dutyKey             String // wartung | stk | mtk | …
+  dutyKey             DutyKey
   inspectionTypeCode  String
   inspectionType      RefInspectionType      @relation(fields: [inspectionTypeCode], references: [code])
   deadlineAnchor      DeadlineAnchor
   intervalValue       Int?
-  intervalUnit        String?
+  intervalUnit        IntervalUnit?
   cadenceLabel        String?
   constancyObjectCode String?
   constancyObject     RefConstancyObject?    @relation(fields: [constancyObjectCode], references: [code])
@@ -747,7 +819,7 @@ model DutyPerformance {
   serviceRequestId String?
   serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
   performedAt      DateTime       @db.Date
-  result           String         @default("passed") // passed | passed_with_conditions | failed
+  result           DutyPerformanceResult @default(passed)
   note             String?        @db.Text
   performedBy      String
   source           String         @default("assignment") // assignment | manual | import
@@ -773,6 +845,7 @@ model Organisation {
   invitations UserInvitation[]
   institutionTenants Tenant[] @relation("TenantInstitution")
   smtpSettings SmtpSettings?
+  executorOrgs ExecutorOrg[]
 
   @@index([activeTo])
 }
@@ -798,13 +871,12 @@ model SmtpSettings {
 
 /// Capacity of an organisation: institution | service_provider | inspection_partner | platform_operator.
 model OrganisationRole {
-  id             String       @id @default(cuid())
+  id             String               @id @default(cuid())
   organisationId String
-  organisation   Organisation @relation(fields: [organisationId], references: [id])
-  /** institution | service_provider | inspection_partner | platform_operator */
-  role           String
-  grantedFrom    DateTime     @db.Date
-  grantedTo      DateTime?    @db.Date
+  organisation   Organisation         @relation(fields: [organisationId], references: [id])
+  role           OrganisationCapacity
+  grantedFrom    DateTime             @db.Date
+  grantedTo      DateTime?            @db.Date
 
   @@unique([organisationId, role])
   @@index([role, grantedTo])
@@ -822,9 +894,30 @@ model OrgMembership {
   /** MySQL DATE cannot default to CURRENT_TIMESTAMP — set in app/seed. */
   validFrom      DateTime     @db.Date
   validTo        DateTime?    @db.Date
+  /** External inspector commissioned by this organisation (Fremdprüfer). */
+  isExternal       Boolean   @default(false)
+  commissionedFrom DateTime? @db.Date
+  commissionedTo   DateTime? @db.Date
+  liabilityUntil   DateTime? @db.Date
+  liabilitySumEur  Int?
+  staffAssignments PartnerStaffAssignment[]
 
   @@unique([organisationId, userId])
   @@index([userId])
+  @@index([organisationId, isExternal])
+}
+
+/// Which managed tenants a partner membership may act on (non-admin fail-closed).
+model PartnerStaffAssignment {
+  id           String        @id @default(cuid())
+  membershipId String
+  membership   OrgMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime      @default(now())
+
+  @@unique([membershipId, tenantId])
+  @@index([tenantId])
 }
 
 /// Live link that lets a service_provider organisation open one clinic.
@@ -839,7 +932,9 @@ model ServiceContract {
   terminatedAt   DateTime?
   suspendedAt    DateTime?
   billingRef     String?
-  /** JSON string[] — inventory | due-dates | inspection */
+  /** Art. 28 AVV Nachweis reference (provider_operated). */
+  avvRef         String?
+  /** JSON string[] — inventory | due-dates | inspection | reprocessing | training */
   scope          String       @db.Text
 
   @@unique([tenantId, organisationId])
@@ -894,19 +989,23 @@ model TrainingRecord {
 
 /** FA-713 — in-house executor still stored per clinic. External partners use Organisation. */
 model ExecutorOrg {
-  id        String   @id @default(cuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  code      String // O-MSR | O-RTS | O-INT
-  name      String
-  kind      String // external | internal
-  active    Boolean  @default(true)
-  sortOrder Int      @default(0)
-  requests  ServiceRequest[]
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  code           String // O-MSR | O-RTS | O-INT
+  name           String
+  kind           String // external | internal
+  active         Boolean       @default(true)
+  sortOrder      Int           @default(0)
+  /** When set, links this clinic executor row to the partner Organisation. */
+  organisationId String?
+  organisation   Organisation? @relation(fields: [organisationId], references: [id])
+  requests       ServiceRequest[]
   dispatchTargets DispatchTarget[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
+  @@index([organisationId])
 }
 
 model DeviceUnitEvent {
@@ -959,7 +1058,7 @@ model ServiceRequest {
   note            String?             @db.Text
   raisedBy        String?
   raisedById      String?
-  raisedByUser    User?               @relation(fields: [raisedById], references: [id])
+  raisedByUser    User?               @relation("ServiceRequestRaisedBy", fields: [raisedById], references: [id])
   siteId          String?
   locationText    String              @db.Text
   accessHint      String?             @db.Text
@@ -983,6 +1082,11 @@ model ServiceRequest {
   allocatedBy     String?
   /** FA-714 — set on transmit; allocation becomes immutable. */
   transmittedAt   DateTime?
+  /** Partner user assigned to perform the work (Disposition). */
+  assigneeUserId  String?
+  assigneeUser    User?               @relation("ServiceRequestAssignee", fields: [assigneeUserId], references: [id])
+  /** Appointment date — moves state to scheduled when set. */
+  scheduledAt     DateTime?           @db.Date
   statusEvents    StatusEvent[]
   attachments     Attachment[]
   dispatchRecords DispatchRecord[]
@@ -993,6 +1097,7 @@ model ServiceRequest {
   @@index([raisedById])
   @@index([dutyId])
   @@index([executorOrgId])
+  @@index([tenantId, assigneeUserId])
   @@index([tenantId, source, state])
 }
 
@@ -1097,8 +1202,8 @@ model OrderRequest {
   subjectId       String?
   deliveryAddress String      @db.Text
   note            String?     @db.Text
-  approvalState   String      @default("pending_approval")
-  state           String      @default("captured")
+  approvalState   OrderApprovalState @default(pending_approval)
+  state           OrderRequestState  @default(captured)
   correlationId   String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -1287,11 +1392,24 @@ model ReprocessingOnDevice {
   equipmentDeviceId String
   profileDevice     DeviceInstance @relation("ReprocessedItem", fields: [profileDeviceId], references: [id])
   equipmentDevice   DeviceInstance @relation("ReprocessingEquipment", fields: [equipmentDeviceId], references: [id])
+  /** Open link while validTo is null; close instead of delete so recall history survives. */
+  validFrom         DateTime       @default(now())
+  validTo           DateTime?
+  /**
+   * SCH-02 style — set to `profileDeviceId:equipmentDeviceId` while validTo is null;
+   * cleared when closed so the same pair can be linked again later.
+   */
+  openLinkKey       String?        @unique @db.VarChar(191)
   recordedBy        String
   recordedAt        DateTime       @default(now())
 
-  @@unique([profileDeviceId, equipmentDeviceId])
+  /** Standalone FK indexes (MySQL) plus history / pair lookups. */
+  @@index([profileDeviceId])
+  @@index([equipmentDeviceId])
   @@index([tenantId, equipmentDeviceId])
+  @@index([tenantId, profileDeviceId, validTo])
+  @@index([tenantId, equipmentDeviceId, validTo])
+  @@index([profileDeviceId, equipmentDeviceId])
 }
 
 /** SEC-07 — admin-triggered password reset; redeem sets a new password via email link. */

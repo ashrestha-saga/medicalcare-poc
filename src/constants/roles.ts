@@ -32,10 +32,6 @@ export const ROLES: { value: UserRole; label: string; description: string }[] = 
   },
 ];
 
-export const PIN_LENGTH = 4;
-export const PIN_MAX_ATTEMPTS = 3; // SEC-901
-export const IDLE_LOCK_MS = 5 * 60 * 1000;
-
 export function roleLabel(role: UserRole | undefined): string {
   if (!role) return "—";
   return ROLES.find((r) => r.value === role)?.label ?? role;

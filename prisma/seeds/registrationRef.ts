@@ -64,10 +64,10 @@ const INSPECTION_TYPES: {
   legalBasis: string;
   deadlineAnchor: string;
   defaultInterval: number | null;
-  intervalUnit: string | null;
+  intervalUnit: "months" | "years" | null;
   evidenceHint: string;
   category: "inspection" | "operating";
-  confidence: "verified" | "derived";
+  confidence: "verified" | "derived" | "determination";
   sourceRef: string | null;
 }[] = [
   {
@@ -93,8 +93,8 @@ const INSPECTION_TYPES: {
     intervalUnit: "months",
     evidenceHint: "Protokoll, Eintrag im Medizinproduktebuch, Kennzeichnung am Produkt",
     category: INSPECTION,
-    confidence: "derived",
-    sourceRef: "§ 12 MPBetreibV",
+    confidence: "verified",
+    sourceRef: "§ 12 Absatz 2 MPBetreibV",
   },
   {
     code: "MTK",
@@ -204,14 +204,14 @@ const INSPECTION_TYPES: {
     code: "REPROC_CTRL",
     ruleSetId: "rs-mpbetreibv",
     label: "Kontrolle der beauftragten Aufbereitung",
-    legalBasis: "§ 8 MPBetreibV",
+    legalBasis: "§ 8 MPBetreibV — Turnus vom Betreiber festzulegen",
     deadlineAnchor: "year_end",
     defaultInterval: 12,
     intervalUnit: "months",
     evidenceHint: "Dokumentation der eigenen Kontrolle",
     category: OPERATING,
-    confidence: "verified",
-    sourceRef: "§ 8 MPBetreibV",
+    confidence: "determination",
+    sourceRef: "§ 8 MPBetreibV (Turnus Betreiberfestlegung)",
   },
   {
     code: "VALIDATION",
@@ -223,8 +223,8 @@ const INSPECTION_TYPES: {
     intervalUnit: "months",
     evidenceHint: "Validierungsbericht mit IQ, BQ und LQ",
     category: INSPECTION,
-    confidence: "verified",
-    sourceRef: "DIN EN ISO 15883 / 17665",
+    confidence: "derived",
+    sourceRef: "DIN EN ISO 15883 / 17665 — Intervall je Geraetetyp aus RefReprocessingEquipmentType",
   },
   {
     code: "SINGLE_USE",
@@ -275,7 +275,7 @@ const INSPECTION_TYPES: {
     intervalUnit: null,
     evidenceHint: "Kontaminationsmessungen, Buchfuehrung ueber den Verbleib",
     category: INSPECTION,
-    confidence: "derived",
+    confidence: "verified",
     sourceRef: "StrlSchG / StrlSchV",
   },
 ];
@@ -414,6 +414,8 @@ type Annex2Json = {
     matchTerms?: string[];
     matchExclude?: string[];
     matchConfidence?: string;
+    confidence?: "verified" | "derived";
+    sourceRef?: string;
     variante?: string;
   }[];
 };
@@ -479,6 +481,17 @@ export async function seedRegistrationRef(prisma: PrismaClient): Promise<void> {
   for (const r of annex2.regeln) {
     const id = `annex2-${r.id}`;
     const isGroup = r.ebene === "gruppe";
+    const intervalConfidence =
+      r.confidence === "verified" || r.confidence === "derived"
+        ? r.confidence
+        : ("derived" as const);
+    const intervalSourceRef =
+      r.sourceRef ??
+      (r.fristJahre != null
+        ? intervalConfidence === "verified"
+          ? `Anlage 2 Nr. ${r.ziffer}`
+          : `Anlage 2 Nr. ${r.ziffer} — abzugleichen`
+        : null);
     await prisma.refAnnex2Item.upsert({
       where: { id },
       update: {
@@ -492,7 +505,12 @@ export async function seedRegistrationRef(prisma: PrismaClient): Promise<void> {
         conditionText: r.bedingung ?? null,
         matchTerms: r.matchTerms ?? [],
         matchExclude: r.matchExclude ?? [],
-        matchConfidence: r.matchConfidence === "kuratiert" ? "derived" : (r.matchConfidence ?? "derived"),
+        termMatchConfidence:
+          r.matchConfidence === "verified" || r.matchConfidence === "kuratiert"
+            ? "verified"
+            : "derived",
+        confidence: intervalConfidence,
+        sourceRef: intervalSourceRef,
       },
       create: {
         id,
@@ -506,7 +524,12 @@ export async function seedRegistrationRef(prisma: PrismaClient): Promise<void> {
         conditionText: r.bedingung ?? null,
         matchTerms: r.matchTerms ?? [],
         matchExclude: r.matchExclude ?? [],
-        matchConfidence: r.matchConfidence === "kuratiert" ? "derived" : (r.matchConfidence ?? "derived"),
+        termMatchConfidence:
+          r.matchConfidence === "verified" || r.matchConfidence === "kuratiert"
+            ? "verified"
+            : "derived",
+        confidence: intervalConfidence,
+        sourceRef: intervalSourceRef,
       },
     });
   }

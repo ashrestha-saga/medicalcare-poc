@@ -2,6 +2,7 @@
 
 import type { TrainingFormOptionsDTO } from "@/interfaces";
 import { useRecordTrainingForm } from "@/components/hooks/training/useRecordTrainingForm";
+import { TrainingModelSearchSelect } from "@/components/features/training/TrainingModelSearchSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,21 +93,11 @@ export function RecordTrainingForm({
             {subjectKind === "model" ? (
               <label className="p-train__fld">
                 <span>Device model</span>
-                <select
+                <TrainingModelSearchSelect
+                  models={form.models}
                   value={subjectModelId}
-                  onChange={(e) => setSubjectModelId(e.target.value)}
-                  data-testid="training-subject-model"
-                >
-                  {form.models.length === 0 ? (
-                    <option value="">No inventory models</option>
-                  ) : (
-                    form.models.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))
-                  )}
-                </select>
+                  onChange={setSubjectModelId}
+                />
               </label>
             ) : (
               <label className="p-train__fld">

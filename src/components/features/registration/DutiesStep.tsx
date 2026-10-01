@@ -72,9 +72,15 @@ export function DutiesStep({
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{d.titel}</span>
               <Badge variant="secondary">{d.art}</Badge>
-              {d.vertrauen !== "n/a" ? (
+              {d.vertrauen !== "n/a" && d.vertrauen !== "not_applicable" ? (
                 <Badge variant="outline">
-                  {d.vertrauen === "verified" ? t("verified") : t("derived")}
+                  {d.vertrauen === "verified"
+                    ? t("verified")
+                    : d.vertrauen === "determination"
+                      ? t("determination")
+                      : d.vertrauen === "responsible"
+                        ? t("responsible")
+                        : t("derived")}
                 </Badge>
               ) : null}
             </div>

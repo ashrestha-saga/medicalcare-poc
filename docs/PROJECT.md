@@ -4,7 +4,7 @@ Mobile-first web application for clinical technicians and nursing staff: scan or
 
 This document describes how the system works, the domain model, and the technical features available in the codebase.
 
-For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) (Wave 2 hygiene plus post–Wave 2: `RoleGrant.kind`, `UserPermission`, `SmtpSettings`, `PasswordResetToken`, invite permission snapshots).
+For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) (incl. SWOT finishing 30.09.: enums, reprocessing link history, deriveDuties P1–P3 / AED, RoleGrant / UserPermission / SMTP / password reset).
 
 ---
 
@@ -272,9 +272,13 @@ Initial registration (**Erstanlage**) is a four-step wizard: identity → charac
 - Greenfield `/registration` stays in the client until **Release**. `POST /api/registration/preview` derives duties from the characteristics payload (no draft row). `POST /api/registration/release` then creates the `DeviceInstance` and freezes duties in one step.
 - Inventarize still creates a `state=draft` instance and opens `/registration/[id]`; that path hydrates the wizard and passes `draftId` on release (update + freeze).
 - Einstufung lives on the **model** (`DeviceModelClassification`), historised (`validTo` close + insert).
-- Release (and reclassify apply) writes `confidence = verified` with `confirmedBy` / `confirmedAt`: the prerequisite-gated release **is** the Beleg. Callers can still pass a lower `classificationConfidence` explicitly.
-- Duty derivation runs in application TypeScript (`deriveDuties`); on release, duties freeze into `DeviceReleaseSnapshot` / `DeviceDuty` and are never silently rewritten.
-- Each frozen duty stores its own cycle (`intervalValue` / `intervalUnit` / `deadlineAnchor`) and a computed `dueAt` (`dueDate()`): Wartung is day-exact, STK/IT-Sicherheit month-end, MTK and Sachverständigenprüfung year-end. Event / process / permanent / free-text interval anchors stay `dueAt = null`.
+- Erstanlage release defaults `confidence = responsible` with `confirmedBy` / `confirmedAt`. Reclassify apply defaults `verified`. Callers can still pass a lower `classificationConfidence` explicitly.
+- Duty derivation runs in application TypeScript (`deriveDuties`); on release, duties freeze into `DeviceReleaseSnapshot` / `DeviceDuty` and are never silently rewritten. Fixture check: `npm run test:pflichten` (222 cases / 1,197 duties).
+  - **P1:** non-applicable duties get `deadlineAnchor=none`, no interval, `confidence=n/a`.
+  - **P2 / AED:** one STK duty; Anlage 1 or MedGV Altgerät grounds; `aedAusnahme` (shown only for `aktiv-therapie` / `sonstiges`) overrides both. Classification `stk` is taken from that duty on release/reclassify.
+  - **P3:** implants skip Wartung calendar duty; IFU interval is operator `determination` when Wartung applies.
+  - **AUF-01:** validation calendar duties on reprocessing equipment only; products link via historised `ReprocessingOnDevice` (`validFrom` / `validTo`, unique open `openLinkKey`).
+- Each frozen duty stores its own cycle (`intervalValue` / `intervalUnit` / `deadlineAnchor`) and a computed `dueAt` (`dueDate()`): Wartung is day-exact, STK/IT-Sicherheit month-end, MTK and Sachverständigenprüfung year-end. **Equipment validation is `year_end` (product decision).** Event / process / permanent / free-text interval anchors stay `dueAt = null`.
 - Completing a duty (`POST /api/duties/[id]/complete`) sets `lastCompletedAt`, rolls `dueAt` from the completion date, and for Wartung also updates `DeviceInstance.nextMaintenanceDueAt`. `nextObligationDueAt` on inventory detail is `min(dueAt)` across applicable open duties.
 - Inventory detail lists open duties. Instance “mark maintenance done” keeps the Wartung duty in sync.
 - **Reclassify (admin):** `/registration/reclassify/[modelId]` reopens Characteristics → Duties → Prerequisites, then applies to **all** tenant copies of the model (suspend prior duties + new snapshot). Requires `catalog:update` and explicit impact acknowledgement.
@@ -387,16 +391,6 @@ If the user has TOTP enabled, login returns a challenge and the UI asks for a 6-
 - TTL: **12 hours**
 - Tenant and user identity always derived from the cookie on the server
 
-### Device PIN (client)
-
-Optional **4-digit PIN** stored hashed in localStorage via `sessionStore`:
-
-- Wrong PIN ×3 → force full sign-in
-- Idle auto-lock after **5 minutes** (`IDLE_LOCK_MS`)
-- Lock on tab hide (`useIdleTimer`)
-
-PIN is a device UI lock, not a substitute for server auth.
-
 ### OXID OAuth
 
 OXID OAuth2 + PKCE links a **tenant shop** (Settings → `/auth/callback`). Tokens stay server-side (`TenantOxidConnection`). Used for catalog/parts adapters — not the primary staff password login UI.
@@ -496,7 +490,6 @@ Wiring real systems should only require filling HTTP adapters + `.env` OAuth/API
 - TOTP secrets encrypted at rest; backup codes hashed.
 - Error responses omit stack traces in production paths.
 - External calls log hashed identifiers + correlation ids where applicable.
-- Optional device PIN lock + idle timeout on the client.
 - RBAC enforced in RouteGuard (UI) and API handlers (server).
 
 ---

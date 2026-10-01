@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { ConsoleStaffListDTO } from "@/interfaces/console";
 import { api, ApiError } from "@/lib/http/apiClient";
@@ -119,7 +120,12 @@ export function ConsoleStaffScreen() {
                   {data.members.map((m) => (
                     <tr key={m.membershipId} className="border-b border-border/70">
                       <td className="py-2 pr-3">
-                        <div className="font-medium">{m.name}</div>
+                        <Link
+                          href={`/partner/staff/${m.membershipId}`}
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          {m.name}
+                        </Link>
                         <div className="text-xs text-muted-foreground">{m.jobTitle ?? "—"}</div>
                       </td>
                       <td className="py-2 pr-3 text-xs">{m.email}</td>

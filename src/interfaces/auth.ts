@@ -38,15 +38,6 @@ export interface SignInProps {
   door?: "clinic" | "partner";
 }
 
-export interface LockScreenProps {
-  onLockedOut: () => void;
-  onSignOut: () => void;
-}
-
-export interface PinSetupProps {
-  onDone: () => void;
-}
-
 export interface AuthGateProps {
   children: ReactNode;
   /** Signed-out redirect target. Defaults to /login (clinic door). */

@@ -36,7 +36,7 @@ export function useRecordTrainingForm({
   );
   const subjectKind = selectedType?.subjectKind ?? "model";
 
-  const [subjectModelId, setSubjectModelId] = useState(form.models[0]?.id ?? "");
+  const [subjectModelId, setSubjectModelId] = useState("");
   const [subjectActivity, setSubjectActivity] = useState(form.activities[0] ?? "");
   const [heldOn, setHeldOn] = useState(todayIso());
   const [location, setLocation] = useState("");
@@ -53,14 +53,11 @@ export function useRecordTrainingForm({
     (code: string) => {
       setTrainingTypeCode(code);
       const next = typeByCode(form.types, code);
-      if (next?.subjectKind === "model" && !subjectModelId && form.models[0]) {
-        setSubjectModelId(form.models[0].id);
-      }
       if (next?.subjectKind === "activity" && !subjectActivity && form.activities[0]) {
         setSubjectActivity(form.activities[0]);
       }
     },
-    [form.activities, form.models, form.types, subjectActivity, subjectModelId],
+    [form.activities, form.types, subjectActivity],
   );
 
   const setModeSafe = useCallback(

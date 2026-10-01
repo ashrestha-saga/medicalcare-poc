@@ -25,13 +25,27 @@ import {
 const MENU_I18N: Partial<
   Record<
     MenuModuleId,
-    "customers" | "dueDates" | "requests" | "staff" | "organisation" | "activity" | "settings"
+    | "customers"
+    | "dueDates"
+    | "requests"
+    | "disposition"
+    | "mySites"
+    | "assignments"
+    | "staff"
+    | "external"
+    | "organisation"
+    | "activity"
+    | "settings"
   >
 > = {
   "console-customers": "customers",
   "console-due-dates": "dueDates",
   "console-requests": "requests",
+  "console-disposition": "disposition",
+  "console-my-sites": "mySites",
+  "console-assignments": "assignments",
   "console-staff": "staff",
+  "console-external": "external",
   "console-organisation": "organisation",
   "console-activity": "activity",
   "console-settings": "settings",
@@ -39,8 +53,11 @@ const MENU_I18N: Partial<
 
 function ConsoleNavIcon({ id }: { id: MenuModuleId }) {
   if (id === "console-due-dates") return <DueDatesIcon />;
-  if (id === "console-requests") return <RequestsIcon />;
-  if (id === "console-staff") return <UsersIcon />;
+  if (id === "console-requests" || id === "console-disposition" || id === "console-assignments") {
+    return <RequestsIcon />;
+  }
+  if (id === "console-my-sites") return <LocationsIcon />;
+  if (id === "console-staff" || id === "console-external") return <UsersIcon />;
   if (id === "console-organisation") return <ManagementIcon />;
   if (id === "console-activity") return <ActivityIcon />;
   if (id === "console-settings") return <SettingsIcon />;
@@ -61,8 +78,8 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   const org = menu.filter((m) => m.group === "org");
 
   return (
-    <div className="flex min-h-screen flex-col bg-background" data-testid="console-shell">
-      <header className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-5">
+    <div className="flex h-dvh flex-col overflow-hidden bg-background" data-testid="console-shell">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-5">
         <div>
           <div className="text-sm font-semibold">{t("title")}</div>
           <div className="mt-0.5 text-xs text-muted-foreground">
@@ -85,14 +102,14 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           </button>
         </div>
       </header>
-      <div className="flex flex-1 flex-col md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {permissionsLoading ? (
-          <div className="border-b border-border p-3 md:w-56 md:border-b-0 md:border-r">
+          <div className="shrink-0 border-b border-border p-3 md:w-56 md:border-b-0 md:border-r">
             <Loading label="…" />
           </div>
         ) : showNav ? (
           <nav
-            className="border-b border-border p-3 md:w-56 md:border-b-0 md:border-r"
+            className="shrink-0 overflow-y-auto border-b border-border p-3 md:w-56 md:border-b-0 md:border-r"
             aria-label={t("navLabel")}
           >
             {ops.length > 0 ? (
@@ -131,7 +148,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             ) : null}
           </nav>
         ) : null}
-        <div className="min-w-0 flex-1">{children}</div>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
       </div>
     </div>
   );

@@ -51,7 +51,8 @@ export interface RegistrationAnnex2Ref {
   restriction: string | null;
   matchTerms: string[];
   matchExclude: string[];
-  matchConfidence: string;
+  /** Certainty of term→device matching (not the interval confidence). */
+  termMatchConfidence: string;
   hinweis: string | null;
   verfahren: string | null;
   wahlweiseNach: string[] | null;

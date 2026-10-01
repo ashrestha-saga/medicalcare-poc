@@ -15,6 +15,13 @@ function blockVisible(kind: ProductKindDTO | null, key: string, weitere: boolean
   return weitere;
 }
 
+/**
+ * Mockup v18: AED layperson/public-space question only for aktiv-therapie and sonstiges.
+ */
+export function showsAedExemptionQuestion(produktart: string | undefined | null): boolean {
+  return produktart === "aktiv-therapie" || produktart === "sonstiges";
+}
+
 /** FA-208 — only confirmed / chosen count as answered; deferred is explicit gap (ERF-01). */
 export type AnswerState =
   | "offen"
@@ -71,6 +78,7 @@ export const TRACKED_FIELDS = [
   "eigenTyp",
   "wartungIntervall",
   "wartungQuelle",
+  "wartungBegruendung",
   "messgroesse",
   "messvariante",
   "anlage2Choice",
@@ -100,6 +108,7 @@ const FIELD_LABELS: Record<TrackedField, string> = {
   eigenTyp: "Type of reprocessing device",
   wartungIntervall: "Maintenance interval (months)",
   wartungQuelle: "Origin of the maintenance interval",
+  wartungBegruendung: "Justification of the set interval",
   messgroesse: "Measured quantity (Anlage 2)",
   messvariante: "Measured quantity — variant",
   anlage2Choice: "Measuring function per Anlage 2",
@@ -535,6 +544,10 @@ function applyValue(m: RegistrationCharacteristics, field: string, value: unknow
     m.wartungQuelle = value as "hersteller" | "eigen";
     return;
   }
+  if (field === "wartungBegruendung") {
+    m.wartungBegruendung = typeof value === "string" ? value : String(value ?? "");
+    return;
+  }
   (m as unknown as Record<string, unknown>)[field] = value;
 }
 
@@ -559,6 +572,9 @@ export function clearDependents(
   }
   if (field === "aufbereitung" && value === false) {
     return clearFields(m, ["aufbKlasse", "aufbExtern", "aufbGeraete", "zubehoer"]);
+  }
+  if (field === "wartungQuelle" && value !== "eigen") {
+    return clearFields(m, ["wartungBegruendung"]);
   }
   return m;
 }
@@ -589,6 +605,10 @@ export interface UnansweredField {
 }
 
 function needsAnswer(m: RegistrationCharacteristics, field: string): boolean {
+  if (field === "wartungBegruendung") {
+    if (!isAnswered(fieldMeta(m, field))) return true;
+    return !String(m.wartungBegruendung ?? "").trim();
+  }
   return !isAnswered(fieldMeta(m, field));
 }
 
@@ -612,6 +632,12 @@ export function unansweredVisibleFields(
   if (show("wartung")) {
     add("wartungIntervall");
     add("wartungQuelle");
+    if (
+      hydrated.wartungQuelle === "eigen" &&
+      isAnswered(fieldMeta(hydrated, "wartungQuelle"))
+    ) {
+      add("wartungBegruendung");
+    }
   }
 
   if (show("stk")) {
@@ -619,7 +645,11 @@ export function unansweredVisibleFields(
     if (hydrated.aktiv === true && isAnswered(fieldMeta(hydrated, "aktiv"))) {
       add("anlage1");
       add("altgeraet");
-      if (hydrated.anlage1 === true && isAnswered(fieldMeta(hydrated, "anlage1"))) {
+      if (
+        showsAedExemptionQuestion(hydrated.produktart) &&
+        hydrated.anlage1 === true &&
+        isAnswered(fieldMeta(hydrated, "anlage1"))
+      ) {
         add("aedAusnahme");
       }
     }

@@ -55,6 +55,7 @@ afterAll(async () => {
       where: { id: tenantId },
       select: { institutionOrgId: true },
     });
+    await prisma.userInvitation.deleteMany({ where: { tenantId } });
     await prisma.auditEvent.deleteMany({ where: { tenantId } });
     await prisma.serviceContract.deleteMany({ where: { tenantId } });
     await prisma.site.deleteMany({ where: { tenantId } });
@@ -85,18 +86,23 @@ describe("clinicOnboardService", () => {
       country: "DE",
       tenantCode,
       siteName: "Hauptstandort",
+      contactName: "Dr. Kontakt",
+      contactEmail: `kontakt-${suffix.toLowerCase()}@praxis-test.example`,
       validFrom: "2026-10-01",
       billingRef: "KTO-TEST",
+      avvRef: "AVV-TEST",
       operatingModel: "provider_operated",
       scope: ["inventory", "inspection"],
     });
-    const { clinic } = await clinicOnboardService.create(adminCtx, input);
+    const { clinic, invite } = await clinicOnboardService.create(adminCtx, input);
     createdTenantIds.push(clinic.tenantId);
     expect(clinic.tenantCode).toBe(tenantCode);
     expect(clinic.live).toBe(true);
     expect(clinic.city).toBe("Bonn");
     expect(clinic.siteCount).toBe(1);
     expect(clinic.scope).toEqual(["inventory", "inspection"]);
+    expect(invite.email).toBe(input.contactEmail);
+    expect(invite.redeemUrl).toContain("/invite?token=");
 
     const tenant = await prisma.tenant.findFirst({ where: { code: tenantCode } });
     expect(tenant?.operatingModel).toBe("provider_operated");
@@ -110,6 +116,11 @@ describe("clinicOnboardService", () => {
       where: { tenantId: tenant!.id, organisationId: MSR_ID },
     });
     expect(contract?.billingRef).toBe("KTO-TEST");
+    const invitation = await prisma.userInvitation.findFirst({
+      where: { tenantId: tenant!.id, email: input.contactEmail },
+    });
+    expect(invitation?.role).toBe("superadmin");
+    expect(invitation?.name).toBe("Dr. Kontakt");
     const audit = await prisma.auditEvent.findFirst({
       where: { tenantId: tenant!.id, resource: "tenant", action: "create" },
     });
@@ -120,10 +131,13 @@ describe("clinicOnboardService", () => {
   it("refuses a partner who is not an organisation admin", async () => {
     const input = createClinicSchema.parse({
       name: "No",
+      postalCode: "12345",
       city: "X",
       tenantCode: "T-NOPE99",
       siteName: "S",
+      contactEmail: "nope99@example.com",
       validFrom: "2026-10-01",
+      avvRef: "AVV-X",
       operatingModel: "provider_operated",
       scope: ["inventory"],
     });
@@ -136,10 +150,13 @@ describe("clinicOnboardService", () => {
   it("refuses an organisation without service_provider capacity", async () => {
     const input = createClinicSchema.parse({
       name: "No",
+      postalCode: "12345",
       city: "X",
       tenantCode: "T-NOPE98",
       siteName: "S",
+      contactEmail: "nope98@example.com",
       validFrom: "2026-10-01",
+      avvRef: "AVV-X",
       operatingModel: "provider_operated",
       scope: ["inventory"],
     });

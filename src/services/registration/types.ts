@@ -39,6 +39,8 @@ export interface RegistrationCharacteristics {
   zubehoer?: { t: string; klasse: string }[];
   wartungIntervall?: number;
   wartungQuelle?: "hersteller" | "eigen";
+  /** Required when wartungQuelle is eigen — operator-set interval justification. */
+  wartungBegruendung?: string;
   wartungExtern?: boolean;
   energie?: boolean;
   aedAusnahme?: boolean;

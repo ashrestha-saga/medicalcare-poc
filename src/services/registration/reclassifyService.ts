@@ -6,7 +6,7 @@ import { notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { computeNextMaintenanceDueAt } from "@/lib/maintenance/schedule";
 import { characteristicConflicts } from "./conflicts";
-import { deriveDuties } from "./deriveDuties";
+import { deriveDuties, stkFlagFromDuties } from "./deriveDuties";
 import {
   formatUnansweredMessage,
   hydrateAnswerMeta,
@@ -21,6 +21,7 @@ import {
 } from "./prerequisites";
 import type { RegistrationCharacteristics } from "./types";
 import { writeDuty } from "./writeDuty";
+import { isReprocessingEquipmentDevice } from "./reprocessingLinkService";
 
 const APP_VERSION = "reclassify-1.0";
 
@@ -68,6 +69,11 @@ async function resolveAnnex2(characteristics: RegistrationCharacteristics) {
         hinweis: meta?.hinweis ?? item.conditionText,
         verfahren: meta?.verfahren ?? null,
         wahlweiseNach: meta?.wahlweiseNach ?? null,
+        confidence:
+          item.confidence === "verified" || item.confidence === "derived"
+            ? item.confidence
+            : meta?.confidence ?? "derived",
+        sourceRef: item.sourceRef ?? meta?.sourceRef ?? null,
         id: item.id,
       };
     }
@@ -88,6 +94,11 @@ async function resolveAnnex2(characteristics: RegistrationCharacteristics) {
         hinweis: meta?.hinweis ?? item.conditionText,
         verfahren: meta?.verfahren ?? null,
         wahlweiseNach: meta?.wahlweiseNach ?? null,
+        confidence:
+          item.confidence === "verified" || item.confidence === "derived"
+            ? item.confidence
+            : meta?.confidence ?? "derived",
+        sourceRef: item.sourceRef ?? meta?.sourceRef ?? null,
         id: item.id,
       };
     }
@@ -210,6 +221,8 @@ export const reclassifyService = {
             hinweis: annex2.hinweis,
             verfahren: annex2.verfahren,
             wahlweiseNach: annex2.wahlweiseNach,
+            confidence: annex2.confidence,
+            sourceRef: annex2.sourceRef,
           }
         : null,
     });
@@ -304,7 +317,7 @@ export const reclassifyService = {
         data: {
           deviceModelId: modelId,
           openClassificationKey: modelId,
-          stk: Boolean(characteristics.anlage1 || characteristics.altgeraet),
+          stk: stkFlagFromDuties(duties),
           mtkItemId,
           radiation: Boolean(characteristics.strahlung),
           softwareClass:
@@ -338,6 +351,18 @@ export const reclassifyService = {
           },
         });
         updatedCopies += 1;
+
+        // SWOT 3.5 — if this exemplar is no longer reprocessing equipment, close open links.
+        const stillEquipment = isReprocessingEquipmentDevice({
+          productKindCode: characteristics.produktart ?? null,
+          characteristicsJson: JSON.stringify(characteristics),
+        });
+        if (!stillEquipment) {
+          await tx.reprocessingOnDevice.updateMany({
+            where: { tenantId, equipmentDeviceId: inst.id, validTo: null },
+            data: { validTo: now, openLinkKey: null },
+          });
+        }
 
         if (inst.state !== "released") continue;
 

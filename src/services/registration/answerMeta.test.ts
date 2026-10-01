@@ -68,6 +68,27 @@ describe("answerMeta FA-208–216", () => {
     expect(m.answerMeta?.anlage1).toBeUndefined();
   });
 
+  it("requires AED answer only for aktiv-therapie / sonstiges", () => {
+    const therapy = kindStub({
+      code: "aktiv-therapie",
+      shows: ["stk", "wartung"],
+      presets: { aktiv: true, anlage1: true },
+    });
+    let m = applyProductKindAsSuggestions(therapy);
+    m = confirmAllSuggestions(m, "Ada");
+    expect(unansweredVisibleFields(m, therapy).some((f) => f.field === "aedAusnahme")).toBe(true);
+
+    const imaging = kindStub({
+      code: "bildgebung",
+      shows: ["stk", "wartung", "strahlung"],
+      presets: { aktiv: true },
+    });
+    m = applyProductKindAsSuggestions(imaging);
+    m = confirmAllSuggestions(m, "Ada");
+    m = answerField(m, "anlage1", true, "Ada");
+    expect(unansweredVisibleFields(m, imaging).some((f) => f.field === "aedAusnahme")).toBe(false);
+  });
+
   it("changing a suggestion marks geaendert in the protocol", () => {
     let m = emptyCharacteristics();
     m = applyProductKindAsSuggestions(
@@ -118,5 +139,28 @@ describe("answerMeta FA-208–216", () => {
     m = confirmSuggestion(m, "implantat", "Ada");
     expect(m.answerMeta?.implantat?.state).toBe("vorschlag_bestaetigt");
     expect(buildDecisionProtocol(m)[0]?.origin).toBe("bestaetigt");
+  });
+
+  it("requires Wartung justification when interval origin is operator", () => {
+    const kind = kindStub({ code: "sonstiges", shows: ["wartung"] });
+    let m = applyProductKindAsSuggestions(kind);
+    m = answerField(m, "wartungIntervall", 12, "Ada");
+    m = answerField(m, "wartungQuelle", "eigen", "Ada");
+    expect(unansweredVisibleFields(m, kind).some((f) => f.field === "wartungBegruendung")).toBe(
+      true,
+    );
+    m = answerField(m, "wartungBegruendung", "  ", "Ada");
+    expect(unansweredVisibleFields(m, kind).some((f) => f.field === "wartungBegruendung")).toBe(
+      true,
+    );
+    m = answerField(m, "wartungBegruendung", "High intensity of use", "Ada");
+    expect(unansweredVisibleFields(m, kind).some((f) => f.field === "wartungBegruendung")).toBe(
+      false,
+    );
+    m = answerField(m, "wartungQuelle", "hersteller", "Ada");
+    expect(m.wartungBegruendung).toBeUndefined();
+    expect(unansweredVisibleFields(m, kind).some((f) => f.field === "wartungBegruendung")).toBe(
+      false,
+    );
   });
 });

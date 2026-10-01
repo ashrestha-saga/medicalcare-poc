@@ -45,8 +45,8 @@ export interface OrderRequestDTO {
   subjectId: string | null;
   deliveryAddress: string;
   note: string | null;
-  approvalState: "pending_approval" | "approved" | "rejected" | string;
-  state: string;
+  approvalState: "pending_approval" | "approved" | "rejected";
+  state: "captured";
   raisedBy: string | null;
   createdAt: string;
   items: {

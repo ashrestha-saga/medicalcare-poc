@@ -1,0 +1,354 @@
+{
+ "_hinweis": "Erzeugt aus devicecare-bestand-backoffice-v20.html. Feldnamen folgen den Modellen aus schema.prisma; neue Felder sind in schema-erweiterung.prisma benannt.",
+ "RefProductKind": [
+  {
+   "code": "bildgebung",
+   "label": "Bildgebung mit ionisierender Strahlung",
+   "hint": "Röntgen, Angiografie, CT, Mammografie",
+   "sortGroup": "Bildgebung und Strahlung",
+   "shows": "stk,strahlung,software,vernetzt,wartung",
+   "blocks": "implantat,einmal,eigenAufb",
+   "presets": "{\"aktiv\": true, \"strahlung\": true, \"strahlenArt\": \"roentgen\", \"vernetzt\": true}"
+  },
+  {
+   "code": "therapie-strahlen",
+   "label": "Strahlentherapie",
+   "hint": "Beschleuniger, Bestrahlungsvorrichtungen",
+   "sortGroup": "Bildgebung und Strahlung",
+   "shows": "stk,strahlung,software,vernetzt,wartung",
+   "blocks": "implantat,einmal,eigenAufb",
+   "presets": "{\"aktiv\": true, \"strahlung\": true, \"strahlenArt\": \"therapie\", \"vernetzt\": true}"
+  },
+  {
+   "code": "nuklear",
+   "label": "Nuklearmedizin",
+   "hint": "Gammakamera, PET, Umgang mit radioaktiven Stoffen",
+   "sortGroup": "Bildgebung und Strahlung",
+   "shows": "stk,strahlung,software,vernetzt,wartung",
+   "blocks": "implantat,einmal,eigenAufb",
+   "presets": "{\"aktiv\": true, \"strahlung\": true, \"strahlenArt\": \"nuklear\", \"vernetzt\": true}"
+  },
+  {
+   "code": "sonografie",
+   "label": "Sonografie und bildgebender Ultraschall",
+   "hint": "Ultraschallsysteme mit Schallköpfen",
+   "sortGroup": "Aktive Geräte und Messtechnik",
+   "shows": "stk,aufbereitung,zubehoer,software,vernetzt,wartung",
+   "blocks": "strahlung,implantat,einmal,eigenAufb",
+   "presets": "{\"aktiv\": true, \"aufbereitung\": true, \"vernetzt\": true}"
+  },
+  {
+   "code": "aktiv-therapie",
+   "label": "Aktives Therapie- oder Funktionsgerät",
+   "hint": "Beatmung, Infusion, HF-Chirurgie, Defibrillation, Dialyse",
+   "sortGroup": "Aktive Geräte und Messtechnik",
+   "shows": "stk,aufbereitung,software,vernetzt,wartung",
+   "blocks": "implantat,einmal,eigenAufb",
+   "presets": "{\"aktiv\": true, \"anlage1\": true}"
+  },
+  {
+   "code": "messgeraet",
+   "label": "Messgerät mit Messfunktion",
+   "hint": "Blutdruck, Thermometer, Tonometer, Ergometer, Dosimeter",
+   "sortGroup": "Aktive Geräte und Messtechnik",
+   "shows": "mtk,stk,vernetzt,wartung,aufbereitung",
+   "blocks": "strahlung,eigenAufb,implantat,einmal",
+   "presets": "{}"
+  },
+  {
+   "code": "aufbereitungsgeraet",
+   "label": "Aufbereitungsgerät",
+   "hint": "Thermodesinfektor, Autoklav, Folienschweißgerät",
+   "sortGroup": "Aufbereitung, Instrumente, Software",
+   "shows": "eigenAufb,stk,vernetzt,wartung",
+   "blocks": "strahlung,implantat,einmal,aufbereitung",
+   "presets": "{\"aktiv\": true, \"istAufbGeraet\": true}"
+  },
+  {
+   "code": "instrument",
+   "label": "Wiederverwendbares Instrument oder Zubehör",
+   "hint": "Instrumentensets, Endoskope, Sonden",
+   "sortGroup": "Aufbereitung, Instrumente, Software",
+   "shows": "aufbereitung,aufbgeraet,zubehoer,einmal",
+   "blocks": "strahlung,software,implantat,vernetzt,mtk,eigenAufb",
+   "presets": "{\"aufbereitung\": true}"
+  },
+  {
+   "code": "software",
+   "label": "Software als eigenständiges Produkt",
+   "hint": "Befundungssoftware, SaMD, SaIVD",
+   "sortGroup": "Aufbereitung, Instrumente, Software",
+   "shows": "software,vernetzt",
+   "blocks": "stk,strahlung,aufbereitung,implantat,mtk,eigenAufb,einmal",
+   "presets": "{\"software\": true, \"vernetzt\": true}"
+  },
+  {
+   "code": "implantat",
+   "label": "Implantat nach Anlage 3",
+   "hint": "Implantierbare Produkte mit Dokumentationspflicht",
+   "sortGroup": "Aufbereitung, Instrumente, Software",
+   "shows": "implantat",
+   "blocks": "stk,strahlung,aufbereitung,software,mtk,vernetzt,eigenAufb,einmal",
+   "presets": "{\"implantat\": true}"
+  },
+  {
+   "code": "sonstiges",
+   "label": "Sonstiges Produkt",
+   "hint": "Alle Merkmale einzeln wählbar",
+   "sortGroup": "Aufbereitung, Instrumente, Software",
+   "shows": "stk,mtk,strahlung,software,aufbereitung,aufbgeraet,zubehoer,einmal,vernetzt,implantat,wartung,eigenAufb",
+   "blocks": "",
+   "presets": "{}"
+  }
+ ],
+ "RefReprocessingClass": [
+  {
+   "code": "unkritisch",
+   "label": "Unkritisch — Kontakt nur mit intakter Haut",
+   "requiresQmsCert": false,
+   "requiresValidatedProcess": false,
+   "evidence": "Schriftliche Arbeitsanweisung, Dokumentation der Durchführung",
+   "note": "Reinigung und ggf. Desinfektion nach schriftlicher Arbeitsanweisung."
+  },
+  {
+   "code": "semikritisch-a",
+   "label": "Semikritisch A — Kontakt mit Schleimhaut, ohne besondere Anforderungen",
+   "requiresQmsCert": false,
+   "requiresValidatedProcess": true,
+   "evidence": "Validierungsbericht des Verfahrens, Freigabeprotokolle je Charge, Arbeitsanweisung",
+   "note": "Validierte Reinigung und Desinfektion."
+  },
+  {
+   "code": "semikritisch-b",
+   "label": "Semikritisch B — Kontakt mit Schleimhaut, mit besonderen Anforderungen",
+   "requiresQmsCert": false,
+   "requiresValidatedProcess": true,
+   "evidence": "Validierungsbericht des Verfahrens, Freigabeprotokolle je Charge, Nachweis zu Trocknung und Lagerung",
+   "note": "Validierte maschinelle Aufbereitung empfohlen, erhöhte Anforderungen an Trocknung und Lagerung."
+  },
+  {
+   "code": "kritisch-a",
+   "label": "Kritisch A — Durchdringt Haut oder Schleimhaut, ohne besondere Anforderungen",
+   "requiresQmsCert": false,
+   "requiresValidatedProcess": true,
+   "evidence": "Validierungsbericht des Verfahrens einschließlich Sterilisation, Freigabeprotokolle je Charge",
+   "note": "Validierte Reinigung, Desinfektion und Sterilisation."
+  },
+  {
+   "code": "kritisch-b",
+   "label": "Kritisch B — mit besonderen Anforderungen an die Aufbereitung",
+   "requiresQmsCert": true,
+   "requiresValidatedProcess": true,
+   "evidence": "Wie kritisch A, zusätzlich Zertifikat des Qualitätsmanagementsystems einer benannten Stelle",
+   "note": "Validierte Prozesse; Zertifizierung des Qualitätsmanagementsystems durch eine benannte Stelle."
+  },
+  {
+   "code": "kritisch-c",
+   "label": "Kritisch C — mit besonders hohen Anforderungen",
+   "requiresQmsCert": true,
+   "requiresValidatedProcess": true,
+   "evidence": "Wie kritisch B, zusätzlich erweiterte Prozess- und Wirksamkeitsnachweise",
+   "note": "Wie kritisch B, zusätzlich besonders hohe Anforderungen an Prozess und Nachweis."
+  }
+ ],
+ "RefReprocessingEquipmentType": [
+  {
+   "code": "rdg",
+   "label": "Reinigungs- und Desinfektionsgerät (Thermodesinfektor, RDG)",
+   "standard": "DIN EN ISO 15883-1 und -2",
+   "validationStandard": "DIN EN ISO 15883 · Leitlinie DGKH/DGSV/AKI",
+   "revalidationMonths": 12,
+   "revalidationSource": "Norm und Leitlinie: mindestens jährlich",
+   "sourcesDiverge": false,
+   "routineTests": [
+    "Arbeitstäglich: Sichtprüfung von Siebkörben, Düsen und Sprüharmen auf Freigängigkeit",
+    "Chargenbezogen: Prozessprotokoll mit Temperatur-Zeit-Verlauf, A0-Wert",
+    "Periodisch: Prüfung der Reinigungsleistung mit Prüfanschmutzung nach DIN EN ISO 15883-5"
+   ],
+   "batchRelease": "Chargenfreigabe durch sachkundige Person anhand des Prozessprotokolls"
+  },
+  {
+   "code": "klein",
+   "label": "Kleinsterilisator, Dampf (unter 1 Sterilisationseinheit)",
+   "standard": "DIN EN 13060 — Typ B, N oder S",
+   "validationStandard": "DIN EN ISO 17665 · DIN SPEC 58929 · Leitlinie DGKH/DGSV/AKI",
+   "revalidationMonths": 12,
+   "revalidationSource": "Quellen weichen ab: überwiegend jährlich, teilweise zweijährig für Kleinsterilisatoren",
+   "sourcesDiverge": true,
+   "routineTests": [
+    "Arbeitstäglich: Vakuumtest und Dampfdurchdringungstest (Helix oder Bowie-Dick, je nach Beladungstyp)",
+    "Chargenbezogen: Chargenprotokoll, Behandlungsindikator, Prüfung der Verpackungsunversehrtheit",
+    "Nur Typ B eignet sich für verpacktes Hohlkörper-Instrumentarium"
+   ],
+   "batchRelease": "Chargenfreigabe durch sachkundige Person nach Prüfung von Protokoll und Indikator"
+  },
+  {
+   "code": "gross",
+   "label": "Dampfsterilisator ab 1 Sterilisationseinheit",
+   "standard": "DIN EN 285",
+   "validationStandard": "DIN EN ISO 17665 · Leitlinie DGKH/DGSV/AKI",
+   "revalidationMonths": 12,
+   "revalidationSource": "DIN EN ISO 17665-1: jährlich empfohlen",
+   "sourcesDiverge": false,
+   "routineTests": [
+    "Arbeitstäglich: Vakuumtest und Bowie-Dick-Test",
+    "Chargenbezogen: Chargenprotokoll, Behandlungsindikator, gegebenenfalls Bioindikator",
+    "Regelmäßig: Prüfung der Dampfqualität nach DIN EN 285"
+   ],
+   "batchRelease": "Chargenfreigabe durch sachkundige Person, dokumentiert"
+  },
+  {
+   "code": "siegel",
+   "label": "Folienschweißgerät (Siegelgerät)",
+   "standard": "DIN EN ISO 11607-1 · DIN 58953-7",
+   "validationStandard": "DIN EN ISO 11607-2",
+   "revalidationMonths": 12,
+   "revalidationSource": "erneute Leistungsqualifikation mit Siegelnahtfestigkeitsprüfung",
+   "sourcesDiverge": false,
+   "routineTests": [
+    "Arbeitstäglich: Siegelnahtprüfung (Seal-Check oder Tintentest)",
+    "Arbeitstäglich: Kontrolle von Siegeltemperatur, Anpressdruck und Vorschubgeschwindigkeit",
+    "Chargenbezogen: Sichtprüfung der Naht auf Kanäle, Falten und Durchgängigkeit"
+   ],
+   "batchRelease": "Sichtprüfung und Dokumentation der Siegelparameter vor Arbeitsbeginn"
+  }
+ ],
+ "RefAnnex2Item": [
+  {
+   "code": "1.1",
+   "label": "Ton- und Sprachaudiometer",
+   "intervalYears": 1,
+   "deadlineAnchor": "year_end",
+   "confidence": "verified",
+   "sourceRef": "Anlage 2 Nr. 1.1"
+  },
+  {
+   "code": "1.2.1",
+   "label": "medizinische Elektrothermometer",
+   "intervalYears": 2,
+   "deadlineAnchor": "year_end",
+   "confidence": "derived",
+   "sourceRef": "Anlage 2 Nr. 1.2.1 — abzugleichen"
+  },
+  {
+   "code": "1.2.2",
+   "label": "Elektrothermometer mit austauschbaren Temperaturfühlern",
+   "intervalYears": 2,
+   "deadlineAnchor": "year_end",
+   "confidence": "derived",
+   "sourceRef": "Anlage 2 Nr. 1.2.2 — abzugleichen"
+  },
+  {
+   "code": "1.2.3",
+   "label": "Infrarot-Strahlungsthermometer",
+   "intervalYears": 1,
+   "deadlineAnchor": "year_end",
+   "confidence": "verified",
+   "sourceRef": "Anlage 2 Nr. 1.2.3"
+  },
+  {
+   "code": "1.3",
+   "label": "Messgeräte zur nichtinvasiven Blutdruckmessung",
+   "intervalYears": 2,
+   "deadlineAnchor": "year_end",
+   "confidence": "verified",
+   "sourceRef": "Anlage 2 Nr. 1.3"
+  },
+  {
+   "code": "1.4.1",
+   "label": "Augentonometer, allgemein",
+   "intervalYears": 2,
+   "deadlineAnchor": "year_end",
+   "confidence": "derived",
+   "sourceRef": "Anlage 2 Nr. 1.4.1 — abzugleichen"
+  },
+  {
+   "code": "1.4.2",
+   "label": "Augentonometer zur Grenzwertprüfung",
+   "intervalYears": 5,
+   "deadlineAnchor": "year_end",
+   "confidence": "derived",
+   "sourceRef": "Anlage 2 Nr. 1.4.2 — abzugleichen"
+  },
+  {
+   "code": "1.5.1",
+   "label": "Therapiedosimeter bis 1,33 MeV",
+   "intervalYears": 2,
+   "deadlineAnchor": "year_end",
+   "confidence": "derived",
+   "sourceRef": "Anlage 2 Nr. 1.5.1 — abzugleichen"
+  },
+  {
+   "code": "1.5.2",
+   "label": "Therapiedosimeter ab 1,33 MeV (Vergleichsmessung)",
+   "intervalYears": 2,
+   "deadlineAnchor": "year_end",
+   "confidence": "derived",
+   "sourceRef": "Anlage 2 Nr. 1.5.2 — abzugleichen"
+  },
+  {
+   "code": "1.6",
+   "label": "Diagnostikdosimeter",
+   "intervalYears": 5,
+   "deadlineAnchor": "year_end",
+   "confidence": "derived",
+   "sourceRef": "Anlage 2 Nr. 1.6 — abzugleichen"
+  },
+  {
+   "code": "1.7",
+   "label": "Tretkurbelergometer",
+   "intervalYears": 2,
+   "deadlineAnchor": "year_end",
+   "confidence": "verified",
+   "sourceRef": "Anlage 2 Nr. 1.7"
+  }
+ ],
+ "RefRadiationApplication": [
+  {
+   "code": "roentgen",
+   "label": "Röntgendiagnostik",
+   "authorisation": "anzeige",
+   "qualityGuideline": "QS-RL Röntgendiagnostik",
+   "expertInspectionApplies": true,
+   "medicalBoardNote": "in der Regel alle zwei bis drei Jahre, bei Mängeln kurzfristiger"
+  },
+  {
+   "code": "therapie",
+   "label": "Strahlentherapie",
+   "authorisation": "genehmigung",
+   "qualityGuideline": "Qualitätssicherungs-Richtlinie Strahlentherapie",
+   "expertInspectionApplies": true,
+   "medicalBoardNote": "engmaschiger als in der Diagnostik"
+  },
+  {
+   "code": "nuklear",
+   "label": "Nuklearmedizin — Umgang mit radioaktiven Stoffen",
+   "authorisation": "genehmigung",
+   "qualityGuideline": "Qualitätssicherungs-Richtlinie Nuklearmedizin",
+   "expertInspectionApplies": false,
+   "medicalBoardNote": "engmaschiger als in der Diagnostik"
+  }
+ ],
+ "RefConstancyObject": [
+  {
+   "code": "aufnahme",
+   "label": "Aufnahmeeinrichtung"
+  },
+  {
+   "code": "durchl",
+   "label": "Durchleuchtungseinrichtung"
+  },
+  {
+   "code": "monitor",
+   "label": "Befundungsmonitor und Betrachtungsbedingungen"
+  },
+  {
+   "code": "digital",
+   "label": "Digitale Bildverarbeitung und Ausgabemedien"
+  },
+  {
+   "code": "dosis",
+   "label": "Dosisanzeige und Dosisflächenprodukt"
+  }
+ ]
+}

@@ -21,6 +21,11 @@ import type { Prisma } from "@prisma/client";
 const clinicStaff = (tenantId: string) =>
   ({ tenantId, accountKind: "clinic" as const });
 
+function clinicRoleSearch(needle: string): Prisma.UserWhereInput[] {
+  const roles = USER_ROLES.filter((r) => r.includes(needle));
+  return roles.length ? [{ role: { in: roles } }] : [];
+}
+
 function toAdminUserDTO(row: {
   id: string;
   email: string;
@@ -74,7 +79,7 @@ export const userAdminService = {
               OR: [
                 { email: { contains: needle } },
                 { name: { contains: needle } },
-                { role: { contains: needle } },
+                ...clinicRoleSearch(needle),
               ],
             }
           : {}),

@@ -38,7 +38,7 @@ export async function GET(req: Request) {
               restriction: a.restriction,
               matchTerms: parseJsonStringArray(a.matchTerms),
               matchExclude: parseJsonStringArray(a.matchExclude),
-              matchConfidence: a.matchConfidence,
+              termMatchConfidence: a.termMatchConfidence,
               hinweis: meta?.hinweis ?? a.conditionText,
               verfahren: meta?.verfahren ?? null,
               wahlweiseNach: meta?.wahlweiseNach ?? null,

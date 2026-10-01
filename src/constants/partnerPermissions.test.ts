@@ -12,10 +12,12 @@ import {
 
 describe("partner permission intersection", () => {
   it("maps handover scope aliases", () => {
-    expect(normalizeContractScope(["bestand", "fristen", "pruefung"])).toEqual([
+    expect(normalizeContractScope(["bestand", "fristen", "pruefung", "aufbereitung", "schulung"])).toEqual([
       "inventory",
       "due-dates",
       "inspection",
+      "reprocessing",
+      "training",
     ]);
   });
 
@@ -69,11 +71,18 @@ describe("partner console RBAC", () => {
     expect(perms).toContain("console:customers:create");
     expect(perms).toContain("console:contracts:lifecycle");
     expect(perms).toContain("console:staff:invite");
+    expect(perms).toContain("console:disposition:assign");
+    expect(perms).toContain("console:staff:assign");
+    expect(perms).toContain("console:external:manage");
     expect(consoleMenuFromPermissions(perms).map((m) => m.id)).toEqual([
       "console-customers",
       "console-due-dates",
+      "console-my-sites",
+      "console-disposition",
+      "console-assignments",
       "console-requests",
       "console-staff",
+      "console-external",
       "console-organisation",
       "console-activity",
       "console-settings",
@@ -86,13 +95,24 @@ describe("partner console RBAC", () => {
     expect(partnerHasConsolePermission("inspector", "console:customers:create")).toBe(false);
     expect(partnerHasConsolePermission("inspector", "console:staff:invite")).toBe(false);
     expect(partnerHasConsolePermission("inspector", "console:contracts:lifecycle")).toBe(false);
+    expect(partnerHasConsolePermission("inspector", "console:disposition:view")).toBe(true);
+    expect(partnerHasConsolePermission("inspector", "console:disposition:assign")).toBe(false);
     expect(consoleMenuFromPermissions(perms).some((m) => m.id === "console-staff")).toBe(false);
     expect(consoleMenuFromPermissions(perms).some((m) => m.id === "console-customers")).toBe(true);
+    expect(consoleMenuFromPermissions(perms).some((m) => m.id === "console-disposition")).toBe(true);
   });
 
-  it("order sees ops views but not staff or organisation", () => {
+  it("order sees ops views including disposition assign but not staff", () => {
     const menuIds = consoleMenuFromPermissions(partnerConsolePermissions("order")).map((m) => m.id);
-    expect(menuIds).toEqual(["console-customers", "console-due-dates", "console-requests"]);
+    expect(menuIds).toEqual([
+      "console-customers",
+      "console-due-dates",
+      "console-my-sites",
+      "console-disposition",
+      "console-assignments",
+      "console-requests",
+    ]);
+    expect(partnerHasConsolePermission("order", "console:disposition:assign")).toBe(true);
   });
 
   it("guards console paths by slug", () => {
@@ -101,9 +121,13 @@ describe("partner console RBAC", () => {
     expect(canAccessConsolePath("/partner/customers/new", inspector)).toBe(false);
     expect(canAccessConsolePath("/partner/staff", inspector)).toBe(false);
     expect(canAccessConsolePath("/partner/customers/abc", inspector)).toBe(true);
+    expect(canAccessConsolePath("/partner/disposition", inspector)).toBe(true);
+    expect(canAccessConsolePath("/partner/my-sites", inspector)).toBe(true);
+    expect(canAccessConsolePath("/partner/my-sites/tenant-1", inspector)).toBe(true);
 
     const admin = partnerConsolePermissions("admin");
     expect(canAccessConsolePath("/partner/customers/new", admin)).toBe(true);
     expect(canAccessConsolePath("/partner/staff", admin)).toBe(true);
+    expect(canAccessConsolePath("/partner/external-inspectors", admin)).toBe(true);
   });
 });

@@ -180,21 +180,21 @@ export const CRITICAL_PERMISSIONS: ReadonlySet<PermissionSlug> = new Set(
   PERMISSION_GROUPS.filter((g) => g.critical).flatMap((g) => g.items.map((i) => i.slug)),
 );
 
-/** Sidebar modules. Visibility = `shell:nav` + module slug. */
+/** Sidebar modules. Visibility = `shell:nav` + module slug. Groups match mockup: WORK / MASTER DATA. */
 export const MENU_MODULES: readonly MenuModule[] = [
-  { id: "inventory", label: "Inventory", href: "/devices", slug: "inventory:view" },
-  { id: "registration", label: "Registration", href: "/registration", slug: "inventory:update" },
-  { id: "due-dates", label: "Due dates", href: "/due-dates", slug: "duties:view" },
-  { id: "training", label: "Training", href: "/training", slug: "training:view" },
-  { id: "catalog", label: "Catalog", href: "/catalog", slug: "catalog:view" },
-  { id: "clarifications", label: "Clarifications", href: "/clarifications", slug: "clarifications:view" },
-  { id: "requests", label: "Requests", href: "/requests", slug: "requests:view-mine" },
-  { id: "users", label: "Users", href: "/users", slug: "users:view" },
-  { id: "locations", label: "Locations", href: "/locations", slug: "locations:view" },
-  { id: "roles", label: "Roles", href: "/roles", slug: "roles:view" },
-  { id: "management", label: "Management", href: "/management", slug: "management:view" },
-  { id: "activity", label: "Activity", href: "/activity", slug: "audit:view" },
-  { id: "security", label: "Security", href: "/security", slug: "account:security" },
+  { id: "registration", label: "Registration", href: "/registration", slug: "inventory:update", group: "work" },
+  { id: "clarifications", label: "Clarifications", href: "/clarifications", slug: "clarifications:view", group: "work" },
+  { id: "inventory", label: "Inventory", href: "/devices", slug: "inventory:view", group: "work" },
+  { id: "due-dates", label: "Due dates", href: "/due-dates", slug: "duties:view", group: "work" },
+  { id: "requests", label: "Requests", href: "/requests", slug: "requests:view-mine", group: "work" },
+  { id: "training", label: "Training", href: "/training", slug: "training:view", group: "work" },
+  { id: "management", label: "Management", href: "/management", slug: "management:view", group: "master" },
+  { id: "users", label: "Users", href: "/users", slug: "users:view", group: "master" },
+  { id: "catalog", label: "Catalog", href: "/catalog", slug: "catalog:view", group: "master" },
+  { id: "locations", label: "Locations", href: "/locations", slug: "locations:view", group: "master" },
+  { id: "roles", label: "Roles", href: "/roles", slug: "roles:view", group: "master" },
+  { id: "activity", label: "Activity", href: "/activity", slug: "audit:view", group: "master" },
+  { id: "security", label: "Security", href: "/security", slug: "account:security", group: "master" },
   { id: "settings", label: "Settings", href: "/settings", slug: "settings:view" },
 ];
 

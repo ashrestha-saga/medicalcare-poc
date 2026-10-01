@@ -74,7 +74,7 @@ export function evaluateClarificationIssues(input: ClarificationEvalInput): Clar
       issues.push(
         issue(
           "derived_classification",
-          conf === "guess" ? "Classification is only a guess" : "Classification only derived",
+          "Classification only derived",
           "medium",
         ),
       );

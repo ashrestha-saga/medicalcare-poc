@@ -26,9 +26,9 @@ export async function injectSession(context: BrowserContext, user: SessionUser =
   ]);
 }
 
-export async function signInAndSkipPin(page: Page, user: SessionUser = E2E_USER) {
+/** Inject session and land on the scanner home. */
+export async function signInAs(page: Page, user: SessionUser = E2E_USER) {
   await injectSession(page.context(), user);
   await page.goto("/");
-  await page.getByTestId("pin-skip").click();
   await expect(page.getByTestId("scan-screen")).toBeVisible();
 }

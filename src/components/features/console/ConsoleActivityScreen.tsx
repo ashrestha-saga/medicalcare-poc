@@ -8,6 +8,16 @@ import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/Loading";
 
+const SCOPE_LABEL: Record<
+  string,
+  "auditScopeOrg" | "auditScopeTenant" | "auditScopePlatform" | "auditScopeOther"
+> = {
+  managing_org: "auditScopeOrg",
+  tenant: "auditScopeTenant",
+  platform: "auditScopePlatform",
+  other: "auditScopeOther",
+};
+
 export function ConsoleActivityScreen() {
   const t = useTranslations("console");
   const [data, setData] = useState<ConsoleAuditListDTO | null>(null);
@@ -46,24 +56,36 @@ export function ConsoleActivityScreen() {
             </Alert>
           ) : null}
           {data ? (
-            <div className="space-y-2 font-mono text-xs">
-              {data.events.map((ev) => (
-                <div key={ev.id} className="border-b border-border/60 py-2">
-                  <span className="text-muted-foreground">{ev.occurredAt.replace("T", " ").slice(0, 16)}</span>
-                  {" · "}
-                  <span className="text-primary">
-                    {ev.capacity === "managing_org"
-                      ? t("auditCapacityOrg")
-                      : ev.capacity === "tenant"
-                        ? t("auditCapacityTenant")
-                        : t("auditCapacityOther")}
-                  </span>
-                  {" · "}
-                  <span>{ev.actorName}</span>
-                  {" — "}
-                  <span>{ev.summary}</span>
-                </div>
-              ))}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="py-2 pr-2 font-medium">{t("auditColTime")}</th>
+                    <th className="py-2 pr-2 font-medium">{t("auditColScope")}</th>
+                    <th className="py-2 pr-2 font-medium">{t("auditColActor")}</th>
+                    <th className="py-2 font-medium">{t("auditColAction")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.events.map((ev) => (
+                    <tr key={ev.id} className="border-b border-border/60">
+                      <td className="py-2 pr-2 font-mono text-xs text-muted-foreground">
+                        {ev.occurredAt.replace("T", " ").slice(0, 16)}
+                      </td>
+                      <td className="py-2 pr-2 text-xs text-primary">
+                        {t(SCOPE_LABEL[ev.actingScope] ?? "auditScopeOther")}
+                      </td>
+                      <td className="py-2 pr-2 text-xs">{ev.actorName}</td>
+                      <td className="py-2 text-xs">
+                        {ev.summary}
+                        <span className="block text-muted-foreground">
+                          {ev.resource}/{ev.resourceId}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
               {data.events.length === 0 ? (
                 <p className="text-sm text-muted-foreground">{t("auditEmpty")}</p>
               ) : null}

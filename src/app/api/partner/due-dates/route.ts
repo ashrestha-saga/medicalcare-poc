@@ -14,7 +14,10 @@ export async function GET(req: Request) {
     return await withTenantBypass(async () => {
       requirePartnerPermission(ctx, "console:due-dates:view");
       correlationId = ctx.correlationId;
-      const data = await partnerPortfolioService.listDueDates(ctx);
+      const url = new URL(req.url);
+      const overdueOnly = url.searchParams.get("overdue") === "1";
+      const tenantId = url.searchParams.get("tenantId")?.trim() || undefined;
+      const data = await partnerPortfolioService.listDueDates(ctx, { overdueOnly, tenantId });
       return Response.json(data, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {

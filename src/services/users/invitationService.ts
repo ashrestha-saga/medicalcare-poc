@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { PartnerContext, TenantWorkContext } from "@/interfaces";
 import type { PermissionSlug } from "@/interfaces/permissions";
 import type { UserRole } from "@/interfaces/session";
-import { actorFromContext, requestMetaFrom } from "@/lib/auth/actorContext";
+import { actorFromContext, actorFromPartnerOnTenant, requestMetaFrom } from "@/lib/auth/actorContext";
 import { requirePartnerPermission, requirePermission } from "@/lib/auth/tenantContext";
 import { runWithoutTenantAsync } from "@/lib/auth/tenantStore";
 import { conflict, notFound, unprocessable } from "@/lib/errors";
@@ -153,6 +153,64 @@ export const invitationService = {
     };
   },
 
+  /**
+   * Partner onboarding: invite the institution contact as clinic superadmin
+   * for a tenant just created under a management contract.
+   */
+  async inviteClinicSuperadminOnOnboard(
+    ctx: PartnerContext,
+    input: { tenantId: string; email: string; name?: string | null },
+  ) {
+    requirePartnerPermission(ctx, "console:customers:create");
+    const email = input.email.trim().toLowerCase();
+    if (!email) throw unprocessable("Contact email address is required.", { field: "contactEmail" });
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw conflict("A user with this email already exists.", { field: "contactEmail" });
+    }
+
+    const token = newToken();
+    const row = await runWithoutTenantAsync(() =>
+      prisma.userInvitation.create({
+        data: {
+          tenantId: input.tenantId,
+          email,
+          name: input.name?.trim() || null,
+          role: "superadmin",
+          tokenHash: hashToken(token),
+          expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+          createdByUserId: ctx.user.id,
+        },
+      }),
+    );
+
+    const redeemUrl = `${redeemBaseUrl()}/invite?token=${encodeURIComponent(token)}`;
+    const mail = await sendInviteMail({
+      to: email,
+      redeemUrl,
+      inviterName: ctx.user.name,
+      owner: { organisationId: ctx.organisationId },
+    });
+
+    await recordAudit({
+      actor: actorFromPartnerOnTenant(ctx, input.tenantId, null),
+      resource: "user",
+      resourceId: row.id,
+      action: "create",
+      summary: `Invited ${email} as clinic superadmin on onboard`,
+      after: { email, role: "superadmin", invitationId: row.id },
+    });
+
+    return {
+      id: row.id,
+      email: row.email,
+      expiresAt: row.expiresAt.toISOString(),
+      redeemUrl,
+      emailSimulated: mail.simulated,
+    };
+  },
+
   async resendClinicInvite(ctx: TenantWorkContext, invitationId: string) {
     requirePermission(ctx, "users:create");
     const inv = await prisma.userInvitation.findFirst({
@@ -225,10 +283,24 @@ export const invitationService = {
 
   async createPartnerInvite(
     ctx: PartnerContext,
-    input: { email: string; name?: string | null; appRole: "inspector" | "admin" | "order" },
+    input: {
+      email: string;
+      name?: string | null;
+      appRole: "inspector" | "admin" | "order";
+      external?: {
+        commissionedFrom: string;
+        commissionedTo: string;
+        liabilityUntil: string;
+        liabilitySumEur?: number | null;
+      };
+    },
     req?: Request | null,
   ) {
-    requirePartnerPermission(ctx, "console:staff:invite");
+    if (input.external) {
+      requirePartnerPermission(ctx, "console:external:manage");
+    } else {
+      requirePartnerPermission(ctx, "console:staff:invite");
+    }
     const email = input.email.trim().toLowerCase();
     if (!email) throw unprocessable("Email is required.", { field: "email" });
 
@@ -244,6 +316,9 @@ export const invitationService = {
           email,
           name: input.name?.trim() || null,
           appRole: input.appRole,
+          permissions: input.external
+            ? ({ __partnerExternal: input.external } as object)
+            : undefined,
           tokenHash: hashToken(token),
           expiresAt: new Date(Date.now() + INVITE_TTL_MS),
           createdByUserId: ctx.user.id,
@@ -319,7 +394,7 @@ export const invitationService = {
               tenantId: invite.tenantId,
               email: invite.email,
               name: displayName,
-              role: invite.role ?? "user",
+              role: (invite.role as "superadmin" | "device_admin" | "security_officer" | "user" | null) ?? "user",
               accountKind: "clinic",
               passwordHash: hashPassword(password),
               active: true,
@@ -343,6 +418,23 @@ export const invitationService = {
       }
 
       if (invite.organisationId && invite.appRole) {
+        const externalMeta =
+          invite.permissions &&
+          typeof invite.permissions === "object" &&
+          !Array.isArray(invite.permissions) &&
+          "__partnerExternal" in (invite.permissions as object)
+            ? (
+                invite.permissions as {
+                  __partnerExternal?: {
+                    commissionedFrom: string;
+                    commissionedTo: string;
+                    liabilityUntil: string;
+                    liabilitySumEur?: number | null;
+                  };
+                }
+              ).__partnerExternal
+            : undefined;
+
         const user = await prisma.$transaction(async (tx) => {
           const created = await tx.user.create({
             data: {
@@ -354,14 +446,45 @@ export const invitationService = {
               active: true,
             },
           });
-          await tx.orgMembership.create({
+          const membership = await tx.orgMembership.create({
             data: {
               userId: created.id,
               organisationId: invite.organisationId!,
               appRole: invite.appRole!,
               validFrom: new Date(),
+              ...(externalMeta
+                ? {
+                    isExternal: true,
+                    commissionedFrom: new Date(`${externalMeta.commissionedFrom}T00:00:00.000Z`),
+                    commissionedTo: new Date(`${externalMeta.commissionedTo}T00:00:00.000Z`),
+                    liabilityUntil: new Date(`${externalMeta.liabilityUntil}T00:00:00.000Z`),
+                    liabilitySumEur: externalMeta.liabilitySumEur ?? null,
+                  }
+                : {}),
             },
           });
+          // Default: assign all live contracts for non-admin internal staff (fail-closed acting).
+          if (invite.appRole !== "admin" && !externalMeta) {
+            const now = new Date();
+            const contracts = await tx.serviceContract.findMany({
+              where: { organisationId: invite.organisationId! },
+            });
+            const live = contracts.filter(
+              (c) =>
+                !c.terminatedAt &&
+                !c.suspendedAt &&
+                c.validFrom.getTime() <= now.getTime() &&
+                (c.validTo == null || c.validTo.getTime() >= now.getTime()),
+            );
+            if (live.length > 0) {
+              await tx.partnerStaffAssignment.createMany({
+                data: live.map((c) => ({
+                  membershipId: membership.id,
+                  tenantId: c.tenantId,
+                })),
+              });
+            }
+          }
           await tx.userInvitation.update({
             where: { id: invite.id },
             data: { acceptedAt: new Date() },

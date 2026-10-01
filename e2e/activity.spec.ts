@@ -21,7 +21,6 @@ const NURSE: SessionUser = {
 test("superadmin can open Activity", async ({ page, context }) => {
   await injectSession(context, ADMIN);
   await page.goto("/activity");
-  await page.getByTestId("pin-skip").click();
   await expect(page.getByTestId("activity-page")).toBeVisible();
   await expect(page.getByTestId("data-table")).toBeVisible();
   await expect(page.getByTestId("nav-activity")).toBeVisible();
@@ -30,6 +29,5 @@ test("superadmin can open Activity", async ({ page, context }) => {
 test("floor user cannot open Activity", async ({ page, context }) => {
   await injectSession(context, NURSE);
   await page.goto("/activity");
-  await page.getByTestId("pin-skip").click();
   await expect(page.getByTestId("forbidden")).toBeVisible();
 });

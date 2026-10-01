@@ -14,6 +14,8 @@ export type Annex2JsonRule = {
   matchTerms?: string[];
   matchExclude?: string[];
   quelle?: string;
+  confidence?: "verified" | "derived";
+  sourceRef?: string;
 };
 
 const byId = new Map<string, Annex2JsonRule>();

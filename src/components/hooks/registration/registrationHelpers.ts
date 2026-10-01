@@ -6,6 +6,7 @@ export {
   answerProgressCounts,
   fieldMeta,
   isAnswered,
+  showsAedExemptionQuestion,
 } from "@/services/registration/answerMeta";
 export type {
   DecisionProtocolEntry,

@@ -57,13 +57,15 @@ const ORGANISATIONS = [
   },
 ] as const;
 
+import type { OrganisationCapacity } from "@prisma/client";
+
 /** Klinikum Nord contract: bestand / fristen / pruefung, still open. */
 const MSR_ID = "1f0f2544-0dc8-5869-9c13-85f741e48258";
 const RTS_ID = "7a48a751-3e3a-5edb-abfa-95ef550e6249";
 const KLN_ID = "5c7c8e35-11ff-58f7-814f-bc94c9481bd1";
 const KLN_CONTRACT_ID = "d6223305-9759-5d99-bac4-670ea0292f2f";
 
-const ORG_CAPACITIES: { organisationId: string; role: string; id: string }[] = [
+const ORG_CAPACITIES: { organisationId: string; role: OrganisationCapacity; id: string }[] = [
   { id: "orole-msr-provider", organisationId: MSR_ID, role: "service_provider" },
   { id: "orole-msr-inspect", organisationId: MSR_ID, role: "inspection_partner" },
   { id: "orole-rts-inspect", organisationId: RTS_ID, role: "inspection_partner" },
@@ -226,6 +228,33 @@ export async function seedPartnerOrgs(
         validFrom: p.validFrom,
         validTo: null,
       },
+    });
+
+    // Non-admin members need an explicit staff assignment (fail closed).
+    if (p.appRole !== "admin" && p.organisationId === MSR_ID) {
+      await prisma.partnerStaffAssignment.upsert({
+        where: {
+          membershipId_tenantId: { membershipId: p.membershipId, tenantId },
+        },
+        update: {},
+        create: {
+          id: `psa-${p.membershipId}`,
+          membershipId: p.membershipId,
+          tenantId,
+        },
+      });
+    }
+  }
+
+  // Link clinic executor rows to partner organisations by code (O-MSR → MSR).
+  const orgsByCode = await prisma.organisation.findMany({
+    where: { code: { in: ["MSR", "RTS"] } },
+    select: { id: true, code: true },
+  });
+  for (const org of orgsByCode) {
+    await prisma.executorOrg.updateMany({
+      where: { tenantId, code: `O-${org.code}` },
+      data: { organisationId: org.id },
     });
   }
 

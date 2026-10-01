@@ -10,7 +10,6 @@
     "geltungsbereich": "Deutschland",
     "hinweis": "Die Fristen und Bezeichnungen stammen aus dem Verordnungstext und sind verbindlich. Die Felder matchTerms und matchExclude sind KEIN Verordnungsinhalt, sondern eine kuratierte Zuordnungshilfe des Betreibers dieser Datenbank."
   },
-
   "fristenlogik": {
     "bezug": "jahresende",
     "beschreibung": "Die Fristen beginnen mit Ablauf des Jahres, in dem das Produkt in Betrieb genommen oder die letzte messtechnische Kontrolle durchgeführt wurde (§ 15 Absatz 5 MPBetreibV). Für Wiederholungen gelten dieselben Fristen.",
@@ -19,7 +18,6 @@
     "sofortpflicht": "Unabhängig von der Frist ist eine messtechnische Kontrolle unverzüglich durchzuführen, wenn Anzeichen dafür vorliegen, dass das Produkt die Fehlergrenzen nicht einhält (§ 15 Absatz 5 Satz 4). Dieser Fall ist ereignisgesteuert und nicht aus der Regeltabelle ableitbar.",
     "fristverlaengerung": "Eine Verlängerung ist möglich, wenn der Hersteller bescheinigt, dass das Produkt über einen längeren Zeitraum die zulässige maximale Messabweichung einhält. Kann er eine solche Bescheinigung nicht ausstellen, ist eine Verlängerung aufgrund einer gutachterlichen Stellungnahme des Herstellers bis zu der von ihm festgelegten Dauer möglich (§ 15). Eine verlängerte Frist gehört an das Exemplar, nicht an die Regel."
   },
-
   "regeln": [
     {
       "id": "MTK-1.1",
@@ -29,15 +27,24 @@
       "mtk": true,
       "fristJahre": 1,
       "matchTerms": [
-        "Audiometer", "Tonaudiometer", "Sprachaudiometer", "Reintonaudiometer",
-        "Screening-Audiometer", "Hörtestgerät"
+        "Audiometer",
+        "Tonaudiometer",
+        "Sprachaudiometer",
+        "Reintonaudiometer",
+        "Screening-Audiometer",
+        "Hörtestgerät"
       ],
-      "matchExclude": ["Otoakustische Emissionen", "OAE-Screening", "Tympanometer"],
+      "matchExclude": [
+        "Otoakustische Emissionen",
+        "OAE-Screening",
+        "Tympanometer"
+      ],
       "matchConfidence": "kuratiert",
       "quelle": "Anlage 2 Nr. 1.1 MPBetreibV",
-      "hinweis": "Die Ausschlussbegriffe sind eine Auslegungsentscheidung. Ob ein OAE- oder Tympanometriegerät die Hörfähigkeit im Sinne der Ziffer bestimmt, ist im Einzelfall an der Zweckbestimmung zu prüfen."
+      "hinweis": "Die Ausschlussbegriffe sind eine Auslegungsentscheidung. Ob ein OAE- oder Tympanometriegerät die Hörfähigkeit im Sinne der Ziffer bestimmt, ist im Einzelfall an der Zweckbestimmung zu prüfen.",
+      "confidence": "verified",
+      "sourceRef": "Anlage 2 Nr. 1.1"
     },
-
     {
       "id": "MTK-1.2",
       "ziffer": "1.2",
@@ -58,13 +65,22 @@
       "mtk": true,
       "fristJahre": 2,
       "matchTerms": [
-        "Elektrothermometer", "medizinisches Elektrothermometer",
-        "elektronisches Fieberthermometer", "Digitalthermometer",
+        "Elektrothermometer",
+        "medizinisches Elektrothermometer",
+        "elektronisches Fieberthermometer",
+        "Digitalthermometer",
         "Kompaktthermometer"
       ],
-      "matchExclude": ["Quecksilberglasthermometer", "Infrarot", "Stirnthermometer", "Ohrthermometer"],
+      "matchExclude": [
+        "Quecksilberglasthermometer",
+        "Infrarot",
+        "Stirnthermometer",
+        "Ohrthermometer"
+      ],
       "matchConfidence": "kuratiert",
-      "quelle": "Anlage 2 Nr. 1.2.1 MPBetreibV"
+      "quelle": "Anlage 2 Nr. 1.2.1 MPBetreibV",
+      "confidence": "derived",
+      "sourceRef": "Anlage 2 Nr. 1.2.1 — abzugleichen"
     },
     {
       "id": "MTK-1.2.2",
@@ -75,13 +91,18 @@
       "mtk": true,
       "fristJahre": 2,
       "matchTerms": [
-        "Temperaturfühler", "austauschbarer Temperaturfühler", "Thermometer mit Wechselfühler",
-        "Kerntemperatursonde", "Temperatursonde"
+        "Temperaturfühler",
+        "austauschbarer Temperaturfühler",
+        "Thermometer mit Wechselfühler",
+        "Kerntemperatursonde",
+        "Temperatursonde"
       ],
       "matchExclude": [],
       "matchConfidence": "kuratiert",
       "quelle": "Anlage 2 Nr. 1.2.2 MPBetreibV",
-      "hinweis": "Sonde und Basisgerät bilden eine messtechnische Einheit. Wird die Sonde getauscht, ist die Zuordnung am Exemplar zu prüfen."
+      "hinweis": "Sonde und Basisgerät bilden eine messtechnische Einheit. Wird die Sonde getauscht, ist die Zuordnung am Exemplar zu prüfen.",
+      "confidence": "derived",
+      "sourceRef": "Anlage 2 Nr. 1.2.2 — abzugleichen"
     },
     {
       "id": "MTK-1.2.3",
@@ -92,16 +113,21 @@
       "mtk": true,
       "fristJahre": 1,
       "matchTerms": [
-        "Infrarot-Strahlungsthermometer", "Infrarotthermometer", "IR-Thermometer",
-        "Stirnthermometer", "Ohrthermometer", "Tympanonthermometer",
+        "Infrarot-Strahlungsthermometer",
+        "Infrarotthermometer",
+        "IR-Thermometer",
+        "Stirnthermometer",
+        "Ohrthermometer",
+        "Tympanonthermometer",
         "kontaktloses Fieberthermometer"
       ],
       "matchExclude": [],
       "matchConfidence": "kuratiert",
       "quelle": "Anlage 2 Nr. 1.2.3 MPBetreibV",
-      "hinweis": "Einzige Ziffer der Gruppe 1.2 mit einjähriger Frist. Wer die Gruppe pauschal auf zwei Jahre setzt, verfehlt hier die Frist."
+      "hinweis": "Einzige Ziffer der Gruppe 1.2 mit einjähriger Frist. Wer die Gruppe pauschal auf zwei Jahre setzt, verfehlt hier die Frist.",
+      "confidence": "verified",
+      "sourceRef": "Anlage 2 Nr. 1.2.3"
     },
-
     {
       "id": "MTK-1.3",
       "ziffer": "1.3",
@@ -110,16 +136,27 @@
       "mtk": true,
       "fristJahre": 2,
       "matchTerms": [
-        "Blutdruckmessgerät", "NIBP", "nichtinvasive Blutdruckmessung",
-        "Oberarmmessgerät", "Handgelenkmessgerät", "Sphygmomanometer",
-        "Aneroidmanometer", "Langzeitblutdruckmessgerät", "ABDM"
+        "Blutdruckmessgerät",
+        "NIBP",
+        "nichtinvasive Blutdruckmessung",
+        "Oberarmmessgerät",
+        "Handgelenkmessgerät",
+        "Sphygmomanometer",
+        "Aneroidmanometer",
+        "Langzeitblutdruckmessgerät",
+        "ABDM"
       ],
-      "matchExclude": ["invasive Blutdruckmessung", "IBP", "Druckaufnehmer intraarteriell"],
+      "matchExclude": [
+        "invasive Blutdruckmessung",
+        "IBP",
+        "Druckaufnehmer intraarteriell"
+      ],
       "matchConfidence": "kuratiert",
       "quelle": "Anlage 2 Nr. 1.3 MPBetreibV",
-      "hinweis": "Auch integrierte NIBP-Module in Patientenmonitoren fallen darunter. Die Zuordnung hängt an der Messfunktion, nicht an der Bauform."
+      "hinweis": "Auch integrierte NIBP-Module in Patientenmonitoren fallen darunter. Die Zuordnung hängt an der Messfunktion, nicht an der Bauform.",
+      "confidence": "verified",
+      "sourceRef": "Anlage 2 Nr. 1.3"
     },
-
     {
       "id": "MTK-1.4",
       "ziffer": "1.4",
@@ -138,12 +175,18 @@
       "mtk": true,
       "fristJahre": 2,
       "matchTerms": [
-        "Augentonometer", "Tonometer", "Applanationstonometer",
-        "Non-Contact-Tonometer", "Luftstoßtonometer", "Goldmann-Tonometer"
+        "Augentonometer",
+        "Tonometer",
+        "Applanationstonometer",
+        "Non-Contact-Tonometer",
+        "Luftstoßtonometer",
+        "Goldmann-Tonometer"
       ],
       "matchExclude": [],
       "matchConfidence": "kuratiert",
-      "quelle": "Anlage 2 Nr. 1.4.1 MPBetreibV"
+      "quelle": "Anlage 2 Nr. 1.4.1 MPBetreibV",
+      "confidence": "derived",
+      "sourceRef": "Anlage 2 Nr. 1.4.1 — abzugleichen"
     },
     {
       "id": "MTK-1.4.2",
@@ -153,13 +196,18 @@
       "bezeichnung": "Augentonometer zur Grenzwertprüfung",
       "mtk": true,
       "fristJahre": 5,
-      "matchTerms": ["Grenzwerttonometer", "Tonometer zur Grenzwertprüfung", "Screening-Tonometer"],
+      "matchTerms": [
+        "Grenzwerttonometer",
+        "Tonometer zur Grenzwertprüfung",
+        "Screening-Tonometer"
+      ],
       "matchExclude": [],
       "matchConfidence": "kuratiert",
       "quelle": "Anlage 2 Nr. 1.4.2 MPBetreibV",
-      "hinweis": "Abgrenzung zu 1.4.1 folgt der Zweckbestimmung des Herstellers, nicht der Bauart. Im Zweifel 1.4.1 mit der kürzeren Frist ansetzen."
+      "hinweis": "Abgrenzung zu 1.4.1 folgt der Zweckbestimmung des Herstellers, nicht der Bauart. Im Zweifel 1.4.1 mit der kürzeren Frist ansetzen.",
+      "confidence": "derived",
+      "sourceRef": "Anlage 2 Nr. 1.4.2 — abzugleichen"
     },
-
     {
       "id": "MTK-1.5",
       "ziffer": "1.5",
@@ -178,10 +226,19 @@
       "bezeichnung": "Therapiedosimeter mit Photonenstrahlung im Energiebereich bis 1,33 MeV — allgemein",
       "mtk": true,
       "fristJahre": 2,
-      "matchTerms": ["Therapiedosimeter", "Dosimeter Strahlentherapie", "Ionisationskammer-Dosimeter"],
-      "matchExclude": ["Diagnostikdosimeter", "Personendosimeter"],
+      "matchTerms": [
+        "Therapiedosimeter",
+        "Dosimeter Strahlentherapie",
+        "Ionisationskammer-Dosimeter"
+      ],
+      "matchExclude": [
+        "Diagnostikdosimeter",
+        "Personendosimeter"
+      ],
       "matchConfidence": "kuratiert",
-      "quelle": "Anlage 2 Nr. 1.5.1 MPBetreibV"
+      "quelle": "Anlage 2 Nr. 1.5.1 MPBetreibV",
+      "confidence": "derived",
+      "sourceRef": "Anlage 2 Nr. 1.5.1 — abzugleichen"
     },
     {
       "id": "MTK-1.5.1.b",
@@ -196,7 +253,9 @@
       "matchTerms": [],
       "matchConfidence": "bedingungsgebunden",
       "quelle": "Anlage 2 Nr. 1.5.1 MPBetreibV",
-      "hinweis": "Die verlängerte Frist gilt nur, solange die Bedingung nachweislich erfüllt ist. Diese Variante darf nicht über einen Gerätetypbegriff vorausgewählt werden — sie hängt am Verhalten des Betreibers, nicht am Produkt."
+      "hinweis": "Die verlängerte Frist gilt nur, solange die Bedingung nachweislich erfüllt ist. Diese Variante darf nicht über einen Gerätetypbegriff vorausgewählt werden — sie hängt am Verhalten des Betreibers, nicht am Produkt.",
+      "confidence": "derived",
+      "sourceRef": "Anlage 2 Nr. 1.5.1 — abzugleichen"
     },
     {
       "id": "MTK-1.5.2",
@@ -207,10 +266,15 @@
       "mtk": true,
       "fristJahre": 2,
       "verfahren": "Vergleichsmessung durch eine von der zuständigen Landesbehörde beauftragte Messstelle",
-      "matchTerms": ["Linearbeschleuniger-Dosimeter", "Beschleunigerdosimeter"],
+      "matchTerms": [
+        "Linearbeschleuniger-Dosimeter",
+        "Beschleunigerdosimeter"
+      ],
       "matchConfidence": "kuratiert",
       "quelle": "Anlage 2 Nr. 1.5.2 MPBetreibV",
-      "hinweis": "Nicht durch einen beliebigen Servicepartner durchführbar. Die Beauftragung ist behördlich gebunden — ein Auftrag aus der App führt hier zur Messstelle, nicht zum Servicepartner."
+      "hinweis": "Nicht durch einen beliebigen Servicepartner durchführbar. Die Beauftragung ist behördlich gebunden — ein Auftrag aus der App führt hier zur Messstelle, nicht zum Servicepartner.",
+      "confidence": "derived",
+      "sourceRef": "Anlage 2 Nr. 1.5.2 — abzugleichen"
     },
     {
       "id": "MTK-1.5.3",
@@ -220,13 +284,18 @@
       "bezeichnung": "Therapiedosimeter mit Photonenstrahlung aus Co-60-Bestrahlungsanlagen",
       "mtk": true,
       "fristJahre": null,
-      "wahlweiseNach": ["1.5.1", "1.5.2"],
-      "matchTerms": ["Kobalt-60-Dosimeter", "Co-60-Dosimeter"],
+      "wahlweiseNach": [
+        "1.5.1",
+        "1.5.2"
+      ],
+      "matchTerms": [
+        "Kobalt-60-Dosimeter",
+        "Co-60-Dosimeter"
+      ],
       "matchConfidence": "kuratiert",
       "quelle": "Anlage 2 Nr. 1.5.3 MPBetreibV",
       "hinweis": "Keine eigene Frist. Der Betreiber wählt zwischen dem Verfahren nach 1.5.1 und 1.5.2; die gewählte Variante gehört an das Exemplar."
     },
-
     {
       "id": "MTK-1.6",
       "ziffer": "1.6",
@@ -235,13 +304,18 @@
       "einschraenkung": "sofern sie nicht nach § 90 der Strahlenschutzverordnung dem Mess- und Eichgesetz unterliegen",
       "mtk": true,
       "fristJahre": 5,
-      "matchTerms": ["Diagnostikdosimeter", "Dosisflächenprodukt-Messgerät", "DFP-Messgerät"],
+      "matchTerms": [
+        "Diagnostikdosimeter",
+        "Dosisflächenprodukt-Messgerät",
+        "DFP-Messgerät"
+      ],
       "matchExclude": [],
       "matchConfidence": "kuratiert",
       "quelle": "Anlage 2 Nr. 1.6 MPBetreibV",
-      "hinweis": "ACHTUNG: Der Verweis wurde geändert. Ältere Quellen nennen hier § 2 Absatz 1 Nummer 3 oder 4 der Eichordnung. Wer eine Regeltabelle aus solchen Quellen übernimmt, trägt einen aufgehobenen Verweis mit."
+      "hinweis": "ACHTUNG: Der Verweis wurde geändert. Ältere Quellen nennen hier § 2 Absatz 1 Nummer 3 oder 4 der Eichordnung. Wer eine Regeltabelle aus solchen Quellen übernimmt, trägt einen aufgehobenen Verweis mit.",
+      "confidence": "derived",
+      "sourceRef": "Anlage 2 Nr. 1.6 — abzugleichen"
     },
-
     {
       "id": "MTK-1.7",
       "ziffer": "1.7",
@@ -249,14 +323,23 @@
       "bezeichnung": "Tretkurbelergometer zur definierten physikalischen und reproduzierbaren Belastung von Patienten",
       "mtk": true,
       "fristJahre": 2,
-      "matchTerms": ["Tretkurbelergometer", "Fahrradergometer", "Ergometer", "Belastungsergometer"],
-      "matchExclude": ["Laufbandergometer", "Handkurbelergometer"],
+      "matchTerms": [
+        "Tretkurbelergometer",
+        "Fahrradergometer",
+        "Ergometer",
+        "Belastungsergometer"
+      ],
+      "matchExclude": [
+        "Laufbandergometer",
+        "Handkurbelergometer"
+      ],
       "matchConfidence": "kuratiert",
       "quelle": "Anlage 2 Nr. 1.7 MPBetreibV",
-      "hinweis": "Die Ziffer nennt ausdrücklich das Tretkurbelergometer. Ob ein Laufband unter die Ziffer fällt, ist eine Auslegungsfrage und hier bewusst ausgeschlossen statt stillschweigend eingeschlossen."
+      "hinweis": "Die Ziffer nennt ausdrücklich das Tretkurbelergometer. Ob ein Laufband unter die Ziffer fällt, ist eine Auslegungsfrage und hier bewusst ausgeschlossen statt stillschweigend eingeschlossen.",
+      "confidence": "verified",
+      "sourceRef": "Anlage 2 Nr. 1.7"
     }
   ],
-
   "ausnahmen": [
     {
       "id": "MTK-AUSNAHME-1",
@@ -268,7 +351,6 @@
       "hinweis": "Der genaue Wortlaut des Bedingungsteils ist vor der Produktivsetzung am amtlichen Text zu verifizieren. Die Wirkung — Entfall der MTK — ist gesichert."
     }
   ],
-
   "verbundpflichten": [
     {
       "id": "MPB-ANLAGE2",
@@ -287,7 +369,6 @@
       "hinweis": "Eine überfällige MTK ist damit nicht nur ein Dokumentationsmangel, sondern berührt die Betriebserlaubnis. Das rechtfertigt eine eigene Eskalationsstufe in der Fristenanzeige."
     }
   ],
-
   "durchfuehrung": {
     "normale": "Sofern in Anlage 2 nicht anders angegeben, dürfen nur messtechnische Normale benutzt werden, die auf ein nationales oder internationales Normal rückgeführt sind und hinreichend kleine Fehlergrenzen und Messunsicherheiten einhalten (§ 15 Absatz 4).",
     "vermutungswirkung": "Die ordnungsgemäße Durchführung wird vermutet, wenn der Leitfaden zu messtechnischen Kontrollen von Medizinprodukten mit Messfunktion (LMKM) beachtet wird.",
