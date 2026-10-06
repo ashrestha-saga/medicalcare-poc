@@ -94,10 +94,68 @@ export const updateClinicContractSchema = z.object({
 
 export type UpdateClinicContractParsed = z.infer<typeof updateClinicContractSchema>;
 
+export const consoleStaffSkillDraftSchema = z.object({
+  skillCode: z.string().trim().min(1).max(64),
+  levelCode: z.string().trim().min(1).max(64),
+  validUntil: z
+    .string()
+    .trim()
+    .nullable()
+    .optional()
+    .refine((v) => v == null || v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v), {
+      message: "Date must be YYYY-MM-DD or empty.",
+    }),
+  evidenceRef: z.string().trim().max(300).nullable().optional(),
+});
+
 export const consoleStaffInviteSchema = z.object({
   email: z.string().trim().email().max(200),
   name: z.string().trim().max(120).optional().nullable(),
   appRole: z.enum(["admin", "inspector", "order"]),
+  jobTitle: z.string().trim().max(120).nullable().optional(),
+  validFrom: z
+    .string()
+    .trim()
+    .nullable()
+    .optional()
+    .refine((v) => v == null || v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v), {
+      message: "Date must be YYYY-MM-DD or empty.",
+    }),
+  dispatchOrigin: z.enum(["home", "partner_site", "organisation"]).nullable().optional(),
+  originPostalCode: z.string().trim().max(20).nullable().optional(),
+  originCity: z.string().trim().max(120).nullable().optional(),
+  radiusKm: z.number().int().min(0).max(2000).nullable().optional(),
+  skills: z.array(consoleStaffSkillDraftSchema).max(30).optional(),
+});
+
+export const consoleStaffPatchSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  jobTitle: z.string().trim().max(120).nullable().optional(),
+  appRole: z.enum(["admin", "inspector", "order"]).optional(),
+  validFrom: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
+    .optional(),
+  dispatchOrigin: z.enum(["home", "partner_site", "organisation"]).optional(),
+  originPostalCode: z.string().trim().max(20).nullable().optional(),
+  originCity: z.string().trim().max(120).nullable().optional(),
+  radiusKm: z.number().int().min(0).max(2000).nullable().optional(),
+});
+
+export const consoleStaffSkillCreateSchema = consoleStaffSkillDraftSchema;
+
+export const consoleStaffQualificationCreateSchema = z.object({
+  qualificationCode: z.string().trim().min(1).max(64),
+  validUntil: z
+    .string()
+    .trim()
+    .nullable()
+    .optional()
+    .refine((v) => v == null || v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v), {
+      message: "Date must be YYYY-MM-DD or empty.",
+    }),
+  evidenceRef: z.string().trim().max(300).nullable().optional(),
 });
 
 export const consoleStaffAssignSchema = z.object({
@@ -111,6 +169,12 @@ export const consoleTenantStaffAssignSchema = z.object({
 });
 
 export type ConsoleTenantStaffAssignParsed = z.infer<typeof consoleTenantStaffAssignSchema>;
+export type ConsoleStaffInviteParsed = z.infer<typeof consoleStaffInviteSchema>;
+export type ConsoleStaffPatchParsed = z.infer<typeof consoleStaffPatchSchema>;
+export type ConsoleStaffSkillCreateParsed = z.infer<typeof consoleStaffSkillCreateSchema>;
+export type ConsoleStaffQualificationCreateParsed = z.infer<
+  typeof consoleStaffQualificationCreateSchema
+>;
 
 export const dispositionAssignSchema = z.object({
   executorOrgId: z.string().trim().min(1).nullable().optional(),
@@ -127,9 +191,24 @@ export const dispositionAssignSchema = z.object({
 
 export type DispositionAssignParsed = z.infer<typeof dispositionAssignSchema>;
 
+/** Advance one disposition step; optional appointment applied on this click only. */
+export const dispositionAdvanceSchema = z.object({
+  scheduledAt: z
+    .string()
+    .trim()
+    .nullable()
+    .optional()
+    .refine((v) => v == null || v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v), {
+      message: "Schedule date must be YYYY-MM-DD or empty.",
+    }),
+});
+
+export type DispositionAdvanceParsed = z.infer<typeof dispositionAdvanceSchema>;
+
 export const consoleExternalInviteSchema = z.object({
   email: z.string().trim().email().max(200),
   name: z.string().trim().max(120).optional().nullable(),
+  employerOrganisationId: z.string().trim().min(1),
   commissionedFrom: z
     .string()
     .trim()
@@ -143,11 +222,17 @@ export const consoleExternalInviteSchema = z.object({
     .trim()
     .refine((v) => /^\d{4}-\d{2}-\d{2}$/.test(v), { message: "Liability end must be YYYY-MM-DD." }),
   liabilitySumEur: z.number().int().positive().nullable().optional(),
+  originPostalCode: z.string().trim().max(20).nullable().optional(),
+  originCity: z.string().trim().max(120).nullable().optional(),
+  radiusKm: z.number().int().min(0).max(2000).nullable().optional(),
+  skills: z.array(consoleStaffSkillDraftSchema).max(30).optional(),
 });
 
 export type ConsoleExternalInviteParsed = z.infer<typeof consoleExternalInviteSchema>;
 
 export const consoleExternalUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  employerOrganisationId: z.string().trim().min(1).nullable().optional(),
   commissionedFrom: z
     .string()
     .trim()
@@ -164,6 +249,9 @@ export const consoleExternalUpdateSchema = z.object({
     .refine((v) => /^\d{4}-\d{2}-\d{2}$/.test(v))
     .optional(),
   liabilitySumEur: z.number().int().positive().nullable().optional(),
+  originPostalCode: z.string().trim().max(20).nullable().optional(),
+  originCity: z.string().trim().max(120).nullable().optional(),
+  radiusKm: z.number().int().min(0).max(2000).nullable().optional(),
   validTo: z
     .string()
     .trim()

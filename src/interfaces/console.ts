@@ -71,7 +71,7 @@ export interface ConsoleClinicDetailDTO extends ConsoleClinicDTO {
   mpsbName: string | null;
   /** True when provider-operated and avvRef empty. */
   avvMissing: boolean;
-  /** Partner org staff vs this tenant (no qualifications in this cut). */
+  /** Partner org staff vs this tenant. */
   staff: ConsoleClinicStaffRowDTO[];
   /** Open/recent service requests in this tenant. */
   assignments: ConsoleRequestRowDTO[];
@@ -88,6 +88,7 @@ export interface ConsoleClinicStaffRowDTO {
   assigned: boolean;
   /** Org admin — access is implicit; assign/revoke UI disabled. */
   accessLocked: boolean;
+  qualifications: { id: string; code: string; label: string; validUntil: string | null }[];
 }
 
 export interface UpdateClinicContractInput {
@@ -123,15 +124,22 @@ export interface ConsoleRequestRowDTO {
   tenantCode: string | null;
   tenantName: string;
   reference: string;
+  /** Primary device line (trade name / model / inventory). */
   deviceLabel: string;
+  /** Secondary device line (model or inventory), when distinct. */
+  deviceDetail: string | null;
   serviceType: string;
   state: string;
   executorOrgId: string | null;
   executorName: string | null;
+  /** Short contractor code (e.g. MSR from O-MSR). */
+  executorCode: string | null;
   assigneeUserId: string | null;
   assigneeName: string | null;
   scheduledAt: string | null;
   displayState: DispositionDisplayState;
+  /** Next console-advanceable display state, or null when done / rejected / awaiting Prüfpartner. */
+  nextDisplayState: DispositionDisplayState | null;
   raisedAt: string;
   managed: boolean;
 }
@@ -146,14 +154,44 @@ export interface DispositionAssignInput {
   scheduledAt?: string | null;
 }
 
-export interface ConsoleStaffMemberDTO {
+export interface ConsoleStaffQualificationDTO {
+  id: string;
+  code: string;
+  label: string;
+  validUntil: string | null;
+  evidenceRef: string | null;
+}
+
+export interface ConsoleStaffSkillDTO {
+  id: string;
+  skillCode: string;
+  skillLabel: string;
+  levelCode: string;
+  levelLabel: string;
+  validUntil: string | null;
+  evidenceRef: string | null;
+}
+
+export interface ConsoleStaffExpiringItemDTO {
   membershipId: string;
-  userId: string;
+  personName: string;
+  kind: "qualification" | "skill";
+  label: string;
+  /** Present when kind is skill — for i18n level label. */
+  skillLevelCode?: string | null;
+  validUntil: string;
+}
+
+export interface ConsoleStaffMemberDTO {
+  /** Active: OrgMembership id. Invited: `invite:{invitationId}`. */
+  membershipId: string;
+  /** Null while invite pending. */
+  userId: string | null;
   name: string;
   email: string;
   jobTitle: string | null;
   appRole: string;
-  validFrom: string;
+  validFrom: string | null;
   validTo: string | null;
   isExternal: boolean;
   commissionedFrom: string | null;
@@ -162,36 +200,134 @@ export interface ConsoleStaffMemberDTO {
   liabilitySumEur: number | null;
   /** Tenant ids this member may act on (all live for admin; assigned subset otherwise). */
   assignedTenantIds: string[];
+  status: "active" | "invited";
+  dispatchOrigin: "home" | "partner_site" | "organisation" | null;
+  originPostalCode: string | null;
+  originCity: string | null;
+  radiusKm: number | null;
+  qualifications: ConsoleStaffQualificationDTO[];
+  skills: ConsoleStaffSkillDTO[];
+  assignedClinicNames: string[];
+  invitationExpiresAt?: string | null;
+  /** Employer firm when isExternal (Radiotec etc.). */
+  employerOrganisationId?: string | null;
+  employerName?: string | null;
+  employerCode?: string | null;
+  /** External: commission + liability still valid. */
+  deployable?: boolean;
+  notDeployableReason?: string | null;
+}
+
+export interface ConsoleExternalNotDeployableDTO {
+  membershipId: string;
+  personName: string;
+  reason: string;
+}
+
+export interface ConsoleExternalEmployerOptionDTO {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export interface ConsoleExternalListDTO {
+  members: ConsoleStaffMemberDTO[];
+  notDeployable: ConsoleExternalNotDeployableDTO[];
+  employerOptions: ConsoleExternalEmployerOptionDTO[];
+  refs: ConsoleStaffRefsDTO;
+  canManage: boolean;
+}
+
+export interface ConsoleExternalInviteInput {
+  email: string;
+  name?: string | null;
+  employerOrganisationId: string;
+  commissionedFrom: string;
+  commissionedTo: string;
+  liabilityUntil: string;
+  liabilitySumEur?: number | null;
+  originPostalCode?: string | null;
+  originCity?: string | null;
+  radiusKm?: number | null;
+  skills?: ConsoleStaffSkillDraftInput[];
+}
+
+export interface ConsoleExternalUpdateInput {
+  name?: string;
+  employerOrganisationId?: string | null;
+  commissionedFrom?: string;
+  commissionedTo?: string;
+  liabilityUntil?: string;
+  liabilitySumEur?: number | null;
+  originPostalCode?: string | null;
+  originCity?: string | null;
+  radiusKm?: number | null;
+  validTo?: string | null;
+}
+
+export interface ConsoleStaffRefsDTO {
+  qualifications: { code: string; label: string }[];
+  skills: { code: string; label: string }[];
+  skillLevels: { code: string; label: string; rank: number }[];
 }
 
 export interface ConsoleStaffListDTO {
   members: ConsoleStaffMemberDTO[];
-  clinics: { tenantId: string; tenantName: string; tenantCode: string | null; live: boolean }[];
+  clinics: {
+    tenantId: string;
+    tenantName: string;
+    tenantCode: string | null;
+    live: boolean;
+    city?: string | null;
+  }[];
   canInvite: boolean;
   canAssign: boolean;
+  expiringSoon: ConsoleStaffExpiringItemDTO[];
+  refs: ConsoleStaffRefsDTO;
+}
+
+export interface ConsoleStaffSkillDraftInput {
+  skillCode: string;
+  levelCode: string;
+  validUntil?: string | null;
+  evidenceRef?: string | null;
 }
 
 export interface ConsoleStaffInviteInput {
   email: string;
   name?: string | null;
   appRole: "admin" | "inspector" | "order";
+  jobTitle?: string | null;
+  validFrom?: string | null;
+  dispatchOrigin?: "home" | "partner_site" | "organisation" | null;
+  originPostalCode?: string | null;
+  originCity?: string | null;
+  radiusKm?: number | null;
+  skills?: ConsoleStaffSkillDraftInput[];
 }
 
-export interface ConsoleExternalInviteInput {
-  email: string;
-  name?: string | null;
-  commissionedFrom: string;
-  commissionedTo: string;
-  liabilityUntil: string;
-  liabilitySumEur?: number | null;
+export interface ConsoleStaffPatchInput {
+  name?: string;
+  jobTitle?: string | null;
+  appRole?: "admin" | "inspector" | "order";
+  validFrom?: string;
+  dispatchOrigin?: "home" | "partner_site" | "organisation";
+  originPostalCode?: string | null;
+  originCity?: string | null;
+  radiusKm?: number | null;
 }
 
-export interface ConsoleExternalUpdateInput {
-  commissionedFrom?: string;
-  commissionedTo?: string;
-  liabilityUntil?: string;
-  liabilitySumEur?: number | null;
-  validTo?: string | null;
+export interface ConsoleStaffSkillCreateInput {
+  skillCode: string;
+  levelCode: string;
+  validUntil?: string | null;
+  evidenceRef?: string | null;
+}
+
+export interface ConsoleStaffQualificationCreateInput {
+  qualificationCode: string;
+  validUntil?: string | null;
+  evidenceRef?: string | null;
 }
 
 export interface MySitesTenantShellDTO {

@@ -1,9 +1,8 @@
-import { SiteAssignmentsScreen } from "@/components/features/console/SiteAssignmentsScreen";
+import { SiteAssignmentsScreen } from "@/components/features/partner/my-sites/SiteAssignmentsScreen";
 
 type Props = { params: Promise<{ tenantId: string }> };
 
-/** /partner/my-sites/[tenantId] — institution assignments portal. */
-export default async function SiteAssignmentsPage({ params }: Props) {
+export default async function PartnerSiteAssignmentsPage({ params }: Props) {
   const { tenantId } = await params;
-  return <SiteAssignmentsScreen tenantId={decodeURIComponent(tenantId)} />;
+  return <SiteAssignmentsScreen tenantId={tenantId} />;
 }

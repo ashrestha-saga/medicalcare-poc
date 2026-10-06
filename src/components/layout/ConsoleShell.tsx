@@ -27,7 +27,6 @@ const MENU_I18N: Partial<
     MenuModuleId,
     | "customers"
     | "dueDates"
-    | "requests"
     | "disposition"
     | "mySites"
     | "assignments"
@@ -40,7 +39,6 @@ const MENU_I18N: Partial<
 > = {
   "console-customers": "customers",
   "console-due-dates": "dueDates",
-  "console-requests": "requests",
   "console-disposition": "disposition",
   "console-my-sites": "mySites",
   "console-assignments": "assignments",
@@ -53,7 +51,7 @@ const MENU_I18N: Partial<
 
 function ConsoleNavIcon({ id }: { id: MenuModuleId }) {
   if (id === "console-due-dates") return <DueDatesIcon />;
-  if (id === "console-requests" || id === "console-disposition" || id === "console-assignments") {
+  if (id === "console-disposition" || id === "console-assignments") {
     return <RequestsIcon />;
   }
   if (id === "console-my-sites") return <LocationsIcon />;

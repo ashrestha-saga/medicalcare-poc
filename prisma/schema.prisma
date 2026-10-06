@@ -160,6 +160,14 @@ enum OrganisationCapacity {
   platform_operator
 }
 
+/** Where a partner staff member starts for dispatch (deployment area). */
+enum DispatchOrigin {
+  home
+  /** Partner org depot / Betriebsstätte (free-text PLZ/city until OrganisationSite exists). */
+  partner_site
+  organisation
+}
+
 enum ClinicRole {
   superadmin
   device_admin
@@ -286,6 +294,8 @@ model User {
   trainingRecords      TrainingRecord[]
   permissions          UserPermission[]
   passwordResetTokens  PasswordResetToken[]
+  qualifications       PersonQualification[]
+  skills               PersonSkill[]
 
   @@index([tenantId])
   @@index([accountKind])
@@ -840,6 +850,7 @@ model Organisation {
   activeFrom  DateTime @db.Date
   activeTo    DateTime? @db.Date
   memberships OrgMembership[]
+  employedExternals OrgMembership[] @relation("ExternalEmployerOrg")
   contracts   ServiceContract[]
   roles       OrganisationRole[]
   invitations UserInvitation[]
@@ -900,11 +911,77 @@ model OrgMembership {
   commissionedTo   DateTime? @db.Date
   liabilityUntil   DateTime? @db.Date
   liabilitySumEur  Int?
+  /** Deployment / dispatch starting point. */
+  dispatchOrigin   DispatchOrigin @default(organisation)
+  originPostalCode String?
+  originCity       String?
+  radiusKm         Int?
+  /** Employer org when isExternal (e.g. Radiotec); commissioning org is organisationId. */
+  employerOrganisationId String?
+  employerOrganisation   Organisation? @relation("ExternalEmployerOrg", fields: [employerOrganisationId], references: [id])
   staffAssignments PartnerStaffAssignment[]
 
   @@unique([organisationId, userId])
   @@index([userId])
   @@index([organisationId, isExternal])
+  @@index([employerOrganisationId])
+}
+
+/// Formal qualification catalogue (Fachkunde etc.). Staff cut — no catalogue rules yet.
+model RefQualification {
+  code      String  @id
+  label     String  @db.Text
+  legalBasis String?
+  persons   PersonQualification[]
+}
+
+/// Device-specific familiarity catalogue.
+model RefSkill {
+  code    String @id
+  label   String
+  persons PersonSkill[]
+}
+
+/// Ranked skill levels: eingewiesen < geuebt < hersteller.
+model RefSkillLevel {
+  code    String @id
+  label   String
+  rank    Int    @unique
+  persons PersonSkill[]
+}
+
+/// Formal qualification held by a user (clinic or partner).
+model PersonQualification {
+  id                String           @id @default(cuid())
+  userId            String
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  qualificationCode String
+  qualification     RefQualification @relation(fields: [qualificationCode], references: [code])
+  validUntil        DateTime?        @db.Date
+  evidenceRef       String?
+  recordedBy        String
+  recordedAt        DateTime         @default(now())
+
+  @@unique([userId, qualificationCode])
+  @@index([validUntil])
+}
+
+/// Device skill held by a user.
+model PersonSkill {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skillCode   String
+  skill       RefSkill      @relation(fields: [skillCode], references: [code])
+  levelCode   String
+  level       RefSkillLevel @relation(fields: [levelCode], references: [code])
+  validUntil  DateTime?     @db.Date
+  evidenceRef String?
+  recordedBy  String
+  recordedAt  DateTime      @default(now())
+
+  @@unique([userId, skillCode])
+  @@index([validUntil])
 }
 
 /// Which managed tenants a partner membership may act on (non-admin fail-closed).

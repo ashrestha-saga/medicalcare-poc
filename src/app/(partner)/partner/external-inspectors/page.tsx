@@ -1,5 +1,5 @@
-import { ExternalInspectorsScreen } from "@/components/features/console/ExternalInspectorsScreen";
+import { ExternalInspectorsScreen } from "@/components/features/partner/external-inspectors/ExternalInspectorsScreen";
 
-export default function ExternalInspectorsPage() {
+export default function PartnerExternalInspectorsPage() {
   return <ExternalInspectorsScreen />;
 }

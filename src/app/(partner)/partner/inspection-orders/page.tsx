@@ -1,5 +1,5 @@
-import { InspectionOrdersScreen } from "@/components/features/console/InspectionOrdersScreen";
+import { InspectionOrdersScreen } from "@/components/features/partner/inspection-orders/InspectionOrdersScreen";
 
-export default function InspectionOrdersPage() {
+export default function PartnerInspectionOrdersPage() {
   return <InspectionOrdersScreen />;
 }

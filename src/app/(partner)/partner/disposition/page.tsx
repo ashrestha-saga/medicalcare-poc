@@ -1,5 +1,5 @@
-import { DispositionScreen } from "@/components/features/console/DispositionScreen";
+import { DispositionScreen } from "@/components/features/partner/disposition/DispositionScreen";
 
-export default function DispositionPage() {
+export default function PartnerDispositionPage() {
   return <DispositionScreen />;
 }

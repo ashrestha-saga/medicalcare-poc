@@ -1,6 +1,5 @@
 import type { PartnerContext } from "@/interfaces/session";
-import type { ConsoleDutyListDTO, ConsoleRequestListDTO } from "@/interfaces/console";
-import { dispositionDisplayState } from "@/services/console/dispositionService";
+import type { ConsoleDutyListDTO } from "@/interfaces/console";
 import { runWithoutTenantAsync } from "@/lib/auth/tenantStore";
 import { prisma } from "@/lib/prisma";
 import { isLiveContract } from "@/services/access/partnerAccessService";
@@ -70,47 +69,6 @@ export const partnerPortfolioService = {
             dueAt: d.dueAt?.toISOString() ?? null,
             confidence: d.confidence,
             overdue: Boolean(d.dueAt && d.dueAt.getTime() < now.getTime()),
-          };
-        }),
-      };
-    });
-  },
-
-  async listRequests(ctx: PartnerContext): Promise<ConsoleRequestListDTO> {
-    return runWithoutTenantAsync(async () => {
-      const tenants = await liveTenantMap(ctx.organisationId);
-      const tenantIds = [...tenants.keys()];
-      if (tenantIds.length === 0) return { rows: [] };
-
-      const rows = await prisma.serviceRequest.findMany({
-        where: { tenantId: { in: tenantIds } },
-        include: {
-          executorOrg: { select: { name: true } },
-          assigneeUser: { select: { name: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 200,
-      });
-
-      return {
-        rows: rows.map((r) => {
-          const tenant = tenants.get(r.tenantId);
-          return {
-            tenantId: r.tenantId,
-            tenantCode: tenant?.code ?? null,
-            tenantName: tenant?.name ?? r.tenantId,
-            reference: r.reference,
-            deviceLabel: r.locationText || r.subjectId,
-            serviceType: r.serviceType,
-            state: r.state,
-            executorOrgId: r.executorOrgId,
-            executorName: r.executorOrg?.name ?? null,
-            assigneeUserId: r.assigneeUserId,
-            assigneeName: r.assigneeUser?.name ?? null,
-            scheduledAt: r.scheduledAt ? r.scheduledAt.toISOString().slice(0, 10) : null,
-            displayState: dispositionDisplayState(r.state, r.assigneeUserId, r.scheduledAt),
-            raisedAt: r.createdAt.toISOString(),
-            managed: true,
           };
         }),
       };

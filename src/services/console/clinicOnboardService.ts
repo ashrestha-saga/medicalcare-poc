@@ -21,7 +21,10 @@ import {
 import { requirePartnerPermission } from "@/lib/auth/tenantContext";
 import { getCachedPartnerConsolePermissions } from "@/services/roles/roleGrantsService";
 import { invitationService } from "@/services/users/invitationService";
-import { dispositionDisplayState } from "@/services/console/dispositionService";
+import {
+  dispositionDisplayState,
+  nextDispositionDisplayState,
+} from "@/services/console/dispositionService";
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -300,7 +303,17 @@ export const clinicOnboardService = {
             user: { active: true, accountKind: "partner" },
           },
           include: {
-            user: { select: { id: true, name: true, email: true, jobTitle: true } },
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                jobTitle: true,
+                qualifications: {
+                  include: { qualification: { select: { code: true, label: true } } },
+                },
+              },
+            },
             staffAssignments: { where: { tenantId }, select: { tenantId: true } },
           },
           orderBy: [{ appRole: "asc" }, { user: { name: "asc" } }],
@@ -308,7 +321,7 @@ export const clinicOnboardService = {
         prisma.serviceRequest.findMany({
           where: { tenantId },
           include: {
-            executorOrg: { select: { name: true } },
+            executorOrg: { select: { name: true, code: true } },
             assigneeUser: { select: { name: true } },
           },
           orderBy: { createdAt: "desc" },
@@ -336,6 +349,12 @@ export const clinicOnboardService = {
         appRole: String(m.appRole),
         assigned,
         accessLocked,
+        qualifications: m.user.qualifications.map((q) => ({
+          id: q.id,
+          code: q.qualification.code,
+          label: q.qualification.label,
+          validUntil: q.validUntil ? isoDate(q.validUntil) : null,
+        })),
       };
     });
 
@@ -345,14 +364,19 @@ export const clinicOnboardService = {
       tenantName: row.tenant.name,
       reference: r.reference,
       deviceLabel: r.locationText || r.subjectId,
+      deviceDetail: null,
       serviceType: r.serviceType,
       state: r.state,
       executorOrgId: r.executorOrgId,
       executorName: r.executorOrg?.name ?? null,
+      executorCode: r.executorOrg?.code?.replace(/^O-/i, "") ?? null,
       assigneeUserId: r.assigneeUserId,
       assigneeName: r.assigneeUser?.name ?? null,
       scheduledAt: r.scheduledAt ? isoDate(r.scheduledAt) : null,
       displayState: dispositionDisplayState(r.state, r.assigneeUserId, r.scheduledAt),
+      nextDisplayState: nextDispositionDisplayState(
+        dispositionDisplayState(r.state, r.assigneeUserId, r.scheduledAt),
+      ),
       raisedAt: r.createdAt.toISOString(),
       managed: true,
     }));

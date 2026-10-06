@@ -55,6 +55,20 @@ const ORGANISATIONS = [
     contact: "info@zahnzentrum-ville.example",
     activeFrom: new Date("2020-01-01T00:00:00.000Z"),
   },
+  {
+    id: "org-svx-vogel",
+    code: "SVX",
+    name: "Sachverständigenbüro Vogel",
+    contact: "buero@svx.example",
+    activeFrom: new Date("2020-01-01T00:00:00.000Z"),
+  },
+  {
+    id: "org-val-validtec",
+    code: "VAL",
+    name: "ValidTec GmbH",
+    contact: "info@validtec.example",
+    activeFrom: new Date("2020-01-01T00:00:00.000Z"),
+  },
 ] as const;
 
 import type { OrganisationCapacity } from "@prisma/client";
@@ -69,6 +83,8 @@ const ORG_CAPACITIES: { organisationId: string; role: OrganisationCapacity; id: 
   { id: "orole-msr-provider", organisationId: MSR_ID, role: "service_provider" },
   { id: "orole-msr-inspect", organisationId: MSR_ID, role: "inspection_partner" },
   { id: "orole-rts-inspect", organisationId: RTS_ID, role: "inspection_partner" },
+  { id: "orole-svx-inspect", organisationId: "org-svx-vogel", role: "inspection_partner" },
+  { id: "orole-val-inspect", organisationId: "org-val-validtec", role: "inspection_partner" },
   { id: "orole-kln-inst", organisationId: KLN_ID, role: "institution" },
   { id: "orole-prx-inst", organisationId: "0830a493-a1ba-5a5e-aa82-16ce74b894ee", role: "institution" },
   { id: "orole-mvz-inst", organisationId: "3fbe41da-61c9-5a20-a01d-c12631739a1a", role: "institution" },

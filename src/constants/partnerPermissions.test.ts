@@ -80,7 +80,6 @@ describe("partner console RBAC", () => {
       "console-my-sites",
       "console-disposition",
       "console-assignments",
-      "console-requests",
       "console-staff",
       "console-external",
       "console-organisation",
@@ -110,7 +109,6 @@ describe("partner console RBAC", () => {
       "console-my-sites",
       "console-disposition",
       "console-assignments",
-      "console-requests",
     ]);
     expect(partnerHasConsolePermission("order", "console:disposition:assign")).toBe(true);
   });

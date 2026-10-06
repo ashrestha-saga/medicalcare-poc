@@ -1,5 +1,5 @@
-import { ConsoleActivityScreen } from "@/components/features/console/ConsoleActivityScreen";
+import { ActivityScreen } from "@/components/features/partner/activity/ActivityScreen";
 
 export default function PartnerActivityPage() {
-  return <ConsoleActivityScreen />;
+  return <ActivityScreen />;
 }

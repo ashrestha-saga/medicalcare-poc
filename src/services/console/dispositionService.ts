@@ -7,7 +7,7 @@ import type {
   SiteAssignmentRowDTO,
   SitePortalDTO,
 } from "@/interfaces/console";
-import type { DispositionAssignParsed } from "@/schemas/console";
+import type { DispositionAdvanceParsed, DispositionAssignParsed } from "@/schemas/console";
 import { actorFromPartnerOrg } from "@/lib/auth/actorContext";
 import { runWithoutTenantAsync } from "@/lib/auth/tenantStore";
 import { forbidden, notFound, unprocessable } from "@/lib/errors";
@@ -96,46 +96,103 @@ export function dispositionDisplayState(
   return "erfasst";
 }
 
+/** Console may advance through scheduling; completion is recorded in Prüfpartner. */
+const CONSOLE_ADVANCE_CHAIN: DispositionDisplayState[] = [
+  "erfasst",
+  "zugewiesen",
+  "terminiert",
+  "in_arbeit",
+];
+
+export function nextDispositionDisplayState(
+  current: DispositionDisplayState,
+): DispositionDisplayState | null {
+  const i = CONSOLE_ADVANCE_CHAIN.indexOf(current);
+  if (i < 0 || i >= CONSOLE_ADVANCE_CHAIN.length - 1) return null;
+  return CONSOLE_ADVANCE_CHAIN[i + 1] ?? null;
+}
+
+function shortExecutorCode(code: string | null | undefined): string | null {
+  if (!code) return null;
+  return code.replace(/^O-/i, "");
+}
+
 function mapRow(
   r: {
     tenantId: string;
     reference: string;
     locationText: string;
     subjectId: string;
+    subjectType?: string;
     serviceType: string;
     state: ServiceRequestState;
     executorOrgId: string | null;
     assigneeUserId: string | null;
     scheduledAt: Date | null;
     createdAt: Date;
-    executorOrg: { name: string } | null;
+    executorOrg: { name: string; code?: string } | null;
     assigneeUser: { name: string } | null;
   },
   tenant: { code: string | null; name: string } | undefined,
   managed: boolean,
+  device?: { label: string; detail: string | null } | null,
 ): ConsoleRequestRowDTO {
+  const displayState = dispositionDisplayState(r.state, r.assigneeUserId, r.scheduledAt);
+  const deviceLabel = device?.label || r.locationText || r.subjectId;
   return {
     tenantId: r.tenantId,
     tenantCode: tenant?.code ?? null,
     tenantName: tenant?.name ?? r.tenantId,
     reference: r.reference,
-    deviceLabel: r.locationText || r.subjectId,
+    deviceLabel,
+    deviceDetail: device?.detail ?? null,
     serviceType: r.serviceType,
     state: r.state,
     executorOrgId: r.executorOrgId,
     executorName: r.executorOrg?.name ?? null,
+    executorCode: shortExecutorCode(r.executorOrg?.code) ?? null,
     assigneeUserId: r.assigneeUserId,
     assigneeName: r.assigneeUser?.name ?? null,
     scheduledAt: isoDate(r.scheduledAt),
-    displayState: dispositionDisplayState(r.state, r.assigneeUserId, r.scheduledAt),
+    displayState,
+    nextDisplayState: nextDispositionDisplayState(displayState),
     raisedAt: r.createdAt.toISOString(),
     managed,
   };
 }
 
+async function deviceLabelsForRequests(
+  rows: { subjectType: string; subjectId: string; tenantId: string; locationText: string }[],
+): Promise<Map<string, { label: string; detail: string | null }>> {
+  const instanceIds = [
+    ...new Set(rows.filter((r) => r.subjectType === "instance").map((r) => r.subjectId)),
+  ];
+  if (instanceIds.length === 0) return new Map();
+  const devices = await prisma.deviceInstance.findMany({
+    where: { id: { in: instanceIds } },
+    select: {
+      id: true,
+      inventoryNumber: true,
+      model: { select: { tradeName: true, modelName: true } },
+    },
+  });
+  const out = new Map<string, { label: string; detail: string | null }>();
+  for (const d of devices) {
+    const trade = d.model?.tradeName?.trim() || null;
+    const model = d.model?.modelName?.trim() || null;
+    const inv = d.inventoryNumber?.trim() || null;
+    const label = trade || model || inv || d.id;
+    let detail: string | null = null;
+    if (trade && model && model !== trade) detail = model;
+    else if ((trade || model) && inv) detail = inv;
+    out.set(d.id, { label, detail });
+  }
+  return out;
+}
+
 export const dispositionService = {
   async list(ctx: PartnerContext): Promise<ConsoleRequestListDTO> {
-    requirePartnerPermission(ctx, "console:disposition:view", "console:requests:view");
+    requirePartnerPermission(ctx, "console:disposition:view");
     return runWithoutTenantAsync(async () => {
       const now = new Date();
       const contracts = await prisma.serviceContract.findMany({
@@ -154,7 +211,7 @@ export const dispositionService = {
       const rows = await prisma.serviceRequest.findMany({
         where: { OR: orFilters },
         include: {
-          executorOrg: { select: { name: true, organisationId: true } },
+          executorOrg: { select: { name: true, code: true, organisationId: true } },
           assigneeUser: { select: { name: true } },
           tenant: { select: { id: true, name: true, code: true } },
         },
@@ -162,9 +219,16 @@ export const dispositionService = {
         take: 300,
       });
 
+      const devices = await deviceLabelsForRequests(rows);
+
       return {
         rows: rows.map((r) =>
-          mapRow(r, liveTenants.get(r.tenantId) ?? r.tenant, liveTenants.has(r.tenantId)),
+          mapRow(
+            r,
+            liveTenants.get(r.tenantId) ?? r.tenant,
+            liveTenants.has(r.tenantId),
+            r.subjectType === "instance" ? devices.get(r.subjectId) : null,
+          ),
         ),
       };
     });
@@ -185,7 +249,7 @@ export const dispositionService = {
       const rows = await prisma.serviceRequest.findMany({
         where: { executorOrg: { organisationId: ctx.organisationId } },
         include: {
-          executorOrg: { select: { name: true } },
+          executorOrg: { select: { name: true, code: true } },
           assigneeUser: { select: { name: true } },
           tenant: { select: { id: true, name: true, code: true } },
         },
@@ -193,9 +257,16 @@ export const dispositionService = {
         take: 300,
       });
 
+      const devices = await deviceLabelsForRequests(rows);
+
       return {
         rows: rows.map((r) =>
-          mapRow(r, liveTenants.get(r.tenantId) ?? r.tenant, liveTenants.has(r.tenantId)),
+          mapRow(
+            r,
+            liveTenants.get(r.tenantId) ?? r.tenant,
+            liveTenants.has(r.tenantId),
+            r.subjectType === "instance" ? devices.get(r.subjectId) : null,
+          ),
         ),
       };
     });
@@ -527,6 +598,129 @@ export const dispositionService = {
     return this.assignFromPortal(ctx, reference, input);
   },
 
+  /**
+   * Advance one console disposition step (mockup → button).
+   * Gates: assignee required before "zugewiesen"; appointment before "terminiert".
+   * Optional scheduledAt is persisted only on this click (not on date pick).
+   * Stops at in_arbeit — completion is recorded in Prüfpartner.
+   */
+  async advance(
+    ctx: PartnerContext,
+    reference: string,
+    input: DispositionAdvanceParsed = {},
+  ): Promise<ConsoleRequestRowDTO> {
+    requirePartnerPermission(ctx, "console:disposition:assign");
+
+    return runWithoutTenantAsync(async () => {
+      const row = await prisma.serviceRequest.findFirst({
+        where: { reference },
+        include: {
+          executorOrg: { select: { name: true, code: true, organisationId: true } },
+          assigneeUser: { select: { name: true } },
+          tenant: { select: { id: true, name: true, code: true } },
+        },
+      });
+      if (!row) throw notFound("Service request not found.");
+
+      const now = new Date();
+      const contract = await prisma.serviceContract.findFirst({
+        where: { organisationId: ctx.organisationId, tenantId: row.tenantId },
+      });
+      const managed = Boolean(contract && isLiveContract(contract, now));
+      const isExecutor = row.executorOrg?.organisationId === ctx.organisationId;
+      if (!managed && !isExecutor) throw forbidden();
+
+      let nextScheduled = row.scheduledAt;
+      if (input.scheduledAt !== undefined) {
+        if (!input.scheduledAt || input.scheduledAt === "") {
+          nextScheduled = null;
+        } else {
+          nextScheduled = new Date(`${input.scheduledAt}T00:00:00.000Z`);
+        }
+      }
+
+      // Use persisted appointment for step detection so a draft date cannot skip stages.
+      const display = dispositionDisplayState(row.state, row.assigneeUserId, row.scheduledAt);
+      const next = nextDispositionDisplayState(display);
+      if (!next) {
+        throw unprocessable(
+          "No further stage on this console. Completion is recorded in the inspection partner access.",
+          { field: "state" },
+        );
+      }
+
+      if (next === "zugewiesen" && !row.assigneeUserId) {
+        throw unprocessable("Assign a handler before advancing.", { field: "assigneeUserId" });
+      }
+      if (next === "terminiert" && !nextScheduled) {
+        throw unprocessable("Set an appointment before advancing.", { field: "scheduledAt" });
+      }
+
+      let nextState: ServiceRequestState = row.state;
+      if (next === "zugewiesen") {
+        if (row.state === "captured" || row.state === "queued" || row.state === "transmitted") {
+          nextState = "acknowledged";
+        }
+      } else if (next === "terminiert") {
+        nextState = "scheduled";
+      } else if (next === "in_arbeit") {
+        nextState = "in_progress";
+      }
+
+      const updated = await prisma.serviceRequest.update({
+        where: { id: row.id },
+        data: {
+          state: nextState,
+          scheduledAt: nextScheduled,
+        },
+        include: {
+          executorOrg: { select: { name: true, code: true } },
+          assigneeUser: { select: { name: true } },
+          tenant: { select: { id: true, name: true, code: true } },
+        },
+      });
+
+      if (nextState !== row.state) {
+        await prisma.statusEvent.create({
+          data: {
+            tenantId: row.tenantId,
+            serviceRequestId: row.id,
+            state: nextState,
+            source: "console",
+            actor: ctx.user.name,
+            note: `Disposition advance → ${next}`,
+          },
+        });
+      }
+
+      await recordAudit({
+        actor: actorFromPartnerOrg(ctx),
+        resource: "service_request",
+        resourceId: row.id,
+        action: "update",
+        summary: `Disposition advanced ${reference} to ${next}`,
+        before: {
+          state: row.state,
+          scheduledAt: isoDate(row.scheduledAt),
+          displayState: display,
+        },
+        after: {
+          state: updated.state,
+          scheduledAt: isoDate(updated.scheduledAt),
+          displayState: next,
+        },
+      });
+
+      const devices = await deviceLabelsForRequests([updated]);
+      return mapRow(
+        updated,
+        updated.tenant,
+        managed,
+        updated.subjectType === "instance" ? devices.get(updated.subjectId) : null,
+      );
+    });
+  },
+
   async assign(
     ctx: PartnerContext,
     reference: string,
@@ -538,7 +732,7 @@ export const dispositionService = {
       const row = await prisma.serviceRequest.findFirst({
         where: { reference },
         include: {
-          executorOrg: true,
+          executorOrg: { select: { name: true, code: true, organisationId: true } },
           assigneeUser: { select: { name: true } },
           tenant: { select: { id: true, name: true, code: true } },
         },
@@ -548,7 +742,9 @@ export const dispositionService = {
       const contract = await prisma.serviceContract.findFirst({
         where: { organisationId: ctx.organisationId, tenantId: row.tenantId },
       });
-      if (!contract || !isLiveContract(contract)) {
+      const managed = Boolean(contract && isLiveContract(contract));
+      const isExecutor = row.executorOrg?.organisationId === ctx.organisationId;
+      if (!managed && !isExecutor) {
         throw forbidden();
       }
 
@@ -635,7 +831,7 @@ export const dispositionService = {
           state: nextState,
         },
         include: {
-          executorOrg: { select: { name: true } },
+          executorOrg: { select: { name: true, code: true } },
           assigneeUser: { select: { name: true } },
           tenant: { select: { id: true, name: true, code: true } },
         },
@@ -674,7 +870,13 @@ export const dispositionService = {
         },
       });
 
-      return mapRow(updated, updated.tenant, true);
+      const devices = await deviceLabelsForRequests([updated]);
+      return mapRow(
+        updated,
+        updated.tenant,
+        managed,
+        updated.subjectType === "instance" ? devices.get(updated.subjectId) : null,
+      );
     });
   },
 

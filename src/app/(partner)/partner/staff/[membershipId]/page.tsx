@@ -1,4 +1,4 @@
-import { StaffDetailScreen } from "@/components/features/console/StaffDetailScreen";
+import { StaffDetailScreen } from "@/components/features/partner/staff/StaffDetailScreen";
 
 type Props = { params: Promise<{ membershipId: string }> };
 

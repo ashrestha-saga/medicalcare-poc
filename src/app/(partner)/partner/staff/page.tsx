@@ -1,5 +1,5 @@
-import { ConsoleStaffScreen } from "@/components/features/console/ConsoleStaffScreen";
+import { StaffScreen } from "@/components/features/partner/staff/StaffScreen";
 
 export default function PartnerStaffPage() {
-  return <ConsoleStaffScreen />;
+  return <StaffScreen />;
 }

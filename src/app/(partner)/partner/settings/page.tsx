@@ -1,6 +1,5 @@
-import { ConsoleSettingsScreen } from "@/components/features/console/ConsoleSettingsScreen";
+import { SettingsScreen } from "@/components/features/partner/settings/SettingsScreen";
 
-/** /partner/settings — organisation SMTP and related console settings. */
 export default function PartnerSettingsPage() {
-  return <ConsoleSettingsScreen />;
+  return <SettingsScreen />;
 }

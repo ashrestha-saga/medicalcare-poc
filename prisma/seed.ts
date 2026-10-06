@@ -11,6 +11,7 @@ import { dutyService } from "../src/services/registration/dutyService";
 import { seedHandoverInventory } from "./seeds/handoverInventory";
 import { seedPartnerOrgs } from "./seeds/partnerOrgs";
 import { seedRegistrationRef } from "./seeds/registrationRef";
+import { seedStaffSkillsRefs } from "./seeds/staffSkillsRefs";
 
 export const SEED = {
   tenantId: "demo-tenant",
@@ -482,6 +483,7 @@ export async function seed(prisma: PrismaClient) {
   const roleGrantsCreated = await seedRoleGrantsIfEmpty(prisma);
 
   const partners = await seedPartnerOrgs(prisma, tenant.id);
+  await seedStaffSkillsRefs(prisma);
 
   // Handover testdaten → existing Prisma models only; all under demo-tenant.
   const handover = await seedHandoverInventory(prisma, tenant.id);

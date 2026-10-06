@@ -1,6 +1,5 @@
-import { PartnerHomeScreen } from "@/components/features/partner/PartnerHomeScreen";
+import { PartnerHomeScreen } from "@/components/features/partner/home/PartnerHomeScreen";
 
-/** /partner/organisation — own organisation (people + roles). */
 export default function PartnerOrganisationPage() {
   return <PartnerHomeScreen />;
 }

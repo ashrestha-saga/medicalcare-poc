@@ -23,6 +23,30 @@ import nodemailer from "nodemailer";
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CLINIC_ROLES = new Set(["superadmin", "device_admin", "security_officer", "user"]);
 
+export type StaffInviteDraft = {
+  jobTitle?: string | null;
+  validFrom?: string | null;
+  dispatchOrigin?: "home" | "partner_site" | "organisation" | null;
+  originPostalCode?: string | null;
+  originCity?: string | null;
+  radiusKm?: number | null;
+  employerOrganisationId?: string | null;
+  skills?: Array<{
+    skillCode: string;
+    levelCode: string;
+    validUntil?: string | null;
+    evidenceRef?: string | null;
+  }>;
+};
+
+export type ExternalInviteMeta = {
+  commissionedFrom: string;
+  commissionedTo: string;
+  liabilityUntil: string;
+  liabilitySumEur?: number | null;
+  employerOrganisationId?: string | null;
+};
+
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
@@ -287,12 +311,8 @@ export const invitationService = {
       email: string;
       name?: string | null;
       appRole: "inspector" | "admin" | "order";
-      external?: {
-        commissionedFrom: string;
-        commissionedTo: string;
-        liabilityUntil: string;
-        liabilitySumEur?: number | null;
-      };
+      external?: ExternalInviteMeta;
+      staffDraft?: StaffInviteDraft | null;
     },
     req?: Request | null,
   ) {
@@ -307,6 +327,14 @@ export const invitationService = {
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) throw conflict("A user with this email already exists.");
 
+    const permissionsPayload: Record<string, unknown> = {};
+    if (input.external) {
+      permissionsPayload.__partnerExternal = input.external;
+    }
+    if (input.staffDraft) {
+      permissionsPayload.__staffDraft = input.staffDraft;
+    }
+
     const token = newToken();
     // Org-scoped invites have null tenantId — bypass SEC-01 stamp/filter.
     const row = await runWithoutTenantAsync(() =>
@@ -316,9 +344,10 @@ export const invitationService = {
           email,
           name: input.name?.trim() || null,
           appRole: input.appRole,
-          permissions: input.external
-            ? ({ __partnerExternal: input.external } as object)
-            : undefined,
+          permissions:
+            Object.keys(permissionsPayload).length > 0
+              ? (permissionsPayload as Prisma.InputJsonValue)
+              : undefined,
           tokenHash: hashToken(token),
           expiresAt: new Date(Date.now() + INVITE_TTL_MS),
           createdByUserId: ctx.user.id,
@@ -418,21 +447,21 @@ export const invitationService = {
       }
 
       if (invite.organisationId && invite.appRole) {
-        const externalMeta =
+        const permsObj =
           invite.permissions &&
           typeof invite.permissions === "object" &&
-          !Array.isArray(invite.permissions) &&
-          "__partnerExternal" in (invite.permissions as object)
-            ? (
-                invite.permissions as {
-                  __partnerExternal?: {
-                    commissionedFrom: string;
-                    commissionedTo: string;
-                    liabilityUntil: string;
-                    liabilitySumEur?: number | null;
-                  };
-                }
-              ).__partnerExternal
+          !Array.isArray(invite.permissions)
+            ? (invite.permissions as Record<string, unknown>)
+            : null;
+
+        const externalMeta =
+          permsObj && "__partnerExternal" in permsObj
+            ? (permsObj.__partnerExternal as ExternalInviteMeta)
+            : undefined;
+
+        const staffDraft =
+          permsObj && "__staffDraft" in permsObj
+            ? (permsObj.__staffDraft as StaffInviteDraft)
             : undefined;
 
         const user = await prisma.$transaction(async (tx) => {
@@ -444,14 +473,24 @@ export const invitationService = {
               role: null,
               passwordHash: hashPassword(password),
               active: true,
+              jobTitle: staffDraft?.jobTitle?.trim() || null,
             },
           });
+          const validFrom = staffDraft?.validFrom
+            ? new Date(`${staffDraft.validFrom}T00:00:00.000Z`)
+            : externalMeta
+              ? new Date(`${externalMeta.commissionedFrom}T00:00:00.000Z`)
+              : new Date();
           const membership = await tx.orgMembership.create({
             data: {
               userId: created.id,
               organisationId: invite.organisationId!,
               appRole: invite.appRole!,
-              validFrom: new Date(),
+              validFrom,
+              dispatchOrigin: staffDraft?.dispatchOrigin ?? "organisation",
+              originPostalCode: staffDraft?.originPostalCode?.trim() || null,
+              originCity: staffDraft?.originCity?.trim() || null,
+              radiusKm: staffDraft?.radiusKm ?? null,
               ...(externalMeta
                 ? {
                     isExternal: true,
@@ -459,29 +498,27 @@ export const invitationService = {
                     commissionedTo: new Date(`${externalMeta.commissionedTo}T00:00:00.000Z`),
                     liabilityUntil: new Date(`${externalMeta.liabilityUntil}T00:00:00.000Z`),
                     liabilitySumEur: externalMeta.liabilitySumEur ?? null,
+                    employerOrganisationId:
+                      externalMeta.employerOrganisationId?.trim() ||
+                      staffDraft?.employerOrganisationId?.trim() ||
+                      null,
                   }
                 : {}),
             },
           });
-          // Default: assign all live contracts for non-admin internal staff (fail-closed acting).
-          if (invite.appRole !== "admin" && !externalMeta) {
-            const now = new Date();
-            const contracts = await tx.serviceContract.findMany({
-              where: { organisationId: invite.organisationId! },
-            });
-            const live = contracts.filter(
-              (c) =>
-                !c.terminatedAt &&
-                !c.suspendedAt &&
-                c.validFrom.getTime() <= now.getTime() &&
-                (c.validTo == null || c.validTo.getTime() >= now.getTime()),
-            );
-            if (live.length > 0) {
-              await tx.partnerStaffAssignment.createMany({
-                data: live.map((c) => ({
-                  membershipId: membership.id,
-                  tenantId: c.tenantId,
-                })),
+          if (staffDraft?.skills && staffDraft.skills.length > 0) {
+            for (const s of staffDraft.skills) {
+              await tx.personSkill.create({
+                data: {
+                  userId: created.id,
+                  skillCode: s.skillCode,
+                  levelCode: s.levelCode,
+                  validUntil: s.validUntil
+                    ? new Date(`${s.validUntil}T00:00:00.000Z`)
+                    : null,
+                  evidenceRef: s.evidenceRef?.trim() || null,
+                  recordedBy: invite.createdByUserId ?? created.id,
+                },
               });
             }
           }
