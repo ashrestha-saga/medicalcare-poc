@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { TrainingFormOptionsDTO } from "@/interfaces";
 import { useRecordTrainingForm } from "@/components/hooks/training/useRecordTrainingForm";
 import { TrainingModelSearchSelect } from "@/components/features/training/TrainingModelSearchSelect";
@@ -18,6 +19,8 @@ export function RecordTrainingForm({
   onCancel: () => void;
   onCreated: (eventId: string) => void;
 }) {
+  const t = useTranslations("trainingDetail");
+  const tCommon = useTranslations("common");
   const {
     selectedType,
     subjectKind,
@@ -57,12 +60,12 @@ export function RecordTrainingForm({
         onClick={onCancel}
         data-testid="training-back-overview"
       >
-        ← To the overview
+        {t("backToOverview")}
       </button>
       <div className="mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">Record training</h2>
+        <h2 className="text-2xl font-semibold tracking-tight">{t("recordTitle")}</h2>
         <p className="mt-1.5 text-sm text-muted-foreground">
-          One session, any number of participants — and each gets their own record.
+          {t("recordLead")}
         </p>
       </div>
 
@@ -70,20 +73,20 @@ export function RecordTrainingForm({
         <Card className="border-border/80 bg-card/60">
           <CardHeader>
             <CardTitle className="text-base uppercase tracking-[0.08em] text-muted-foreground">
-              Session
+              {t("session")}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-train__form-body !pt-0">
             <label className="p-train__fld">
-              <span>Type of training</span>
+              <span>{t("typeOfTraining")}</span>
               <select
                 value={trainingTypeCode}
                 onChange={(e) => onTypeChange(e.target.value)}
                 data-testid="training-type"
               >
-                {form.types.map((t) => (
-                  <option key={t.code} value={t.code}>
-                    {t.label} — {t.legalBasis}
+                {form.types.map((type) => (
+                  <option key={type.code} value={type.code}>
+                    {type.label} {tCommon("dash")} {type.legalBasis}
                   </option>
                 ))}
               </select>
@@ -92,7 +95,7 @@ export function RecordTrainingForm({
 
             {subjectKind === "model" ? (
               <label className="p-train__fld">
-                <span>Device model</span>
+                <span>{t("deviceModel")}</span>
                 <TrainingModelSearchSelect
                   models={form.models}
                   value={subjectModelId}
@@ -101,7 +104,7 @@ export function RecordTrainingForm({
               </label>
             ) : (
               <label className="p-train__fld">
-                <span>Activity</span>
+                <span>{t("activity")}</span>
                 <select
                   value={subjectActivity}
                   onChange={(e) => setSubjectActivity(e.target.value)}
@@ -118,7 +121,7 @@ export function RecordTrainingForm({
 
             <div className="p-train__fld-row">
               <label className="p-train__fld">
-                <span>Date</span>
+                <span>{t("date")}</span>
                 <Input
                   type="date"
                   value={heldOn}
@@ -127,7 +130,7 @@ export function RecordTrainingForm({
                 />
               </label>
               <label className="p-train__fld">
-                <span>Location</span>
+                <span>{t("location")}</span>
                 <Input
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
@@ -138,7 +141,7 @@ export function RecordTrainingForm({
 
             <div className="p-train__fld-row">
               <label className="p-train__fld">
-                <span>Instructor</span>
+                <span>{t("instructor")}</span>
                 <Input
                   value={instructorName}
                   onChange={(e) => setInstructorName(e.target.value)}
@@ -146,7 +149,7 @@ export function RecordTrainingForm({
                 />
               </label>
               <label className="p-train__fld">
-                <span>Instructor qualification</span>
+                <span>{t("instructorQualification")}</span>
                 <Input
                   value={instructorQualification}
                   onChange={(e) => setInstructorQualification(e.target.value)}
@@ -162,19 +165,18 @@ export function RecordTrainingForm({
                 onChange={(e) => setInstructorExternal(e.target.checked)}
                 data-testid="training-instructor-external"
               />
-              <span>External instructor</span>
+              <span>{t("externalInstructor")}</span>
             </label>
 
             <label className="p-train__fld">
-              <span>Basis of the training</span>
+              <span>{t("basisOfTraining")}</span>
               <Input
                 value={basisDocument}
                 onChange={(e) => setBasisDocument(e.target.value)}
                 data-testid="training-basis"
               />
               <em className="p-train__fld-hint">
-                For instruction under § 11 this is the instructions for use. Without a named basis it
-                is not clear what was trained on.
+                {t("basisHint")}
               </em>
             </label>
           </CardContent>
@@ -183,11 +185,11 @@ export function RecordTrainingForm({
         <Card className="border-border/80 bg-card/60">
           <CardHeader>
             <CardTitle className="text-base uppercase tracking-[0.08em] text-muted-foreground">
-              Participants
+              {t("participants")}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-train__form-body !pt-0">
-            <div className="p-train__mode-pick" role="group" aria-label="Session mode">
+            <div className="p-train__mode-pick" role="group" aria-label={t("sessionModeAria")}>
               <button
                 type="button"
                 className={cn("p-train__mode-btn", mode === "individual" && "is-on")}
@@ -197,8 +199,8 @@ export function RecordTrainingForm({
               >
                 <span className="p-train__mode-dot" aria-hidden />
                 <span>
-                  <b>Individual training</b>
-                  <em>One person, one record.</em>
+                  <b>{t("individualTraining")}</b>
+                  <em>{t("individualTrainingHint")}</em>
                 </span>
               </button>
               <button
@@ -210,8 +212,8 @@ export function RecordTrainingForm({
               >
                 <span className="p-train__mode-dot" aria-hidden />
                 <span>
-                  <b>Group training</b>
-                  <em>One session, one record per participant.</em>
+                  <b>{t("groupTraining")}</b>
+                  <em>{t("groupTrainingHint")}</em>
                 </span>
               </button>
             </div>
@@ -249,7 +251,7 @@ export function RecordTrainingForm({
 
             <div className="p-train__form-actions">
               <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={saving}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button
                 type="button"
@@ -258,7 +260,7 @@ export function RecordTrainingForm({
                 disabled={saving}
                 data-testid="training-save"
               >
-                {saving ? "Saving…" : "Create records"}
+                {saving ? t("saving") : t("createRecords")}
               </Button>
             </div>
           </CardContent>

@@ -15,12 +15,6 @@ import { cn } from "@/lib/utils";
 import { RecordTrainingForm } from "./RecordTrainingForm";
 import { TrainingEventsTable } from "./training-table";
 
-const MATRIX_LABEL: Record<string, string> = {
-  instructed: "instructed",
-  equivalent_series: "identical model",
-  open: "open",
-};
-
 function SummaryTile({
   label,
   value,
@@ -61,7 +55,9 @@ function EventDetail({
   event: TrainingEventDTO;
   onBack: () => void;
 }) {
-  const modeLabel = event.mode === "group" ? "group session" : "individual session";
+  const t = useTranslations("trainingDetail");
+  const tCommon = useTranslations("common");
+  const modeLabel = event.mode === "group" ? t("modeGroup") : t("modeIndividual");
   return (
     <div className="px-4 pb-6 pt-4 sm:px-[18px]" data-testid="training-event-detail">
       <button
@@ -70,7 +66,7 @@ function EventDetail({
         onClick={onBack}
         data-testid="training-back-overview"
       >
-        ← To the overview
+        {t("backToOverview")}
       </button>
       <div className="mb-4">
         <h2 className="text-2xl font-semibold tracking-tight">{eventTitle(event)}</h2>
@@ -83,15 +79,15 @@ function EventDetail({
         <Card className="border-border/80 bg-card/60" data-testid="training-records-card">
           <CardHeader>
             <CardTitle className="text-base uppercase tracking-[0.08em] text-muted-foreground">
-              Individual records
+              {t("individualRecords")}
             </CardTitle>
             <CardDescription>
-              {event.recordCount} record{event.recordCount === 1 ? "" : "s"} from a {modeLabel}.
+              {t("recordsFromSession", { count: event.recordCount, mode: modeLabel })}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {event.records.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No individual records on this event.</p>
+              <p className="text-sm text-muted-foreground">{t("noIndividualRecords")}</p>
             ) : (
               <ul className="p-train__people">
                 {event.records.map((r) => (
@@ -100,7 +96,7 @@ function EventDetail({
                       <b>{r.personName}</b>
                       {r.personJobTitle ? <span>{r.personJobTitle}</span> : null}
                     </div>
-                    <span className="p-train__tag is-instructed">confirmed</span>
+                    <span className="p-train__tag is-instructed">{t("confirmed")}</span>
                   </li>
                 ))}
               </ul>
@@ -111,30 +107,30 @@ function EventDetail({
         <Card className="border-border/80 bg-card/60" data-testid="training-context-card">
           <CardHeader>
             <CardTitle className="text-base uppercase tracking-[0.08em] text-muted-foreground">
-              Context
+              {t("context")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="p-train__context !p-0">
               <dl className="p-train__meta-grid">
                 <div>
-                  <dt>Instructor</dt>
+                  <dt>{t("instructor")}</dt>
                   <dd>{event.instructorName}</dd>
                 </div>
                 <div>
-                  <dt>Qualification</dt>
+                  <dt>{t("qualification")}</dt>
                   <dd>{event.instructorQualification}</dd>
                 </div>
                 <div>
-                  <dt>Basis</dt>
+                  <dt>{t("basis")}</dt>
                   <dd>{event.basisDocument}</dd>
                 </div>
                 <div>
-                  <dt>Location</dt>
-                  <dd>{event.location || "—"}</dd>
+                  <dt>{t("location")}</dt>
+                  <dd>{event.location || tCommon("dash")}</dd>
                 </div>
                 <div>
-                  <dt>Status</dt>
+                  <dt>{t("status")}</dt>
                   <dd>{event.statusLabel}</dd>
                 </div>
               </dl>
@@ -149,9 +145,20 @@ function EventDetail({
   );
 }
 
+function matrixStatusLabel(
+  status: string,
+  t: (key: "matrixInstructed" | "matrixEquivalent" | "matrixOpen") => string,
+): string {
+  if (status === "instructed") return t("matrixInstructed");
+  if (status === "equivalent_series") return t("matrixEquivalent");
+  if (status === "open") return t("matrixOpen");
+  return status;
+}
+
 export function TrainingScreen() {
   const t = useTranslations("pages.training");
   const tCards = useTranslations("trainingCards");
+  const tDetail = useTranslations("trainingDetail");
   const {
     data,
     error,
@@ -201,10 +208,10 @@ export function TrainingScreen() {
           {!loading && data && view === "detail" && !selectedEvent ? (
             <div className="p-train__alert">
               <Alert>
-                <AlertDescription>Event not found.</AlertDescription>
+                <AlertDescription>{tDetail("eventNotFound")}</AlertDescription>
               </Alert>
               <button type="button" className="p-train__back" onClick={goOverview}>
-                ← To the overview
+                {tDetail("backToOverview")}
               </button>
             </div>
           ) : null}
@@ -274,12 +281,9 @@ export function TrainingScreen() {
                 >
                   <p>
                     <span className="font-medium text-foreground">
-                      Instruction and briefing are not the same thing.{" "}
+                      {tDetail("overviewNoteTitle")}{" "}
                     </span>
-                    Einweisung (§ 4 Abs. 3 / § 11) applies to a person on a device type and has no
-                    statutory expiry — though it effectively lapses when an update changes handling
-                    more than slightly. Unterweisung (§ 63 StrlSchV) is activity-based and recurring.
-                    A shared due-date field for both would mislead.
+                    {tDetail("overviewNoteBody")}
                   </p>
                 </aside>
               </div>
@@ -295,12 +299,12 @@ export function TrainingScreen() {
                   onClick={goOverview}
                   data-testid="training-back-overview"
                 >
-                  ← To the overview
+                  {tDetail("backToOverview")}
                 </button>
               </div>
               <ListPageShell
-                title="Matrix person × device model"
-                description="Who may use which device? The matrix shows only models with units held in the inventory."
+                title={tDetail("matrixTitle")}
+                description={tDetail("matrixDescription")}
                 className="!pt-2"
               >
               <div className="space-y-4">
@@ -310,14 +314,14 @@ export function TrainingScreen() {
                 >
                   {matrixPeople.length === 0 || matrixModels.length === 0 ? (
                     <p className="p-train__empty">
-                      Matrix needs staff and released inventory models.
+                      {tDetail("matrixEmpty")}
                     </p>
                   ) : (
                     <div className="p-train__table-wrap">
                       <table className="p-train__matrix-table">
                         <thead>
                           <tr>
-                            <th>Person</th>
+                            <th>{tDetail("matrixPersonCol")}</th>
                             {matrixModels.map((m) => (
                               <th key={m.id}>{m.name}</th>
                             ))}
@@ -337,7 +341,7 @@ export function TrainingScreen() {
                                 return (
                                   <td key={m.id}>
                                     <span className={cn("p-train__tag", `is-${status}`)}>
-                                      {MATRIX_LABEL[status] ?? status}
+                                      {matrixStatusLabel(status, tDetail)}
                                     </span>
                                   </td>
                                 );
@@ -352,11 +356,9 @@ export function TrainingScreen() {
                 <aside className="rounded-md border border-border border-l-4 border-l-primary bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
                   <p>
                     <span className="font-medium text-foreground">
-                      Identical model means instructed.{" "}
+                      {tDetail("matrixNoteTitle")}{" "}
                     </span>
-                    If a person is already instructed on a model in the same product series, they do
-                    not need a second session — the matrix shows that separately so the original
-                    instruction stays traceable.
+                    {tDetail("matrixNoteBody")}
                   </p>
                 </aside>
               </div>

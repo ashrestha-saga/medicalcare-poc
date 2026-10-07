@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { cartTotal, formatMoney, itemCount } from "@/lib/cart";
 import { useRequestStore } from "@/store/requestStore";
 import { useScanStore } from "@/store/scanStore";
@@ -15,6 +16,8 @@ import { QtyStepper } from "./QtyStepper";
  * Section 37 — spare-parts flow. Parts come from the OXID category search.
  */
 export function PartsScreen() {
+  const t = useTranslations("parts");
+  const tCommon = useTranslations("common");
   const resolution = useScanStore((s) => s.resolution);
   const captured = useScanStore((s) => s.captured);
   const backToDevice = useScanStore((s) => s.backToDevice);
@@ -33,6 +36,7 @@ export function PartsScreen() {
 
   const total = useMemo(() => cartTotal(cart), [cart]);
   const cartCount = itemCount(cart);
+  const sourceLabel = source === "oxid-mock" ? t("sourceOxidMock") : source;
 
   return (
     <div data-testid="parts-screen">
@@ -40,7 +44,7 @@ export function PartsScreen() {
         resolution={resolution}
         captured={captured}
         actions={
-          <button type="button" className="p-close" onClick={backToDevice} aria-label="Back">
+          <button type="button" className="p-close" onClick={backToDevice} aria-label={t("backAria")}>
             ×
           </button>
         }
@@ -48,11 +52,12 @@ export function PartsScreen() {
 
       <div className="p-sec">
         <p className="p-sec-title">
-          Spare parts {source ? `· ${source === "oxid-mock" ? "OXID (mock)" : source}` : ""}
+          {t("sectionTitle")}
+          {sourceLabel ? ` · ${sourceLabel}` : ""}
         </p>
         <div className="p-field">
           <input
-            placeholder="Search parts or categories…"
+            placeholder={t("searchPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             data-testid="parts-search"
@@ -64,7 +69,7 @@ export function PartsScreen() {
           </div>
         ) : parts.length === 0 ? (
           <p style={{ textAlign: "center", fontSize: 12.5, color: "var(--on-dark-soft)", padding: 16 }}>
-            No parts found.
+            {t("noPartsFound")}
           </p>
         ) : (
           <div>
@@ -89,7 +94,7 @@ export function PartsScreen() {
                       onClick={() => addPart(p)}
                       data-testid={`add-${p.articleNumber}`}
                     >
-                      Add
+                      {t("add")}
                     </button>
                   )}
                 </div>
@@ -101,9 +106,7 @@ export function PartsScreen() {
 
       {cart.length > 0 && (
         <div className="p-sec" data-testid="cart">
-          <p className="p-sec-title">
-            Order request · {cartCount} item{cartCount === 1 ? "" : "s"}
-          </p>
+          <p className="p-sec-title">{t("orderRequestTitle", { count: cartCount })}</p>
           {cart.map((c) => (
             <div key={c.part.id} className="p-part">
               <div>
@@ -112,17 +115,21 @@ export function PartsScreen() {
                 </b>
               </div>
               <span className="t-mono" style={{ fontSize: 11, color: "var(--on-dark-soft)" }}>
-                {c.part.unitPrice !== null ? formatMoney(c.part.unitPrice * c.quantity, c.part.currency) : "—"}
+                {c.part.unitPrice !== null
+                  ? formatMoney(c.part.unitPrice * c.quantity, c.part.currency)
+                  : tCommon("dash")}
               </span>
             </div>
           ))}
           <div className="p-sum">
-            <span>Estimated total</span>
-            <b data-testid="cart-total">{total ? formatMoney(total.amount, total.currency) : "on request"}</b>
+            <span>{t("estimatedTotal")}</span>
+            <b data-testid="cart-total">
+              {total ? formatMoney(total.amount, total.currency) : t("onRequest")}
+            </b>
           </div>
           <div className="p-field">
             <label htmlFor="order-delivery">
-              Delivery address <span className="p-req" aria-hidden="true">*</span>
+              {t("deliveryAddress")} <span className="p-req" aria-hidden="true">*</span>
             </label>
             <textarea
               id="order-delivery"
@@ -132,12 +139,13 @@ export function PartsScreen() {
             />
           </div>
           <div className="p-field">
-            <label htmlFor="order-note">Note</label>
+            <label htmlFor="order-note">{t("note")}</label>
             <input id="order-note" value={orderNote} onChange={(e) => setOrderNote(e.target.value)} />
           </div>
           <p className="p-lead" data-s="manual" data-testid="approval-notice" style={{ margin: "0 0 14px" }}>
-            This creates an order <strong>request</strong>. It requires approval by an authorized buyer before any
-            order is placed.
+            {t.rich("approvalNotice", {
+              strong: (chunks) => <strong>{chunks}</strong>,
+            })}
           </p>
           <button
             type="button"
@@ -146,29 +154,27 @@ export function PartsScreen() {
             disabled={busy}
             data-testid="submit-order"
           >
-            {busy ? <Spinner /> : "Submit order request"}
+            {busy ? <Spinner /> : t("submitOrderRequest")}
           </button>
         </div>
       )}
 
       <Modal
         open={confirmOpen}
-        title="Submit order request?"
+        title={t("confirmTitle")}
         onClose={() => setConfirmOpen(false)}
         footer={
           <>
             <button type="button" className="p-cta ghost" onClick={() => setConfirmOpen(false)}>
-              Cancel
+              {t("cancel")}
             </button>
             <button type="button" className="p-cta" onClick={() => void submit()} data-testid="confirm-order">
-              Submit for approval
+              {t("submitForApproval")}
             </button>
           </>
         }
       >
-        <p style={{ fontSize: 13 }}>
-          {count} item{count === 1 ? "" : "s"} will be requested for delivery to:
-        </p>
+        <p style={{ fontSize: 13 }}>{t("confirmBody", { count })}</p>
         <p
           style={{
             whiteSpace: "pre-line",
@@ -180,11 +186,9 @@ export function PartsScreen() {
             marginTop: 10,
           }}
         >
-          {deliveryAddress || "—"}
+          {deliveryAddress || tCommon("dash")}
         </p>
-        <p style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>
-          Nothing is ordered until an authorized buyer approves this request.
-        </p>
+        <p style={{ fontSize: 12.5, color: "var(--warn)", marginTop: 10 }}>{t("approvalWarn")}</p>
       </Modal>
     </div>
   );

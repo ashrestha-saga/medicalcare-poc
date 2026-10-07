@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useResolve } from "@/components/hooks/scan/useResolve";
 import { useScanStore } from "@/store/scanStore";
 import { CameraScanner } from "./CameraScanner";
@@ -7,6 +8,7 @@ import { KeypadIcon } from "./KeypadIcon";
 
 /** Persistent tablet camera chrome — open-corner ROI, sweep, manual entry (UX §§9–12). */
 export function CameraPane({ tabletHint = false }: { tabletHint?: boolean }) {
+  const t = useTranslations("scan");
   const startManualEntry = useScanStore((s) => s.startManualEntry);
   const reset = useScanStore((s) => s.reset);
   const phase = useScanStore((s) => s.phase);
@@ -38,14 +40,14 @@ export function CameraPane({ tabletHint = false }: { tabletHint?: boolean }) {
         }}
       >
         <KeypadIcon />
-        Enter number
+        {t("enterNumber")}
       </button>
       <div className="p-camhint">
         {phase === "manual-entry"
-          ? "Scanning paused — enter the number on the right"
+          ? t("scanningPaused")
           : tabletHint
-            ? "Camera stays active — continue on the right"
-            : "Hold the device label in the frame"}
+            ? t("cameraStaysActive")
+            : t("holdLabelInFrame")}
       </div>
     </div>
   );

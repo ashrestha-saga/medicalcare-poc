@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type {
   CatalogDetailProps,
   CatalogModelDetailDTO,
@@ -21,6 +21,7 @@ import {
   catalogSourceLabel,
 } from "@/components/hooks/catalog/catalogDisplay";
 import { catalogStateBadge } from "@/components/hooks/catalog/useCatalogColumns";
+import { intlLocale, type AppLocale } from "@/lib/locale";
 
 function isDetail(model: CatalogModelDetailDTO | CatalogModelListItemDTO): model is CatalogModelDetailDTO {
   return "spread" in model && "createdAt" in model;
@@ -35,9 +36,9 @@ function FieldBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-function formatWhen(iso: string): string {
+function formatWhen(iso: string, locale: AppLocale): string {
   try {
-    return new Date(iso).toLocaleString("de-DE", {
+    return new Date(iso).toLocaleString(intlLocale(locale), {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -50,18 +51,22 @@ function formatWhen(iso: string): string {
 }
 
 export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailProps) {
+  const t = useTranslations("catalogDetail");
+  const tCommon = useTranslations("common");
   const tClass = useTranslations("classificationOptions");
+  const locale = useLocale() as AppLocale;
   const detail = isDetail(model) ? model : null;
   const status = catalogStateBadge(model.state);
   const meta = [catalogShortId(model.id), model.manufacturer, `v${model.version}`].filter(Boolean).join(" · ");
   const options = catalogClassificationOptions(model.classification, tClass);
   const spread = detail?.spread ?? [];
+  const dash = tCommon("dash");
 
   return (
     <div className="px-4 pb-8 sm:px-[18px]" data-testid="catalog-detail">
       <section className="mb-4">
-        <p className="text-xs text-muted-foreground">Model</p>
-        <h2 className="text-2xl font-semibold tracking-tight">Classification, intervals, documents, distribution</h2>
+        <p className="text-xs text-muted-foreground">{t("eyebrowModel")}</p>
+        <h2 className="text-2xl font-semibold tracking-tight">{t("pageHeadline")}</h2>
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -78,35 +83,35 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
                 <Badge variant={status.variant}>{status.label}</Badge>
                 {canEdit && onEdit && (
                   <Button type="button" size="sm" className="h-8" onClick={onEdit} data-testid="catalog-edit-open">
-                    Edit
+                    {t("edit")}
                   </Button>
                 )}
                 <Button type="button" variant="outline" size="sm" className="h-8" onClick={onBack}>
-                  Back
+                  {t("back")}
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="grid gap-3 sm:grid-cols-2">
-              <FieldBox label="Basic UDI-DI" value={model.basicUdiDi ?? "—"} />
+              <FieldBox label={t("basicUdiDi")} value={model.basicUdiDi ?? dash} />
               <FieldBox
-                label="GTIN"
+                label={t("gtin")}
                 value={
                   [model.udiDi, ...model.gtins]
                     .map((v) => v?.trim())
                     .filter((v): v is string => Boolean(v))
                     .filter((v, i, arr) => arr.indexOf(v) === i)
-                    .join(", ") || "—"
+                    .join(", ") || dash
                 }
               />
-              <FieldBox label="GMDN / EMDN" value={catalogGmdnEmdn(model)} />
-              <FieldBox label="Manufacturer" value={model.manufacturer ?? "—"} />
-              <FieldBox label="Data source" value={catalogSourceLabel(model.source)} />
+              <FieldBox label={t("gmdnEmdn")} value={catalogGmdnEmdn(model, dash)} />
+              <FieldBox label={t("manufacturer")} value={model.manufacturer ?? dash} />
+              <FieldBox label={t("dataSource")} value={catalogSourceLabel(model.source, t)} />
               <FieldBox
-                label="Maintenance cycle"
+                label={t("maintenanceCycle")}
                 value={
                   model.maintenanceCycleMonths != null
-                    ? `${model.maintenanceCycleMonths} months`
-                    : "—"
+                    ? t("months", { count: model.maintenanceCycleMonths })
+                    : dash
                 }
               />
             </CardContent>
@@ -132,7 +137,9 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
               ))}
               {model.classification?.confidence ? (
                 <p className="text-xs text-muted-foreground">
-                  Confidence: <span className="uppercase">{model.classification.confidence}</span>
+                  {t("confidence", {
+                    value: String(model.classification.confidence).toUpperCase(),
+                  })}
                   {model.classification.source ? ` · ${model.classification.source}` : ""}
                 </p>
               ) : null}
@@ -157,13 +164,13 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle className="text-base">Compatible products</CardTitle>
-                <CardDescription>0 assignments</CardDescription>
+                <CardTitle className="text-base">{t("compatibleProducts")}</CardTitle>
+                <CardDescription>{t("zeroAssignments")}</CardDescription>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Compatible product assignments are not stored in DeviceModel yet.
+                {t("compatibleProductsEmpty")}
               </p>
             </CardContent>
           </Card>
@@ -172,15 +179,15 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
         <aside className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base lowercase">spread</CardTitle>
+              <CardTitle className="text-base lowercase">{t("spread")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {spread.length ? (
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead>Client</TableHead>
-                      <TableHead className="text-right">Copies</TableHead>
+                      <TableHead>{t("client")}</TableHead>
+                      <TableHead className="text-right">{t("copies")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -196,41 +203,41 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
                   </TableBody>
                 </Table>
               ) : (
-                <p className="px-6 pb-6 text-sm text-muted-foreground">No inventory copies at clinic sites yet.</p>
+                <p className="px-6 pb-6 text-sm text-muted-foreground">{t("noInventoryCopies")}</p>
               )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Documents</CardTitle>
-              <CardDescription>0 central</CardDescription>
+              <CardTitle className="text-base">{t("documents")}</CardTitle>
+              <CardDescription>{t("zeroCentral")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Central documents are not linked on DeviceModel yet.</p>
+              <p className="text-sm text-muted-foreground">{t("documentsEmpty")}</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Versions</CardTitle>
+              <CardTitle className="text-base">{t("versions")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="rounded-md border border-border px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">v{model.version}</p>
-                  <Badge variant="success">ACTIVE</Badge>
+                  <Badge variant="success">{t("activeBadge")}</Badge>
                 </div>
                 {detail && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Updated {formatWhen(detail.updatedAt)}
+                    {t("updatedAt", { when: formatWhen(detail.updatedAt, locale) })}
                     <br />
-                    Created {formatWhen(detail.createdAt)}
+                    {t("createdAt", { when: formatWhen(detail.createdAt, locale) })}
                   </p>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Version history beyond the current integer is not stored; each save increments DeviceModel.version.
+                {t("versionHistoryNote")}
               </p>
             </CardContent>
           </Card>

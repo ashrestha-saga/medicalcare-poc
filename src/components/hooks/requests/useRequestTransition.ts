@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { ServiceRequestDTO } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { toast } from "@/store/toastStore";
@@ -13,6 +14,7 @@ export function useRequestTransition(
   request: ServiceRequestDTO,
   onUpdated: (next: ServiceRequestDTO) => void,
 ) {
+  const t = useTranslations("requestsDetail");
   const [busy, setBusy] = useState(false);
   const [executorOrgId, setExecutorOrgId] = useState(request.executorOrgId ?? "");
 
@@ -36,15 +38,15 @@ export function useRequestTransition(
           },
         );
         onUpdated(res.request);
-        toast.success("Executor allocated.");
+        toast.success(t("toastAllocated"));
       } catch (e) {
         setExecutorOrgId(request.executorOrgId ?? "");
-        toast.error(e instanceof ApiError ? e.message : "Could not allocate.");
+        toast.error(e instanceof ApiError ? e.message : t("toastAllocateFailed"));
       } finally {
         setBusy(false);
       }
     },
-    [onUpdated, request.executorOrgId, request.reference],
+    [onUpdated, request.executorOrgId, request.reference, t],
   );
 
   const onExecutorChange = useCallback(
@@ -65,13 +67,13 @@ export function useRequestTransition(
         { method: "POST", body: JSON.stringify({}) },
       );
       onUpdated(res.request);
-      toast.success("Assignment transmitted.");
+      toast.success(t("toastTransmitted"));
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Could not transmit.");
+      toast.error(e instanceof ApiError ? e.message : t("toastTransmitFailed"));
     } finally {
       setBusy(false);
     }
-  }, [onUpdated, request.reference]);
+  }, [onUpdated, request.reference, t]);
 
   return {
     busy,

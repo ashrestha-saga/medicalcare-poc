@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ExternalLink, Loader2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import type { SiteDTO } from "@/interfaces";
 import type { useDeviceEditor } from "@/components/hooks/devices/useDeviceEditor";
 import { UserSelect } from "@/components/features/shared/UserSelect";
@@ -16,42 +17,48 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatDate, formatDateTime } from "@/lib/format";
+import type { AppLocale } from "@/lib/locale";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 
 type EditorApi = ReturnType<typeof useDeviceEditor>;
+type IssuesT = ReturnType<typeof useTranslations<"clarificationsIssues">>;
 
 interface DeviceEditFormProps {
   form: EditorApi;
   sites: SiteDTO[];
 }
 
-function formatWhen(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
+function stateLabel(state: string, t: IssuesT): string {
+  switch (state) {
+    case "draft":
+      return t("stateDraft");
+    case "review":
+      return t("stateReview");
+    case "released":
+      return t("stateReleased");
+    case "retired":
+      return t("stateRetired");
+    default:
+      return state;
   }
 }
 
-function classificationSummary(form: EditorApi): string {
+function classificationSummary(form: EditorApi, t: IssuesT): string {
   const c = form.detail?.modelClassification;
-  if (!c) return "No model classification on file.";
+  if (!c) return t("noModelClassification");
   const parts = [
-    c.softwareClass ? `SW ${c.softwareClass}` : null,
-    c.annex1 ? "Annex 1" : null,
-    c.annex2 ? "Annex 2" : null,
-    c.radiation ? "Radiation" : null,
+    c.softwareClass ? t("classSw", { class: c.softwareClass }) : null,
+    c.annex1 ? t("classAnnex1") : null,
+    c.annex2 ? t("classAnnex2") : null,
+    c.radiation ? t("classRadiation") : null,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : "—";
 }
 
 export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
+  const t = useTranslations("clarificationsIssues");
+  const locale = useLocale() as AppLocale;
   const { checkPermission } = usePermissions();
   const canViewCatalog = checkPermission("catalog:view");
   const modelHref =
@@ -64,15 +71,17 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
     })),
   );
 
-  const title = form.detail?.tradeName ?? form.detail?.modelName ?? form.detail?.inventoryNumber ?? "Device";
+  const title =
+    form.detail?.tradeName ??
+    form.detail?.modelName ??
+    form.detail?.inventoryNumber ??
+    t("deviceFallback");
   const identityLocked = form.state === "released" || form.state === "retired";
   const meta = [
     form.detail?.inventoryNumber,
-    form.state,
+    form.state ? stateLabel(form.state, t) : null,
     form.detail?.modelSource,
-    form.detail?.commissionedAt
-      ? new Date(form.detail.commissionedAt).toLocaleDateString("de-DE")
-      : null,
+    form.detail?.commissionedAt ? formatDate(form.detail.commissionedAt, locale) : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -88,14 +97,13 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
           onClick={form.close}
           data-testid="device-edit-back"
         >
-          ← To the inventory list
+          {t("backToInventory")}
         </Button>
         <h2 data-testid="device-edit-title">{title}</h2>
-        <p className="p-requests__sub">{meta || "Edit device record"}</p>
+        <p className="p-requests__sub">{meta || t("editDeviceRecord")}</p>
         {identityLocked && (
           <p className="mt-2 text-sm text-muted-foreground" data-testid="device-identity-locked">
-            Released — identity is immutable. Responsible person, site, and maintenance
-            can still be updated.
+            {t("identityLocked")}
           </p>
         )}
       </section>
@@ -103,7 +111,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
       {form.loading || !form.detail ? (
         <div className="flex items-center gap-2 px-1 py-10 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Loading device…
+          {t("loadingDevice")}
         </div>
       ) : (
         <form
@@ -115,12 +123,12 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
         >
           <div className="space-y-4 rounded-xl border border-border bg-card/40 p-4 sm:p-5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Mandatory information
+              {t("mandatoryInformation")}
             </p>
 
             <div className="grid gap-2">
               <Label htmlFor="device-designation" required>
-                Designation
+                {t("designation")}
               </Label>
               <Input
                 id="device-designation"
@@ -134,7 +142,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="device-type" required>
-                  Type / model
+                  {t("typeModel")}
                 </Label>
                 <Input
                   id="device-type"
@@ -146,7 +154,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="device-manufacturer" required>
-                  Manufacturer
+                  {t("manufacturer")}
                 </Label>
                 <Input
                   id="device-manufacturer"
@@ -160,7 +168,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="device-serial">Serial number</Label>
+                <Label htmlFor="device-serial">{t("serialNumber")}</Label>
                 <Input
                   id="device-serial"
                   value={form.serialNumber}
@@ -173,7 +181,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                 )}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="device-udi">UDI-DI</Label>
+                <Label htmlFor="device-udi">{t("udiDi")}</Label>
                 <Input
                   id="device-udi"
                   value={form.udiDi}
@@ -186,14 +194,12 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                 )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              One of the two identifiers is sufficient, but not neither.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("identifierHint")}</p>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="device-year" required>
-                  Year of purchase
+                  {t("yearOfPurchase")}
                 </Label>
                 <Input
                   id="device-year"
@@ -209,8 +215,8 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                 value={form.responsibleUserId}
                 onChange={form.setResponsibleUserId}
                 roles={["device_admin"]}
-                label="Responsible person"
-                placeholder="Select device administrator"
+                label={t("responsiblePerson")}
+                placeholder={t("selectDeviceAdmin")}
                 disabled={form.busy}
                 data-testid="device-responsible"
               />
@@ -218,14 +224,14 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label required>Location / area</Label>
+                <Label required>{t("locationArea")}</Label>
                 <Select
                   value={form.areaId || undefined}
                   onValueChange={form.setAreaId}
                   disabled={form.busy}
                 >
                   <SelectTrigger data-testid="device-area">
-                    <SelectValue placeholder="Select area" />
+                    <SelectValue placeholder={t("selectArea")} />
                   </SelectTrigger>
                   <SelectContent>
                     {areaOptions.map((a) => (
@@ -238,7 +244,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="device-inv" required>
-                  Inventory number
+                  {t("inventoryNumber")}
                 </Label>
                 <Input
                   id="device-inv"
@@ -251,7 +257,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="device-room">Space / room</Label>
+              <Label htmlFor="device-room">{t("spaceRoom")}</Label>
               <Input
                 id="device-room"
                 value={form.room}
@@ -263,30 +269,28 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label>State</Label>
+                <Label>{t("state")}</Label>
                 <Select
                   value={form.state}
                   onValueChange={(v) => form.setState(v as typeof form.state)}
                   disabled={form.busy}
                 >
                   <SelectTrigger data-testid="device-state">
-                    <SelectValue placeholder="Select state" />
+                    <SelectValue placeholder={t("selectState")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="review">Review</SelectItem>
-                    <SelectItem value="released">Released</SelectItem>
-                    <SelectItem value="retired">Retired</SelectItem>
+                    <SelectItem value="draft">{t("stateDraft")}</SelectItem>
+                    <SelectItem value="review">{t("stateReview")}</SelectItem>
+                    <SelectItem value="released">{t("stateReleased")}</SelectItem>
+                    <SelectItem value="retired">{t("stateRetired")}</SelectItem>
                   </SelectContent>
                 </Select>
                 {form.state !== "released" && form.state !== "retired" ? (
-                  <p className="text-xs text-muted-foreground">
-                    Not yet released — complete registration or set Released here.
-                  </p>
+                  <p className="text-xs text-muted-foreground">{t("notYetReleasedHint")}</p>
                 ) : null}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="device-cycle">Maintenance cycle (months)</Label>
+                <Label htmlFor="device-cycle">{t("maintenanceCycleMonths")}</Label>
                 <Input
                   id="device-cycle"
                   type="number"
@@ -295,18 +299,18 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                   value={form.maintenanceCycleMonths}
                   onChange={(e) => form.setMaintenanceCycleMonths(e.target.value)}
                   disabled={form.busy}
-                  placeholder="e.g. 12"
+                  placeholder={t("cyclePlaceholder")}
                   data-testid="device-maintenance-cycle"
                 />
               </div>
             </div>
 
             <div className="grid gap-2">
-              <Label>Next due</Label>
+              <Label>{t("nextDue")}</Label>
               <Input
                 value={
                   form.detail.nextMaintenanceDueAt
-                    ? new Date(form.detail.nextMaintenanceDueAt).toLocaleDateString("de-DE")
+                    ? formatDate(form.detail.nextMaintenanceDueAt, locale)
                     : "—"
                 }
                 readOnly
@@ -318,7 +322,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
             <div className="flex flex-wrap gap-2 pt-2">
               <Button type="submit" disabled={form.busy} data-testid="device-save">
                 {form.busy && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save
+                {t("save")}
               </Button>
               <Button
                 type="button"
@@ -330,10 +334,10 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                 data-testid="device-mark-maintenance-done"
               >
                 {form.completingMaintenance && <Loader2 className="h-4 w-4 animate-spin" />}
-                Mark maintenance done
+                {t("markMaintenanceDone")}
               </Button>
               <Button type="button" variant="outline" disabled={form.busy} onClick={form.close}>
-                Cancel
+                {t("cancel")}
               </Button>
             </div>
           </div>
@@ -344,7 +348,7 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
               data-testid="device-model-classification"
             >
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Classification — from the model
+                {t("classificationFromModel")}
               </p>
               <div className="mt-3 space-y-2">
                 {form.detail.modelClassification?.confidence && (
@@ -352,19 +356,19 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                     {form.detail.modelClassification.confidence}
                   </Badge>
                 )}
-                <p className="text-sm text-foreground">{classificationSummary(form)}</p>
+                <p className="text-sm text-foreground">{classificationSummary(form, t)}</p>
                 <p className="text-xs text-muted-foreground">
                   {form.detail.modelClassification
-                    ? `Applies to all ${form.detail.modelClassification.instanceCount} copies of this model.`
-                    : "Link a device model to inherit classification."}
+                    ? t("appliesToCopies", {
+                        count: form.detail.modelClassification.instanceCount,
+                      })
+                    : t("linkModelForClassification")}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Not editable here — edit classification in the catalog.
-                </p>
+                <p className="text-xs text-muted-foreground">{t("notEditableHere")}</p>
                 {modelHref && (
                   <Button asChild type="button" variant="outline" size="sm" className="mt-1 h-8 w-full">
                     <Link href={modelHref} data-testid="device-edit-open-catalog-model">
-                      Open model in catalog
+                      {t("openModelInCatalog")}
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Link>
                   </Button>
@@ -374,14 +378,14 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
 
             <div className="rounded-xl border border-border bg-card/40 p-4" data-testid="device-course">
               <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                Course
+                {t("course")}
               </p>
               <ul className="mt-3 space-y-3">
                 {form.detail.course.map((event) => (
                   <li key={`${event.label}-${event.at}`} className="border-l-2 border-border pl-3">
                     <p className="text-sm text-foreground">{event.label}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatWhen(event.at)}
+                      {formatDateTime(event.at, locale)}
                       {event.actor ? ` · ${event.actor}` : ""}
                       {event.actorKind ? ` · ${event.actorKind}` : ""}
                       {event.organisationName ? ` · ${event.organisationName}` : ""}

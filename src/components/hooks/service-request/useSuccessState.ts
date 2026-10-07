@@ -1,44 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { DispatchRecordDTO, InventarizeOffer, ServiceRequestDTO } from "@/interfaces";
-import { SERVICE_REQUEST_STATE_LABELS } from "@/constants/serviceRequest";
 import { api } from "@/lib/http/apiClient";
 import { useOfflineQueueStore } from "@/store/offlineQueueStore";
 import { useScanStore } from "@/store/scanStore";
-
-export function channelLabel(target: string): string {
-  const type = target.split(":")[0] ?? target;
-  switch (type) {
-    case "mail":
-      return "Email";
-    case "oxid":
-      return "OXID API";
-    case "webhook":
-      return "Webhook";
-    default:
-      return target;
-  }
-}
-
-export function dispatchHeadline(records: DispatchRecordDTO[]): string {
-  if (records.length === 0) return "Service request saved";
-  const ok = records.filter((r) => r.success).length;
-  const fail = records.length - ok;
-  if (fail === 0) return "Service request transmitted";
-  if (ok === 0) return "Service request saved — dispatch failed";
-  return "Service request saved — partially transmitted";
-}
-
-export function serviceRequestStateLabel(state: string): string {
-  return SERVICE_REQUEST_STATE_LABELS[state] ?? state;
-}
 
 /**
  * Success / queued screen: offline sync, poll detail, dispatch summary.
  * Catalog/BEUDAMED hits offer inventarize before the dispatch summary.
  */
 export function useSuccessState() {
+  const t = useTranslations("scan");
+  const tStatus = useTranslations("status");
   const success = useScanStore((s) => s.success);
   const phase = useScanStore((s) => s.phase);
   const reset = useScanStore((s) => s.reset);
@@ -72,10 +47,10 @@ export function useSuccessState() {
         .then((d) => alive && setDetail(d))
         .catch(() => undefined);
     void load();
-    const t = setInterval(load, 5000);
+    const timer = setInterval(load, 5000);
     return () => {
       alive = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, [phase, success]);
 
@@ -97,13 +72,60 @@ export function useSuccessState() {
     setInventarizeDone(true);
   }, []);
 
+  const channelLabel = useCallback(
+    (target: string): string => {
+      const type = target.split(":")[0] ?? target;
+      switch (type) {
+        case "mail":
+          return t("channelEmail");
+        case "oxid":
+          return t("channelOxid");
+        case "webhook":
+          return t("channelWebhook");
+        default:
+          return target;
+      }
+    },
+    [t],
+  );
+
+  const dispatchHeadline = useCallback(
+    (recs: DispatchRecordDTO[]): string => {
+      if (recs.length === 0) return t("successSaved");
+      const ok = recs.filter((r) => r.success).length;
+      const fail = recs.length - ok;
+      if (fail === 0) return t("successTransmitted");
+      if (ok === 0) return t("successDispatchFailed");
+      return t("successPartial");
+    },
+    [t],
+  );
+
+  const stateLabel = useCallback(
+    (state: string): string => {
+      const known = [
+        "captured",
+        "queued",
+        "transmitted",
+        "acknowledged",
+        "in_progress",
+        "completed",
+        "rejected",
+      ] as const;
+      return (known as readonly string[]).includes(state)
+        ? tStatus(state as (typeof known)[number])
+        : state;
+    },
+    [tStatus],
+  );
+
   const title = !success
     ? ""
     : isQueued
-      ? "Saved locally"
+      ? t("successQueuedTitle")
       : isService
         ? dispatchHeadline(records)
-        : "Order request transmitted";
+        : t("successOrderTitle");
 
   const checkTone =
     isQueued || (dispatchSummary && dispatchSummary.fail > 0 && dispatchSummary.ok === 0)
@@ -126,5 +148,17 @@ export function useSuccessState() {
     showInventarize,
     inventarizeOffer,
     finishInventarize,
+    channelLabel,
+    stateLabel,
+    deviceFallbackTitle: t("deviceFallbackTitle"),
+    queuedOnlineSub: t("queuedOnlineSub"),
+    queuedOfflineSub: t("queuedOfflineSub"),
+    dispatchChannels: t("dispatchChannels"),
+    noDispatchTargets: t("noDispatchTargets"),
+    httpAttempt: (status: number, count: number) => t("httpAttempt", { status, count }),
+    attemptOnly: (count: number) => t("attemptOnly", { count }),
+    channelsSummary: (ok: number, total: number) => t("channelsSummary", { ok, total }),
+    channelsFailedSuffix: (fail: number) => t("channelsFailedSuffix", { fail }),
+    scanNext: t("scanNext"),
   };
 }

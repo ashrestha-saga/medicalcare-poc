@@ -1987,6 +1987,17 @@ body {
   min-height: 96px;
 }
 
+.p-sr-actions {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.p-sr-actions .p-cta {
+  width: 100%;
+}
+
 .p-photo-block .p-sec-title {
   display: block;
 }

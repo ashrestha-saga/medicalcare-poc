@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
+import { useTranslations } from "next-intl";
 import type { ResolveResponse } from "@/interfaces";
 import { api, ApiError, NetworkError } from "@/lib/http/apiClient";
 import { parseIdentifier } from "@/lib/gs1";
@@ -14,6 +15,7 @@ import { toast } from "@/store/toastStore";
  * parse (client, for feedback) → POST /api/resolve → store transition.
  */
 export function useResolve() {
+  const t = useTranslations("scan");
   const startResolving = useScanStore((s) => s.startResolving);
   const resolved = useScanStore((s) => s.resolved);
   const resolveFailed = useScanStore((s) => s.resolveFailed);
@@ -60,7 +62,7 @@ export function useResolve() {
             correlationId: "offline",
           });
         } else {
-          const message = e instanceof ApiError ? e.message : "We couldn't identify this device. Please try again.";
+          const message = e instanceof ApiError ? e.message : t("resolveFailed");
           log("error", message);
           toast.error(message);
           resolveFailed(message);
@@ -69,7 +71,7 @@ export function useResolve() {
         inFlight.current = false;
       }
     },
-    [startResolving, resolved, resolveFailed, resetForm, prefillLocation],
+    [startResolving, resolved, resolveFailed, resetForm, prefillLocation, t],
   );
 
   return { resolve };

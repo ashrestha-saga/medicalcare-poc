@@ -20,6 +20,7 @@ interface CatalogScreenProps {
 /** Central DeviceModel catalog — list → detail → full-page edit; create stays a modal. */
 export function CatalogScreen({ modelId }: CatalogScreenProps) {
   const t = useTranslations("pages.catalog");
+  const tDetail = useTranslations("catalogDetail");
   const tCommon = useTranslations("common");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -85,7 +86,7 @@ export function CatalogScreen({ modelId }: CatalogScreenProps) {
           ) : (
             <div className="flex items-center gap-2 px-4 py-10 text-sm text-muted-foreground sm:px-[18px]">
               <Loader2 className="h-4 w-4 animate-spin" />
-              {list.detailLoading ? "Loading model…" : "Model not found."}
+              {list.detailLoading ? tDetail("loadingModel") : tDetail("modelNotFound")}
             </div>
           )
         ) : (
@@ -95,10 +96,9 @@ export function CatalogScreen({ modelId }: CatalogScreenProps) {
             headerExtra={
               <Alert variant="warning" data-testid="catalog-warning">
                 <TriangleAlert className="h-4 w-4" />
-                <AlertTitle>Changes to the catalog affect all clients</AlertTitle>
+                <AlertTitle>{tDetail("catalogWarningTitle")}</AlertTitle>
                 <AlertDescription>
-                  Classification and model master data are shared. Prefer versioned updates and confirm
-                  with affected clinics before releasing safety-relevant changes.
+                  {tDetail("catalogWarningBody")}
                 </AlertDescription>
               </Alert>
             }

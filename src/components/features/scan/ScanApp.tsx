@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { useScanStore } from "@/store/scanStore";
 import { PartsScreen } from "@/components/features/cart/PartsScreen";
 import { DeviceScreen } from "@/components/features/device/DeviceScreen";
@@ -55,6 +56,7 @@ export function ScanApp() {
 }
 
 function Workflow({ showInlineCamera }: { showInlineCamera: boolean }) {
+  const t = useTranslations("scan");
   const phase = useScanStore((s) => s.phase);
 
   switch (phase) {
@@ -74,8 +76,8 @@ function Workflow({ showInlineCamera }: { showInlineCamera: boolean }) {
     case "submitting":
       return (
         <div className="p-wait" data-testid="submitting-state">
-          <strong>Sending…</strong>
-          <p>Transmitting the request to the configured destinations.</p>
+          <strong>{t("sending")}</strong>
+          <p>{t("sendingHint")}</p>
         </div>
       );
     case "queued":

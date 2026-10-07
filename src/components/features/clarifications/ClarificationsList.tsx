@@ -1,7 +1,12 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import type { ClarificationItemDTO, ClarificationSeverity, ClarificationSummaryDTO } from "@/interfaces";
+import type {
+  ClarificationIssue,
+  ClarificationItemDTO,
+  ClarificationSeverity,
+  ClarificationSummaryDTO,
+} from "@/interfaces";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -21,6 +26,45 @@ function severityBadge(severity: ClarificationSeverity): "destructive" | "second
   if (severity === "high") return "destructive";
   if (severity === "medium") return "secondary";
   return "outline";
+}
+
+function severityLabelKey(severity: ClarificationSeverity): "severityHigh" | "severityMedium" | "severityLow" {
+  if (severity === "high") return "severityHigh";
+  if (severity === "medium") return "severityMedium";
+  return "severityLow";
+}
+
+function translateIssue(
+  t: ReturnType<typeof useTranslations<"clarificationsIssues">>,
+  issue: ClarificationIssue,
+): string {
+  // C3 deferred rows keep custom English labels with actor context.
+  if (issue.label.includes("deferred by")) {
+    return issue.label;
+  }
+
+  switch (issue.code) {
+    case "not_released": {
+      const lower = issue.label.toLowerCase();
+      if (lower.includes("review")) return t("not_released_review");
+      return t("not_released_draft");
+    }
+    case "duplicate_serial": {
+      const match = issue.label.match(/\(([^)]+)\)/);
+      if (match?.[1]) return t("duplicate_serial", { peers: match[1] });
+      return issue.label;
+    }
+    case "missing_responsible":
+    case "missing_maintenance_cycle":
+    case "missing_classification":
+    case "derived_classification":
+    case "missing_room":
+    case "missing_model_name":
+    case "missing_serial":
+      return t(issue.code);
+    default:
+      return issue.label;
+  }
 }
 
 function SummaryCard({
@@ -57,6 +101,7 @@ export function ClarificationsList({
   onEdit,
 }: ClarificationsListProps) {
   const t = useTranslations("pages.clarifications");
+  const tIssues = useTranslations("clarificationsIssues");
 
   return (
     <div className="space-y-4" data-testid="clarifications-list">
@@ -117,7 +162,7 @@ export function ClarificationsList({
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="truncate text-base font-semibold text-foreground">{item.title}</h3>
                     <Badge variant={severityBadge(item.severity)} className="uppercase">
-                      {item.severity}
+                      {tIssues(severityLabelKey(item.severity))}
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -125,7 +170,11 @@ export function ClarificationsList({
                     {item.locationText ? ` · ${item.locationText}` : ""}
                     {item.serialNumber ? ` · SN ${item.serialNumber}` : ""}
                   </p>
-                  <p className="text-sm text-amber-800 dark:text-amber-300">{item.reasonText}</p>
+                  <p className="text-sm text-amber-800 dark:text-amber-300">
+                    {item.issues.length > 0
+                      ? item.issues.map((issue) => translateIssue(tIssues, issue)).join(" · ")
+                      : item.reasonText}
+                  </p>
                   {item.sourceLabel && (
                     <p className="text-[11px] text-muted-foreground">
                       {t("modelSource", { source: item.sourceLabel })}

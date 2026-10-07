@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Spinner } from "@/components/ui/Loading";
 import { useAssignmentDetail } from "@/components/hooks/requests/useAssignmentDetail";
 import { RequestDetail } from "./RequestDetail";
@@ -11,6 +12,7 @@ interface AssignmentDetailScreenProps {
 
 /** Individual assignment at `/requests/[reference]`. */
 export function AssignmentDetailScreen({ reference }: AssignmentDetailScreenProps) {
+  const t = useTranslations("requestsDetail");
   const router = useRouter();
   const detail = useAssignmentDetail(reference);
 
@@ -20,17 +22,17 @@ export function AssignmentDetailScreen({ reference }: AssignmentDetailScreenProp
         <div className="p-admin">
           {detail.loading ? (
             <div className="flex items-center justify-center gap-2 px-4 py-16 text-sm text-muted-foreground">
-              <Spinner /> Loading assignment…
+              <Spinner /> {t("loadingAssignment")}
             </div>
           ) : detail.notFound || !detail.request ? (
             <div className="space-y-3 px-4 py-10 sm:px-[18px]">
-              <p className="text-sm text-muted-foreground">Assignment not found.</p>
+              <p className="text-sm text-muted-foreground">{t("assignmentNotFound")}</p>
               <button
                 type="button"
                 className="text-sm text-primary hover:underline"
                 onClick={() => router.push("/requests")}
               >
-                ← To the assignment list
+                {t("backToList")}
               </button>
             </div>
           ) : (

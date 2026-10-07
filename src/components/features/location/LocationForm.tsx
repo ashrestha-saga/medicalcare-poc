@@ -124,7 +124,7 @@ export function LocationForm({ errors }: LocationFormProps) {
           )}
 
           {errors.deliveryAddress && <p className="p-err">{errors.deliveryAddress}</p>}
-          <p className="p-field-hint">Spare parts go to goods receiving, not to the place of use.</p>
+          <p className="p-field-hint">{t("deliveryHint")}</p>
         </div>
       </div>
     </>

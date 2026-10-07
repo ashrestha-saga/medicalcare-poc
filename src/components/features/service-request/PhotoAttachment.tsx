@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { PhotoAttachmentProps } from "@/interfaces";
 import { downscaleImage, ImageProcessingError } from "@/lib/image";
 import { newClientId } from "@/lib/http/apiClient";
@@ -18,11 +19,13 @@ export function PhotoAttachment({
   required,
   error,
   hint,
-  buttonLabel = "+ Photo",
+  buttonLabel,
 }: PhotoAttachmentProps) {
+  const t = useTranslations("scan");
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const mine = photos.filter((p) => p.kind === kind);
+  const resolvedButtonLabel = buttonLabel ?? t("photoButton");
 
   const onFiles = async (files: FileList | null) => {
     if (!files?.length) return;
@@ -34,7 +37,7 @@ export function PhotoAttachment({
       }
     } catch (e) {
       toast.error(
-        e instanceof ImageProcessingError ? e.message : "The photo could not be processed. Please try another one.",
+        e instanceof ImageProcessingError ? e.message : t("photoProcessError"),
       );
     } finally {
       setBusy(false);
@@ -59,7 +62,7 @@ export function PhotoAttachment({
             <div key={p.id} className="p-thumb">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.dataUrl} alt="" />
-              <button type="button" onClick={() => onRemove(p.id)} aria-label="Remove photo">
+              <button type="button" onClick={() => onRemove(p.id)} aria-label={t("removePhoto")}>
                 ×
               </button>
             </div>
@@ -86,7 +89,7 @@ export function PhotoAttachment({
                 />
                 <circle cx="12" cy="14" r="3.2" stroke="currentColor" strokeWidth="1.6" />
               </svg>
-              {buttonLabel}
+              {resolvedButtonLabel}
             </>
           )}
         </button>

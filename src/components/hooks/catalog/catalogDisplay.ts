@@ -7,14 +7,22 @@ export function catalogShortId(id: string): string {
   return id.slice(0, 8).toUpperCase();
 }
 
-export function catalogSourceLabel(source: CatalogModelListItemDTO["source"]): string {
-  if (source === "catalog") return "Manufacturer / catalog";
-  if (source === "beudamed") return "BEUDAMED";
-  return "Manual";
+type SourceT = (key: "sourceManufacturerCatalog" | "sourceBeudamed" | "sourceManual") => string;
+
+export function catalogSourceLabel(
+  source: CatalogModelListItemDTO["source"],
+  t: SourceT,
+): string {
+  if (source === "catalog") return t("sourceManufacturerCatalog");
+  if (source === "beudamed") return t("sourceBeudamed");
+  return t("sourceManual");
 }
 
-export function catalogGmdnEmdn(model: { gmdnCode: string | null; emdnCode: string | null }): string {
-  return [model.gmdnCode, model.emdnCode].filter(Boolean).join(" / ") || "—";
+export function catalogGmdnEmdn(
+  model: { gmdnCode: string | null; emdnCode: string | null },
+  empty = "—",
+): string {
+  return [model.gmdnCode, model.emdnCode].filter(Boolean).join(" / ") || empty;
 }
 
 export function catalogClassificationOptions(

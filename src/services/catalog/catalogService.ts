@@ -98,6 +98,14 @@ export async function upsertOxidCatalogModel(
   return toDeviceModelDTO(row);
 }
 
+const MODEL_WITH_CLASSIFICATION = {
+  classifications: {
+    where: { validTo: null },
+    orderBy: { validFrom: "desc" as const },
+    take: 1,
+  },
+} as const;
+
 export function createCatalogService(adapter: CatalogSearchAdapter = selectCatalogSearchAdapter()): CatalogResolver {
   return {
     async find(identifier, tenantId, userId) {
@@ -118,6 +126,7 @@ export function createCatalogService(adapter: CatalogSearchAdapter = selectCatal
           OR: [{ udiDi: gtin }, { basicUdiDi: gtin }, { gtins: { contains: `"${gtin}"` } }],
         },
         orderBy: { version: "desc" },
+        include: MODEL_WITH_CLASSIFICATION,
       });
       if (local) {
         logger.info("catalog.local.hit", { gtin, modelId: local.id, tradeName: local.tradeName });
@@ -166,6 +175,9 @@ export function createCatalogService(adapter: CatalogSearchAdapter = selectCatal
 export const catalogService = createCatalogService();
 
 export async function findModelById(id: string): Promise<DeviceModelDTO | null> {
-  const row = await prisma.deviceModel.findUnique({ where: { id } });
+  const row = await prisma.deviceModel.findUnique({
+    where: { id },
+    include: MODEL_WITH_CLASSIFICATION,
+  });
   return row ? toDeviceModelDTO(row) : null;
 }

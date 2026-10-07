@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import type {
   BeudamedExternalViewProps,
   CatalogActionViewProps,
@@ -11,13 +12,14 @@ import type {
 import { useCatalogAdopt } from "@/components/hooks/device/useCatalogAdopt";
 import { useRequestStore } from "@/store/requestStore";
 import { inspectionTagsFromFlags } from "@/lib/inspectionTags";
+import { intlLocale, type AppLocale } from "@/lib/locale";
 import { DeviceHeader } from "./DeviceHeader";
 import { InventoryLocationCheck } from "./InventoryLocationCheck";
 
-function formatFetchedAt(iso: string): string {
+function formatFetchedAt(iso: string, locale: AppLocale): string {
   try {
     const d = new Date(iso);
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "numeric", year: "numeric" });
+    return d.toLocaleDateString(intlLocale(locale), { day: "numeric", month: "numeric", year: "numeric" });
   } catch {
     return iso.slice(0, 10);
   }
@@ -25,15 +27,16 @@ function formatFetchedAt(iso: string): string {
 
 /** Stage 2 adopt — inventory miss, article master (local or OXID) knows the model. */
 function CatalogModelView({ resolution, onAdopt, onClose }: CatalogModelViewProps) {
+  const t = useTranslations("device");
   const model = resolution.model;
-  const title = model?.tradeName ?? model?.modelName ?? "Article";
+  const title = model?.tradeName ?? model?.modelName ?? t("articleFallback");
   const code = model?.udiDi ?? model?.gtins?.[0] ?? resolution.identifier.udiDi ?? resolution.identifier.gtin ?? null;
   const isOxid = resolution.source.system === "oxid-catalog";
 
   return (
     <div className="p-adopt" data-adopt="catalog" data-testid="catalog-model-view">
       <section className="p-devhead p-adopt__head">
-        <button type="button" className="p-close" onClick={onClose} aria-label="Scan another">
+        <button type="button" className="p-close" onClick={onClose} aria-label={t("scanAnotherAria")}>
           ×
         </button>
         <h2 data-testid="device-title">{title}</h2>
@@ -44,8 +47,8 @@ function CatalogModelView({ resolution, onAdopt, onClose }: CatalogModelViewProp
           </div>
         )}
         <p className="p-adopt__status">
-          Article from the article master
-          {isOxid ? " · OXID Shop" : ""}
+          {t("articleFromMaster")}
+          {isOxid ? t("oxidShopSuffix") : ""}
         </p>
       </section>
 
@@ -56,20 +59,17 @@ function CatalogModelView({ resolution, onAdopt, onClose }: CatalogModelViewProp
           data-testid="source-banner"
           data-source={resolution.source.system}
         >
-          {isOxid ? "OXID Shop · Article master" : "Article master (local)"}
+          {isOxid ? t("sourceOxidCatalog") : t("sourceLocalCatalog")}
         </div>
 
         <div className="p-lead p-adopt__lead" data-s="catalog" data-testid="catalog-lead">
-          No device is on file for this code. The article master knows the product — that is
-          enough for the service request. An equipment record is not created.
+          {t("catalogLead")}
         </div>
 
-        <p className="p-ext-note p-adopt__note">
-          UDI-DI identifies the model, not the individual unit.
-        </p>
+        <p className="p-ext-note p-adopt__note">{t("udiDiNote")}</p>
 
         <button type="button" className="p-cta p-adopt__cta" onClick={onAdopt} data-testid="adopt-catalog">
-          Continue for service
+          {t("continueForService")}
         </button>
       </div>
     </div>
@@ -78,6 +78,7 @@ function CatalogModelView({ resolution, onAdopt, onClose }: CatalogModelViewProp
 
 /** After catalog adopt — choose service request or spare parts. */
 function CatalogActionView({ resolution, onService, onParts, onBack, onClose }: CatalogActionViewProps) {
+  const t = useTranslations("device");
   return (
     <div data-testid="catalog-action-view">
       <DeviceHeader
@@ -85,10 +86,10 @@ function CatalogActionView({ resolution, onService, onParts, onBack, onClose }: 
         captured={null}
         actions={
           <>
-            <button type="button" className="p-close" onClick={onBack} aria-label="Back" data-testid="catalog-action-back">
+            <button type="button" className="p-close" onClick={onBack} aria-label={t("backAria")} data-testid="catalog-action-back">
               ←
             </button>
-            <button type="button" className="p-close" onClick={onClose} aria-label="Scan another">
+            <button type="button" className="p-close" onClick={onClose} aria-label={t("scanAnotherAria")}>
               ×
             </button>
           </>
@@ -97,12 +98,12 @@ function CatalogActionView({ resolution, onService, onParts, onBack, onClose }: 
 
       <div className="p-two">
         <button type="button" className="p-big" data-p="1" onClick={onService} data-testid="continue-service-request">
-          <b>Service request</b>
-          <span>Inspection, repair or other service for this product.</span>
+          <b>{t("serviceRequest")}</b>
+          <span>{t("serviceRequestHintProduct")}</span>
         </button>
         <button type="button" className="p-big" onClick={onParts} data-testid="open-parts">
-          <b>Spare parts</b>
-          <span>Request spare parts — approval by an authorized buyer required.</span>
+          <b>{t("spareParts")}</b>
+          <span>{t("sparePartsHint")}</span>
         </button>
       </div>
     </div>
@@ -111,23 +112,25 @@ function CatalogActionView({ resolution, onService, onParts, onBack, onClose }: 
 
 /** EXTERNAL DATA — shown first when stage 3 (BEUDAMED / EUDAMED) answers. */
 function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternalViewProps) {
+  const t = useTranslations("device");
+  const locale = useLocale() as AppLocale;
   const model = resolution.model;
-  const title = model?.tradeName ?? model?.modelName ?? "Device";
+  const title = model?.tradeName ?? model?.modelName ?? t("deviceFallback");
   const udi = model?.udiDi ?? resolution.identifier.udiDi ?? resolution.identifier.gtin ?? null;
-  const fetched = formatFetchedAt(resolution.source.fetchedAt);
+  const fetched = formatFetchedAt(resolution.source.fetchedAt, locale);
 
   const rows: { label: string; value: string }[] = [
-    model?.manufacturer ? { label: "Manufacturer", value: model.manufacturer } : null,
-    model?.riskClass ? { label: "Risk class", value: model.riskClass } : null,
-    model?.emdnCode ? { label: "EMDN", value: model.emdnCode } : null,
-    model?.basicUdiDi ? { label: "Basic UDI-DI", value: model.basicUdiDi } : null,
-    model?.gmdnCode ? { label: "GMDN", value: model.gmdnCode } : null,
+    model?.manufacturer ? { label: t("fieldManufacturer"), value: model.manufacturer } : null,
+    model?.riskClass ? { label: t("fieldRiskClass"), value: model.riskClass } : null,
+    model?.emdnCode ? { label: t("fieldEmdn"), value: model.emdnCode } : null,
+    model?.basicUdiDi ? { label: t("fieldBasicUdiDi"), value: model.basicUdiDi } : null,
+    model?.gmdnCode ? { label: t("fieldGmdn"), value: model.gmdnCode } : null,
   ].filter(Boolean) as { label: string; value: string }[];
 
   return (
     <div className="p-adopt" data-testid="beudamed-external-view">
       <section className="p-devhead p-adopt__head">
-        <button type="button" className="p-close" onClick={onClose} aria-label="Scan another">
+        <button type="button" className="p-close" onClick={onClose} aria-label={t("scanAnotherAria")}>
           ×
         </button>
         <h2 data-testid="device-title">{title}</h2>
@@ -137,7 +140,7 @@ function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternal
             {model?.manufacturer && <span>{model.manufacturer}</span>}
           </div>
         )}
-        <p className="p-adopt__status">External manufacturer data</p>
+        <p className="p-adopt__status">{t("externalManufacturerData")}</p>
       </section>
 
       <div className="p-adopt__body">
@@ -147,13 +150,13 @@ function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternal
           data-testid="source-banner"
           data-source="beudamed"
         >
-          BEUDAMED · EUDAMED mirror
-          {resolution.source.cached ? " · Cache" : ""} · Fetched {fetched}
+          {t("beudamedBanner")}
+          {resolution.source.cached ? t("cacheSuffix") : ""}
+          {t("fetchedPrefix", { date: fetched })}
         </div>
 
         <div className="p-lead p-adopt__lead" data-s="catalog" data-testid="beudamed-lead">
-          The code is unknown locally. Manufacturer data was loaded from the BEUDAMED mirror
-          (EUDAMED) and can be used for the service request.
+          {t("beudamedLead")}
         </div>
 
         {rows.length > 0 && (
@@ -167,13 +170,10 @@ function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternal
           </dl>
         )}
 
-        <p className="p-ext-note p-adopt__note">
-          UDI-DI identifies the model, not the individual unit. A device record is not
-          created by this step.
-        </p>
+        <p className="p-ext-note p-adopt__note">{t("udiDiNoteNoRecord")}</p>
 
         <button type="button" className="p-cta p-adopt__cta" onClick={onAdopt} data-testid="continue-service-request">
-          Continue for service
+          {t("continueForService")}
         </button>
       </div>
     </div>
@@ -182,6 +182,7 @@ function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternal
 
 /** Stage 1 — device already in inventory: confirm place of use, then service / parts. */
 function InventoryDeviceView({ resolution, onService, onParts, onClose }: InventoryDeviceViewProps) {
+  const t = useTranslations("device");
   const device = resolution.device!;
   const siteId = useRequestStore((s) => s.form.siteId);
   const [locError, setLocError] = useState<string | null>(null);
@@ -191,7 +192,7 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
 
   const goService = () => {
     if (!siteId.trim()) {
-      setLocError("Please select a site.");
+      setLocError(t("selectSiteError"));
       return;
     }
     setLocError(null);
@@ -200,7 +201,7 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
 
   const goParts = () => {
     if (!siteId.trim()) {
-      setLocError("Please select a site.");
+      setLocError(t("selectSiteError"));
       return;
     }
     setLocError(null);
@@ -214,7 +215,7 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
         captured={null}
         hideSourceBanner
         actions={
-          <button type="button" className="p-close" onClick={onClose} aria-label="Scan another">
+          <button type="button" className="p-close" onClick={onClose} aria-label={t("scanAnotherAria")}>
             ×
           </button>
         }
@@ -222,8 +223,8 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
 
       <div className="p-inv__body">
         <div className="p-lead p-inv__lead" data-s="inventory" data-testid="inventory-lead">
-          <strong>Already in inventory · {inv}</strong>
-          <span>Confirm the place of use — the device data is already on file.</span>
+          <strong>{t("alreadyInInventory", { inventoryNumber: inv })}</strong>
+          <span>{t("confirmPlaceOfUse")}</span>
         </div>
 
         <InventoryLocationCheck error={locError} />
@@ -231,27 +232,27 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
         <div className="p-inv__meta" data-testid="inventory-meta">
           {tags.length > 0 && (
             <div className="p-inv__tags">
-              {tags.map((t) => (
-                <span key={t} className="p-cls-tag" data-c="v">
-                  {t}
+              {tags.map((tag) => (
+                <span key={tag} className="p-cls-tag" data-c="v">
+                  {tag}
                 </span>
               ))}
             </div>
           )}
           <Link href="/devices" className="p-inv__record-link" data-testid="inventory-record-link">
-            View record →
+            {t("viewRecord")}
           </Link>
         </div>
       </div>
 
       <div className="p-two p-inv__actions">
         <button type="button" className="p-big" data-p="1" onClick={goService} data-testid="continue-service-request">
-          <b>Request service</b>
-          <span>Request inspection, maintenance, or repair from the service partner</span>
+          <b>{t("requestService")}</b>
+          <span>{t("requestServiceHint")}</span>
         </button>
         <button type="button" className="p-big" onClick={goParts} data-testid="open-parts">
-          <b>Order spare parts</b>
-          <span>Order matching articles for this device via plusorder</span>
+          <b>{t("orderSpareParts")}</b>
+          <span>{t("orderSparePartsHint")}</span>
         </button>
       </div>
     </div>
@@ -259,6 +260,7 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
 }
 
 export function DeviceScreen() {
+  const t = useTranslations("device");
   const {
     resolution,
     captured,
@@ -316,7 +318,7 @@ export function DeviceScreen() {
         resolution={resolution}
         captured={captured}
         actions={
-          <button type="button" className="p-close" onClick={reset} aria-label="Scan another">
+          <button type="button" className="p-close" onClick={reset} aria-label={t("scanAnotherAria")}>
             ×
           </button>
         }
@@ -324,8 +326,8 @@ export function DeviceScreen() {
 
       <div className="p-two">
         <button type="button" className="p-big" data-p="1" onClick={continueToServiceRequest} data-testid="continue-service-request">
-          <b>Service request</b>
-          <span>Inspection, repair or other service for this device.</span>
+          <b>{t("serviceRequest")}</b>
+          <span>{t("serviceRequestHintDevice")}</span>
         </button>
         <button
           type="button"
@@ -334,12 +336,8 @@ export function DeviceScreen() {
           disabled={!partsAllowed}
           data-testid="open-parts"
         >
-          <b>Spare parts</b>
-          <span>
-            {partsAllowed
-              ? "Request spare parts — approval by an authorized buyer required."
-              : "Not available for manually captured devices."}
-          </span>
+          <b>{t("spareParts")}</b>
+          <span>{partsAllowed ? t("sparePartsHint") : t("sparePartsUnavailable")}</span>
         </button>
       </div>
     </div>

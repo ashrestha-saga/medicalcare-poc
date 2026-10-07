@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  channelLabel,
-  serviceRequestStateLabel,
-  useSuccessState,
-} from "@/components/hooks/service-request/useSuccessState";
+import { useSuccessState } from "@/components/hooks/service-request/useSuccessState";
 import { InventarizeForm } from "./InventarizeForm";
 
 export function SuccessState() {
@@ -22,6 +18,18 @@ export function SuccessState() {
     showInventarize,
     inventarizeOffer,
     finishInventarize,
+    channelLabel,
+    stateLabel,
+    deviceFallbackTitle,
+    queuedOnlineSub,
+    queuedOfflineSub,
+    dispatchChannels,
+    noDispatchTargets,
+    httpAttempt,
+    attemptOnly,
+    channelsSummary,
+    channelsFailedSuffix,
+    scanNext,
   } = useSuccessState();
 
   if (!success) return null;
@@ -30,7 +38,7 @@ export function SuccessState() {
     const deviceTitle =
       inventarizeOffer.tradeName?.trim() ||
       inventarizeOffer.modelName?.trim() ||
-      "Device";
+      deviceFallbackTitle;
     return (
       <InventarizeForm
         offer={inventarizeOffer}
@@ -47,11 +55,7 @@ export function SuccessState() {
       </div>
       <h2>{title}</h2>
       {isQueued ? (
-        <p className="p-done-sub">
-          {online
-            ? "Will be sent as soon as possible…"
-            : "Will be sent automatically when the connection returns."}
-        </p>
+        <p className="p-done-sub">{online ? queuedOnlineSub : queuedOfflineSub}</p>
       ) : (
         <p className="ref" data-testid="success-reference">
           {success.reference}
@@ -61,9 +65,9 @@ export function SuccessState() {
       {detail && isService && !isQueued && (
         <>
           <section className="p-dispatch" data-testid="dispatch-results">
-            <p className="p-sec-title">Dispatch channels</p>
+            <p className="p-sec-title">{dispatchChannels}</p>
             {records.length === 0 ? (
-              <p className="p-done-sub">No dispatch targets configured.</p>
+              <p className="p-done-sub">{noDispatchTargets}</p>
             ) : (
               <ul className="p-dispatch-list">
                 {records.map((d) => (
@@ -80,11 +84,11 @@ export function SuccessState() {
                         )}
                         {d.httpStatus != null && (
                           <span className="p-dispatch-meta">
-                            HTTP {d.httpStatus} · Attempt {d.attemptCount}
+                            {httpAttempt(d.httpStatus, d.attemptCount)}
                           </span>
                         )}
                         {d.httpStatus == null && d.attemptCount > 1 && (
-                          <span className="p-dispatch-meta">Attempt {d.attemptCount}</span>
+                          <span className="p-dispatch-meta">{attemptOnly(d.attemptCount)}</span>
                         )}
                       </div>
                     </div>
@@ -94,8 +98,8 @@ export function SuccessState() {
             )}
             {dispatchSummary && (
               <p className="p-dispatch-summary" data-testid="dispatch-summary">
-                {dispatchSummary.ok}/{dispatchSummary.total} channels succeeded
-                {dispatchSummary.fail > 0 ? ` · ${dispatchSummary.fail} failed` : ""}
+                {channelsSummary(dispatchSummary.ok, dispatchSummary.total)}
+                {dispatchSummary.fail > 0 ? channelsFailedSuffix(dispatchSummary.fail) : ""}
               </p>
             )}
           </section>
@@ -103,7 +107,7 @@ export function SuccessState() {
           <ol className="p-status-timeline" data-testid="status-timeline">
             {detail.statusEvents.map((e, i) => (
               <li key={`${e.state}-${e.changedAt}-${i}`}>
-                <span className="t-mono">{serviceRequestStateLabel(e.state)}</span>
+                <span className="t-mono">{stateLabel(e.state)}</span>
                 {" · "}
                 {e.source}
                 {e.note ? ` — ${e.note}` : ""}
@@ -114,7 +118,7 @@ export function SuccessState() {
       )}
 
       <button type="button" className="p-cta" onClick={reset} data-testid="scan-next">
-        Scan next
+        {scanNext}
       </button>
     </div>
   );

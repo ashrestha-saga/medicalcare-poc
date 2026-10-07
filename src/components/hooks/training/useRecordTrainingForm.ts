@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import type {
   CreateTrainingEventResultDTO,
   TrainingFormOptionsDTO,
@@ -28,6 +29,7 @@ export function useRecordTrainingForm({
   form: TrainingFormOptionsDTO;
   onCreated: (eventId: string) => void;
 }) {
+  const t = useTranslations("trainingDetail");
   const defaultType = form.types[0]?.code ?? "";
   const [trainingTypeCode, setTrainingTypeCode] = useState(defaultType);
   const selectedType = useMemo(
@@ -138,8 +140,8 @@ export function useRecordTrainingForm({
 
   const recordHint =
     personIds.length === 1
-      ? "1 participant selected — that creates 1 individual record."
-      : `${personIds.length} participants selected — that creates ${personIds.length} individual records.`;
+      ? t("recordHintOne")
+      : t("recordHintMany", { count: personIds.length });
 
   return {
     form,

@@ -31,8 +31,14 @@ export { inspectionTagsFromFlags };
 /** Prisma rows → DTOs. Raw external shapes never pass through here (Section 8). */
 
 export function toDeviceModelDTO(
-  row: DeviceModel & { maintenanceCycleMonths?: number | null },
+  row: DeviceModel & {
+    maintenanceCycleMonths?: number | null;
+    classifications?: DeviceModelClassification[];
+  },
 ): DeviceModelDTO {
+  const openCls =
+    row.classifications?.find((c) => c.validTo == null) ?? row.classifications?.[0] ?? null;
+  const flags = classificationFlagsFromModel(openCls);
   return {
     id: row.id,
     basicUdiDi: row.basicUdiDi,
@@ -50,6 +56,14 @@ export function toDeviceModelDTO(
     version: row.version,
     state: row.state as DeviceModelDTO["state"],
     maintenanceCycleMonths: row.maintenanceCycleMonths ?? null,
+    classification: flags
+      ? {
+          annex1: flags.annex1,
+          annex2: flags.annex2,
+          softwareClass: flags.softwareClass,
+          radiation: flags.radiation,
+        }
+      : null,
   };
 }
 

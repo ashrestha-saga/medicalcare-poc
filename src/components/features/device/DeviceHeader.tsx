@@ -1,14 +1,16 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type { CapturedArticleDTO, ResolveResponse } from "@/interfaces";
 
 export function SourceBanner({ resolution, captured }: { resolution: ResolveResponse | null; captured: CapturedArticleDTO | null }) {
+  const t = useTranslations("device");
   if (captured) {
     return (
       <div className="p-src" data-s="manual" data-testid="source-banner" data-source="manual">
-        Manually captured, service only
+        {t("sourceManualServiceOnly")}
         <br />
-        Service only — not for sale
+        {t("sourceManualNotForSale")}
       </div>
     );
   }
@@ -17,20 +19,21 @@ export function SourceBanner({ resolution, captured }: { resolution: ResolveResp
   if (system === "beudamed") {
     return (
       <div className="p-src" data-s="beudamed" data-testid="source-banner" data-source="beudamed">
-        BEUDAMED · EUDAMED mirror{resolution.source.cached ? " · cached" : ""}
+        {t("sourceBeudamed")}
+        {resolution.source.cached ? t("sourceCachedSuffix") : ""}
       </div>
     );
   }
   if (system === "catalog" || system === "oxid-catalog") {
     return (
       <div className="p-src" data-s="catalog" data-testid="source-banner" data-source={system}>
-        Article master (GTIN/UDI)
+        {t("sourceArticleMaster")}
       </div>
     );
   }
   return (
     <div className="p-src" data-s="device-inventory" data-testid="source-banner" data-source={system}>
-      Device inventory
+      {t("sourceDeviceInventory")}
     </div>
   );
 }
@@ -46,10 +49,12 @@ export function DeviceHeader({
   actions?: React.ReactNode;
   hideSourceBanner?: boolean;
 }) {
+  const t = useTranslations("device");
   const device = resolution?.device;
   const model = resolution?.model;
 
-  const title = captured?.name ?? model?.tradeName ?? model?.modelName ?? device?.inventoryNumber ?? "Device";
+  const title =
+    captured?.name ?? model?.tradeName ?? model?.modelName ?? device?.inventoryNumber ?? t("deviceFallback");
   const codes = [
     device?.inventoryNumber,
     device?.serialNumber,

@@ -23,6 +23,7 @@ import { zodFieldErrors } from "@/schemas/formErrors";
  */
 export function ServiceRequestForm() {
   const t = useTranslations("serviceRequest");
+  const tScan = useTranslations("scan");
   const resolution = useScanStore((s) => s.resolution);
   const captured = useScanStore((s) => s.captured);
   const phase = useScanStore((s) => s.phase);
@@ -73,8 +74,17 @@ export function ServiceRequestForm() {
       raisedBy: user.name,
       correlationId: newClientId(),
     };
-    const title = captured?.name ?? resolution?.model?.tradeName ?? resolution?.model?.modelName ?? resolution?.model?.udiDi ?? resolution?.device?.inventoryNumber ?? "device";
-    await submit(payload, `${form.serviceType} for ${title}`);
+    const title =
+      captured?.name ??
+      resolution?.model?.tradeName ??
+      resolution?.model?.modelName ??
+      resolution?.model?.udiDi ??
+      resolution?.device?.inventoryNumber ??
+      tScan("deviceFallback");
+    await submit(
+      payload,
+      tScan("submitTitleTemplate", { serviceType: form.serviceType!, title }),
+    );
   };
 
   const allErrors = { ...errors, ...fieldErrors };
@@ -85,7 +95,7 @@ export function ServiceRequestForm() {
         resolution={resolution}
         captured={captured}
         actions={
-          <button type="button" className="p-close" onClick={backToDevice} disabled={busy} aria-label="Change">
+          <button type="button" className="p-close" onClick={backToDevice} disabled={busy} aria-label={tScan("changeDeviceAria")}>
             ×
           </button>
         }
@@ -118,7 +128,7 @@ export function ServiceRequestForm() {
         />
 
         <div className="p-sr-actions">
-          <button type="button" className="p-btn p-btn--primary" onClick={() => void onSubmit()} disabled={busy} data-testid="submit-service-request">
+          <button type="button" className="p-cta" onClick={() => void onSubmit()} disabled={busy} data-testid="submit-service-request">
             {busy ? (
               <>
                 <Spinner /> {t("sending")}

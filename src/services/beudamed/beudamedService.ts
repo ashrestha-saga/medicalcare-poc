@@ -62,7 +62,17 @@ export function createBeudamedService(deps: Deps = {}): BeudamedResolver {
       const cached = await prisma.externalSourceRecord.findFirst({
         where: { source: "beudamed", identifier: udiDi },
         orderBy: { fetchedAt: "desc" },
-        include: { deviceModel: true },
+        include: {
+          deviceModel: {
+            include: {
+              classifications: {
+                where: { validTo: null },
+                orderBy: { validFrom: "desc" },
+                take: 1,
+              },
+            },
+          },
+        },
       });
       if (cached && isFresh(cached.fetchedAt, env.beudamed.cacheTtlDays, now())) {
         await recordExternalCall({

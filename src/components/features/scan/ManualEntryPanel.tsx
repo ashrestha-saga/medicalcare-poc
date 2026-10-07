@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import type { ManualEntryPanelProps } from "@/interfaces";
-import { IDENTIFIER_KIND_LABELS } from "@/constants/scan";
 import { parseIdentifier } from "@/lib/gs1";
 
 /**
@@ -10,6 +10,7 @@ import { parseIdentifier } from "@/lib/gs1";
  * Live GS1/GTIN parse feedback while typing (same parser as resolve).
  */
 export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
+  const t = useTranslations("scan");
   const [value, setValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const parsed = useMemo(() => (value.trim() ? parseIdentifier(value) : null), [value]);
@@ -17,6 +18,21 @@ export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  const kindLabel = (kind: string) => {
+    switch (kind) {
+      case "gtin":
+        return t("kindGtin");
+      case "udi-di":
+        return t("kindUdiDi");
+      case "inventory":
+        return t("kindInventory");
+      case "serial":
+        return t("kindSerial");
+      default:
+        return t("kindUnknown");
+    }
+  };
 
   const submit = () => {
     const raw = value.trim();
@@ -28,19 +44,17 @@ export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
   return (
     <div className="p-manualentry" data-testid="manual-entry-panel">
       <div className="p-manualentry-body">
-        <h1 className="p-manualentry-title">Enter inventory number</h1>
-        <p className="p-manualentry-lead">
-          For damaged labels, devices without a barcode, or when the camera is not available.
-        </p>
+        <h1 className="p-manualentry-title">{t("manualEntryTitle")}</h1>
+        <p className="p-manualentry-lead">{t("manualEntryLead")}</p>
 
         <label className="p-manualentry-label" htmlFor="manual-id">
-          Inventory or serial number <span className="p-req" aria-hidden="true">*</span>
+          {t("inventoryOrSerialLabel")} <span className="p-req" aria-hidden="true">*</span>
         </label>
         <input
           ref={inputRef}
           id="manual-id"
           className="p-manualentry-input"
-          placeholder="INV-2024-0417"
+          placeholder={t("inventoryPlaceholder")}
           autoComplete="off"
           autoCapitalize="characters"
           spellCheck={false}
@@ -52,31 +66,31 @@ export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
 
         {parsed && (
           <p className="p-manualentry-detect" data-testid="manual-entry-detected">
-            Detected: {IDENTIFIER_KIND_LABELS[parsed.kind] ?? parsed.kind}
+            {t("detected", { kind: kindLabel(parsed.kind) })}
           </p>
         )}
 
         {parsed?.gtin && (
           <dl className="p-manualentry-gs1" data-testid="manual-entry-gs1">
             <div>
-              <dt>GTIN</dt>
+              <dt>{t("gs1Gtin")}</dt>
               <dd className="t-mono">{parsed.gtin}</dd>
             </div>
             {parsed.serial && (
               <div>
-                <dt>Serial</dt>
+                <dt>{t("gs1Serial")}</dt>
                 <dd className="t-mono">{parsed.serial}</dd>
               </div>
             )}
             {parsed.lot && (
               <div>
-                <dt>Lot</dt>
+                <dt>{t("gs1Lot")}</dt>
                 <dd className="t-mono">{parsed.lot}</dd>
               </div>
             )}
             {parsed.expiry && (
               <div>
-                <dt>Expiry</dt>
+                <dt>{t("gs1Expiry")}</dt>
                 <dd className="t-mono">{parsed.expiry}</dd>
               </div>
             )}
@@ -85,7 +99,7 @@ export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
 
         <div className="p-actions p-manualentry-actions">
           <button type="button" className="btn-secondary" onClick={onClose} data-testid="manual-entry-cancel">
-            Back
+            {t("back")}
           </button>
           <button
             type="button"
@@ -94,7 +108,7 @@ export function ManualEntryPanel({ onClose, onSubmit }: ManualEntryPanelProps) {
             disabled={!value.trim()}
             data-testid="manual-entry-submit"
           >
-            Search
+            {t("search")}
           </button>
         </div>
       </div>

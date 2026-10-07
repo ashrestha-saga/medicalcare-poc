@@ -2,6 +2,14 @@ import type { DeviceDutyDTO } from "./registration";
 
 export type DeviceModelSource = "manual" | "catalog" | "beudamed";
 
+/** Open model classification flags used for service-type filtering (scan flow). */
+export interface DeviceModelClassificationFlags {
+  annex1: boolean | null;
+  annex2: boolean | null;
+  softwareClass: string | null;
+  radiation: boolean | null;
+}
+
 export interface DeviceModelDTO {
   id: string;
   basicUdiDi: string | null;
@@ -20,6 +28,11 @@ export interface DeviceModelDTO {
   state: "draft" | "review" | "released";
   /** Default maintenance interval in months for new inventory copies. */
   maintenanceCycleMonths: number | null;
+  /**
+   * Open DeviceModelClassification when loaded (resolve / catalog).
+   * Null when unknown or not yet classified — service dropdown then shows always-on types only.
+   */
+  classification?: DeviceModelClassificationFlags | null;
 }
 
 export interface DeviceLocationDTO {

@@ -1,18 +1,40 @@
 "use client";
 
-import { INSPECTION_TYPES } from "@/constants/inspectionTypes";
+import { useEffect, useMemo } from "react";
+import { useTranslations } from "next-intl";
+import {
+  classificationFlagsFromResolution,
+  serviceTypesForClassification,
+} from "@/lib/serviceTypesFromClassification";
 import { useRequestStore } from "@/store/requestStore";
+import { useScanStore } from "@/store/scanStore";
 
-/** Manual service-type selection — no classification proposal engine. */
+/** Service-type selection filtered by catalog classification (+ always-on types). */
 export function ClassificationPanel({ error }: { error?: string | null }) {
+  const t = useTranslations("scan");
+  const tTypes = useTranslations("inspectionTypes");
   const value = useRequestStore((s) => s.form.serviceType ?? "");
   const patch = useRequestStore((s) => s.patch);
+  const resolution = useScanStore((s) => s.resolution);
+
+  const options = useMemo(() => {
+    const flags = classificationFlagsFromResolution(resolution);
+    return serviceTypesForClassification(flags);
+  }, [resolution]);
+
+  useEffect(() => {
+    if (!value) return;
+    if (!options.some((o) => o.code === value)) {
+      patch({ serviceType: null });
+    }
+  }, [value, options, patch]);
 
   return (
     <div data-testid="classification-panel">
       <div className="p-field" data-testid="inspection-list">
         <label htmlFor="service-type">
-          Service <span className="p-req" aria-hidden="true">
+          {t("serviceTypeLabel")}{" "}
+          <span className="p-req" aria-hidden="true">
             *
           </span>
         </label>
@@ -22,10 +44,10 @@ export function ClassificationPanel({ error }: { error?: string | null }) {
           onChange={(e) => patch({ serviceType: e.target.value || null })}
           data-testid="service-type-select"
         >
-          <option value="">Select service…</option>
-          {INSPECTION_TYPES.map((t) => (
-            <option key={t.code} value={t.code}>
-              {t.label}
+          <option value="">{t("selectService")}</option>
+          {options.map((item) => (
+            <option key={item.code} value={item.code}>
+              {tTypes(`${item.code}.label`)}
             </option>
           ))}
         </select>

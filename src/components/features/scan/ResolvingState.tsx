@@ -1,10 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 export function ResolvingState() {
+  const t = useTranslations("scan");
   return (
     <div className="p-wait" data-testid="resolving-state">
-      <strong>Identifying…</strong>
-      <p>Looking up the identifier in inventory, catalog and BEUDAMED.</p>
+      <strong>{t("identifying")}</strong>
+      <p>{t("identifyingHint")}</p>
     </div>
   );
 }

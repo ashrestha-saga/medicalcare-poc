@@ -2,49 +2,41 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import type { DeviceDutyDTO, DeviceInstanceDetailDTO } from "@/interfaces";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/format";
+import type { AppLocale } from "@/lib/locale";
 
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString("de-DE", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return iso.slice(0, 10);
-  }
-}
-
-function intervalLabel(duty: DeviceDutyDTO): string {
-  if (duty.intervalValue != null && duty.intervalUnit) {
-    const unit = duty.intervalUnit === "years" ? "years" : "months";
-    return `${duty.intervalValue} ${unit}`;
-  }
-  return duty.cadenceLabel ?? anchorLabel(duty.deadlineAnchor);
-}
-
-function anchorLabel(anchor: string): string {
+function anchorLabelKey(
+  anchor: string,
+):
+  | "anchorExactDay"
+  | "anchorMonthEnd"
+  | "anchorYearEnd"
+  | "anchorEvent"
+  | "anchorInterval"
+  | "anchorProcess"
+  | "anchorPermanent"
+  | null {
   switch (anchor) {
     case "exact_day":
-      return "exact day";
+      return "anchorExactDay";
     case "month_end":
-      return "end of month";
+      return "anchorMonthEnd";
     case "year_end":
-      return "end of year";
+      return "anchorYearEnd";
     case "event":
-      return "event";
+      return "anchorEvent";
     case "interval":
-      return "interval";
+      return "anchorInterval";
     case "process":
-      return "process";
+      return "anchorProcess";
     case "permanent":
-      return "ongoing";
+      return "anchorPermanent";
     default:
-      return anchor;
+      return null;
   }
 }
 
@@ -68,22 +60,59 @@ export function DeviceDutiesPanel({
   completingId,
   onComplete,
 }: DeviceDutiesPanelProps) {
+  const t = useTranslations("inventoryDetail");
+  const tCommon = useTranslations("common");
+  const locale = useLocale() as AppLocale;
   const [showNotApplicable, setShowNotApplicable] = useState(false);
   const duties = device.duties ?? [];
   const applicable = duties.filter((d) => d.applicable);
   const notApplicable = duties.filter((d) => !d.applicable);
   const rows = showNotApplicable ? duties : applicable;
+  const dash = tCommon("dash");
+
+  const translateAnchor = (anchor: string): string => {
+    const key = anchorLabelKey(anchor);
+    return key ? t(key) : anchor;
+  };
+
+  const intervalLabel = (duty: DeviceDutyDTO): string => {
+    if (duty.intervalValue != null && duty.intervalUnit) {
+      const unit = duty.intervalUnit === "years" ? t("years") : t("monthsUnit");
+      return `${duty.intervalValue} ${unit}`;
+    }
+    return duty.cadenceLabel ?? translateAnchor(duty.deadlineAnchor);
+  };
+
+  const dutyStatusLabel = (status: DeviceDutyDTO["status"]): string => {
+    switch (status) {
+      case "overdue":
+        return t("dutyStatusOverdue");
+      case "due":
+        return t("dutyStatusDue");
+      case "ok":
+        return t("dutyStatusOk");
+      case "unset":
+        return t("dutyStatusUnset");
+      case "n/a":
+        return t("dutyStatusNa");
+      default:
+        return status;
+    }
+  };
 
   return (
     <section className="mt-4 rounded-md border border-border bg-card/40" data-testid="device-duties">
       <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border px-4 py-3">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">Duties</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t("duties")}</h3>
           <p className="text-xs text-muted-foreground">
-            Next obligation{" "}
-            {device.nextObligationDueAt ? formatDate(device.nextObligationDueAt) : "—"}
+            {t("nextObligation", {
+              date: device.nextObligationDueAt ? formatDate(device.nextObligationDueAt, locale) : dash,
+            })}
             {" · "}
-            Maintenance {formatDate(device.nextMaintenanceDueAt)}
+            {t("maintenanceDueShort", {
+              date: formatDate(device.nextMaintenanceDueAt, locale),
+            })}
           </p>
         </div>
         {notApplicable.length > 0 && (
@@ -94,24 +123,24 @@ export function DeviceDutiesPanel({
             className="h-8"
             onClick={() => setShowNotApplicable((v) => !v)}
           >
-            {showNotApplicable ? "Hide not applicable" : `Show not applicable (${notApplicable.length})`}
+            {showNotApplicable
+              ? t("hideNotApplicable")
+              : t("showNotApplicable", { count: notApplicable.length })}
           </Button>
         )}
       </div>
 
       {rows.length === 0 ? (
-        <p className="px-4 py-4 text-sm text-muted-foreground">
-          No frozen duties yet. Complete initial registration or reclassify the model.
-        </p>
+        <p className="px-4 py-4 text-sm text-muted-foreground">{t("noDuties")}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                <th className="px-4 py-2 font-semibold">Duty</th>
-                <th className="px-4 py-2 font-semibold">Cycle</th>
-                <th className="px-4 py-2 font-semibold">Due</th>
-                <th className="px-4 py-2 font-semibold">Last done</th>
+                <th className="px-4 py-2 font-semibold">{t("colDuty")}</th>
+                <th className="px-4 py-2 font-semibold">{t("colCycle")}</th>
+                <th className="px-4 py-2 font-semibold">{t("colDue")}</th>
+                <th className="px-4 py-2 font-semibold">{t("colLastDone")}</th>
                 {canComplete ? <th className="px-4 py-2 font-semibold" /> : null}
               </tr>
             </thead>
@@ -124,17 +153,19 @@ export function DeviceDutiesPanel({
                   </td>
                   <td className="px-4 py-3 align-top text-muted-foreground">
                     {intervalLabel(duty)}
-                    {duty.dueAt ? ` · ${anchorLabel(duty.deadlineAnchor)}` : ""}
+                    {duty.dueAt ? ` · ${translateAnchor(duty.deadlineAnchor)}` : ""}
                   </td>
                   <td className={`px-4 py-3 align-top ${statusTone(duty.status)}`}>
-                    {duty.dueAt ? formatDate(duty.dueAt) : "—"}
+                    {duty.dueAt ? formatDate(duty.dueAt, locale) : dash}
                     {duty.status !== "ok" && duty.status !== "unset" ? (
                       <Badge variant="secondary" className="ml-2 uppercase">
-                        {duty.status}
+                        {dutyStatusLabel(duty.status)}
                       </Badge>
                     ) : null}
                   </td>
-                  <td className="px-4 py-3 align-top text-muted-foreground">{formatDate(duty.lastCompletedAt)}</td>
+                  <td className="px-4 py-3 align-top text-muted-foreground">
+                    {formatDate(duty.lastCompletedAt, locale)}
+                  </td>
                   {canComplete ? (
                     <td className="px-4 py-3 align-top text-right">
                       {duty.applicable ? (
@@ -148,7 +179,7 @@ export function DeviceDutiesPanel({
                           data-testid={`device-duty-complete-${duty.dutyKey}`}
                         >
                           {completingId === duty.id && <Loader2 className="h-4 w-4 animate-spin" />}
-                          Mark done
+                          {t("markDone")}
                         </Button>
                       ) : null}
                     </td>

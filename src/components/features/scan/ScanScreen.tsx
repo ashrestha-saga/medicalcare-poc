@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useResolve } from "@/components/hooks/scan/useResolve";
 import { useScanStore } from "@/store/scanStore";
 import { CameraScanner } from "./CameraScanner";
@@ -12,6 +13,7 @@ import { ManualEntryPanel } from "./ManualEntryPanel";
  * Tablet: ready copy or manual entry on the right; camera stays in the left pane.
  */
 export function ScanScreen({ showCamera = true }: { showCamera?: boolean }) {
+  const t = useTranslations("scan");
   const phase = useScanStore((s) => s.phase);
   const startManualEntry = useScanStore((s) => s.startManualEntry);
   const cancelManualEntry = useScanStore((s) => s.cancelManualEntry);
@@ -41,14 +43,14 @@ export function ScanScreen({ showCamera = true }: { showCamera?: boolean }) {
           </div>
           <button type="button" className="p-manualbtn" onClick={startManualEntry} data-testid="manual-entry-open">
             <KeypadIcon />
-            Enter number
+            {t("enterNumber")}
           </button>
-          <div className="p-camhint">Hold the device label in the frame</div>
+          <div className="p-camhint">{t("holdLabelInFrame")}</div>
         </div>
       ) : (
         <div className="p-wait">
-          <strong>Ready to scan</strong>
-          <p>Scan a label to request service or order spare parts.</p>
+          <strong>{t("readyToScan")}</strong>
+          <p>{t("readyToScanHint")}</p>
           {lastError && <p className="p-err">{lastError}</p>}
         </div>
       )}

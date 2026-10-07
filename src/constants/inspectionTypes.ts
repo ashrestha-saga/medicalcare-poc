@@ -1,7 +1,7 @@
 /**
- * FA-404 / AC #6 — the master list of inspection/service types.
- * This list is ALWAYS rendered in full. A classification proposal may highlight
- * or pre-select entries but must never remove or reorder them.
+ * Master list of inspection/service types (canonical order).
+ * The scan-flow dropdown filters this via `serviceTypesForClassification`:
+ * STK/MTK from catalog annex flags; REPAIR / SOFTWARE / RADIATION / OTHER always.
  */
 export const INSPECTION_TYPES = [
   {
