@@ -37,7 +37,7 @@ export interface RecordDutyCompletionArgs {
 export async function recordDutyCompletion(
   tx: Prisma.TransactionClient,
   args: RecordDutyCompletionArgs,
-): Promise<{ nextDue: Date | null }> {
+): Promise<{ nextDue: Date | null; dutyPerformanceId: string }> {
   const d = args.duty;
   const nextDue = computeDutyDueAt({
     deadlineAnchor: d.deadlineAnchor,
@@ -47,7 +47,7 @@ export async function recordDutyCompletion(
     intervalUnit: d.intervalUnit,
   });
 
-  await tx.dutyPerformance.create({
+  const performance = await tx.dutyPerformance.create({
     data: {
       tenantId: args.tenantId,
       deviceDutyId: d.id,
@@ -123,5 +123,5 @@ export async function recordDutyCompletion(
     }
   }
 
-  return { nextDue };
+  return { nextDue, dutyPerformanceId: performance.id };
 }

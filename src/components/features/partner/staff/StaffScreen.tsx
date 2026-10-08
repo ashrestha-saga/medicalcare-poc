@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import type { ConsoleStaffListDTO, ConsoleStaffMemberDTO } from "@/interfaces/console";
-import { api, ApiError } from "@/lib/http/apiClient";
+import type { ConsoleStaffMemberDTO } from "@/interfaces/console";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
 import { useStaffColumns } from "@/components/hooks/partner/staff/useStaffColumns";
+import { useStaffList } from "@/components/hooks/partner/staff/useStaffList";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { staffSkillLevelMessageKey } from "@/lib/console/staffLabels";
@@ -17,49 +16,8 @@ export function StaffScreen() {
   const t = useTranslations("console");
   const { checkPermission } = usePermissions();
   const canInviteUi = checkPermission("console:staff:invite");
-  const [data, setData] = useState<ConsoleStaffListDTO | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [keyword, setKeyword] = useState("");
+  const { data, filtered, error, loading, keyword, setKeyword } = useStaffList();
   const columns = useStaffColumns();
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setData(await api<ConsoleStaffListDTO>("/api/partner/staff"));
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : t("staffLoadFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    // Initial fetch — setState inside async refresh is intentional.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load list on mount
-    void refresh();
-  }, [refresh]);
-
-  const filtered = useMemo(() => {
-    const members = data?.members ?? [];
-    const q = keyword.trim().toLowerCase();
-    if (!q) return members;
-    return members.filter((m) =>
-      [
-        m.name,
-        m.email,
-        m.jobTitle ?? "",
-        m.appRole,
-        m.status,
-        ...m.qualifications.map((x) => x.label),
-        ...m.assignedClinicNames,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [data, keyword]);
 
   return (
     <div className="p-work" data-testid="console-staff">
@@ -90,8 +48,7 @@ export function StaffScreen() {
                       item.kind === "skill" && item.skillLevelCode
                         ? staffSkillLevelMessageKey(item.skillLevelCode)
                         : null;
-                    const levelSuffix =
-                      levelKey != null ? ` (${t(levelKey)})` : "";
+                    const levelSuffix = levelKey != null ? ` (${t(levelKey)})` : "";
                     return (
                       <li key={`${item.membershipId}-${item.kind}-${item.label}`}>
                         {item.personName}: {item.label}

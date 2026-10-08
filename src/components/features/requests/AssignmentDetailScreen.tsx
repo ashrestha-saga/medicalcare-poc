@@ -43,6 +43,11 @@ export function AssignmentDetailScreen({ reference }: AssignmentDetailScreenProp
               executors={detail.executors}
               onBack={() => router.push("/requests")}
               onUpdated={detail.applyUpdated}
+              onWithdrawn={() =>
+                router.push(
+                  detail.request?.source === "due_date" ? "/due-dates" : "/requests",
+                )
+              }
             />
           )}
         </div>

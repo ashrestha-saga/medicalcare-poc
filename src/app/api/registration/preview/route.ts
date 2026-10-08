@@ -15,7 +15,9 @@ export async function POST(req: Request) {
       const preview = await releaseService.previewFromPayload(session, {
         characteristics: input.characteristics as RegistrationCharacteristics,
         areaId: input.areaId,
-        purchaseYear: input.purchaseYear });
+        purchaseYear: input.purchaseYear,
+        trustCatalogModel: input.trustCatalogModel,
+      });
       return Response.json(preview, { headers: { "x-correlation-id": session.correlationId } });
     });
   } catch (error) {

@@ -4,7 +4,7 @@ Mobile-first web application for clinical technicians and nursing staff: scan or
 
 This document describes how the system works, the domain model, and the technical features available in the codebase.
 
-For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) (incl. SWOT finishing 30.09.: enums, reprocessing link history, deriveDuties P1–P3 / AED, RoleGrant / UserPermission / SMTP / password reset).
+For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) (incl. **§4.8 Prüfpartner**, transmit/withdraw handoff, SWOT finishing 30.09.: enums, reprocessing link history, deriveDuties P1–P3 / AED, RoleGrant / UserPermission / SMTP / password reset).
 
 ---
 
@@ -75,15 +75,15 @@ Tenancy is strict: every inventory row, request, and dispatch target belongs to 
 
 ```
 src/
-  app/                 # Routes, layouts, globals.css, api/* BFF handlers, auth/callback
-  components/          # ui/ primitives · features/{auth,scan,device,classification,…}
-  services/            # Domain services (resolve, inventory, dispatch, auth/totp, …)
+  app/                 # (app) clinic · (partner) console · (inspect) field protocol · (auth) · api/*
+  components/          # ui/ · features/{registration,requests,inspect,partner,…}
+  services/            # Domain services (resolve, registration, requests, pruefpartner, …)
   interfaces/          # Shared DTOs (client + server)
   lib/                 # GS1 parser, session, crypto, env, offline queue, http client, errors
-  store/               # Zustand stores
+  store/               # Zustand stores (incl. inspectQueueStore)
   constants/           # Permissions, session TTL, auth routes
   schemas/             # Zod request schemas
-prisma/                # schema.prisma, migrations, seed.ts
+prisma/                # schema.prisma, migrations, seed.ts, fixtures/seed-pruefpartner.json
 tests/                 # Vitest unit + integration
 e2e/                   # Playwright
 docs/                  # This documentation
@@ -121,11 +121,12 @@ Primary entities (see `prisma/schema.prisma`):
 
 ### Requests & dispatch
 
-- **ServiceRequest** — idempotent create (`idempotencyKey` + `fingerprint`); subject is `instance` \| `model` \| `captured`; status events + attachments + dispatch records.
+- **ServiceRequest** — idempotent create (`idempotencyKey` + `fingerprint`); subject is `instance` \| `model` \| `captured`; status events + attachments + dispatch records. Clinic **allocate → transmit** sets `transmittedAt` (partner visibility gate). Clinic may **withdraw** only before transmit.
 - **OrderRequest** — spare-parts order (separate lifecycle; approval defaults to `pending_approval`).
 - **DispatchTarget** / **DispatchRecord** — per-tenant targets (`mail`, `oxid`, `webhook`) and per-send outcomes.
-- **DeviceModelClassification** — historised model-level Einstufung (open row = `validTo` null).
+- **DeviceModelClassification** — historised model-level Einstufung (open row = `validTo` null). Anlage 2 via wizard; `appliedPartCode` / `deviceFamilyCode` exist on the schema for Prüfpartner but are not set by the registration UI yet.
 - **Erstanlage** — wizard holds identity/characteristics in the client; release (`POST /api/registration/release`) creates the instance and freezes duties (`DeviceReleaseSnapshot` / `DeviceDuty`). Inventarize still creates a draft and deep-links to `/registration/[id]`. Scan uses **manual** service-type select (no proposal engine).
+- **Prüfpartner** — `RefInspectionCatalogue` + steps; `InspectionRun` / `InspectionStepResult`; `BaselineMeasurement`; partner `TestEquipment`. See [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) §4.8 / §5.4.
 - **ExternalSourceRecord** — BEUDAMED (and similar) cache entries.
 - **TenantOxidConnection** — OAuth tokens for the linked OXID shop (server-side only).
 - **TotpChallenge** — short-lived login challenge between password success and session issue.
@@ -139,12 +140,13 @@ Primary entities (see `prisma/schema.prisma`):
 | `/` | Scanner / resolve / request workflow (home) |
 | `/login` | Email + password (+ TOTP step when enabled) |
 | `/devices` | Inventory list & detail |
-| `/due-dates` | Frozen duty due dates and assignments (`duties:view`) |
+| `/due-dates` | Frozen duty due dates and assignments (`duties:view`); create assignment → `/requests/[reference]` |
 | `/registration`, `/registration/[id]` | Erstanlage wizard (create / resume draft) |
-| `/registration`, `/registration/[id]` | Erstanlage wizard (create / resume draft) |
-| `/registration/reclassify/[modelId]` | Admin model-wide reclassification |
+| `/registration/reclassify/[modelId]` | Admin model-wide reclassification (incl. third-party evidence) |
 | `/catalog`, `/catalog/[id]` | Device model catalog |
-| `/requests` | Service / order request list |
+| `/requests`, `/requests/[reference]` | Assignments: allocate, **transmit**, **withdraw** (pre-transmit) |
+| `/inspect`, `/inspect/[reference]` | Partner/clinic field protocol (catalogue, equipment, steps, seal) |
+| `/partner/*` | Partner console: disposition, my-sites, due-dates, inspection orders, staff, settings (test equipment) |
 | `/users` | User administration |
 | `/locations` | Sites and areas |
 | `/roles` | Role catalog (DB grants; editable with `roles:update`) |
@@ -152,7 +154,7 @@ Primary entities (see `prisma/schema.prisma`):
 | `/settings` | Tenant settings (appearance theme + OXID shop link) |
 | `/auth/callback` | OXID OAuth2 callback (route handler) |
 
-Layouts: root, `(app)` (authenticated shell), `(auth)`.
+Layouts: root, `(app)` (clinic shell), `(partner)`, `(inspect)`, `(auth)`.
 
 Capturers with role `user` have no sidebar (`shell:nav`) but can use home (`/`) and `/security`.
 
@@ -206,8 +208,19 @@ Route handlers under `src/app/api/`:
 | `GET` | `/api/service-requests/[reference]` |
 | `POST` | `/api/service-requests/[reference]/status` |
 | `POST` | `/api/service-requests/[reference]/transition` |
+| `POST` | `/api/service-requests/[reference]/allocate` |
+| `POST` | `/api/service-requests/[reference]/transmit` |
+| `POST` | `/api/service-requests/[reference]/withdraw` | Pre-transmit only |
 | `GET`/`POST` | `/api/order-requests` |
 | `GET` | `/api/attachments/[id]` |
+
+### Prüfpartner / partner inspect
+
+| Method | Path |
+|---|---|
+| `GET`/`POST` | `/api/partner/inspection-runs` (+ `[id]`, steps, confirm-device, complete, resolve) |
+| `GET`/`POST`/`PATCH` | `/api/partner/test-equipment` (+ `[id]`) |
+| `GET` | `/api/partner/due-dates`, disposition / my-sites assignment APIs |
 
 ### Admin / settings / ops
 
@@ -291,15 +304,17 @@ Released instances reject identity/classification-changing PATCHes (`state === '
 
 ## 9. Service requests & spare-parts orders
 
-### Service request create
+### Service request create & handoff
 
-`POST /api/service-requests`:
+`POST /api/service-requests` (or due-date assign → same entity):
 
 1. Validate payload (zod) and permissions.
 2. **Idempotency:** same `(idempotencyKey, fingerprint)` → 200 with same reference; same key + different payload → 409; unique-constraint races handled.
-3. One transaction: create request + `captured` status event + attachments.
-4. Dispatch to configured targets (isolated per target).
-5. Request becomes **`transmitted`** once at least one target succeeds.
+3. One transaction: create request + `captured` status event + attachments; due-date flow navigates to `/requests/[reference]`.
+4. Clinic **allocate** executor → **transmit** sets `transmittedAt` (partner portals only list transmitted assignments).
+5. Optional outbound dispatch to configured targets (isolated per target).
+6. **Withdraw** (pre-transmit only) deletes a wrong assignment so the duty is free again.
+7. Partner disposition → `/inspect/[reference]` for the Prüfpartner protocol (catalogue, equipment, seal / baselines).
 
 Downstream systems can push status via `POST .../status`. Staff can transition open requests when permitted (`requests:transition`).
 
@@ -551,6 +566,7 @@ npm run dev                   # http://localhost:3000
 - Sites Bonn / Cologne with areas
 - Device models + inventory instances (`INV-10001`, `INV-10002`)
 - Erstanlage Ref* seeds (product kinds, Anlage 2, inspection types, …)
+- Prüfpartner catalogues / steps / families (`prisma/fixtures/seed-pruefpartner.json`); demo test equipment for MSR/RTS (Sicherheitstester + Röntgen-Prüfkörper)
 - Dispatch targets (mail + OXID)
 
 Try these identifiers after seed:
@@ -567,9 +583,11 @@ Try these identifiers after seed:
 ## Related reading
 
 - Root [`README.md`](../README.md) — quick start and high-level architecture
+- [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) — schema map (§4.8 Prüfpartner, §5.3–5.4 handoff / inspect)
 - `prisma/schema.prisma` — authoritative data model
 - `src/constants/permissions.ts` — RBAC defaults + path/menu helpers
 - `src/services/roles/roleGrantsService.ts` — DB-backed RoleGrant cache + catalog CRUD
 - `src/services/resolve/resolveService.ts` — resolution chain
+- `src/services/pruefpartner/*` — catalogue resolution, inspection runs, baselines, test equipment
 - `src/services/auth/totpService.ts` — 2FA lifecycle
 - `src/services/inventory/deviceInventoryService.ts` — inventarnummer allocation & inventarize create

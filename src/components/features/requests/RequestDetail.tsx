@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import type { RequestDetailProps } from "@/interfaces";
 import { Spinner } from "@/components/ui/Loading";
@@ -13,6 +13,7 @@ import {
   useRequestTransition,
 } from "@/components/hooks/requests";
 import type { AppLocale } from "@/lib/locale";
+import { WithdrawAssignmentDialog } from "./WithdrawAssignmentDialog";
 
 function MetaRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -30,18 +31,22 @@ export function RequestDetail({
   executors = [],
   onBack,
   onUpdated,
+  onWithdrawn,
 }: RequestDetailProps) {
   const t = useTranslations("requestsDetail");
   const tStatus = useTranslations("status");
   const tCommon = useTranslations("common");
   const locale = useLocale() as AppLocale;
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const {
     busy,
     executorOrgId,
     onExecutorChange,
     canAllocate: allocationEditable,
     canTransmit,
+    canWithdraw,
     transmit,
+    withdraw,
   } = useRequestTransition(request, onUpdated);
 
   const subtitle = [request.serviceType, request.deviceName].filter(Boolean).join(" · ");
@@ -172,6 +177,17 @@ export function RequestDetail({
                 {busy ? <Spinner /> : t("transmit")}
               </Button>
             ) : null}
+            {canWork && canWithdraw ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setWithdrawOpen(true)}
+                data-testid="withdraw-assignment"
+              >
+                {t("withdraw")}
+              </Button>
+            ) : null}
             <Button type="button" variant="outline" onClick={onBack}>
               {t("back")}
             </Button>
@@ -211,6 +227,21 @@ export function RequestDetail({
           ) : null}
         </aside>
       </div>
+
+      <WithdrawAssignmentDialog
+        open={withdrawOpen}
+        reference={request.reference}
+        busy={busy}
+        onOpenChange={setWithdrawOpen}
+        onConfirm={() => {
+          void withdraw().then((ok) => {
+            if (ok) {
+              setWithdrawOpen(false);
+              onWithdrawn?.();
+            }
+          });
+        }}
+      />
     </div>
   );
 }

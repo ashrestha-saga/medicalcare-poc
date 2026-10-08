@@ -139,4 +139,14 @@ export function TrainingIcon() {
   );
 }
 
+/** Open data-quality / deferred answers — flag marker, not used elsewhere in nav. */
+export function ClarificationsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M6 21V4" />
+      <path d="M6 4.5h9.5l-1.8 3.2 1.8 3.3H6" />
+    </svg>
+  );
+}
+
 

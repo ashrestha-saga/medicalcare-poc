@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { ConsoleAuditListDTO } from "@/interfaces/console";
-import { api, ApiError } from "@/lib/http/apiClient";
+import { usePartnerActivity } from "@/components/hooks/partner/activity/usePartnerActivity";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/Loading";
@@ -20,26 +18,7 @@ const SCOPE_LABEL: Record<
 
 export function ActivityScreen() {
   const t = useTranslations("console");
-  const [data, setData] = useState<ConsoleAuditListDTO | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    void api<ConsoleAuditListDTO>("/api/partner/audit?limit=100")
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof ApiError ? e.message : t("auditLoadFailed"));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
+  const { data, error, loading } = usePartnerActivity();
 
   return (
     <div className="p-work" data-testid="console-activity">

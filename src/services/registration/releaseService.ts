@@ -115,6 +115,8 @@ export interface ReleaseInput {
    */
   classificationConfidence?: "verified" | "responsible" | "derived" | "guess";
   evidenceText?: string | null;
+  /** Link another inventory unit to an already-classified DeviceModel. */
+  catalogLink?: boolean;
 }
 
 export interface PreviewInput {
@@ -122,6 +124,8 @@ export interface PreviewInput {
   areaId?: string | null;
   purchaseYear?: number | string | null;
   deviceInstanceId?: string | null;
+  /** Derive duties from catalog model classification without re-validating Merkmale. */
+  trustCatalogModel?: boolean;
 }
 
 export interface CommitRegistrationInput extends CreateDraftInput, ReleaseInput {
@@ -180,16 +184,21 @@ export const releaseService = {
   async previewFromPayload(ctx: TenantWorkContext, input: PreviewInput) {
     requirePermission(ctx, "inventory:update");
     const characteristics = hydrateAnswerMeta(input.characteristics);
-    const conflicts = characteristicConflicts(characteristics, {
-      purchaseYear: input.purchaseYear,
-    });
-    if (conflicts.length) {
-      throw unprocessable(conflicts.join(" · "), { field: "characteristics", conflicts });
+    const trustCatalog = Boolean(input.trustCatalogModel);
+    if (!trustCatalog) {
+      const conflicts = characteristicConflicts(characteristics, {
+        purchaseYear: input.purchaseYear,
+      });
+      if (conflicts.length) {
+        throw unprocessable(conflicts.join(" · "), { field: "characteristics", conflicts });
+      }
     }
     if (!characteristics.produktart?.trim()) {
       throw unprocessable("Product kind is required.", { field: "produktart" });
     }
-    await assertCharacteristicsAnswered(characteristics);
+    if (!trustCatalog) {
+      await assertCharacteristicsAnswered(characteristics);
+    }
 
     const annex2 = await resolveAnnex2(characteristics);
     let radiationRef = null;
@@ -230,6 +239,19 @@ export const releaseService = {
       requiresValidatedProcess,
     });
 
+    const releaseLevel = computeReleaseLevel(characteristics);
+
+    // Catalog-link preview only needs duties; skip tenant-scoped site/evidence lookups.
+    if (trustCatalog) {
+      return {
+        duties,
+        prerequisites: [],
+        site: null,
+        conflicts: [] as string[],
+        releaseLevel,
+      };
+    }
+
     let site: SiteSafetyStatus | null = null;
     if (input.areaId) {
       const area = await prisma.area.findFirst({
@@ -253,7 +275,6 @@ export const releaseService = {
 
     const refRows = await loadPrerequisiteRows();
     const prerequisites = buildPrerequisitesFromRef(refRows, characteristics, site, evidenceByCode);
-    const releaseLevel = computeReleaseLevel(characteristics);
     return {
       duties,
       prerequisites,
@@ -317,36 +338,47 @@ export const releaseService = {
     }
 
     const characteristics = parseCharacteristics(row.characteristicsJson);
-    const conflicts = characteristicConflicts(characteristics, {
-      purchaseYear: row.commissionedAt ? row.commissionedAt.getUTCFullYear() : null,
-    });
-    if (conflicts.length) {
-      throw unprocessable(conflicts.join(" · "), { field: "characteristics", conflicts });
+    const catalogLink = Boolean(input.catalogLink && row.modelId);
+    if (!catalogLink) {
+      const conflicts = characteristicConflicts(characteristics, {
+        purchaseYear: row.commissionedAt ? row.commissionedAt.getUTCFullYear() : null,
+      });
+      if (conflicts.length) {
+        throw unprocessable(conflicts.join(" · "), { field: "characteristics", conflicts });
+      }
+      await assertCharacteristicsAnswered(characteristics);
     }
-    await assertCharacteristicsAnswered(characteristics);
     if (!row.serialNumber && !row.udiDi) {
       throw unprocessable("Serial number or UDI-DI is required.");
     }
     if (!row.areaId) throw unprocessable("Site/area is required.", { field: "areaId" });
 
-    const preview = await this.derivePreview(ctx, draftId);
-    const releaseLevel = preview.releaseLevel ?? computeReleaseLevel(characteristics);
-    const open = openMandatoryPrerequisites(preview.prerequisites, input.checks ?? {}, {
-      releaseLevel,
-      requireEvidence: releaseLevel >= 2,
+    const preview = await this.previewFromPayload(ctx, {
+      characteristics,
+      areaId: row.areaId,
+      purchaseYear: row.commissionedAt ? row.commissionedAt.getUTCFullYear() : null,
+      deviceInstanceId: row.id,
+      trustCatalogModel: catalogLink,
     });
-    if (open.length) {
-      const thirdParty = open.filter((x) => x.evidenceKind === "third_party");
-      if (thirdParty.length && releaseLevel >= 3) {
-        throw unprocessable(
-          `Release level 3 requires third-party evidence (external record). Open: ${thirdParty.map((x) => x.t).join(" · ")}`,
-          { field: "prerequisites", open: thirdParty.map((x) => x.k), code: "third_party_required" },
-        );
-      }
-      throw unprocessable(`Release not possible. Open: ${open.map((x) => x.t).join(" · ")}`, {
-        field: "prerequisites",
-        open: open.map((x) => x.k),
+    const releaseLevel = preview.releaseLevel ?? computeReleaseLevel(characteristics);
+    if (!catalogLink) {
+      const open = openMandatoryPrerequisites(preview.prerequisites, input.checks ?? {}, {
+        releaseLevel,
+        requireEvidence: releaseLevel >= 2,
       });
+      if (open.length) {
+        const thirdParty = open.filter((x) => x.evidenceKind === "third_party");
+        if (thirdParty.length && releaseLevel >= 3) {
+          throw unprocessable(
+            `Release level 3 requires third-party evidence (external record). Open: ${thirdParty.map((x) => x.t).join(" · ")}`,
+            { field: "prerequisites", open: thirdParty.map((x) => x.k), code: "third_party_required" },
+          );
+        }
+        throw unprocessable(`Release not possible. Open: ${open.map((x) => x.t).join(" · ")}`, {
+          field: "prerequisites",
+          open: open.map((x) => x.k),
+        });
+      }
     }
 
     const protocol = characteristics.decisionProtocol?.length
@@ -372,12 +404,14 @@ export const releaseService = {
       mtkItemId = item?.id ?? null;
     }
 
-    const confidence = input.classificationConfidence ?? "responsible";
+    const confidence = input.classificationConfidence ?? (catalogLink ? "verified" : "responsible");
     const evidenceText =
       input.evidenceText?.trim() ||
-      (confidence === "responsible" || confidence === "verified"
-        ? `Initial registration release by ${ctx.user.name} — prerequisites confirmed (level ${releaseLevel})`
-        : null);
+      (catalogLink
+        ? `Catalog link by ${ctx.user.name} — model classification reused`
+        : confidence === "responsible" || confidence === "verified"
+          ? `Initial registration release by ${ctx.user.name} — prerequisites confirmed (level ${releaseLevel})`
+          : null);
 
     const modelChars = extractModelCharacteristics(characteristicsFrozen);
     const evidenceRows = await prisma.deviceEvidence.findMany({
@@ -386,49 +420,73 @@ export const releaseService = {
 
     const referenceDate = row.commissionedAt ?? new Date();
 
+    const existingOpenClassification =
+      catalogLink && row.modelId
+        ? await prisma.deviceModelClassification.findFirst({
+            where: { deviceModelId: row.modelId, validTo: null },
+            orderBy: { validFrom: "desc" },
+          })
+        : null;
+
     const result = await prisma.$transaction(async (tx) => {
-      if (row.modelId) {
-        await tx.deviceModelClassification.updateMany({
-          where: { deviceModelId: row.modelId, validTo: null },
-          data: { validTo: new Date(), openClassificationKey: null },
-        });
-      }
+      let classificationId: string | null = existingOpenClassification?.id ?? null;
 
-      const fieldStates: Record<string, string> = {};
-      const deferredFields: string[] = [];
-      for (const [field, meta] of Object.entries(characteristicsFrozen.answerMeta ?? {})) {
-        fieldStates[field] = meta.state === "deferred" ? "deferred" : meta.state === "selbst_gewaehlt" ? "chosen" : meta.state === "vorschlag_bestaetigt" ? "confirmed" : meta.state === "vorschlag" ? "proposed" : "open";
-        if (meta.state === "deferred") deferredFields.push(field);
-      }
+      if (!catalogLink || !existingOpenClassification) {
+        if (row.modelId) {
+          await tx.deviceModelClassification.updateMany({
+            where: { deviceModelId: row.modelId, validTo: null },
+            data: { validTo: new Date(), openClassificationKey: null },
+          });
+        }
 
-      const classification =
-        row.modelId != null
-          ? await tx.deviceModelClassification.create({
-              data: {
-                deviceModelId: row.modelId,
-                openClassificationKey: row.modelId,
-                stk: stkFlagFromDuties(preview.duties),
-                mtkItemId,
-                radiation: Boolean(characteristics.strahlung),
-                softwareClass:
-                  characteristics.software && characteristics.swKlasse && characteristics.swKlasse !== "keine"
-                    ? characteristics.swKlasse
-                    : null,
-                confidence,
-                evidenceText,
-                ruleSetId: mpRule.id,
-                confirmedBy:
-                  confidence === "verified" || confidence === "responsible" ? ctx.user.name : null,
-                confirmedAt:
-                  confidence === "verified" || confidence === "responsible" ? new Date() : null,
-                productKindCode: characteristics.produktart || row.productKindCode,
-                characteristics: JSON.stringify(modelChars),
-                fieldStates: JSON.stringify(fieldStates),
-                decisions: JSON.stringify(protocol),
-                deferredFields: deferredFields.length ? JSON.stringify(deferredFields) : null,
-              },
-            })
-          : null;
+        const fieldStates: Record<string, string> = {};
+        const deferredFields: string[] = [];
+        for (const [field, meta] of Object.entries(characteristicsFrozen.answerMeta ?? {})) {
+          fieldStates[field] =
+            meta.state === "deferred"
+              ? "deferred"
+              : meta.state === "selbst_gewaehlt"
+                ? "chosen"
+                : meta.state === "vorschlag_bestaetigt"
+                  ? "confirmed"
+                  : meta.state === "vorschlag"
+                    ? "proposed"
+                    : "open";
+          if (meta.state === "deferred") deferredFields.push(field);
+        }
+
+        const classification =
+          row.modelId != null
+            ? await tx.deviceModelClassification.create({
+                data: {
+                  deviceModelId: row.modelId,
+                  openClassificationKey: row.modelId,
+                  stk: stkFlagFromDuties(preview.duties),
+                  mtkItemId,
+                  radiation: Boolean(characteristics.strahlung),
+                  softwareClass:
+                    characteristics.software &&
+                    characteristics.swKlasse &&
+                    characteristics.swKlasse !== "keine"
+                      ? characteristics.swKlasse
+                      : null,
+                  confidence,
+                  evidenceText,
+                  ruleSetId: mpRule.id,
+                  confirmedBy:
+                    confidence === "verified" || confidence === "responsible" ? ctx.user.name : null,
+                  confirmedAt:
+                    confidence === "verified" || confidence === "responsible" ? new Date() : null,
+                  productKindCode: characteristics.produktart || row.productKindCode,
+                  characteristics: JSON.stringify(modelChars),
+                  fieldStates: JSON.stringify(fieldStates),
+                  decisions: JSON.stringify(protocol),
+                  deferredFields: deferredFields.length ? JSON.stringify(deferredFields) : null,
+                },
+              })
+            : null;
+        classificationId = classification?.id ?? null;
+      }
 
       const snapshot = await tx.deviceReleaseSnapshot.create({
         data: {
@@ -436,7 +494,7 @@ export const releaseService = {
           deviceInstanceId: row.id,
           releasedBy: ctx.user.name,
           ruleSetIds: JSON.stringify(ruleSetIds),
-          classificationId: classification?.id ?? null,
+          classificationId,
           characteristics: JSON.stringify(characteristicsFrozen),
           derivedDuties: JSON.stringify(preview.duties),
           prerequisites: JSON.stringify({
@@ -444,6 +502,7 @@ export const releaseService = {
             checks: input.checks,
             releaseLevel,
             evidenceIds: evidenceRows.map((e) => e.id),
+            catalogLink: catalogLink || undefined,
           }),
           appVersion: APP_VERSION,
         },
@@ -527,7 +586,7 @@ export const releaseService = {
         },
       });
 
-      return { snapshotId: snapshot.id, classificationId: classification?.id ?? null, releaseLevel };
+      return { snapshotId: snapshot.id, classificationId, releaseLevel };
     });
 
     await recordAudit({

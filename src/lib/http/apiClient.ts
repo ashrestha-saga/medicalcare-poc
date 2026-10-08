@@ -32,16 +32,24 @@ export function newClientId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/**
+ * When to attach x-acting-tenant-id.
+ * On /partner pages, capabilities/menu must stay console:* — do not send the header
+ * for those calls. Partner inspection-run APIs still need the clinic tenant.
+ */
+function resolveActingTenantId(apiPath: string): string | null {
+  if (typeof window === "undefined") return null;
+  const tenantId = useActingTenantStore.getState().tenantId;
+  if (!tenantId) return null;
+  const onPartnerConsole = window.location.pathname.startsWith("/partner");
+  if (!onPartnerConsole) return tenantId;
+  return apiPath.startsWith("/api/partner/inspection-runs") ? tenantId : null;
+}
+
 export async function api<T>(path: string, init: RequestInit & { correlationId?: string } = {}): Promise<T> {
   const { correlationId, headers, ...rest } = init;
   const isFormData = typeof FormData !== "undefined" && rest.body instanceof FormData;
-  // Partner console must not send acting-tenant — capabilities/menu are console:*, not clinic.
-  const onPartnerConsole =
-    typeof window !== "undefined" && window.location.pathname.startsWith("/partner");
-  const actingTenantId =
-    typeof window !== "undefined" && !onPartnerConsole
-      ? useActingTenantStore.getState().tenantId
-      : null;
+  const actingTenantId = resolveActingTenantId(path);
   let res: Response;
   try {
     res = await fetch(path, {

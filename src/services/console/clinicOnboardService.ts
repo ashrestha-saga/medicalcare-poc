@@ -319,7 +319,11 @@ export const clinicOnboardService = {
           orderBy: [{ appRole: "asc" }, { user: { name: "asc" } }],
         }),
         prisma.serviceRequest.findMany({
-          where: { tenantId },
+          where: {
+            tenantId,
+            transmittedAt: { not: null },
+            state: { not: "rejected" },
+          },
           include: {
             executorOrg: { select: { name: true, code: true } },
             assigneeUser: { select: { name: true } },

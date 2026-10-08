@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type {
@@ -66,6 +66,10 @@ export function useCreateExternalInspector() {
       setMetaLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    void loadMeta();
+  }, [loadMeta]);
 
   function patch<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

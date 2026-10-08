@@ -3,13 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
+  CatalogModelDetailDTO,
   DerivedDuty,
+  DeviceInstanceDTO,
   PrerequisiteItem,
   ProductKindDTO,
   RegistrationCharacteristics,
   RegistrationDraftDTO,
   RegistrationIdentityForm,
   RegistrationRefBundle,
+  ResolveResponse,
 } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { registrationIdentityFormSchema } from "@/schemas/registration";
@@ -45,6 +48,8 @@ import {
 } from "@/services/registration/checkRules";
 import { kindMatchesQuery } from "@/components/features/registration/kindDisplay";
 
+export type RegistrationIdentityPhase = "lookup" | "inventory";
+
 function emptyIdentity(): RegistrationIdentityForm {
   return {
     tradeName: "",
@@ -60,6 +65,32 @@ function emptyIdentity(): RegistrationIdentityForm {
     areaId: "",
     room: "",
   };
+}
+
+async function fetchModelDetail(modelId: string): Promise<CatalogModelDetailDTO> {
+  const res = await api<{ model: CatalogModelDetailDTO }>(`/api/catalog/models/${modelId}`);
+  return res.model;
+}
+
+async function derivePreview(
+  merkmale: RegistrationCharacteristics,
+  areaId: string,
+  purchaseYear: string,
+  trustCatalogModel = false,
+): Promise<{ duties: DerivedDuty[]; prerequisites: PrerequisiteItem[] }> {
+  const year = Number(purchaseYear);
+  return api<{ duties: DerivedDuty[]; prerequisites: PrerequisiteItem[] }>(
+    "/api/registration/preview",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        characteristics: merkmale,
+        areaId: areaId || null,
+        purchaseYear: Number.isFinite(year) ? year : null,
+        trustCatalogModel: trustCatalogModel || undefined,
+      }),
+    },
+  );
 }
 
 /**
@@ -85,6 +116,18 @@ export function useRegistrationWizard(initialDraftId?: string) {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [kindQ, setKindQ] = useState("");
+  const [identityPhase, setIdentityPhase] = useState<RegistrationIdentityPhase>(
+    initialDraftId ? "inventory" : "lookup",
+  );
+  const [linkedModelId, setLinkedModelId] = useState<string | null>(null);
+  const [modelClassificationPrefill, setModelClassificationPrefill] =
+    useState<RegistrationCharacteristics | null>(null);
+  const [characteristicsSkipped, setCharacteristicsSkipped] = useState(false);
+  /** Linked to catalog model with open classification — skip Merkmale + prerequisites. */
+  const [catalogLinkMode, setCatalogLinkMode] = useState(false);
+  const [gtinInput, setGtinInput] = useState("");
+  const [notInCatalogOpen, setNotInCatalogOpen] = useState(false);
+  const [notInCatalogGtin, setNotInCatalogGtin] = useState("");
 
   const selectedKind = useMemo(
     () => kinds.find((k) => k.code === merkmale.produktart) ?? null,
@@ -109,6 +152,38 @@ export function useRegistrationWizard(initialDraftId?: string) {
     setStep(n);
   }, []);
 
+  const applyPreviewResult = useCallback(
+    (preview: { duties: DerivedDuty[]; prerequisites: PrerequisiteItem[] }, nextMerkmale: RegistrationCharacteristics) => {
+      setDuties(preview.duties);
+      setDecisionProtocol(buildDecisionProtocol(nextMerkmale));
+      setPrerequisites(preview.prerequisites);
+      const nextChecks: Record<string, boolean> = {};
+      for (const p of preview.prerequisites) {
+        if (p.erfuellt) nextChecks[p.k] = true;
+      }
+      setChecks(nextChecks);
+    },
+    [],
+  );
+
+  const applyLinkedModelDetail = useCallback((model: CatalogModelDetailDTO, serialHint?: string) => {
+    setLinkedModelId(model.id);
+    setModelClassificationPrefill(model.characteristicsPrefill);
+    setCharacteristicsSkipped(false);
+    setCatalogLinkMode(false);
+    setForm((f) => ({
+      ...f,
+      tradeName: model.tradeName?.trim() || model.displayName || "",
+      manufacturer: model.manufacturer?.trim() || "",
+      modelName: model.modelName?.trim() || model.tradeName?.trim() || model.displayName || "",
+      udiDi: model.udiDi?.trim() || model.basicUdiDi?.trim() || "",
+      serialNumber: serialHint?.trim() || f.serialNumber,
+    }));
+    setIdentityPhase("inventory");
+    setError(null);
+    setFieldErrors({});
+  }, []);
+
   useEffect(() => {
     void (async () => {
       const [k, r] = await Promise.all([
@@ -127,6 +202,11 @@ export function useRegistrationWizard(initialDraftId?: string) {
         `/api/registration/drafts/${initialDraftId}`,
       );
       setDraftId(draft.id);
+      setIdentityPhase("inventory");
+      if (draft.model?.id) {
+        setLinkedModelId(draft.model.id);
+        setModelClassificationPrefill(draft.modelClassificationPrefill ?? null);
+      }
       setForm({
         tradeName: draft.model?.tradeName ?? "",
         manufacturer: draft.model?.manufacturer ?? "",
@@ -141,35 +221,50 @@ export function useRegistrationWizard(initialDraftId?: string) {
         areaId: draft.areaId ?? "",
         room: draft.room ?? "",
       });
+
+      const hasInstanceChars = Boolean(draft.characteristics?.produktart);
+      const hasModelPrefill = Boolean(draft.modelClassificationPrefill?.produktart);
+
+      if (!hasInstanceChars && hasModelPrefill && draft.modelClassificationPrefill) {
+        const year = draft.purchaseYear ? String(draft.purchaseYear) : "";
+        const characteristics = hydrateAnswerMeta(
+          mergeModelPrefill(emptyCharacteristics(), draft.modelClassificationPrefill),
+        );
+        setMerkmale(characteristics);
+        try {
+          const preview = await derivePreview(characteristics, draft.areaId ?? "", year, true);
+          applyPreviewResult(preview, characteristics);
+          setCharacteristicsSkipped(true);
+          setCatalogLinkMode(true);
+          setMaxStep(3);
+          setStep(3);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Could not derive duties from catalog model");
+          setMaxStep(1);
+          setStep(1);
+        }
+        return;
+      }
+
       setMerkmale(() => {
-        const base = draft.characteristics?.produktart
+        const base = hasInstanceChars
           ? hydrateAnswerMeta(draft.characteristics)
           : emptyCharacteristics();
-        // C4 — prefill model-owned fields from open classification when draft has none yet.
         if (
-          !draft.characteristics?.produktart &&
-          draft.modelClassificationPrefill?.produktart
-        ) {
-          return hydrateAnswerMeta(
-            mergeModelPrefill(base, draft.modelClassificationPrefill),
-          );
-        }
-        if (
-          draft.characteristics?.produktart &&
+          hasInstanceChars &&
           draft.modelClassificationPrefill &&
           draft.modelClassificationFieldStates
         ) {
-          // Confirmed model fields already present — keep instance answers; wizard shows them as confirmed.
           return base;
         }
         return base;
       });
-      if (draft.characteristics?.produktart || draft.modelClassificationPrefill?.produktart) {
+      if (hasInstanceChars || hasModelPrefill) {
         setMaxStep(2);
         setStep(2);
       }
     })().catch((e) => setError(e instanceof Error ? e.message : "Failed to load draft"));
-  }, [initialDraftId]);
+  }, [initialDraftId, applyPreviewResult, actorName]);
 
   const patchForm = useCallback((partial: Partial<RegistrationIdentityForm>) => {
     setForm((f) => ({ ...f, ...partial }));
@@ -243,16 +338,148 @@ export function useRegistrationWizard(initialDraftId?: string) {
     setMerkmale(emptyCharacteristics());
   }, []);
 
+  const resolveGtin = useCallback(async () => {
+    const raw = gtinInput.trim();
+    if (!raw) return;
+    setError(null);
+    setNotInCatalogOpen(false);
+    setBusy(true);
+    try {
+      const res = await api<ResolveResponse>("/api/resolve", {
+        method: "POST",
+        body: JSON.stringify({ raw, context: "service" }),
+      });
+      if (res.stage === "capture" || !res.model?.id) {
+        setNotInCatalogGtin(raw);
+        setNotInCatalogOpen(true);
+        return;
+      }
+      const detail = await fetchModelDetail(res.model.id);
+      applyLinkedModelDetail(detail, res.identifier.serial);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "GTIN lookup failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [gtinInput, applyLinkedModelDetail]);
+
+  const selectCatalogModel = useCallback(
+    async (modelId: string) => {
+      setError(null);
+      setBusy(true);
+      try {
+        const detail = await fetchModelDetail(modelId);
+        applyLinkedModelDetail(detail);
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "Could not load catalog model");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [applyLinkedModelDetail],
+  );
+
+  const startManualRegistration = useCallback((udiHint?: string) => {
+    setLinkedModelId(null);
+    setModelClassificationPrefill(null);
+    setCharacteristicsSkipped(false);
+    setCatalogLinkMode(false);
+    setMerkmale(emptyCharacteristics());
+    setNotInCatalogOpen(false);
+    setForm((f) => ({
+      ...emptyIdentity(),
+      siteId: f.siteId,
+      areaId: f.areaId,
+      room: f.room,
+      responsibleUserId: f.responsibleUserId,
+      responsiblePerson: f.responsiblePerson,
+      purchaseYear: f.purchaseYear,
+      udiDi: (udiHint ?? (notInCatalogGtin || gtinInput)).trim(),
+    }));
+    setIdentityPhase("inventory");
+    setError(null);
+    setFieldErrors({});
+  }, [gtinInput, notInCatalogGtin]);
+
+  const dismissNotInCatalog = useCallback(() => {
+    setNotInCatalogOpen(false);
+  }, []);
+
+  const clearLinkedModel = useCallback(() => {
+    setLinkedModelId(null);
+    setModelClassificationPrefill(null);
+    setCharacteristicsSkipped(false);
+    setCatalogLinkMode(false);
+    setMerkmale(emptyCharacteristics());
+    setForm(emptyIdentity());
+    setGtinInput("");
+    setIdentityPhase("lookup");
+    setDuties([]);
+    setPrerequisites([]);
+    setDecisionProtocol([]);
+    setChecks({});
+    setMaxStep(1);
+    setStep(1);
+    setError(null);
+    setFieldErrors({});
+  }, []);
+
   const saveIdentity = useCallback(async () => {
     setError(null);
+    if (linkedModelId && !form.serialNumber.trim()) {
+      setFieldErrors({ serialNumber: "Serial number is required when linking a catalog model." });
+      return;
+    }
     const parsed = registrationIdentityFormSchema.safeParse(form);
     if (!parsed.success) {
       setFieldErrors(zodFieldErrors(parsed.error));
       return;
     }
     setFieldErrors({});
+
+    if (linkedModelId) {
+      setBusy(true);
+      try {
+        const dup = await api<{ device: DeviceInstanceDTO | null }>(
+          `/api/devices?serial=${encodeURIComponent(parsed.data.serialNumber!.trim())}&modelId=${encodeURIComponent(linkedModelId)}`,
+        );
+        if (dup.device) {
+          setError(
+            `Serial already in inventory${dup.device.inventoryNumber ? ` · ${dup.device.inventoryNumber}` : ""}.`,
+          );
+          setBusy(false);
+          return;
+        }
+
+        if (modelClassificationPrefill?.produktart) {
+          const characteristics = hydrateAnswerMeta(
+            mergeModelPrefill(emptyCharacteristics(), modelClassificationPrefill),
+          );
+          setMerkmale(characteristics);
+          const preview = await derivePreview(
+            characteristics,
+            parsed.data.areaId,
+            parsed.data.purchaseYear,
+            true,
+          );
+          applyPreviewResult(preview, characteristics);
+          setCharacteristicsSkipped(true);
+          setCatalogLinkMode(true);
+          unlockAndGo(3);
+          return;
+        }
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "Could not continue with linked model");
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    setCharacteristicsSkipped(false);
+    setCatalogLinkMode(false);
     unlockAndGo(2);
-  }, [form, unlockAndGo]);
+  }, [form, linkedModelId, modelClassificationPrefill, unlockAndGo, applyPreviewResult]);
 
   const saveCharacteristicsAndDerive = useCallback(async () => {
     if (!merkmale.produktart) {
@@ -272,33 +499,16 @@ export function useRegistrationWizard(initialDraftId?: string) {
     setError(null);
     setBusy(true);
     try {
-      const year = Number(form.purchaseYear);
-      const preview = await api<{ duties: DerivedDuty[]; prerequisites: PrerequisiteItem[] }>(
-        "/api/registration/preview",
-        {
-          method: "POST",
-          body: JSON.stringify({
-            characteristics: merkmale,
-            areaId: form.areaId || null,
-            purchaseYear: Number.isFinite(year) ? year : null,
-          }),
-        },
-      );
-      setDuties(preview.duties);
-      setDecisionProtocol(buildDecisionProtocol(merkmale));
-      setPrerequisites(preview.prerequisites);
-      const nextChecks: Record<string, boolean> = {};
-      for (const p of preview.prerequisites) {
-        if (p.erfuellt) nextChecks[p.k] = true;
-      }
-      setChecks(nextChecks);
+      const preview = await derivePreview(merkmale, form.areaId, form.purchaseYear);
+      applyPreviewResult(preview, merkmale);
+      setCharacteristicsSkipped(false);
       unlockAndGo(3);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Duty derivation failed");
     } finally {
       setBusy(false);
     }
-  }, [merkmale, form.areaId, form.purchaseYear, selectedKind, unlockAndGo]);
+  }, [merkmale, form.areaId, form.purchaseYear, selectedKind, unlockAndGo, applyPreviewResult]);
 
   const acknowledgeRule = useCallback(
     (hit: CheckRuleHit) => {
@@ -317,6 +527,45 @@ export function useRegistrationWizard(initialDraftId?: string) {
     [merkmale, form.purchaseYear],
   );
 
+  /** Persist identity + characteristics so evidence / catalog-link release can attach. */
+  const ensureDraft = useCallback(
+    async (characteristics: RegistrationCharacteristics = merkmale): Promise<string> => {
+      const year = Number(form.purchaseYear);
+      const payload = {
+        modelId: linkedModelId || undefined,
+        tradeName: form.tradeName,
+        manufacturer: form.manufacturer,
+        modelName: form.modelName || form.tradeName,
+        serialNumber: form.serialNumber || null,
+        udiDi: form.udiDi || null,
+        inventoryNumber: form.inventoryNumber || null,
+        purchaseYear: Number.isFinite(year) ? year : null,
+        responsiblePerson: form.responsiblePerson || null,
+        responsibleUserId: form.responsibleUserId || null,
+        areaId: form.areaId || null,
+        room: form.room || null,
+        productKindCode: characteristics.produktart,
+        characteristics,
+        keepDraft: true,
+        catalogLink: catalogLinkMode || undefined,
+      };
+      if (draftId) {
+        await api(`/api/registration/drafts/${draftId}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+        return draftId;
+      }
+      const res = await api<{ draft: { id: string } }>("/api/registration/drafts", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      setDraftId(res.draft.id);
+      return res.draft.id;
+    },
+    [form, linkedModelId, draftId, merkmale, catalogLinkMode],
+  );
+
   const release = useCallback(async () => {
     setError(null);
     const parsed = registrationIdentityFormSchema.safeParse(form);
@@ -327,18 +576,20 @@ export function useRegistrationWizard(initialDraftId?: string) {
     }
     if (!merkmale.produktart) {
       setError("Select a product kind.");
-      setStep(2);
+      setStep(catalogLinkMode || characteristicsSkipped ? 1 : 2);
       return;
     }
     setFieldErrors({});
     setBusy(true);
     try {
+      const id = catalogLinkMode ? await ensureDraft() : draftId;
       const year = Number(parsed.data.purchaseYear);
       const protocol = buildDecisionProtocol(merkmale);
       const { result } = await api<{ result: { id: string } }>("/api/registration/release", {
         method: "POST",
         body: JSON.stringify({
-          draftId: draftId || undefined,
+          draftId: id || undefined,
+          modelId: linkedModelId || undefined,
           tradeName: parsed.data.tradeName,
           manufacturer: parsed.data.manufacturer,
           modelName: parsed.data.modelName || parsed.data.tradeName,
@@ -355,7 +606,8 @@ export function useRegistrationWizard(initialDraftId?: string) {
             ...merkmale,
             decisionProtocol: protocol,
           },
-          checks,
+          checks: catalogLinkMode ? {} : checks,
+          catalogLink: catalogLinkMode || undefined,
         }),
       });
       router.push(`/devices?highlight=${result.id}`);
@@ -364,7 +616,17 @@ export function useRegistrationWizard(initialDraftId?: string) {
     } finally {
       setBusy(false);
     }
-  }, [form, merkmale, draftId, checks, router]);
+  }, [
+    form,
+    merkmale,
+    draftId,
+    checks,
+    router,
+    linkedModelId,
+    characteristicsSkipped,
+    catalogLinkMode,
+    ensureDraft,
+  ]);
 
   const selectedAnnex2 = useMemo(
     () => refData?.annex2.find((a) => a.id === merkmale.anlage2ItemId) ?? null,
@@ -409,6 +671,7 @@ export function useRegistrationWizard(initialDraftId?: string) {
         setMerkmale(next);
         const year = Number(form.purchaseYear);
         const payload = {
+          modelId: linkedModelId || undefined,
           tradeName: form.tradeName,
           manufacturer: form.manufacturer,
           modelName: form.modelName || form.tradeName,
@@ -445,25 +708,44 @@ export function useRegistrationWizard(initialDraftId?: string) {
         setBusy(false);
       }
     },
-    [merkmale, actorName, form, draftId],
+    [merkmale, actorName, form, draftId, linkedModelId],
   );
+
+  const continueToPrerequisites = useCallback(async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      await ensureDraft();
+      unlockAndGo(4);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not save draft for prerequisites");
+    } finally {
+      setBusy(false);
+    }
+  }, [ensureDraft, unlockAndGo]);
+
+  /** After duties: catalog link releases immediately; greenfield continues to prerequisites. */
+  const continueFromDuties = useCallback(async () => {
+    if (catalogLinkMode) {
+      await release();
+      return;
+    }
+    await continueToPrerequisites();
+  }, [catalogLinkMode, release, continueToPrerequisites]);
 
   const uploadEvidence = useCallback(
     async (code: string, file: File) => {
-      if (!draftId) {
-        setError("Save identity first so evidence can be attached to the draft.");
-        return;
-      }
       setBusy(true);
       setError(null);
       try {
+        const id = await ensureDraft();
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result));
           reader.onerror = () => reject(new Error("Read failed"));
           reader.readAsDataURL(file);
         });
-        await api(`/api/registration/drafts/${draftId}/evidence`, {
+        await api(`/api/registration/drafts/${id}/evidence`, {
           method: "POST",
           body: JSON.stringify({
             prerequisiteCode: code,
@@ -482,19 +764,16 @@ export function useRegistrationWizard(initialDraftId?: string) {
         setBusy(false);
       }
     },
-    [draftId],
+    [ensureDraft],
   );
 
   const setExternalEvidence = useCallback(
     async (code: string, ref: string) => {
-      if (!draftId) {
-        setError("Save identity first so evidence can be attached to the draft.");
-        return;
-      }
       setBusy(true);
       setError(null);
       try {
-        await api(`/api/registration/drafts/${draftId}/evidence`, {
+        const id = await ensureDraft();
+        await api(`/api/registration/drafts/${id}/evidence`, {
           method: "POST",
           body: JSON.stringify({
             prerequisiteCode: code,
@@ -513,7 +792,7 @@ export function useRegistrationWizard(initialDraftId?: string) {
         setBusy(false);
       }
     },
-    [draftId],
+    [ensureDraft],
   );
 
   const kindGroups = useMemo(() => {
@@ -579,7 +858,23 @@ export function useRegistrationWizard(initialDraftId?: string) {
     openMandatory,
     saveIdentity,
     saveCharacteristicsAndDerive,
+    continueToPrerequisites,
+    continueFromDuties,
     release,
+    catalogLinkMode,
+    identityPhase,
+    linkedModelId,
+    hasClassificationPrefill: Boolean(modelClassificationPrefill?.produktart),
+    characteristicsSkipped,
+    gtinInput,
+    setGtinInput,
+    resolveGtin,
+    selectCatalogModel,
+    startManualRegistration,
+    clearLinkedModel,
+    notInCatalogOpen,
+    notInCatalogGtin,
+    dismissNotInCatalog,
   };
 }
 

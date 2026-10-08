@@ -25,6 +25,7 @@ const draftIdentityFields = {
   productKindCode: z.string().trim().max(64).nullable().optional(),
   characteristics: z.record(z.string(), z.unknown()).optional(),
   keepDraft: z.boolean().optional(),
+  catalogLink: z.boolean().optional(),
   clarifications: z
     .array(
       z.object({
@@ -54,6 +55,7 @@ export const updateRegistrationDraftSchema = z.object({
   productKindCode: z.string().trim().max(64).nullable().optional(),
   characteristics: z.record(z.string(), z.unknown()).optional(),
   keepDraft: z.boolean().optional(),
+  catalogLink: z.boolean().optional(),
   clarifications: z
     .array(
       z.object({
@@ -81,6 +83,8 @@ export const registrationPreviewSchema = z.object({
     .passthrough(),
   areaId: z.string().trim().min(1).nullable().optional(),
   purchaseYear: z.number().int().min(1950).max(2100).nullable().optional(),
+  /** Reuse open model classification — skip conflict / unanswered gates. */
+  trustCatalogModel: z.boolean().optional(),
 });
 
 /** POST /api/registration/release — create (or update inventarize draft) and release in one step. */
@@ -95,6 +99,11 @@ export const commitRegistrationSchema = z.object({
   checks: z.record(z.string(), z.boolean()).default({}),
   classificationConfidence: z.enum(["verified", "responsible", "derived", "guess"]).optional(),
   evidenceText: z.string().trim().max(2000).nullable().optional(),
+  /**
+   * Second (or Nth) inventory unit of an already-classified catalog model:
+   * skip Merkmale conflict gates and commissioning prerequisites.
+   */
+  catalogLink: z.boolean().optional(),
 });
 
 /** Body for model-wide reclassification derive/apply. */
@@ -104,6 +113,13 @@ export const reclassifyCharacteristicsSchema = z.object({
       produktart: z.string().trim().min(1, "Product kind is required."),
     })
     .passthrough(),
+});
+
+export const reclassifyEvidenceSchema = z.object({
+  prerequisiteCode: z.string().trim().min(1).max(64),
+  evidenceKind: z.enum(["document", "third_party"]),
+  externalRecordRef: z.string().trim().max(500).nullable().optional(),
+  dataUrl: z.string().trim().max(8_000_000).nullable().optional(),
 });
 
 export const reclassifyApplySchema = z.object({
@@ -116,6 +132,8 @@ export const reclassifyApplySchema = z.object({
   acknowledgeImpact: z.literal(true),
   classificationConfidence: z.enum(["verified", "responsible", "derived", "guess"]).optional(),
   evidenceText: z.string().trim().max(2000).nullable().optional(),
+  /** Document / third-party evidence recorded on the prerequisites step (applied to all copies). */
+  evidence: z.array(reclassifyEvidenceSchema).max(50).optional(),
 });
 
 /**

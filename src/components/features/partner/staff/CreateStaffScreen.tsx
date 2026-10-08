@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useCreateStaff } from "@/components/hooks/partner/staff/useCreateStaff";
@@ -23,16 +23,11 @@ export function CreateStaffScreen() {
     submit,
     refs,
     refsLoading,
-    loadRefs,
     addSkillRow,
     patchSkill,
     removeSkill,
   } = useCreateStaff();
   const { checkPermission, permissionsLoading } = usePermissions();
-
-  useEffect(() => {
-    void loadRefs();
-  }, [loadRefs]);
 
   if (!permissionsLoading && !checkPermission("console:staff:invite")) {
     return (

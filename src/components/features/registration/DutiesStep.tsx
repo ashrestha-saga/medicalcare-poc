@@ -42,11 +42,15 @@ function einheitLabel(
 export function DutiesStep({
   duties,
   decisionProtocol = [],
+  catalogLinkMode = false,
+  busy = false,
   onBack,
   onContinue,
 }: {
   duties: DerivedDuty[];
   decisionProtocol?: DecisionProtocolEntry[];
+  catalogLinkMode?: boolean;
+  busy?: boolean;
   onBack: () => void;
   onContinue: () => void;
 }) {
@@ -153,13 +157,13 @@ export function DutiesStep({
           </div>
         ) : null}
 
-        <Alert>{t("dutiesAlert")}</Alert>
+        <Alert>{catalogLinkMode ? t("dutiesAlertCatalogLink") : t("dutiesAlert")}</Alert>
         <div className="p-reg__actions">
-          <button type="button" className="p-cta ghost" onClick={onBack}>
+          <button type="button" className="p-cta ghost" onClick={onBack} disabled={busy}>
             {t("back")}
           </button>
-          <button type="button" className="p-cta" onClick={onContinue}>
-            {t("reviewPrereqs")}
+          <button type="button" className="p-cta" onClick={onContinue} disabled={busy}>
+            {busy ? tCommon("loading") : catalogLinkMode ? t("releaseCatalogLink") : t("reviewPrereqs")}
           </button>
         </div>
       </div>

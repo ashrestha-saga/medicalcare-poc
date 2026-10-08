@@ -106,7 +106,12 @@ export interface RegistrationDraftDTO {
   siteId: string | null;
   room: string | null;
   purchaseYear: number | null;
-  model: { tradeName: string | null; manufacturer: string | null; modelName: string | null } | null;
+  model: {
+    id: string;
+    tradeName: string | null;
+    manufacturer: string | null;
+    modelName: string | null;
+  } | null;
   /** C4 — model-owned Merkmale from open classification. */
   modelClassificationPrefill?: RegistrationCharacteristics | null;
   modelClassificationConfidence?: string | null;

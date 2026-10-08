@@ -14,6 +14,7 @@ export * from "./orderRequest";
 export * from "./oxid";
 export * from "./partner";
 export * from "./permissions";
+export * from "./pruefpartner";
 export * from "./registration";
 export * from "./resolve";
 export * from "./scan";

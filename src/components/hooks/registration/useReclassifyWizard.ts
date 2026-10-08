@@ -37,7 +37,16 @@ import {
   type CheckRuleHit,
 } from "@/services/registration/checkRules";
 import { kindMatchesQuery } from "@/components/features/registration/kindDisplay";
+import { computeReleaseLevel } from "@/services/registration/deriveDuties";
+import { openMandatoryPrerequisites } from "@/services/registration/prerequisites";
 import type { RegistrationWizardApi } from "./useRegistrationWizard";
+
+type PendingEvidence = {
+  prerequisiteCode: string;
+  evidenceKind: "document" | "third_party";
+  externalRecordRef?: string | null;
+  dataUrl?: string | null;
+};
 
 function emptyIdentity(): RegistrationIdentityForm {
   return {
@@ -72,6 +81,7 @@ export function useReclassifyWizard(modelId: string) {
   const [decisionProtocol, setDecisionProtocol] = useState<DecisionProtocolEntry[]>([]);
   const [prerequisites, setPrerequisites] = useState<PrerequisiteItem[]>([]);
   const [checks, setChecks] = useState<Record<string, boolean>>({});
+  const [pendingEvidence, setPendingEvidence] = useState<PendingEvidence[]>([]);
   const [acknowledgeImpact, setAcknowledgeImpact] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -231,6 +241,7 @@ export function useReclassifyWizard(modelId: string) {
       setDuties(preview.duties);
       setDecisionProtocol(buildDecisionProtocol(merkmale));
       setPrerequisites(preview.prerequisites);
+      setPendingEvidence([]);
       const nextChecks: Record<string, boolean> = {};
       for (const p of preview.prerequisites) {
         if (p.erfuellt) nextChecks[p.k] = true;
@@ -254,6 +265,63 @@ export function useReclassifyWizard(modelId: string) {
     [merkmale],
   );
 
+  const markEvidenceSatisfied = useCallback((code: string) => {
+    setPrerequisites((prev) =>
+      prev.map((p) =>
+        p.k === code ? { ...p, evidenceId: p.evidenceId ?? "pending", erfuellt: true } : p,
+      ),
+    );
+  }, []);
+
+  const uploadEvidence = useCallback(
+    async (code: string, file: File) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("Read failed"));
+          reader.readAsDataURL(file);
+        });
+        setPendingEvidence((prev) => {
+          const rest = prev.filter((e) => e.prerequisiteCode !== code);
+          return [
+            ...rest,
+            { prerequisiteCode: code, evidenceKind: "document", dataUrl },
+          ];
+        });
+        markEvidenceSatisfied(code);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Evidence upload failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [markEvidenceSatisfied],
+  );
+
+  const setExternalEvidence = useCallback(
+    async (code: string, ref: string) => {
+      const trimmed = ref.trim();
+      if (!trimmed) return;
+      setError(null);
+      setPendingEvidence((prev) => {
+        const rest = prev.filter((e) => e.prerequisiteCode !== code);
+        return [
+          ...rest,
+          {
+            prerequisiteCode: code,
+            evidenceKind: "third_party",
+            externalRecordRef: trimmed,
+          },
+        ];
+      });
+      markEvidenceSatisfied(code);
+    },
+    [markEvidenceSatisfied],
+  );
+
   const release = useCallback(async () => {
     setError(null);
     if (!acknowledgeImpact) {
@@ -269,6 +337,7 @@ export function useReclassifyWizard(modelId: string) {
           characteristics: { ...merkmale, decisionProtocol: protocol },
           checks,
           acknowledgeImpact: true,
+          evidence: pendingEvidence,
         }),
       });
       router.push(`/catalog/${modelId}`);
@@ -277,7 +346,7 @@ export function useReclassifyWizard(modelId: string) {
     } finally {
       setBusy(false);
     }
-  }, [acknowledgeImpact, checks, merkmale, modelId, router]);
+  }, [acknowledgeImpact, checks, merkmale, modelId, pendingEvidence, router]);
 
   const selectedAnnex2 = useMemo(
     () => refData?.annex2.find((a) => a.id === merkmale.anlage2ItemId) ?? null,
@@ -301,10 +370,13 @@ export function useReclassifyWizard(modelId: string) {
     [refData, merkmale.strahlenArt],
   );
 
-  const openMandatory = useMemo(
-    () => prerequisites.filter((p) => p.pflicht && !p.erfuellt && !checks[p.k]),
-    [prerequisites, checks],
-  );
+  const openMandatory = useMemo(() => {
+    const releaseLevel = computeReleaseLevel(merkmale);
+    return openMandatoryPrerequisites(prerequisites, checks, {
+      releaseLevel,
+      requireEvidence: releaseLevel >= 2,
+    });
+  }, [prerequisites, checks, merkmale]);
 
   const kindGroups = useMemo(() => {
     const map = new Map<string, ProductKindDTO[]>();
@@ -357,8 +429,8 @@ export function useReclassifyWizard(modelId: string) {
     prerequisites,
     checks,
     setChecks,
-    uploadEvidence: async () => undefined,
-    setExternalEvidence: async () => undefined,
+    uploadEvidence,
+    setExternalEvidence,
     error,
     busy,
     selectedAnnex2,
@@ -369,9 +441,25 @@ export function useReclassifyWizard(modelId: string) {
     openMandatory,
     saveIdentity: async () => undefined,
     saveCharacteristicsAndDerive,
+    continueToPrerequisites: async () => undefined,
+    continueFromDuties: async () => undefined,
     release,
+    catalogLinkMode: false,
     maxStep: 4,
     unlockAndGo: (n) => setStep(n),
+    identityPhase: "inventory",
+    linkedModelId: modelId,
+    hasClassificationPrefill: false,
+    characteristicsSkipped: false,
+    gtinInput: "",
+    setGtinInput: () => undefined,
+    resolveGtin: async () => undefined,
+    selectCatalogModel: async () => undefined,
+    startManualRegistration: () => undefined,
+    clearLinkedModel: () => undefined,
+    notInCatalogOpen: false,
+    notInCatalogGtin: "",
+    dismissNotInCatalog: () => undefined,
   };
 
   return {

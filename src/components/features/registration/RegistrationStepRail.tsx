@@ -8,10 +8,14 @@ const STEP_KEYS = ["stepDevice", "stepCharacteristics", "stepDuties", "stepPrere
 export function RegistrationStepRail({
   step,
   maxStep,
+  characteristicsSkipped = false,
+  catalogLinkMode = false,
   onSelect,
 }: {
   step: number;
   maxStep: number;
+  characteristicsSkipped?: boolean;
+  catalogLinkMode?: boolean;
   onSelect: (n: number) => void;
 }) {
   const t = useTranslations("registration");
@@ -21,16 +25,25 @@ export function RegistrationStepRail({
       {REGISTRATION_STEPS.map((keyLabel, i) => {
         const n = i + 1;
         const active = step === n;
-        const label = t(STEP_KEYS[i]!);
+        const skippedChars = n === 2 && (characteristicsSkipped || catalogLinkMode);
+        const skippedPrereq = n === 4 && catalogLinkMode;
+        const skipped = skippedChars || skippedPrereq;
+        const label = skippedChars
+          ? t("stepCharacteristicsSkipped")
+          : skippedPrereq
+            ? t("stepPrerequisitesSkipped")
+            : t(STEP_KEYS[i]!);
         return (
           <button
             key={keyLabel}
             type="button"
             className="p-reg__step"
             data-active={active ? "1" : "0"}
+            data-skipped={skipped ? "1" : "0"}
             onClick={() => onSelect(n)}
-            disabled={n > maxStep}
+            disabled={n > maxStep || skipped}
             aria-current={active ? "step" : undefined}
+            title={skipped ? label : undefined}
           >
             <span className="p-reg__step-num">{n}</span>
             <span className="p-reg__step-label">{label}</span>

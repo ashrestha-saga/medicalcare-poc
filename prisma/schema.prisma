@@ -168,6 +168,24 @@ enum DispatchOrigin {
   organisation
 }
 
+/** Prüfpartner catalogue scope — generic, annex2 item, constancy object, equipment type. */
+enum CatalogueScope {
+  generic
+  annex2
+  constancy
+  equipment
+}
+
+/** Where a measurement limit comes from (Prüfpartner protocol). */
+enum LimitSource {
+  standard
+  manufacturer
+  applied_part
+  annex2
+  baseline
+  operator
+}
+
 enum ClinicRole {
   superadmin
   device_admin
@@ -244,6 +262,8 @@ model Tenant {
   userInvitations     UserInvitation[]
   passwordResetTokens PasswordResetToken[]
   smtpSettings        SmtpSettings?
+  inspectionRuns      InspectionRun[]
+  baselineMeasurements BaselineMeasurement[]
 
   @@index([institutionOrgId])
 }
@@ -296,6 +316,7 @@ model User {
   passwordResetTokens  PasswordResetToken[]
   qualifications       PersonQualification[]
   skills               PersonSkill[]
+  inspectionRuns       InspectionRun[] @relation("InspectionPerformer")
 
   @@index([tenantId])
   @@index([accountKind])
@@ -512,6 +533,8 @@ model DeviceInstance {
   evidence               DeviceEvidence[]
   reprocessedOn          ReprocessingOnDevice[]   @relation("ReprocessedItem")
   usedForReprocessing    ReprocessingOnDevice[]   @relation("ReprocessingEquipment")
+  inspectionRuns         InspectionRun[]
+  baselineMeasurements   BaselineMeasurement[]
 
   @@unique([tenantId, inventoryNumber])
   /** SCH-01 — same serial under the same model is rejected (NULLs allowed). */
@@ -580,6 +603,8 @@ model RefRuleSet {
   trainingTypes   RefTrainingType[]
   classifications DeviceModelClassification[]
   commissioningPrerequisites RefCommissioningPrerequisite[]
+  inspectionCatalogues       RefInspectionCatalogue[]
+  qualifications             RefQualification[]
 
   @@unique([code, versionLabel])
 }
@@ -598,6 +623,8 @@ model RefInspectionType {
   confidence       Confidence     @default(derived)
   sourceRef        String?
   duties           DeviceDuty[]
+  catalogues       RefInspectionCatalogue[]
+  qualificationRules RefQualificationRule[]
 }
 
 model RefAnnex2Item {
@@ -744,10 +771,18 @@ model DeviceModelClassification {
    * Unique so only one open classification per model.
    */
   openClassificationKey String? @unique @db.VarChar(191)
+  /** STK patient leakage limit follows applied-part type (B/BF/CF). */
+  appliedPartCode   String?
+  appliedPart       RefAppliedPartType? @relation(fields: [appliedPartCode], references: [code])
+  /** STK functional test block. */
+  deviceFamilyCode  String?
+  deviceFamily      RefDeviceFamily? @relation(fields: [deviceFamilyCode], references: [code])
   snapshots      DeviceReleaseSnapshot[]
 
   @@index([deviceModelId])
   @@index([deviceModelId, validTo])
+  @@index([appliedPartCode])
+  @@index([deviceFamilyCode])
 }
 
 model DeviceReleaseSnapshot {
@@ -811,6 +846,7 @@ model DeviceDuty {
   serviceRequests     ServiceRequest[]
   performances        DutyPerformance[]
   reminders           DutyReminder[]
+  inspectionRuns      InspectionRun[]
 
   @@index([deviceInstanceId])
   @@index([tenantId])
@@ -834,6 +870,7 @@ model DutyPerformance {
   performedBy      String
   source           String         @default("assignment") // assignment | manual | import
   recordedAt       DateTime       @default(now())
+  inspectionRun    InspectionRun?
 
   @@index([deviceDutyId, performedAt])
   @@index([tenantId])
@@ -857,6 +894,9 @@ model Organisation {
   institutionTenants Tenant[] @relation("TenantInstitution")
   smtpSettings SmtpSettings?
   executorOrgs ExecutorOrg[]
+  organisationSites OrganisationSite[]
+  testEquipment     TestEquipment[]
+  inspectionRuns    InspectionRun[]
 
   @@index([activeTo])
 }
@@ -919,6 +959,8 @@ model OrgMembership {
   /** Employer org when isExternal (e.g. Radiotec); commissioning org is organisationId. */
   employerOrganisationId String?
   employerOrganisation   Organisation? @relation("ExternalEmployerOrg", fields: [employerOrganisationId], references: [id])
+  organisationSiteId     String?
+  organisationSite       OrganisationSite? @relation(fields: [organisationSiteId], references: [id])
   staffAssignments PartnerStaffAssignment[]
 
   @@unique([organisationId, userId])
@@ -927,12 +969,16 @@ model OrgMembership {
   @@index([employerOrganisationId])
 }
 
-/// Formal qualification catalogue (Fachkunde etc.). Staff cut — no catalogue rules yet.
+/// Formal qualification catalogue (Fachkunde etc.).
 model RefQualification {
-  code      String  @id
-  label     String  @db.Text
+  code       String  @id
+  ruleSetId  String  @default("rs-mpbetreibv")
+  ruleSet    RefRuleSet @relation(fields: [ruleSetId], references: [id])
+  label      String  @db.Text
   legalBasis String?
-  persons   PersonQualification[]
+  rules      RefQualificationRule[]
+  catalogues RefCatalogueQualification[]
+  persons    PersonQualification[]
 }
 
 /// Device-specific familiarity catalogue.
@@ -1169,6 +1215,7 @@ model ServiceRequest {
   dispatchRecords DispatchRecord[]
   performances    DutyPerformance[]
   dispatchOutbox  DispatchOutbox[]
+  inspectionRuns  InspectionRun[]
 
   @@index([tenantId, createdAt])
   @@index([raisedById])
@@ -1530,4 +1577,236 @@ model UserInvitation {
   @@index([tenantId, email])
   @@index([organisationId, email])
   @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Prüfpartner — inspection catalogues, runs, baselines (v7 extension)
+// ---------------------------------------------------------------------------
+
+model RefInspectionCatalogue {
+  id                   String            @id @default(cuid())
+  ruleSetId            String
+  ruleSet              RefRuleSet        @relation(fields: [ruleSetId], references: [id])
+  code                 String
+  inspectionTypeCode   String
+  inspectionType       RefInspectionType @relation(fields: [inspectionTypeCode], references: [code])
+  scope                CatalogueScope    @default(generic)
+  scopeValue           String?
+  label                String
+  legalBasis           String?           @db.Text
+  retention            String?           @db.Text
+  testEquipmentClass   String?
+  traceabilityRequired Boolean           @default(false)
+  setsBaseline         Boolean           @default(false)
+  requiresBaseline     Boolean           @default(false)
+  occasions            Json?
+  draft                Boolean           @default(false)
+  noCatalogue          Boolean           @default(false)
+  note                 String?           @db.Text
+  steps                RefInspectionStep[]
+  qualifications       RefCatalogueQualification[]
+  runs                 InspectionRun[]
+
+  @@unique([ruleSetId, code])
+  @@index([inspectionTypeCode])
+  @@index([scope, scopeValue])
+}
+
+model RefInspectionStep {
+  id                   String                 @id @default(cuid())
+  catalogueId          String
+  catalogue            RefInspectionCatalogue @relation(fields: [catalogueId], references: [id], onDelete: Cascade)
+  position             Int
+  label                String                 @db.Text
+  isMeasurement        Boolean                @default(false)
+  unit                 String?
+  limitText            String?
+  limitSource          LimitSource?
+  dependsOnAppliedPart Boolean                @default(false)
+  comparedToBaseline   Boolean                @default(false)
+  targetValue          Float?
+  triggerNote          String?                @db.Text
+  results              InspectionStepResult[]
+
+  @@unique([catalogueId, position])
+  @@index([catalogueId])
+}
+
+model RefQualificationRule {
+  id                 String            @id @default(cuid())
+  inspectionTypeCode String
+  inspectionType     RefInspectionType @relation(fields: [inspectionTypeCode], references: [code])
+  qualificationCode  String
+  qualification      RefQualification  @relation(fields: [qualificationCode], references: [code])
+
+  @@unique([inspectionTypeCode, qualificationCode])
+}
+
+model RefCatalogueQualification {
+  id                String                 @id @default(cuid())
+  catalogueId       String
+  catalogue         RefInspectionCatalogue @relation(fields: [catalogueId], references: [id], onDelete: Cascade)
+  qualificationCode String
+  qualification     RefQualification       @relation(fields: [qualificationCode], references: [code])
+
+  @@unique([catalogueId, qualificationCode])
+}
+
+model RefTestEquipmentClass {
+  code      String @id
+  label     String @db.Text
+  equipment TestEquipment[]
+}
+
+model TestEquipment {
+  id              String                @id @default(cuid())
+  organisationId  String
+  organisation    Organisation          @relation(fields: [organisationId], references: [id])
+  classCode       String
+  equipmentClass  RefTestEquipmentClass @relation(fields: [classCode], references: [code])
+  label           String
+  serialNumber    String?
+  calibratedUntil DateTime?             @db.Date
+  traceabilityRef String?
+  active          Boolean               @default(true)
+  runs            InspectionRun[]
+
+  @@index([organisationId, classCode])
+  @@index([calibratedUntil])
+}
+
+model RefAppliedPartType {
+  code                String  @id
+  label               String
+  patientLeakageLimit String?
+  classifications     DeviceModelClassification[]
+}
+
+model RefDeviceFamily {
+  code            String  @id
+  label           String
+  steps           RefDeviceFamilyStep[]
+  classifications DeviceModelClassification[]
+}
+
+model RefDeviceFamilyStep {
+  id               String          @id @default(cuid())
+  deviceFamilyCode String
+  deviceFamily     RefDeviceFamily @relation(fields: [deviceFamilyCode], references: [code], onDelete: Cascade)
+  position         Int
+  label            String          @db.Text
+  isMeasurement    Boolean         @default(false)
+  unit             String?
+  limitText        String?
+  limitSource      LimitSource?
+  targetValue      Float?
+
+  @@unique([deviceFamilyCode, position])
+}
+
+model RefValidationOccasion {
+  code  String @id
+  label String @db.Text
+  runs  InspectionRun[]
+}
+
+model RefAttachmentKind {
+  code      String  @id
+  label     String  @db.Text
+  isLeading Boolean @default(false)
+}
+
+model RefHandoverItem {
+  code  String  @id
+  label String  @db.Text
+  note  String? @db.Text
+}
+
+model OrganisationSite {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  code           String
+  name           String
+  postalCode     String?
+  city           String?
+
+  @@unique([organisationId, code])
+  memberships    OrgMembership[]
+}
+
+model InspectionRun {
+  id                  String                 @id @default(cuid())
+  tenantId            String
+  tenant              Tenant                 @relation(fields: [tenantId], references: [id])
+  deviceInstanceId    String
+  deviceInstance      DeviceInstance         @relation(fields: [deviceInstanceId], references: [id])
+  catalogueId         String
+  catalogue           RefInspectionCatalogue @relation(fields: [catalogueId], references: [id])
+  deviceDutyId        String?
+  deviceDuty          DeviceDuty?            @relation(fields: [deviceDutyId], references: [id])
+  dutyPerformanceId   String?                @unique
+  dutyPerformance     DutyPerformance?       @relation(fields: [dutyPerformanceId], references: [id])
+  serviceRequestId    String?
+  serviceRequest      ServiceRequest?        @relation(fields: [serviceRequestId], references: [id])
+  occasionCode        String?
+  occasion            RefValidationOccasion? @relation(fields: [occasionCode], references: [code])
+  performedAt         DateTime               @db.Date
+  performedByUserId   String?
+  performedByUser     User?                  @relation("InspectionPerformer", fields: [performedByUserId], references: [id])
+  performedByName     String
+  organisationId      String?
+  organisation        Organisation?          @relation(fields: [organisationId], references: [id])
+  testEquipmentId     String?
+  testEquipment       TestEquipment?         @relation(fields: [testEquipmentId], references: [id])
+  appliedPartCode     String?
+  result              DutyPerformanceResult  @default(passed)
+  note                String?                @db.Text
+  idempotencyKey      String?                @unique
+  deviceConfirmed     Boolean                @default(false)
+  deviceConfirmSkipped Boolean               @default(false)
+  deviceConfirmCode   String?
+  stepResults         InspectionStepResult[]
+  baselines           BaselineMeasurement[]
+
+  @@index([tenantId, deviceInstanceId, performedAt])
+  @@index([catalogueId])
+  @@index([deviceDutyId])
+  @@index([serviceRequestId])
+}
+
+model InspectionStepResult {
+  id            String            @id @default(cuid())
+  runId         String
+  run           InspectionRun     @relation(fields: [runId], references: [id], onDelete: Cascade)
+  stepId        String
+  step          RefInspectionStep @relation(fields: [stepId], references: [id])
+  confirmed     Boolean?
+  measuredValue String?
+  withinLimit   Boolean?
+  baselineFlag  Boolean           @default(false)
+  note          String?           @db.Text
+
+  @@unique([runId, stepId])
+  @@index([stepId])
+}
+
+model BaselineMeasurement {
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  deviceInstanceId String
+  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
+  measureKey       String
+  value            String
+  unit             String?
+  runId            String?
+  run              InspectionRun? @relation(fields: [runId], references: [id])
+  recordedAt       DateTime       @default(now())
+  recordedBy       String
+  validFrom        DateTime       @default(now())
+  validTo          DateTime?
+
+  @@index([tenantId, deviceInstanceId, measureKey, validTo])
+  @@index([runId])
 }

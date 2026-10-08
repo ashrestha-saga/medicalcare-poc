@@ -3,10 +3,11 @@ import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { recordAudit } from "@/services/audit/auditService";
 import { notFound, unprocessable } from "@/lib/errors";
+import { blobMetaFromDataUrl } from "@/lib/blobMeta";
 import { prisma } from "@/lib/prisma";
 import { computeNextMaintenanceDueAt } from "@/lib/maintenance/schedule";
 import { characteristicConflicts } from "./conflicts";
-import { deriveDuties, stkFlagFromDuties } from "./deriveDuties";
+import { computeReleaseLevel, deriveDuties, stkFlagFromDuties } from "./deriveDuties";
 import {
   formatUnansweredMessage,
   hydrateAnswerMeta,
@@ -19,7 +20,7 @@ import {
   openMandatoryPrerequisites,
   type SiteSafetyStatus,
 } from "./prerequisites";
-import type { RegistrationCharacteristics } from "./types";
+import type { EvidenceKind, RegistrationCharacteristics } from "./types";
 import { writeDuty } from "./writeDuty";
 import { isReprocessingEquipmentDevice } from "./reprocessingLinkService";
 
@@ -117,6 +118,13 @@ export interface ReclassifyContext {
   sampleInventoryNumber: string | null;
 }
 
+export interface ReclassifyEvidenceInput {
+  prerequisiteCode: string;
+  evidenceKind: Extract<EvidenceKind, "document" | "third_party">;
+  externalRecordRef?: string | null;
+  dataUrl?: string | null;
+}
+
 export interface ReclassifyApplyInput {
   characteristics: RegistrationCharacteristics;
   checks: Record<string, boolean>;
@@ -125,6 +133,8 @@ export interface ReclassifyApplyInput {
   /** Defaults to `verified` — the acknowledged apply is the Beleg. */
   classificationConfidence?: "verified" | "responsible" | "derived" | "guess";
   evidenceText?: string | null;
+  /** Document / third-party evidence from the prerequisites step (copied to every instance). */
+  evidence?: ReclassifyEvidenceInput[];
 }
 
 export const reclassifyService = {
@@ -259,8 +269,43 @@ export const reclassifyService = {
     if (!model) throw notFound("Model not found.");
 
     const preview = await this.derive(ctx, modelId, characteristics);
-    const open = openMandatoryPrerequisites(preview.prerequisites, input.checks ?? {});
+    const evidenceItems = (input.evidence ?? []).filter(
+      (e) => Boolean(e.externalRecordRef?.trim()) || Boolean(e.dataUrl?.trim()),
+    );
+    for (const e of evidenceItems) {
+      if (e.evidenceKind === "third_party" && !e.externalRecordRef?.trim() && !e.dataUrl?.trim()) {
+        throw unprocessable(
+          "Third-party evidence requires an external record reference (Prüfpartner / authority).",
+          { field: "evidence", code: e.prerequisiteCode },
+        );
+      }
+    }
+    const evidenceByCode: Record<string, string> = {};
+    for (const e of evidenceItems) {
+      evidenceByCode[e.prerequisiteCode] = `pending:${e.prerequisiteCode}`;
+    }
+    const prerequisitesWithEvidence = preview.prerequisites.map((p) => {
+      const id = evidenceByCode[p.k];
+      if (!id) return p;
+      return {
+        ...p,
+        evidenceId: id,
+        erfuellt: p.evidenceKind === "confirmation" ? p.erfuellt : true,
+      };
+    });
+    const releaseLevel = computeReleaseLevel(characteristics);
+    const open = openMandatoryPrerequisites(prerequisitesWithEvidence, input.checks ?? {}, {
+      releaseLevel,
+      requireEvidence: releaseLevel >= 2,
+    });
     if (open.length) {
+      const thirdParty = open.filter((x) => x.evidenceKind === "third_party");
+      if (thirdParty.length && releaseLevel >= 3) {
+        throw unprocessable(
+          `Release level 3 requires third-party evidence (external record). Open: ${thirdParty.map((x) => x.t).join(" · ")}`,
+          { field: "prerequisites", open: thirdParty.map((x) => x.k), code: "third_party_required" },
+        );
+      }
       throw unprocessable(`Reclassification blocked. Open: ${open.map((x) => x.t).join(" · ")}`, {
         field: "prerequisites",
         open: open.map((x) => x.k),
@@ -340,6 +385,24 @@ export const reclassifyService = {
       let updatedCopies = 0;
       let reReleased = 0;
 
+      /** One shared attachment blob per uploaded evidence item (reused across copies). */
+      const blobIdsByCode: Record<string, string> = {};
+      for (const e of evidenceItems) {
+        if (!e.dataUrl?.trim()) continue;
+        const dataUrl = e.dataUrl.trim();
+        const meta = blobMetaFromDataUrl(dataUrl);
+        const blob = await tx.attachmentBlob.create({
+          data: {
+            tenantId,
+            kind: `evidence:${e.prerequisiteCode}`,
+            dataUrl,
+            contentType: meta.contentType,
+            byteSize: meta.byteSize,
+          },
+        });
+        blobIdsByCode[e.prerequisiteCode] = blob.id;
+      }
+
       for (const inst of instances) {
         await tx.deviceInstance.update({
           where: { id: inst.id },
@@ -351,6 +414,45 @@ export const reclassifyService = {
           },
         });
         updatedCopies += 1;
+
+        for (const e of evidenceItems) {
+          const code = e.prerequisiteCode.trim();
+          const evidenceData = {
+            evidenceKind: e.evidenceKind,
+            attachmentBlobId: blobIdsByCode[code] ?? null,
+            externalRecordRef: e.externalRecordRef?.trim() || null,
+            recordedBy: ctx.user.name,
+            recordedAt: now,
+          };
+          const existing = await tx.deviceEvidence.findUnique({
+            where: {
+              deviceInstanceId_prerequisiteCode: {
+                deviceInstanceId: inst.id,
+                prerequisiteCode: code,
+              },
+            },
+          });
+          if (existing) {
+            await tx.deviceEvidence.update({
+              where: { id: existing.id },
+              data: {
+                ...evidenceData,
+                attachmentBlobId: evidenceData.attachmentBlobId ?? existing.attachmentBlobId,
+                externalRecordRef:
+                  evidenceData.externalRecordRef ?? existing.externalRecordRef,
+              },
+            });
+          } else {
+            await tx.deviceEvidence.create({
+              data: {
+                tenantId,
+                deviceInstanceId: inst.id,
+                prerequisiteCode: code,
+                ...evidenceData,
+              },
+            });
+          }
+        }
 
         // SWOT 3.5 — if this exemplar is no longer reprocessing equipment, close open links.
         const stillEquipment = isReprocessingEquipmentDevice({
@@ -382,8 +484,9 @@ export const reclassifyService = {
             characteristics: JSON.stringify(characteristics),
             derivedDuties: JSON.stringify(duties),
             prerequisites: JSON.stringify({
-              items: preview.prerequisites,
+              items: prerequisitesWithEvidence,
               checks: input.checks,
+              evidenceCodes: evidenceItems.map((e) => e.prerequisiteCode),
               reclassify: true,
               modelId,
             }),

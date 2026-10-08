@@ -10,12 +10,14 @@ Detailed reference for the Prisma/MySQL data model and how the application layer
 2. [Architecture (layers)](#2-architecture-layers)
 3. [Tenancy & identity](#3-tenancy--identity)
 4. [Schema by domain](#4-schema-by-domain)
-5. [Core workflows](#5-core-workflows)
+5. [Core workflows](#5-core-workflows) (resolve, Erstanlage, service handoff, **Prüfpartner**, auth)
 6. [Client architecture](#6-client-architecture)
 7. [Security (schema-related)](#7-security-schema-related)
 8. [Entity relationship (simplified)](#8-entity-relationship-simplified)
 9. [Adapter boundary](#9-adapter-boundary)
 10. [Seeded clinic users](#10-seeded-clinic-users)
+
+Schema domains in §4 include tenancy, devices, Ref*, classification/duties, partners, training, requests/dispatch, **Prüfpartner (§4.8)**, and ops (§4.9).
 
 ---
 
@@ -28,6 +30,7 @@ Detailed reference for the Prisma/MySQL data model and how the application layer
 3. Open service requests or spare-parts orders
 4. Run **Erstanlage** (initial registration) under MPBetreibV — freeze duties, due dates, and prerequisites
 5. Manage inventory, catalog, training, audit, and dispatch to mail / OXID / webhooks
+6. Run **Prüfpartner** inspections (Abnahme / Konstanz / STK / …) against seeded catalogues, with test equipment, qualifications, and baselines
 
 **Hard rule:** the browser never talks to Prisma. UI → BFF (`src/app/api/*`) → `src/services/*` → MySQL.
 
@@ -45,14 +48,14 @@ Source of truth for tables: `prisma/schema.prisma` (provider: **MySQL**, `DATABA
                             │ fetch (apiClient)
 ┌───────────────────────────▼─────────────────────────────────┐
 │  Next.js App Router BFF                                     │
-│  app/(app) pages · app/(partner) · app/(auth)               │
+│  app/(app) · app/(partner) · app/(inspect) · app/(auth)     │
 │  app/api/* route handlers (auth, zod, permissions)          │
 └───────────────────────────┬─────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
 │  Domain services (src/services/*)                           │
 │  resolve · registration · inventory · requests · dispatch   │
-│  auth · audit · training · partner · adapters/*             │
+│  pruefpartner · auth · audit · training · partner · adapters│
 └───────────────────────────┬─────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────┐
@@ -67,7 +70,8 @@ Source of truth for tables: `prisma/schema.prisma` (provider: **MySQL**, `DATABA
 | Path | Role |
 |---|---|
 | `src/app/(app)` | Authenticated clinic UI routes |
-| `src/app/(partner)` | Partner organisation portal |
+| `src/app/(partner)` | Partner organisation portal (disposition, my-sites, due-dates, settings) |
+| `src/app/(inspect)` | Field inspection protocol UI (`/inspect`, `/inspect/[reference]`) |
 | `src/app/(auth)` | Login, invite redeem (`/invite`), password reset (`/reset-password`) |
 | `src/app/api/*` | Thin BFF: session, validate, call service, map errors |
 | `src/services/*` | Business logic + Prisma |
@@ -137,7 +141,7 @@ RoleGrant.kind: clinic | partner_console | partner_acting  (isolates clinic /rol
 
 Each domain starts with a **quick-reference table**, then a longer write-up per model (purpose, key fields, where it runs). Canonical field list: `prisma/schema.prisma`.
 
-**Key enums (Prisma):** `DeviceState`, `ServiceRequestState`, `OutboxState`, `ReminderStatus`, `PartnerAppRole`, `RoleGrantKind`, `TrainingMode`, `OperatingModel`, `OrganisationCapacity`, `ClinicRole`, `DutyPerformanceResult`, `OrderApprovalState`, `OrderRequestState`, `DutyKey`, `IntervalUnit`, `TermMatchConfidence`, plus Erstanlage enums `DutyCategory`, `DeadlineAnchor`, `Confidence`, `FieldState`, `EvidenceKind`.
+**Key enums (Prisma):** `DeviceState`, `ServiceRequestState`, `OutboxState`, `ReminderStatus`, `PartnerAppRole`, `RoleGrantKind`, `TrainingMode`, `OperatingModel`, `OrganisationCapacity`, `ClinicRole`, `DutyPerformanceResult`, `OrderApprovalState`, `OrderRequestState`, `DutyKey`, `IntervalUnit`, `TermMatchConfidence`, plus Erstanlage enums `DutyCategory`, `DeadlineAnchor`, `Confidence`, `FieldState`, `EvidenceKind`, and Prüfpartner enums `CatalogueScope`, `LimitSource`.
 
 ### 4.1 Tenancy & locations
 
@@ -394,7 +398,7 @@ These tables are **not** tenant-scoped. They are seeded once (`prisma/seeds/`, `
 
 | Model | Purpose | Where it works |
 |---|---|---|
-| **DeviceModelClassification** | Historised model Einstufung (`validTo` null = open). confidence: verified \| responsible \| derived \| guess (+ determination / not_applicable). C4: productKindCode, characteristics, fieldStates, decisions, deferredFields | Erstanlage, reclassify wizard, model catalog |
+| **DeviceModelClassification** | Historised model Einstufung (`validTo` null = open). STK/MTK/radiation/software; optional `mtkItemId`, **`appliedPartCode`**, **`deviceFamilyCode`**. C4: productKindCode, characteristics, fieldStates, decisions, deferredFields | Erstanlage, reclassify, catalogue resolution (STK family steps / patient leakage) |
 | **DeviceReleaseSnapshot** | Immutable freeze at release (characteristics, derivedDuties, prerequisites JSON + evidence ids) | `POST /api/registration/release` |
 | **DeviceDuty** | Frozen per-instance obligations + `dueAt`; category (inspection\|operating), setsBaseline / requiresBaseline, referenceDeviceId | `/due-dates`, device duties APIs, assignment → service request |
 | **DeviceEvidence** | Commissioning evidence (blob or external ref) keyed by prerequisiteCode | Erstanlage prerequisites / release gate |
@@ -407,6 +411,14 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 #### DeviceModelClassification
 
 **Purpose:** Historised **Einstufung** at model level (STK yes/no, MTK annex item, radiation, software class, confidence, evidence). Open row = `validTo` null; reclassify closes the old row and inserts a new one.
+
+**Key Prüfpartner fields (on the open row):**
+
+| Field | Set how today | Used for |
+|---|---|---|
+| `mtkItemId` | Erstanlage / reclassify characteristics (Messgröße → Anlage 2) | Annex2-scoped catalogue lookup |
+| `appliedPartCode` | **Not in UI yet** (schema + `RefAppliedPartType` only) | Patient leakage limit on STK steps; inspect “Applied part” header |
+| `deviceFamilyCode` | **Not in UI yet** (schema + `RefDeviceFamily` only) | Extra STK functional steps (`infusion`, `beatmung`, …) |
 
 **In the app:** Erstanlage / reclassify wizards; Erstanlage release defaults to `confidence=responsible` (named person + protocol). `verified` is reserved for statute/norm-backed ref data and explicit catalogue confirmations. Shown on catalog / model context; second inventarize of the same model reuses `characteristics` / `fieldStates`.
 
@@ -439,7 +451,7 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 **Purpose:** Commissioning evidence for one prerequisite on one instance. Keyed by unique `(deviceInstanceId, prerequisiteCode)`. Holds `evidenceKind`, optional `attachmentBlobId`, `externalRecordRef`, issuer/validity, and who recorded it.
 
-**In the app:** `POST /api/registration/drafts/[id]/evidence`; release gate checks that required prerequisites are satisfied. Snapshot freezes evaluated list + evidence ids.
+**In the app:** `POST /api/registration/drafts/[id]/evidence` (registration wizard); reclassify apply can copy document / third-party evidence onto all model copies. Release / reclassify gates require third-party refs for level‑3 items (e.g. Abnahme prerequisite `abn`). **Note:** recording a Prüfbericht reference here does **not** create `BaselineMeasurement` rows — those come from sealing an Abnahme `InspectionRun`.
 
 #### DeviceClarification
 
@@ -544,9 +556,9 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 **Purpose:** Primary work ticket for service / inspection work raised from scan, due-dates, or apps. Idempotent create via unique `idempotencyKey` + content `fingerprint` (safe offline retries).
 
-**Key fields:** `reference` (human id), `subjectType` / `subjectId` (`instance` \| `model` \| `captured`), `serviceType`, location/delivery/contact, `state` (starts `captured`), `source` (`app` \| `due_date`), optional `dutyId`, allocation fields (`executorOrgId`, `allocatedAt`, `transmittedAt`).
+**Key fields:** `reference` (human id), `subjectType` / `subjectId` (`instance` \| `model` \| `captured`), `serviceType`, location/delivery/contact, `state` (starts `captured`), `source` (`app` \| `due_date`), optional `dutyId`, allocation fields (`executorOrgId`, `allocatedAt`, `transmittedAt`), optional `assigneeUserId` / `scheduledAt` (partner disposition).
 
-**In the app:** Home scan workflow; `/requests`; due-date assign; dispatch pipeline; transitions and downstream status webhooks.
+**In the app:** Home scan workflow; `/requests`; due-date assign → navigate to assignment; clinic **allocate → transmit** (locks allocation); partner lists only rows with `transmittedAt` set; clinic may **withdraw** (hard-delete) only **before** transmit; inspect portal loads assignment for protocol work.
 
 #### StatusEvent
 
@@ -592,7 +604,45 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 ---
 
-### 4.8 Cross-cutting ops
+### 4.8 Prüfpartner (inspection catalogues, runs, equipment)
+
+Seeded from `prisma/fixtures/seed-pruefpartner.json` via `prisma/seeds/refPruefpartner.ts`. Demo instruments: `seedPruefpartnerDemoEquipment` (MSR STK tester + MSR/RTS Röntgen-Prüfkörper).
+
+| Model | Purpose | Where it works |
+|---|---|---|
+| **RefInspectionCatalogue** | Protocol template per inspection type + scope (generic / annex2 / constancy / equipment). Flags: `setsBaseline`, `requiresBaseline`, `testEquipmentClass`, `traceabilityRequired`, `draft`, `noCatalogue` | Catalogue resolution on inspect open / start |
+| **RefInspectionStep** | Ordered checklist / measurement steps for a catalogue | Inspect protocol UI |
+| **RefCatalogueQualification** / **RefQualificationRule** | Required Fachkunde for catalogue or inspection type | Qualification gate before start |
+| **RefTestEquipmentClass** | Class labels (e.g. `roentgen_pruefkoerper`, `sicherheitstester`) | Catalogue header + equipment filter |
+| **TestEquipment** | Partner-org instrument inventory (class, serial, calibration, traceability ref) | Partner settings; inspect equipment select |
+| **RefAppliedPartType** | Applied-part codes + patient leakage limits | Classification + STK step limits |
+| **RefDeviceFamily** / **RefDeviceFamilyStep** | Extra STK functional steps by product family | Appended when classification has `deviceFamilyCode` |
+| **RefValidationOccasion** / **RefAttachmentKind** / **RefHandoverItem** | Occasions, attachment kinds, handover checklist refs | Catalogue occasions / future protocol extras |
+| **OrganisationSite** | Partner org site codes (depot / branch) | Partner org master data |
+| **InspectionRun** | One performance of a catalogue on a device (+ optional SR / duty / equipment) | Inspect start → confirm device → seal |
+| **InspectionStepResult** | Measured / confirmed values per step on a run | Protocol steps save |
+| **BaselineMeasurement** | Active Bezugswerte per device × measure key (`validTo` null = current) | Written when sealing a `setsBaseline` catalogue; required by `requiresBaseline` catalogues |
+
+#### Catalogue resolution (`resolveCatalogueForAssignment`)
+
+Given duty `inspectionTypeCode` + device classification + optional `constancyObjectCode`:
+
+1. Try **annex2** catalogue (`scope=annex2`, `scopeValue` = MTK item no.)  
+2. Else **constancy** (`aufnahme` / `monitor` / …)  
+3. Else **equipment** scope if provided  
+4. Else **generic** for that inspection type  
+
+Then adapt steps: skip applied-part-dependent steps when no applied part; for **STK**, append `RefDeviceFamilyStep` rows when `deviceFamilyCode` is set; attach active baselines for steps with `limitSource=baseline`. If `requiresBaseline` and no baseline values → `missingBaseline` (UI blocks constancy).
+
+#### InspectionRun / BaselineMeasurement
+
+**Purpose:** Field protocol execution. Start creates a draft run linked to `ServiceRequest` / `DeviceDuty` / chosen `TestEquipment`. Seal creates `DutyPerformance`, may complete the assignment, and if the catalogue `setsBaseline`, upserts `BaselineMeasurement` rows (measure key = step label).
+
+**In the app:** `(inspect)` screens + `/api/partner/inspection-runs/*`. Gates before start: transmitted assignment, assignee/admin, qualification, baselines (if needed), test equipment of required class (calibration / traceability).
+
+---
+
+### 4.9 Cross-cutting ops
 
 | Model | Purpose | Where it works |
 |---|---|---|
@@ -701,29 +751,49 @@ Inventarize path: `POST /api/devices` → draft instance → `/registration/[id]
 | **P6** | Accessory (`zubehoer`) evidence follows its reprocessing class (`requiresValidatedProcess`), not a blanket validation duty |
 | **AUF-01** | Validation due lives on equipment (**`year_end`**, product decision 30.09.); products reference linked equipment |
 
-Abnahme sets baseline; Konstanz requires baseline before complete. Erstanlage release defaults classification `confidence=responsible`; reclassify apply defaults `verified`.
+Abnahme (`K-ABN`, `setsBaseline`) writes **`BaselineMeasurement`** on seal; Konstanz catalogues (`requiresBaseline`) block start when no active baselines exist. Registration prerequisite `abn` (third-party evidence) is a separate gate and does not populate baselines.
 
-**Product decision:** validation equipment deadline anchor is **`year_end`** (not `exact_day`). Still open: official Anlage-2 interval confirmation vs seeded match data.
+Erstanlage release defaults classification `confidence=responsible`; reclassify apply defaults `verified`.
 
-**Tables:** `DeviceInstance`, `DeviceModel`, `DeviceModelClassification`, `DeviceReleaseSnapshot`, `DeviceDuty`, `DeviceEvidence`, `DeviceClarification`, `ReprocessingOnDevice`, `Ref*` (incl. `RefCommissioningPrerequisite`), `DeviceUnitEvent`; prerequisites also use `SiteHeadcount` / `SafetyOfficerAppointment`.
+**Product decision:** validation equipment deadline anchor is **`year_end`** (not `exact_day`). Still open: official Anlage-2 interval confirmation vs seeded match data; UI for `appliedPartCode` / `deviceFamilyCode` on classification.
 
-**Services:** `src/services/registration/*` (deriveDuties, prerequisites, writeDuty, evidence, reprocessingLink, release, draft). Fixture: `npm run test:pflichten` (`fixtures/pflichten/`, 222 cases / 1,197 duties).
+**Tables:** `DeviceInstance`, `DeviceModel`, `DeviceModelClassification`, `DeviceReleaseSnapshot`, `DeviceDuty`, `DeviceEvidence`, `DeviceClarification`, `ReprocessingOnDevice`, `Ref*` (incl. `RefCommissioningPrerequisite`), `DeviceUnitEvent`; prerequisites also use `SiteHeadcount` / `SafetyOfficerAppointment`; Prüfpartner tables in §4.8.
 
-### 5.3 Service request + dispatch
+**Services:** `src/services/registration/*` (deriveDuties, prerequisites, writeDuty, evidence, reprocessingLink, release, draft, reclassify). Fixture: `npm run test:pflichten` (`fixtures/pflichten/`, 222 cases / 1,197 duties).
+
+### 5.3 Service request + dispatch + handoff
 
 ```
-POST /api/service-requests
-  → transaction: ServiceRequest + StatusEvent(captured) + Attachment*
-  → dispatchService → DispatchTarget adapters
-  → DispatchRecord per target
-  → state transmitted if any success
+Due date / scan
+  → create ServiceRequest (source=due_date | app)  [clinic]
+  → POST …/allocate  (executorOrgId)
+  → POST …/transmit  → StatusEvent(transmitted) + transmittedAt
+       → partner portal/disposition/my-sites lists only if transmittedAt set
+  → partner disposition (assignee, schedule) → inspect protocol
 ```
+
+**Withdraw (clinic):** `POST /api/service-requests/[reference]/withdraw` deletes the SR and related rows. Allowed only while **`transmittedAt` is null** (and not completed / sealed). After transmit, allocation and withdraw are locked.
 
 Optional link: `DeviceDuty` → request (`dutyId`); completion → `DutyPerformance` + roll `dueAt`.
 
-**Services:** `src/services/requests/serviceRequestService.ts`, `src/services/dispatch/*`.
+**Services:** `src/services/requests/serviceRequestService.ts`, `src/services/dispatch/*`, `src/services/console/dispositionService.ts`.
 
-### 5.4 Auth
+### 5.4 Prüfpartner inspection protocol
+
+```
+Partner opens /inspect/[reference]  (assignment must be transmitted)
+  → resolveCatalogueForAssignment + qualification / equipment / baseline gates
+  → POST start run (testEquipmentId, occasion if required)
+  → confirm device (scan or skip)
+  → save step results (pass/fail + measurements)
+  → POST complete / seal
+       → DutyPerformance; optional BaselineMeasurement if catalogue.setsBaseline
+       → ServiceRequest → completed
+```
+
+**Services:** `src/services/pruefpartner/*` (catalogueResolution, inspectionRun, baseline, limitEvaluation, qualificationGate, testEquipmentGate, testEquipment).
+
+### 5.5 Auth
 
 ```
 POST /api/auth/login (User.passwordHash)
@@ -845,28 +915,33 @@ Tenant ─┬─ User (clinic) ── UserPermission?
         ├─ Site ─ Area ─┬─ DeviceInstance* ─┬─ DeviceDuty* ─ DutyPerformance
         │               │                   ├─ DeviceReleaseSnapshot
         │               │                   ├─ DeviceEvidence / DeviceClarification
-        │               │                   ├─ MaintenanceEvent
+        │               │                   ├─ MaintenanceEvent / InspectionRun*
+        │               │                   ├─ BaselineMeasurement*
         │               │                   ├─ ReprocessingOnDevice
         │               │                   └─ DeviceReprocessingProfile
         ├─ ServiceRequest ─┬─ StatusEvent / Attachment / DispatchRecord
-        │                  ├─ DispatchOutbox
-        │                  └─ (optional) DeviceDuty / ExecutorOrg
+        │                  ├─ DispatchOutbox / InspectionRun?
+        │                  └─ (optional) DeviceDuty / ExecutorOrg / assignee User
         ├─ OrderRequest ─ OrderItem
         ├─ DispatchTarget / ExecutorOrg
         ├─ DutyReminder (via DeviceDuty)
         ├─ TrainingEvent ─ TrainingRecord → User
         └─ ServiceContract → Organisation ← OrganisationRole
                                           ← OrgMembership ← User (partner)
-                                          ← SmtpSettings? / UserInvitation (partner)
+                                          ← SmtpSettings? / UserInvitation / TestEquipment
+                                          ← OrganisationSite?
 
 DeviceModel ─┬─ DeviceInstance*
-             ├─ DeviceModelClassification → RefAnnex2Item / RefRuleSet
+             ├─ DeviceModelClassification → RefAnnex2Item / RefAppliedPartType / RefDeviceFamily / RefRuleSet
              ├─ ExternalSourceRecord
              └─ TrainingEvent (subject)
 
+RefInspectionCatalogue ─ RefInspectionStep / RefCatalogueQualification
+                       └─ InspectionRun ─ InspectionStepResult
+
 RoleGrant (kind: clinic|partner_console|partner_acting)
 AuditEvent (tenant-scoped rows)    TotpChallenge → User
-Ref* (global reference, incl. RefCommissioningPrerequisite)
+Ref* (global reference, incl. RefCommissioningPrerequisite, RefTestEquipmentClass, RefDeviceFamily*)
 ```
 
 ---

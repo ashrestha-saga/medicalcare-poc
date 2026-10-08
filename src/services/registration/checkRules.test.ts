@@ -129,4 +129,5 @@ describe("checkRules FA-220–224 / AC 33–38", () => {
     const next = invalidateQuittancesForFields(m, ["aufbereitung"]);
     expect(next.ruleQuittances?.["H-sono-aufb"]).toBeUndefined();
   });
+
 });

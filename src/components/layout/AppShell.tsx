@@ -16,6 +16,7 @@ import { api } from "@/lib/http/apiClient";
 import { useCapturerInventoryUi } from "@/store/capturerInventoryStore";
 import {
   CatalogIcon,
+  ClarificationsIcon,
   DueDatesIcon,
   InventoryIcon,
   LocationsIcon,
@@ -120,6 +121,7 @@ function NavIcon({ id }: { id: MenuModuleId }) {
   if (id === "due-dates") return <DueDatesIcon />;
   if (id === "training") return <TrainingIcon />;
   if (id === "catalog") return <CatalogIcon />;
+  if (id === "clarifications") return <ClarificationsIcon />;
   if (id === "requests") return <RequestsIcon />;
   if (id === "users") return <UsersIcon />;
   if (id === "locations") return <LocationsIcon />;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { DueDateRowDTO, DueDatesBoardDTO, DueDatesBoardFilter } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
@@ -15,6 +16,7 @@ function matchesFilter(row: DueDateRowDTO, filter: DueDatesBoardFilter): boolean
 }
 
 export function useDueDatesList() {
+  const router = useRouter();
   const { checkPermission } = usePermissions();
   const canView = checkPermission("duties:view");
   const canAssign = checkPermission("requests:create");
@@ -61,13 +63,13 @@ export function useDueDatesList() {
       toast.success(
         res.created ? `Assignment ${res.request.reference} created.` : `Assignment ${res.request.reference} already open.`,
       );
-      await refresh();
+      router.push(`/requests/${encodeURIComponent(res.request.reference)}`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Could not create assignment.");
     } finally {
       setAssigningId(null);
     }
-  }, [refresh]);
+  }, [router]);
 
   return {
     canView,

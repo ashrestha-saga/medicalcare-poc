@@ -51,7 +51,14 @@ export type PermissionSlug =
   | "console:organisation:view"
   | "console:audit:view"
   | "console:settings:view"
-  | "console:settings:smtp";
+  | "console:settings:smtp"
+  | "catalogues:view"
+  | "catalogues:edit"
+  | "inspections:perform"
+  | "inspections:view"
+  | "testequipment:manage"
+  | "qualifications:view"
+  | "qualifications:manage";
 
 export type MenuModuleId =
   | "inventory"

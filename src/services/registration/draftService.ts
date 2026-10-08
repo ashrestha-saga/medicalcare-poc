@@ -29,6 +29,8 @@ export interface CreateDraftInput extends DraftIdentityInput {
   characteristics?: RegistrationCharacteristics | null;
   /** C3 — keep state=draft when deferring incomplete fields. */
   keepDraft?: boolean;
+  /** Skip Merkmale conflict gates when linking another unit to a classified catalog model. */
+  catalogLink?: boolean;
   /** C3 — open clarifications to persist with the draft. */
   clarifications?: {
     kind: string;
@@ -182,7 +184,7 @@ export const draftService = {
       ? input.characteristics
       : parseCharacteristics(row.characteristicsJson);
 
-    if (input.characteristics) {
+    if (input.characteristics && !input.catalogLink) {
       const conflicts = characteristicConflicts(characteristics, {
         purchaseYear:
           input.purchaseYear ??

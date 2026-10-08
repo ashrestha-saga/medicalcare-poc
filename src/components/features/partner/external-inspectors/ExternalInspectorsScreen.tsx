@@ -1,10 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import type { ConsoleExternalListDTO, ConsoleStaffMemberDTO } from "@/interfaces/console";
-import { api, ApiError } from "@/lib/http/apiClient";
+import { useExternalInspectorsList } from "@/components/hooks/partner/external-inspectors/useExternalInspectorsList";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -32,39 +30,7 @@ export function ExternalInspectorsScreen() {
   const t = useTranslations("console");
   const { checkPermission } = usePermissions();
   const canManage = checkPermission("console:external:manage");
-  const [data, setData] = useState<ConsoleExternalListDTO | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setData(await api<ConsoleExternalListDTO>("/api/partner/external-inspectors"));
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : t("externalLoadFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- load list on mount
-    void refresh();
-  }, [refresh]);
-
-  const groups = useMemo(() => {
-    const members = data?.members ?? [];
-    const map = new Map<string, { key: string; title: string; members: ConsoleStaffMemberDTO[] }>();
-    for (const m of members) {
-      const key = m.employerOrganisationId ?? "unknown";
-      const title = m.employerName ?? t("externalUnknownEmployer");
-      const g = map.get(key) ?? { key, title, members: [] };
-      g.members.push(m);
-      map.set(key, g);
-    }
-    return [...map.values()].sort((a, b) => a.title.localeCompare(b.title));
-  }, [data, t]);
+  const { data, groups, error, loading } = useExternalInspectorsList();
 
   return (
     <div className="p-work" data-testid="console-external">

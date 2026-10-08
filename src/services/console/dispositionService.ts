@@ -209,7 +209,9 @@ export const dispositionService = {
       orFilters.push({ executorOrg: { organisationId: ctx.organisationId } });
 
       const rows = await prisma.serviceRequest.findMany({
-        where: { OR: orFilters },
+        where: {
+          AND: [{ OR: orFilters }, { transmittedAt: { not: null } }, { state: { not: "rejected" } }],
+        },
         include: {
           executorOrg: { select: { name: true, code: true, organisationId: true } },
           assigneeUser: { select: { name: true } },
@@ -247,7 +249,11 @@ export const dispositionService = {
       );
 
       const rows = await prisma.serviceRequest.findMany({
-        where: { executorOrg: { organisationId: ctx.organisationId } },
+        where: {
+          executorOrg: { organisationId: ctx.organisationId },
+          transmittedAt: { not: null },
+          state: { not: "rejected" },
+        },
         include: {
           executorOrg: { select: { name: true, code: true } },
           assigneeUser: { select: { name: true } },
@@ -317,7 +323,11 @@ export const dispositionService = {
           : Promise.resolve([]),
         liveTenantIds.length
           ? prisma.serviceRequest.findMany({
-              where: { tenantId: { in: liveTenantIds } },
+              where: {
+                tenantId: { in: liveTenantIds },
+                transmittedAt: { not: null },
+                state: { not: "rejected" },
+              },
               select: { tenantId: true, scheduledAt: true },
               orderBy: { createdAt: "desc" },
               take: 500,
@@ -436,7 +446,11 @@ export const dispositionService = {
         null;
 
       const rows = await prisma.serviceRequest.findMany({
-        where: { tenantId },
+        where: {
+          tenantId,
+          transmittedAt: { not: null },
+          state: { not: "rejected" },
+        },
         include: {
           assigneeUser: { select: { id: true, name: true } },
           duty: {
@@ -577,9 +591,18 @@ export const dispositionService = {
     await runWithoutTenantAsync(async () => {
       const row = await prisma.serviceRequest.findFirst({
         where: { reference },
-        select: { assigneeUserId: true },
+        select: { assigneeUserId: true, transmittedAt: true, state: true },
       });
       if (!row) throw notFound("Service request not found.");
+      if (!row.transmittedAt) {
+        throw unprocessable(
+          "Assignment is not visible until the clinic transmits it.",
+          { field: "transmittedAt" },
+        );
+      }
+      if (row.state === "rejected") {
+        throw unprocessable("Assignment was withdrawn.", { field: "state" });
+      }
       const isOwn = row.assigneeUserId === ctx.user.id;
       const isAdminClaim = ctx.user.appRole === "admin" && row.assigneeUserId == null;
       if (!isOwn && !isAdminClaim) {
@@ -621,6 +644,15 @@ export const dispositionService = {
         },
       });
       if (!row) throw notFound("Service request not found.");
+      if (!row.transmittedAt) {
+        throw unprocessable(
+          "Assignment is not visible until the clinic transmits it.",
+          { field: "transmittedAt" },
+        );
+      }
+      if (row.state === "rejected") {
+        throw unprocessable("Assignment was withdrawn.", { field: "state" });
+      }
 
       const now = new Date();
       const contract = await prisma.serviceContract.findFirst({
@@ -738,6 +770,15 @@ export const dispositionService = {
         },
       });
       if (!row) throw notFound("Service request not found.");
+      if (!row.transmittedAt) {
+        throw unprocessable(
+          "Assignment is not visible until the clinic transmits it.",
+          { field: "transmittedAt" },
+        );
+      }
+      if (row.state === "rejected") {
+        throw unprocessable("Assignment was withdrawn.", { field: "state" });
+      }
 
       const contract = await prisma.serviceContract.findFirst({
         where: { organisationId: ctx.organisationId, tenantId: row.tenantId },

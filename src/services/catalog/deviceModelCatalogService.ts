@@ -4,6 +4,7 @@ import type {
   CatalogModelImportResult,
   CatalogModelListItemDTO,
   CatalogSpreadRow,
+  RegistrationCharacteristics,
   TenantContext,
   TenantWorkContext,
 } from "@/interfaces";
@@ -116,6 +117,17 @@ async function buildSpread(modelId: string, tenantId: string): Promise<CatalogSp
     .sort((a, b) => b.copyCount - a.copyCount || a.siteName.localeCompare(b.siteName));
 }
 
+function characteristicsPrefill(row: ModelWithAggregates): RegistrationCharacteristics | null {
+  const latest = row.classifications.find((c) => c.validTo == null) ?? row.classifications[0];
+  if (!latest?.characteristics?.trim()) return null;
+  try {
+    const parsed = JSON.parse(latest.characteristics) as RegistrationCharacteristics;
+    return parsed.produktart?.trim() ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 async function toDetail(row: ModelWithAggregates, tenantId: string): Promise<CatalogModelDetailDTO> {
   const spread = await buildSpread(row.id, tenantId);
   return {
@@ -123,6 +135,7 @@ async function toDetail(row: ModelWithAggregates, tenantId: string): Promise<Cat
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     spread,
+    characteristicsPrefill: characteristicsPrefill(row),
   };
 }
 

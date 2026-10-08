@@ -3,7 +3,15 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CreateServiceRequestDTO } from "@/interfaces";
 import { __resetDbForTests, offlineDb, type OfflineQueueItem } from "./idb";
-import { decideReplay, hydratePayload, isReplayInProgress, replayQueue } from "./offlineQueue";
+import {
+  actingTenantHeader,
+  decideReplay,
+  hydratePayload,
+  isReplayInProgress,
+  replayQueue,
+} from "./offlineQueue";
+import { ACTING_TENANT_HEADER } from "@/constants/session";
+import type { InspectionCompletePayload } from "./idb";
 
 const payload: CreateServiceRequestDTO = {
   idempotencyKey: "key-0001-abcd",
@@ -57,7 +65,7 @@ describe("replayQueue — IndexedDB + mutex", () => {
     const it1 = item({ attachmentIds: ["att-1"] });
     await offlineDb.enqueue(it1, [{ id: "att-1", kind: "fault_photo", dataUrl: "data:image/jpeg;base64,AAA" }]);
     const stored = await offlineDb.get(it1.id);
-    expect(stored?.payload.idempotencyKey).toBe(payload.idempotencyKey);
+    expect((stored!.payload as CreateServiceRequestDTO).idempotencyKey).toBe(payload.idempotencyKey);
     const hydrated = hydratePayload(stored!, await offlineDb.getAttachments(stored!.attachmentIds)) as CreateServiceRequestDTO;
     expect(hydrated.attachments).toEqual([{ kind: "fault_photo", url: "data:image/jpeg;base64,AAA" }]);
   });
@@ -123,5 +131,41 @@ describe("replayQueue — IndexedDB + mutex", () => {
     await p1;
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(isReplayInProgress()).toBe(false);
+  });
+
+  it("replays inspection-run-complete with x-acting-tenant-id from inspect queue", async () => {
+    sessionStorage.setItem(
+      "devicecare.inspectQueue",
+      JSON.stringify({ state: { tenantId: "tenant-clinic-1" }, version: 0 }),
+    );
+    expect(actingTenantHeader()[ACTING_TENANT_HEADER]).toBe("tenant-clinic-1");
+
+    const payload: InspectionCompletePayload = {
+      runId: "run-1",
+      reference: "SR-INSPECT-1",
+      result: "passed",
+      steps: [{ stepId: "step-1", confirmed: true }],
+      note: null,
+    };
+    await offlineDb.enqueue({
+      id: crypto.randomUUID(),
+      operation: "inspection-run-complete",
+      idempotencyKey: "pp-run-1",
+      payload,
+      attachmentIds: [],
+      createdAt: new Date().toISOString(),
+      retryCount: 0,
+      summary: "SR-INSPECT-1",
+    });
+
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      expect(headers.get(ACTING_TENANT_HEADER)).toBe("tenant-clinic-1");
+      return jsonResponse(200, { run: { id: "run-1", reference: "SR-INSPECT-1" } });
+    });
+    const report = await replayQueue(fetchImpl);
+    expect(report.sent).toHaveLength(1);
+    expect(fetchImpl).toHaveBeenCalled();
+    sessionStorage.removeItem("devicecare.inspectQueue");
   });
 });

@@ -1,61 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import type { ConsoleDutyListDTO, ConsoleDutyRowDTO } from "@/interfaces/console";
-import { api, ApiError } from "@/lib/http/apiClient";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
 import { useDueDatesColumns } from "@/components/hooks/partner/due-dates/useDueDatesColumns";
+import { useDueDatesList } from "@/components/hooks/partner/due-dates/useDueDatesList";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-
-export function useDueDates() {
-  const t = useTranslations("console");
-  const [rows, setRows] = useState<ConsoleDutyRowDTO[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [overdueOnly, setOverdueOnly] = useState(false);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const q = overdueOnly ? "?overdue=1" : "";
-      const data = await api<ConsoleDutyListDTO>(`/api/partner/due-dates${q}`);
-      setRows(data.rows);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : t("dueDatesLoadFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [overdueOnly, t]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  return { rows, error, loading, overdueOnly, setOverdueOnly, refresh };
-}
 
 export function DueDatesScreen() {
   const t = useTranslations("console");
   const tFilters = useTranslations("filters");
-  const { rows, error, loading, overdueOnly, setOverdueOnly } = useDueDates();
-  const [keyword, setKeyword] = useState("");
+  const {
+    filtered,
+    error,
+    loading,
+    overdueOnly,
+    setOverdueOnly,
+    keyword,
+    setKeyword,
+  } = useDueDatesList();
   const columns = useDueDatesColumns();
-
-  const filtered = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) =>
-      [row.tenantName, row.inventoryNumber ?? "", row.deviceLabel, row.dutyKey, row.title ?? ""]
-        .join(" ")
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [rows, keyword]);
 
   return (
     <div className="p-work" data-testid="console-due-dates">

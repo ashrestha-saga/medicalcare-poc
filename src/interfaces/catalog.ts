@@ -1,4 +1,5 @@
 import type { DeviceModelDTO, DeviceModelSource } from "./device";
+import type { RegistrationCharacteristics } from "./registration";
 
 /** Latest classification proposal summary for catalog list/detail. */
 export interface CatalogClassificationSummary {
@@ -38,6 +39,11 @@ export interface CatalogModelDetailDTO extends CatalogModelListItemDTO {
   createdAt: string;
   updatedAt: string;
   spread: CatalogSpreadRow[];
+  /**
+   * Open DeviceModelClassification.characteristics JSON when it has a produktart.
+   * Used by Erstanlage to skip Merkmale and derive duties.
+   */
+  characteristicsPrefill: RegistrationCharacteristics | null;
 }
 
 export interface CatalogModelImportResult {

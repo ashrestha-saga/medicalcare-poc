@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import type { CreateOrderRequestDTO, CreateServiceRequestDTO } from "@/interfaces";
-import { offlineDb, type OfflineAttachment, type OfflineQueueItem } from "@/lib/idb";
+import { offlineDb, type InspectionCompletePayload, type OfflineAttachment, type OfflineQueueItem } from "@/lib/idb";
 import { newClientId } from "@/lib/http/apiClient";
 import { replayQueue, type ReplayReport } from "@/lib/offlineQueue";
 import { useLogStore } from "./logStore";
@@ -13,6 +13,7 @@ import { useLogStore } from "./logStore";
  */
 interface OfflineQueueState {
   items: OfflineQueueItem[];
+  inspectionQueue: OfflineQueueItem[];
   online: boolean;
   replaying: boolean;
   lastReport: ReplayReport | null;
@@ -23,12 +24,21 @@ interface OfflineQueueState {
   setOnline(online: boolean): void;
   enqueueServiceRequest(payload: CreateServiceRequestDTO, photos: { kind: "nameplate" | "fault_photo"; dataUrl: string }[], summary: string): Promise<OfflineQueueItem>;
   enqueueOrderRequest(payload: CreateOrderRequestDTO, summary: string): Promise<OfflineQueueItem>;
+  enqueueInspectionComplete(args: {
+    runId: string;
+    reference: string;
+    idempotencyKey: string;
+    result: "passed" | "passed_with_conditions" | "failed";
+    note?: string | null;
+    stepDraft: Record<string, { confirmed?: boolean | null; measuredValue?: string | null }>;
+  }): Promise<OfflineQueueItem>;
   replay(): Promise<ReplayReport | null>;
   dismiss(id: string): Promise<void>;
 }
 
 export const useOfflineQueueStore = create<OfflineQueueState>()((set, get) => ({
   items: [],
+  inspectionQueue: [],
   online: typeof navigator === "undefined" ? true : navigator.onLine,
   replaying: false,
   lastReport: null,
@@ -37,7 +47,11 @@ export const useOfflineQueueStore = create<OfflineQueueState>()((set, get) => ({
 
   load: async () => {
     const items = await offlineDb.list();
-    set({ items, loaded: true });
+    set({
+      items: items.filter((i) => i.operation !== "inspection-run-complete"),
+      inspectionQueue: items.filter((i) => i.operation === "inspection-run-complete"),
+      loaded: true,
+    });
   },
 
   setOnline: (online) => set({ online }),
@@ -57,6 +71,30 @@ export const useOfflineQueueStore = create<OfflineQueueState>()((set, get) => ({
     };
     await offlineDb.enqueue(item, attachments);
     useLogStore.getState().log("queue", `Queued ${summary} (key ${payload.idempotencyKey.slice(0, 8)}…)`);
+    await get().load();
+    return item;
+  },
+
+  enqueueInspectionComplete: async (args) => {
+    const steps = Object.entries(args.stepDraft).map(([stepId, v]) => ({ stepId, ...v }));
+    const item: OfflineQueueItem = {
+      id: newClientId(),
+      operation: "inspection-run-complete",
+      idempotencyKey: args.idempotencyKey,
+      payload: {
+        runId: args.runId,
+        reference: args.reference,
+        result: args.result,
+        note: args.note ?? null,
+        steps,
+      },
+      attachmentIds: [],
+      createdAt: new Date().toISOString(),
+      retryCount: 0,
+      summary: args.reference,
+    };
+    await offlineDb.enqueue(item);
+    useLogStore.getState().log("queue", `Queued inspection ${args.reference}`);
     await get().load();
     return item;
   },

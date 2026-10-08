@@ -29,7 +29,13 @@ export function RegistrationScreen({ draftId }: RegistrationScreenProps) {
           </section>
 
           <div className="p-reg__body" data-testid="registration-wizard">
-            <RegistrationStepRail step={w.step} maxStep={w.maxStep} onSelect={w.setStep} />
+            <RegistrationStepRail
+              step={w.step}
+              maxStep={w.maxStep}
+              characteristicsSkipped={w.characteristicsSkipped}
+              catalogLinkMode={w.catalogLinkMode}
+              onSelect={w.setStep}
+            />
 
             {w.error ? (
               <div className="p-reg__alert">
@@ -47,7 +53,19 @@ export function RegistrationScreen({ draftId }: RegistrationScreenProps) {
                 areas={w.areas}
                 fieldErrors={w.fieldErrors}
                 busy={w.busy}
+                identityPhase={w.identityPhase}
+                linkedModelId={w.linkedModelId}
+                hasClassificationPrefill={w.hasClassificationPrefill}
+                gtinInput={w.gtinInput}
+                setGtinInput={w.setGtinInput}
+                onResolveGtin={w.resolveGtin}
+                onSelectCatalogModel={w.selectCatalogModel}
+                onStartManual={w.startManualRegistration}
+                onClearLinkedModel={w.clearLinkedModel}
                 onContinue={w.saveIdentity}
+                notInCatalogOpen={w.notInCatalogOpen}
+                notInCatalogGtin={w.notInCatalogGtin}
+                onDismissNotInCatalog={w.dismissNotInCatalog}
               />
             ) : null}
 
@@ -57,12 +75,14 @@ export function RegistrationScreen({ draftId }: RegistrationScreenProps) {
               <DutiesStep
                 duties={w.duties}
                 decisionProtocol={w.decisionProtocol}
-                onBack={() => w.setStep(2)}
-                onContinue={() => w.unlockAndGo(4)}
+                catalogLinkMode={w.catalogLinkMode}
+                busy={w.busy}
+                onBack={() => w.setStep(w.catalogLinkMode || w.characteristicsSkipped ? 1 : 2)}
+                onContinue={() => void w.continueFromDuties()}
               />
             ) : null}
 
-            {w.step === 4 ? (
+            {w.step === 4 && !w.catalogLinkMode ? (
               <PrerequisitesStep
                 prerequisites={w.prerequisites}
                 checks={w.checks}

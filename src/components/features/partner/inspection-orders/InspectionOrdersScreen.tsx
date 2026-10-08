@@ -1,9 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { ConsoleRequestListDTO, ConsoleRequestRowDTO } from "@/interfaces/console";
-import { api, ApiError } from "@/lib/http/apiClient";
+import { useInspectionOrdersList } from "@/components/hooks/partner/inspection-orders/useInspectionOrdersList";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -11,38 +9,7 @@ import { Spinner } from "@/components/ui/Loading";
 
 export function InspectionOrdersScreen() {
   const t = useTranslations("console");
-  const [rows, setRows] = useState<ConsoleRequestRowDTO[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [keyword, setKeyword] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    void api<ConsoleRequestListDTO>("/api/partner/inspection-orders")
-      .then((d) => {
-        if (!cancelled) setRows(d.rows);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof ApiError ? e.message : t("assignmentsLoadFailed"));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
-
-  const filtered = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) =>
-      [row.reference, row.tenantName, row.deviceLabel, row.managed ? "managed" : "external"]
-        .join(" ")
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [rows, keyword]);
+  const { filtered, error, loading, keyword, setKeyword } = useInspectionOrdersList();
 
   return (
     <div className="p-work" data-testid="console-inspection-orders">

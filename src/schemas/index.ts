@@ -3,6 +3,7 @@ export * from "./formErrors";
 export * from "./dueDates";
 export * from "./forms";
 export * from "./orderRequest";
+export * from "./pruefpartner";
 export * from "./registration";
 export * from "./resolve";
 export * from "./serviceRequest";

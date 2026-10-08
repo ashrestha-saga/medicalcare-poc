@@ -53,6 +53,10 @@ const INSPECTION_SCOPE: readonly PermissionSlug[] = [
   "requests:view-all",
   "requests:transition",
   "parts:request",
+  "inspections:perform",
+  "inspections:view",
+  "catalogues:view",
+  "qualifications:view",
 ];
 
 /** Reprocessing scope: inventory + clarifications visibility (no clinic training). */
@@ -104,6 +108,10 @@ const ADMIN_BASE: readonly PermissionSlug[] = [
   "requests:view-all",
   "requests:transition",
   "parts:request",
+  "inspections:perform",
+  "inspections:view",
+  "catalogues:view",
+  "qualifications:view",
   "audit:view",
   "audit:export",
 ];
@@ -114,6 +122,10 @@ const INSPECTOR_BASE: readonly PermissionSlug[] = [
   "duties:view",
   "requests:view-open",
   "requests:transition",
+  "inspections:perform",
+  "inspections:view",
+  "catalogues:view",
+  "qualifications:view",
   "audit:view",
 ];
 
@@ -154,6 +166,12 @@ export const ALL_CONSOLE_PERMISSIONS: readonly PermissionSlug[] = [
   "console:audit:view",
   "console:settings:view",
   "console:settings:smtp",
+  "catalogues:view",
+  "catalogues:edit",
+  "inspections:view",
+  "testequipment:manage",
+  "qualifications:view",
+  "qualifications:manage",
 ];
 
 const CONSOLE_VIEW_BASE: readonly PermissionSlug[] = [
@@ -164,12 +182,15 @@ const CONSOLE_VIEW_BASE: readonly PermissionSlug[] = [
   "console:assignments:view",
   "console:organisation:view",
   "console:audit:view",
+  "catalogues:view",
+  "inspections:view",
+  "qualifications:view",
 ];
 
 /** Operator-console grants by OrgMembership.appRole (no acting tenant). */
 export const CONSOLE_ROLE_PERMISSIONS: Record<PartnerAppRole, readonly PermissionSlug[]> = {
   admin: ALL_CONSOLE_PERMISSIONS,
-  inspector: [...CONSOLE_VIEW_BASE],
+  inspector: [...CONSOLE_VIEW_BASE, "testequipment:manage"],
   order: [
     "console:nav",
     "console:customers:view",
@@ -325,6 +346,7 @@ export function resolveConsolePathPermission(path: string): PermissionSlug | nul
   if (CONSOLE_PATH_PERMISSION_MAP[pathname]) return CONSOLE_PATH_PERMISSION_MAP[pathname];
   if (pathname.startsWith("/partner/customers/")) return "console:customers:view";
   if (pathname.startsWith("/partner/my-sites/")) return "console:disposition:view";
+  if (pathname.startsWith("/partner/test-equipment")) return "testequipment:manage";
   if (pathname.startsWith("/partner/staff/")) return "console:staff:view";
   if (pathname.startsWith("/partner/external-inspectors/")) return "console:external:view";
   if (pathname.startsWith("/partner/disposition/")) return "console:disposition:view";

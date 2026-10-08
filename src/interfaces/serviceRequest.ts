@@ -118,6 +118,8 @@ export interface RequestDetailProps {
   executors?: ExecutorOrgDTO[];
   onBack: () => void;
   onUpdated: (next: ServiceRequestDTO) => void;
+  /** Called after a successful withdraw (assignment deleted). */
+  onWithdrawn?: () => void;
 }
 
 export interface CreateServiceRequestResult {

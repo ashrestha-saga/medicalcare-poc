@@ -36,7 +36,9 @@ export async function POST(req: Request, ctx: Ctx) {
         checks: parsed.checks,
         acknowledgeImpact: parsed.acknowledgeImpact,
         classificationConfidence: parsed.classificationConfidence,
-        evidenceText: parsed.evidenceText });
+        evidenceText: parsed.evidenceText,
+        evidence: parsed.evidence,
+      });
       return Response.json({ result }, { headers: { "x-correlation-id": session.correlationId } });
     });
   } catch (error) {

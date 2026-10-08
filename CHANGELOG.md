@@ -36,25 +36,29 @@ Keep entries short, user-facing, and in the past tense (“Added X”, “Fixed 
 ### Added
 
 - Erstanlage (initial registration) wizard: identity → characteristics → duties → prerequisites; duties preview and release APIs under `/api/registration/*`
-- Admin model reclassification at `/registration/reclassify/[modelId]`
+- Admin model reclassification at `/registration/reclassify/[modelId]` (third-party / document evidence on apply)
 - `POST /api/registration/preview` (derive duties without a draft) and payload `POST /api/registration/release`
 - Dual-language UI (EN / DE) via next-intl, cookie locale, status-bar and Settings language toggle
 - Training module (`/training`, `training:view`): events overview, person×model matrix, record session API
 - Management page (`/management`): partner organisation contracts and people with access for the clinic
-- Partner portal (`/partner`, `/login/partner`): organisation home, people, and contracted clinics
+- Partner portal (`/partner`, `/login/partner`): organisation home, people, disposition, my-sites, due-dates, inspection orders, test equipment settings
 - Service-request executor allocation and transmit flow (`/api/service-requests/.../allocate|transmit`)
+- Clinic withdraw assignment before transmit (`POST /api/service-requests/[reference]/withdraw` + AlertDialog UX)
+- Prüfpartner inspect portal (`/(inspect)/inspect`): catalogue resolution, qualification / equipment / baseline gates, protocol steps, seal
+- Inspection schema: `RefInspectionCatalogue` / steps, `InspectionRun` / `InspectionStepResult`, `BaselineMeasurement`, `TestEquipment`, device families / applied parts
+- Seeded Prüfpartner catalogues (`seed-pruefpartner.json`) and demo instruments (MSR Sicherheitstester + MSR/RTS Röntgen-Prüfkörper)
 - Appearance setting (System / Light / Dark) with clinical light theme tokens and browser persistence
 - Reference master data (`RefProductKind`, `RefInspectionType`, `RefAnnex2Item`, …) seeded from stammdaten
 - Historised `DeviceModelClassification`, release snapshots, and frozen `DeviceDuty` rows
 - Per-duty due dates on release/reclassify (`DeviceDuty.dueAt`) with inventory duties list and mark-done
-- Due dates board (`/due-dates`, `duties:view`) with assignment from a duty
+- Due dates board (`/due-dates`, `duties:view`) with assignment from a duty (navigates to `/requests/[reference]`)
 - `POST /api/duties/[id]/complete`, `GET /api/devices/[id]/duties`, `GET /api/duties`
 - DB-backed role permission grants (`RoleGrant`) with editable Roles admin UI (`roles:update`)
 - Clarifications list for incomplete inventory data (superadmin / device admin)
 - Responsible person as device-admin user dropdown (modular `/api/users/options`)
 - Maintenance cycle on models/instances with next due date, completion roll-forward, and audit events
 - Inventory barcode labels (CODE128 of inventory number + name/serial) with single and bulk print
-- Project documentation in `docs/PROJECT.md`
+- Project documentation in `docs/PROJECT.md` / `docs/SCHEMA_AND_ARCHITECTURE.md` (Prüfpartner sync)
 - Changelog workflow (`CHANGELOG.md`)
 - MySQL as the primary database provider (replacing local SQLite for app runtime)
 
@@ -67,7 +71,9 @@ Keep entries short, user-facing, and in the past tense (“Added X”, “Fixed 
 - Prisma `provider` set to `mysql`; Vitest uses MySQL via `DATABASE_URL` / `TEST_DATABASE_URL`
 - Erstanlage wizard no longer saves a draft on Continue; the device is written on Release (`POST /api/registration/release`). Inventarize drafts still resume at `/registration/[id]`.
 - Locale switch swaps message catalogs in place (no full page reload), so wizard form state is preserved
-- New modules (training, management, partner) follow page → feature → hooks → interface → service → schema layering
+- New modules (training, management, partner, inspect) follow page → feature → hooks → interface → service → schema layering
+- Partner assignment lists (disposition, my-sites, inspection orders) require `transmittedAt` (clinic transmit handoff)
+- Inspection step UX: row layout with pass/fail (EN) / In Ordnung·Mangel (DE) and measured value under the title
 
 ### Removed
 

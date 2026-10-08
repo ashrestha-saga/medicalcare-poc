@@ -35,6 +35,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         ...input,
         characteristics: input.characteristics as RegistrationCharacteristics | undefined,
         keepDraft: input.keepDraft,
+        catalogLink: input.catalogLink,
         clarifications: input.clarifications,
       });
       return Response.json({ draft }, { headers: { "x-correlation-id": session.correlationId } });

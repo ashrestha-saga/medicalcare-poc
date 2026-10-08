@@ -12,6 +12,7 @@ import { seedHandoverInventory } from "./seeds/handoverInventory";
 import { seedPartnerOrgs } from "./seeds/partnerOrgs";
 import { seedRegistrationRef } from "./seeds/registrationRef";
 import { seedStaffSkillsRefs } from "./seeds/staffSkillsRefs";
+import { seedPruefpartnerDemoEquipment, seedRefPruefpartner } from "./seeds/refPruefpartner";
 
 export const SEED = {
   tenantId: "demo-tenant",
@@ -68,6 +69,7 @@ export const SEED = {
 
 export async function seed(prisma: PrismaClient) {
   await seedRegistrationRef(prisma);
+  await seedRefPruefpartner(prisma);
 
   const tenant = await prisma.tenant.upsert({
     where: { id: SEED.tenantId },
@@ -484,6 +486,7 @@ export async function seed(prisma: PrismaClient) {
 
   const partners = await seedPartnerOrgs(prisma, tenant.id);
   await seedStaffSkillsRefs(prisma);
+  await seedPruefpartnerDemoEquipment(prisma);
 
   // Handover testdaten → existing Prisma models only; all under demo-tenant.
   const handover = await seedHandoverInventory(prisma, tenant.id);

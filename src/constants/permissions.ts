@@ -36,6 +36,13 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "training:view",
   "audit:view",
   "audit:export",
+  "catalogues:view",
+  "catalogues:edit",
+  "inspections:perform",
+  "inspections:view",
+  "testequipment:manage",
+  "qualifications:view",
+  "qualifications:manage",
 ] as const;
 
 /** Staff who manage the service queue — includes the nav rail. */
@@ -70,6 +77,9 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
     "inventory:update",
     "catalog:update",
     "clarifications:view",
+    "inspections:view",
+    "catalogues:view",
+    "qualifications:view",
     "audit:view",
   ],
   security_officer: [...SERVICE_STAFF, "requests:view-all"],

@@ -1,13 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import type { SiteAssignmentRowDTO, SitePortalDTO } from "@/interfaces/console";
-import { api, ApiError } from "@/lib/http/apiClient";
-import { usePermissions } from "@/lib/providers/PermissionProvider";
-import { useSessionStore } from "@/store/sessionStore";
-import { toast } from "@/store/toastStore";
+import type { DispositionDisplayState, SiteAssignmentRowDTO } from "@/interfaces/console";
+import { useSiteAssignments } from "@/components/hooks/partner/my-sites/useSiteAssignments";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,96 +11,49 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/Loading";
+import { cn } from "@/lib/utils";
+
+function siteStateBadgeClass(state: DispositionDisplayState): string {
+  if (state === "abgeschlossen") {
+    return "border-transparent bg-[rgba(47,217,138,0.18)] text-[var(--green)]";
+  }
+  if (state === "abgelehnt") {
+    return "border-transparent bg-[rgba(255,51,102,0.14)] text-[var(--red)]";
+  }
+  if (state === "in_arbeit") {
+    return "border-transparent bg-[rgba(245,165,36,0.18)] text-[var(--warn)]";
+  }
+  if (state === "terminiert") {
+    return "border-transparent bg-[rgba(30,127,224,0.14)] text-[var(--accent)]";
+  }
+  if (state === "zugewiesen") {
+    return "border-transparent bg-[rgba(139,92,246,0.14)] text-violet-700";
+  }
+  return "border-border bg-muted text-muted-foreground";
+}
 
 export function SiteAssignmentsScreen({ tenantId }: { tenantId: string }) {
   const t = useTranslations("console");
-  const { checkPermission } = usePermissions();
-  const canAssign = checkPermission("console:disposition:assign");
-  const isAdmin = useSessionStore((s) => s.user?.appRole === "admin");
-
-  const [data, setData] = useState<SitePortalDTO | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [scan, setScan] = useState("");
-  const [scanActive, setScanActive] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [busyRef, setBusyRef] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api<SitePortalDTO>(
-        `/api/partner/my-sites/${encodeURIComponent(tenantId)}`,
-      );
-      setData(res);
-      setSelected((prev) => {
-        const next = new Set<string>();
-        for (const id of prev) {
-          if (res.assignments.some((a) => a.reference === id && a.isMine)) next.add(id);
-        }
-        return next;
-      });
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : t("sitePortalLoadFailed"));
-    } finally {
-      setLoading(false);
-    }
-  }, [t, tenantId]);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  const visible = useMemo(() => {
-    const rows = data?.assignments ?? [];
-    const q = scanActive.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) => {
-      if (!row.isMine) return false;
-      const hay = [row.inventoryNumber ?? "", row.serialNumber ?? "", row.reference, row.deviceLabel]
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
-    });
-  }, [data?.assignments, scanActive]);
-
-  const mineVisible = visible.filter((r) => r.isMine);
-
-  function toggle(reference: string, mine: boolean) {
-    if (!mine) return;
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(reference)) next.delete(reference);
-      else next.add(reference);
-      return next;
-    });
-  }
-
-  function selectAllMine() {
-    setSelected(new Set(mineVisible.map((r) => r.reference)));
-  }
-
-  function onSelectInspections() {
-    // Scoping / hand-off to service-partner portal comes later.
-    toast.info(t("sitePortalSelectLater"));
-  }
-
-  async function patchAssignment(reference: string, body: { assigneeUserId?: string | null }) {
-    setBusyRef(reference);
-    try {
-      await api(
-        `/api/partner/my-sites/${encodeURIComponent(tenantId)}/assignments/${encodeURIComponent(reference)}`,
-        { method: "PATCH", body: JSON.stringify(body) },
-      );
-      toast.success(t("dispositionSaved"));
-      await refresh();
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : t("dispositionSaveFailed"));
-    } finally {
-      setBusyRef(null);
-    }
-  }
+  const {
+    data,
+    error,
+    loading,
+    canAssign,
+    isAdmin,
+    scan,
+    setScan,
+    scanActive,
+    applyScan,
+    clearScan,
+    selected,
+    busyRef,
+    visible,
+    selectableMine,
+    toggle,
+    selectAllMine,
+    onSelectInspections,
+    patchAssignment,
+  } = useSiteAssignments(tenantId);
 
   if (loading && !data) {
     return (
@@ -159,29 +108,18 @@ export function SiteAssignmentsScreen({ tenantId }: { tenantId: string }) {
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  setScanActive(scan);
+                  applyScan();
                 }
               }}
               placeholder={t("sitePortalVerifyPlaceholder")}
               className="flex-1"
               data-testid="site-portal-scan"
             />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setScanActive(scan)}
-            >
+            <Button type="button" variant="secondary" onClick={applyScan}>
               {t("sitePortalScan")}
             </Button>
             {scanActive ? (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setScan("");
-                  setScanActive("");
-                }}
-              >
+              <Button type="button" variant="ghost" onClick={clearScan}>
                 {t("sitePortalClearScan")}
               </Button>
             ) : null}
@@ -207,29 +145,41 @@ export function SiteAssignmentsScreen({ tenantId }: { tenantId: string }) {
                 </tr>
               </thead>
               <tbody>
-                {visible.map((row) => (
-                  <AssignmentRow
-                    key={row.reference}
-                    row={row}
-                    checked={selected.has(row.reference)}
-                    onToggle={() => toggle(row.reference, row.isMine)}
-                    canEditAssignee={
-                      canAssign && (row.isMine || (isAdmin && !row.assigneeUserId))
-                    }
-                    busy={busyRef === row.reference}
-                    assignees={data?.assignees ?? []}
-                    onAssign={(userId) =>
-                      void patchAssignment(row.reference, { assigneeUserId: userId })
-                    }
-                  />
-                ))}
+                {visible.map((row) => {
+                  const completed =
+                    row.displayState === "abgeschlossen" || row.displayState === "abgelehnt";
+                  return (
+                    <AssignmentRow
+                      key={row.reference}
+                      row={row}
+                      checked={selected.has(row.reference)}
+                      selectable={row.isMine && !completed}
+                      onToggle={() => toggle(row.reference, row.isMine, completed)}
+                      canEditAssignee={
+                        canAssign &&
+                        !completed &&
+                        (row.isMine || (isAdmin && !row.assigneeUserId))
+                      }
+                      busy={busyRef === row.reference}
+                      assignees={data?.assignees ?? []}
+                      onAssign={(userId) =>
+                        void patchAssignment(row.reference, { assigneeUserId: userId })
+                      }
+                    />
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
 
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={selectAllMine} disabled={mineVisible.length === 0}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={selectAllMine}
+            disabled={selectableMine.length === 0}
+          >
             {t("sitePortalSelectAllMine")}
           </Button>
           <Button
@@ -249,6 +199,7 @@ export function SiteAssignmentsScreen({ tenantId }: { tenantId: string }) {
 function AssignmentRow({
   row,
   checked,
+  selectable,
   onToggle,
   canEditAssignee,
   busy,
@@ -257,6 +208,7 @@ function AssignmentRow({
 }: {
   row: SiteAssignmentRowDTO;
   checked: boolean;
+  selectable: boolean;
   onToggle: () => void;
   canEditAssignee: boolean;
   busy: boolean;
@@ -264,18 +216,19 @@ function AssignmentRow({
   onAssign: (userId: string | null) => void;
 }) {
   const t = useTranslations("console");
-  /** Fade only colleagues' assignments — unassigned stay fully visible. */
-  const muted = Boolean(row.assigneeUserId && !row.isMine);
+  /** Fade colleagues' assignments and completed rows that cannot be selected. */
+  const muted = Boolean((row.assigneeUserId && !row.isMine) || !selectable && row.isMine);
 
   return (
     <tr
-      className={`border-b border-border/70 align-top ${muted ? "opacity-45" : ""}`}
+      className={`border-b border-border/70 align-top ${muted ? "opacity-55" : ""}`}
       data-testid={row.isMine ? "site-assignment-mine" : "site-assignment-other"}
     >
       <td className="px-3 py-3">
         {row.isMine ? (
           <Checkbox
             checked={checked}
+            disabled={!selectable}
             onCheckedChange={() => onToggle()}
             aria-label={row.reference}
           />
@@ -291,7 +244,7 @@ function AssignmentRow({
       <td className="px-3 py-3 text-muted-foreground">{row.serviceType}</td>
       <td className="px-3 py-3 text-muted-foreground">{row.locationText}</td>
       <td className="px-3 py-3">
-        {row.overdue ? (
+        {row.overdue && row.displayState !== "abgeschlossen" ? (
           <Badge variant="destructive" className="mb-1">
             {t("sitePortalOverdue")}
           </Badge>
@@ -299,7 +252,10 @@ function AssignmentRow({
         <p className="font-mono text-xs">{row.dueAt ?? "—"}</p>
       </td>
       <td className="px-3 py-3">
-        <Badge variant="secondary">
+        <Badge
+          variant={row.displayState === "abgeschlossen" ? "success" : "outline"}
+          className={cn(siteStateBadgeClass(row.displayState))}
+        >
           {t(`displayState_${row.displayState}` as "displayState_erfasst")}
         </Badge>
       </td>

@@ -557,6 +557,69 @@ export const serviceRequestService = {
   },
 
   /**
+   * Withdraw a wrong assignment — deletes the ServiceRequest and related rows so the
+   * duty can be reassigned. Only allowed before transmit; locked once handed off.
+   */
+  async withdraw(reference: string, ctx: TenantWorkContext): Promise<{ reference: string }> {
+    requirePermission(ctx, "requests:transition");
+    const existing = await prisma.serviceRequest.findFirst({
+      where: { reference, tenantId: ctx.tenantId },
+      select: { id: true, reference: true, state: true, dutyId: true, transmittedAt: true },
+    });
+    if (!existing) throw notFound(`Unknown service request reference ${reference}.`);
+    if (existing.transmittedAt) {
+      throw unprocessable("Cannot withdraw after transmission — the assignment is locked.", {
+        field: "transmittedAt",
+      });
+    }
+    if (existing.state === "completed") {
+      throw unprocessable("Completed assignments cannot be withdrawn.", { field: "state" });
+    }
+    if (existing.state === "rejected") {
+      throw unprocessable("Assignment already withdrawn.", { field: "state" });
+    }
+
+    const sealedRun = await prisma.inspectionRun.findFirst({
+      where: { serviceRequestId: existing.id, dutyPerformanceId: { not: null } },
+      select: { id: true },
+    });
+    if (sealedRun) {
+      throw unprocessable("Cannot withdraw — a sealed inspection protocol exists.", {
+        field: "inspectionRun",
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const runs = await tx.inspectionRun.findMany({
+        where: { serviceRequestId: existing.id },
+        select: { id: true },
+      });
+      const runIds = runs.map((r) => r.id);
+      if (runIds.length) {
+        await tx.inspectionStepResult.deleteMany({ where: { runId: { in: runIds } } });
+        await tx.inspectionRun.deleteMany({ where: { id: { in: runIds } } });
+      }
+      await tx.statusEvent.deleteMany({ where: { serviceRequestId: existing.id } });
+      await tx.attachment.deleteMany({ where: { serviceRequestId: existing.id } });
+      await tx.dispatchOutbox.deleteMany({ where: { serviceRequestId: existing.id } });
+      await tx.dispatchRecord.deleteMany({ where: { serviceRequestId: existing.id } });
+      await tx.dutyPerformance.deleteMany({ where: { serviceRequestId: existing.id } });
+      await tx.serviceRequest.delete({ where: { id: existing.id } });
+    });
+
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "request",
+      resourceId: reference,
+      action: "delete",
+      summary: `Withdrew assignment ${reference}`,
+      before: { state: existing.state, dutyId: existing.dutyId },
+    });
+
+    return { reference: existing.reference };
+  },
+
+  /**
    * In-app Start / Complete — requires requests:transition. Appends StatusEvent;
    * DeviceCare is the clinic-side system of record (OXID webhook remains separate).
    */

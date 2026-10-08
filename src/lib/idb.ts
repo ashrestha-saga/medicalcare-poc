@@ -6,7 +6,15 @@ import type { CreateOrderRequestDTO, CreateServiceRequestDTO } from "@/interface
  * Stores a *complete replayable submission*, never a pointer into Zustand state.
  */
 
-export type QueueOperation = "service-request" | "order-request";
+export type QueueOperation = "service-request" | "order-request" | "inspection-run-complete";
+
+export interface InspectionCompletePayload {
+  runId: string;
+  reference: string;
+  result: "passed" | "passed_with_conditions" | "failed";
+  steps: { stepId: string; confirmed?: boolean | null; measuredValue?: string | null; note?: string | null }[];
+  note?: string | null;
+}
 
 export interface OfflineAttachment {
   id: string;
@@ -19,7 +27,7 @@ export interface OfflineQueueItem {
   id: string;
   operation: QueueOperation;
   idempotencyKey: string;
-  payload: CreateServiceRequestDTO | CreateOrderRequestDTO;
+  payload: CreateServiceRequestDTO | CreateOrderRequestDTO | InspectionCompletePayload;
   attachmentIds: string[];
   createdAt: string;
   retryCount: number;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useCreateExternalInspector } from "@/components/hooks/partner/external-inspectors/useCreateExternalInspector";
@@ -24,16 +24,11 @@ export function CreateExternalInspectorScreen() {
     submit,
     meta,
     metaLoading,
-    loadMeta,
     addSkillRow,
     patchSkill,
     removeSkill,
   } = useCreateExternalInspector();
   const { checkPermission, permissionsLoading } = usePermissions();
-
-  useEffect(() => {
-    void loadMeta();
-  }, [loadMeta]);
 
   if (!permissionsLoading && !checkPermission("console:external:manage")) {
     return (

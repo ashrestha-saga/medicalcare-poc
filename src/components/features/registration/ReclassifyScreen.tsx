@@ -117,6 +117,8 @@ export function ReclassifyScreen({ modelId }: ReclassifyScreenProps) {
                 releaseDisabled={!w.acknowledgeImpact}
                 title={t("prereqsBeforeApply")}
                 readyMessage={t("reclassifyReady")}
+                onUploadEvidence={w.uploadEvidence}
+                onExternalRef={w.setExternalEvidence}
                 beforeActions={
                   <label
                     className="flex items-start gap-3 rounded-md border border-[var(--border)] bg-[var(--navy)]/40 px-3 py-3"

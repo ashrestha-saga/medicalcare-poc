@@ -75,12 +75,37 @@ export function useRequestTransition(
     }
   }, [onUpdated, request.reference, t]);
 
+  const canWithdraw =
+    !request.allocationLocked &&
+    request.state !== "completed" &&
+    request.state !== "rejected";
+
+  const withdraw = useCallback(async (): Promise<boolean> => {
+    if (!canWithdraw) return false;
+    setBusy(true);
+    try {
+      await api(`/api/service-requests/${encodeURIComponent(request.reference)}/withdraw`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      toast.success(t("toastWithdrawn"));
+      return true;
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("toastWithdrawFailed"));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }, [canWithdraw, request.reference, t]);
+
   return {
     busy,
     executorOrgId,
     onExecutorChange,
     canAllocate,
     canTransmit,
+    canWithdraw,
     transmit,
+    withdraw,
   };
 }
