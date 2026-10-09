@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { DispositionDisplayState, SiteAssignmentRowDTO } from "@/interfaces/console";
 import { useSiteAssignments } from "@/components/hooks/partner/my-sites/useSiteAssignments";
+import { BarcodeCapture } from "@/components/features/shared/barcode-capture";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/Loading";
 import { cn } from "@/lib/utils";
@@ -40,8 +40,6 @@ export function SiteAssignmentsScreen({ tenantId }: { tenantId: string }) {
     loading,
     canAssign,
     isAdmin,
-    scan,
-    setScan,
     scanActive,
     applyScan,
     clearScan,
@@ -101,25 +99,15 @@ export function SiteAssignmentsScreen({ tenantId }: { tenantId: string }) {
           <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {t("sitePortalVerifyTitle")}
           </Label>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-            <Input
-              value={scan}
-              onChange={(e) => setScan(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  applyScan();
-                }
-              }}
-              placeholder={t("sitePortalVerifyPlaceholder")}
-              className="flex-1"
+          <div className="mt-2 space-y-2">
+            <BarcodeCapture
               data-testid="site-portal-scan"
+              placeholder={t("sitePortalVerifyPlaceholder")}
+              submitLabel={t("sitePortalScan")}
+              onCapture={(result) => applyScan(result.raw)}
             />
-            <Button type="button" variant="secondary" onClick={applyScan}>
-              {t("sitePortalScan")}
-            </Button>
             {scanActive ? (
-              <Button type="button" variant="ghost" onClick={clearScan}>
+              <Button type="button" variant="ghost" size="sm" className="h-8" onClick={clearScan}>
                 {t("sitePortalClearScan")}
               </Button>
             ) : null}
@@ -157,6 +145,7 @@ export function SiteAssignmentsScreen({ tenantId }: { tenantId: string }) {
                       onToggle={() => toggle(row.reference, row.isMine, completed)}
                       canEditAssignee={
                         canAssign &&
+                        row.isExecutor &&
                         !completed &&
                         (row.isMine || (isAdmin && !row.assigneeUserId))
                       }

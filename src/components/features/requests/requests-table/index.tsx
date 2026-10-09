@@ -69,7 +69,6 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
         getRowId={(row) => row.id}
         emptyMessage="No requests in this view."
         searchPlaceholder={tFilters("searchRequests")}
-        onRowClick={onSelect}
       />
     </div>
   );

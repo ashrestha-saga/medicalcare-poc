@@ -338,30 +338,34 @@ export function useRegistrationWizard(initialDraftId?: string) {
     setMerkmale(emptyCharacteristics());
   }, []);
 
-  const resolveGtin = useCallback(async () => {
-    const raw = gtinInput.trim();
-    if (!raw) return;
-    setError(null);
-    setNotInCatalogOpen(false);
-    setBusy(true);
-    try {
-      const res = await api<ResolveResponse>("/api/resolve", {
-        method: "POST",
-        body: JSON.stringify({ raw, context: "service" }),
-      });
-      if (res.stage === "capture" || !res.model?.id) {
-        setNotInCatalogGtin(raw);
-        setNotInCatalogOpen(true);
-        return;
+  const resolveGtin = useCallback(
+    async (rawOverride?: string) => {
+      const raw = (rawOverride ?? gtinInput).trim();
+      if (!raw) return;
+      setGtinInput(raw);
+      setError(null);
+      setNotInCatalogOpen(false);
+      setBusy(true);
+      try {
+        const res = await api<ResolveResponse>("/api/resolve", {
+          method: "POST",
+          body: JSON.stringify({ raw, context: "service" }),
+        });
+        if (res.stage === "capture" || !res.model?.id) {
+          setNotInCatalogGtin(raw);
+          setNotInCatalogOpen(true);
+          return;
+        }
+        const detail = await fetchModelDetail(res.model.id);
+        applyLinkedModelDetail(detail, res.identifier.serial);
+      } catch (e) {
+        setError(e instanceof ApiError ? e.message : "GTIN lookup failed");
+      } finally {
+        setBusy(false);
       }
-      const detail = await fetchModelDetail(res.model.id);
-      applyLinkedModelDetail(detail, res.identifier.serial);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "GTIN lookup failed");
-    } finally {
-      setBusy(false);
-    }
-  }, [gtinInput, applyLinkedModelDetail]);
+    },
+    [gtinInput, applyLinkedModelDetail],
+  );
 
   const selectCatalogModel = useCallback(
     async (modelId: string) => {

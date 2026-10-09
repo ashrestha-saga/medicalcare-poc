@@ -13,7 +13,9 @@ import type { AppLocale } from "@/lib/locale";
 interface CapturerDeviceRecordProps {
   device: DeviceInstanceDetailDTO | null;
   loading?: boolean;
+  requestingService?: boolean;
   onClose: () => void;
+  onRequestService?: (device: DeviceInstanceDetailDTO) => void;
 }
 
 function Field({ label, value, dash }: { label: string; value: string | null | undefined; dash: string }) {
@@ -45,7 +47,13 @@ function sourceLabel(
   return dash;
 }
 
-export function CapturerDeviceRecord({ device, loading, onClose }: CapturerDeviceRecordProps) {
+export function CapturerDeviceRecord({
+  device,
+  loading,
+  requestingService,
+  onClose,
+  onRequestService,
+}: CapturerDeviceRecordProps) {
   const t = useTranslations("capturer");
   const tCommon = useTranslations("common");
   const locale = useLocale() as AppLocale;
@@ -134,14 +142,27 @@ export function CapturerDeviceRecord({ device, loading, onClose }: CapturerDevic
         <p>{t("source", { source: sourceLabel(device.modelSource, { catalog: t("sourceCatalog"), manual: t("sourceManual") }, dash) })}</p>
       </div>
 
-      <button
-        type="button"
-        className="p-bestand-detail__back"
-        onClick={onClose}
-        data-testid="capturer-device-back"
-      >
-        {tCommon("back")}
-      </button>
+      <div className="p-bestand-detail__actions">
+        {onRequestService && (
+          <button
+            type="button"
+            className="p-bestand-detail__service"
+            onClick={() => onRequestService(device)}
+            disabled={requestingService}
+            data-testid="capturer-device-service-request"
+          >
+            {requestingService ? t("requestServiceBusy") : t("requestService")}
+          </button>
+        )}
+        <button
+          type="button"
+          className="p-bestand-detail__back"
+          onClick={onClose}
+          data-testid="capturer-device-back"
+        >
+          {tCommon("back")}
+        </button>
+      </div>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { errorResponse } from "@/lib/errors";
 import { createDeviceSchema } from "@/schemas/device";
 import { deviceInventoryService } from "@/services/inventory/deviceInventoryService";
 
-/** GET /api/devices?q=&siteId=&serial=&modelId= — tenant device inventory (inventory:view). */
+/** GET /api/devices?q=&siteId=&room=&serial=&modelId= — tenant device inventory (inventory:view). */
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
@@ -19,7 +19,8 @@ export async function GET(req: Request) {
       }
       const q = params.get("q") ?? undefined;
       const siteId = params.get("siteId") ?? undefined;
-      const devices = await deviceInventoryService.list(ctx, { q, siteId });
+      const room = params.get("room") ?? undefined;
+      const devices = await deviceInventoryService.list(ctx, { q, siteId, room });
       return Response.json({ devices }, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {

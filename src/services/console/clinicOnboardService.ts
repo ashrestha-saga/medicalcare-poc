@@ -325,7 +325,7 @@ export const clinicOnboardService = {
             state: { not: "rejected" },
           },
           include: {
-            executorOrg: { select: { name: true, code: true } },
+            executorOrg: { select: { name: true, code: true, organisationId: true } },
             assigneeUser: { select: { name: true } },
           },
           orderBy: { createdAt: "desc" },
@@ -376,13 +376,14 @@ export const clinicOnboardService = {
       executorCode: r.executorOrg?.code?.replace(/^O-/i, "") ?? null,
       assigneeUserId: r.assigneeUserId,
       assigneeName: r.assigneeUser?.name ?? null,
-      scheduledAt: r.scheduledAt ? isoDate(r.scheduledAt) : null,
+      scheduledAt: r.scheduledAt ? r.scheduledAt.toISOString() : null,
       displayState: dispositionDisplayState(r.state, r.assigneeUserId, r.scheduledAt),
       nextDisplayState: nextDispositionDisplayState(
         dispositionDisplayState(r.state, r.assigneeUserId, r.scheduledAt),
       ),
       raisedAt: r.createdAt.toISOString(),
       managed: true,
+      isExecutor: r.executorOrg?.organisationId === ctx.organisationId,
     }));
 
     const scope = parseContractScope(row.scope);

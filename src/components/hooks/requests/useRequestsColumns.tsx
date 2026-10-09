@@ -2,13 +2,13 @@
 
 import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronsUpDown, Eye } from "lucide-react";
+import { ChevronsUpDown } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { ServiceRequestDTO } from "@/interfaces";
 import { formatWhen, serviceRequestStateBadge } from "@/components/hooks/requests";
+import { OpenButton } from "@/components/features/shared/OpenButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AppLocale } from "@/lib/locale";
 
 function SortHeader({
@@ -147,27 +147,13 @@ export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void)
         cell: ({ row }) => {
           const request = row.original;
           return (
-            <TooltipProvider delayDuration={200}>
-              <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5"
-                      onClick={() => onOpen(request)}
-                      data-testid="request-open"
-                      aria-label={`${tTable("open")} ${request.reference}`}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      {tTable("open")}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{tTable("open")}</TooltipContent>
-                </Tooltip>
-              </div>
-            </TooltipProvider>
+            <div className="flex items-center justify-end">
+              <OpenButton
+                onClick={() => onOpen(request)}
+                data-testid="request-open"
+                aria-label={`${tTable("open")} ${request.reference}`}
+              />
+            </div>
           );
         },
       },

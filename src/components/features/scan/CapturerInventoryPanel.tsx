@@ -32,7 +32,9 @@ export function CapturerInventoryPanel() {
           <CapturerDeviceRecord
             device={inventory.selected}
             loading={inventory.detailLoading && !inventory.selected}
+            requestingService={inventory.requestingService}
             onClose={inventory.closeDetail}
+            onRequestService={(device) => void inventory.requestService(device)}
           />
         ) : (
           <CapturerInventoryList inventory={inventory} onClose={closePanel} />

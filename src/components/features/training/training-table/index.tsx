@@ -56,7 +56,6 @@ export function TrainingEventsTable({ events, loading, onOpen }: TrainingEventsT
         getRowId={(row) => row.id}
         emptyMessage="No training events recorded yet."
         searchPlaceholder={tFilters("searchTraining")}
-        onRowClick={(row) => onOpen(row.id)}
       />
     </div>
   );

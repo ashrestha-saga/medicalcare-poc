@@ -142,6 +142,8 @@ export interface ConsoleRequestRowDTO {
   nextDisplayState: DispositionDisplayState | null;
   raisedAt: string;
   managed: boolean;
+  /** True when the caller's partner organisation is the executing contractor. */
+  isExecutor: boolean;
 }
 
 export interface ConsoleRequestListDTO {
@@ -394,6 +396,8 @@ export interface SiteAssignmentRowDTO {
   assigneeName: string | null;
   /** True when assignee is the current partner user — only these may be selected/updated. */
   isMine: boolean;
+  /** True when the caller's organisation is the executing contractor for this row. */
+  isExecutor: boolean;
 }
 
 export interface SitePortalDTO {

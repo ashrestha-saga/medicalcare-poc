@@ -63,7 +63,6 @@ export function CatalogTable({ list, onSelect, onEdit }: CatalogTableProps) {
         toolbarTrailing={trailing}
         emptyMessage="No models in the catalog."
         getRowId={(row) => row.id}
-        onRowClick={onSelect}
         displayPagination
         searchPlaceholder={tFilters("searchCatalog")}
       />

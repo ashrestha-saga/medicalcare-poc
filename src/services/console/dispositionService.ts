@@ -15,12 +15,38 @@ import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
 import { isLiveContract } from "@/services/access/partnerAccessService";
 import { requirePartnerPermission } from "@/lib/auth/tenantContext";
+import { parseAppointmentInput } from "@/lib/format";
 import { addMonthsUtc } from "@/lib/maintenance/schedule";
 import { computeDutyDueAt } from "@/services/registration/dueDate";
 import type { ServiceRequestState } from "@prisma/client";
 
 function isoDate(d: Date | null | undefined): string | null {
   return d ? d.toISOString().slice(0, 10) : null;
+}
+
+function isoDateTime(d: Date | null | undefined): string | null {
+  return d ? d.toISOString() : null;
+}
+
+function dispositionHistoryNote(
+  next: DispositionDisplayState,
+  opts: { assigneeName: string | null; scheduledAt: Date | null },
+): string {
+  const who = opts.assigneeName?.trim() || null;
+  const when = isoDateTime(opts.scheduledAt);
+  if (next === "terminiert") {
+    const parts = ["Appointment scheduled"];
+    if (when) parts.push(`for ${when}`);
+    if (who) parts.push(`· assigned to ${who}`);
+    return parts.join(" ");
+  }
+  if (next === "zugewiesen") {
+    return who ? `Assigned to ${who}` : "Assigned";
+  }
+  if (next === "in_arbeit") {
+    return who ? `In progress · ${who}` : "In progress";
+  }
+  return `Disposition advanced to ${next}`;
 }
 
 /** Inventory-derived duty due date for portal Due column (not appointment). */
@@ -130,11 +156,12 @@ function mapRow(
     assigneeUserId: string | null;
     scheduledAt: Date | null;
     createdAt: Date;
-    executorOrg: { name: string; code?: string } | null;
+    executorOrg: { name: string; code?: string; organisationId?: string | null } | null;
     assigneeUser: { name: string } | null;
   },
   tenant: { code: string | null; name: string } | undefined,
   managed: boolean,
+  isExecutor: boolean,
   device?: { label: string; detail: string | null } | null,
 ): ConsoleRequestRowDTO {
   const displayState = dispositionDisplayState(r.state, r.assigneeUserId, r.scheduledAt);
@@ -153,11 +180,12 @@ function mapRow(
     executorCode: shortExecutorCode(r.executorOrg?.code) ?? null,
     assigneeUserId: r.assigneeUserId,
     assigneeName: r.assigneeUser?.name ?? null,
-    scheduledAt: isoDate(r.scheduledAt),
+    scheduledAt: isoDateTime(r.scheduledAt),
     displayState,
     nextDisplayState: nextDispositionDisplayState(displayState),
     raisedAt: r.createdAt.toISOString(),
     managed,
+    isExecutor,
   };
 }
 
@@ -191,6 +219,10 @@ async function deviceLabelsForRequests(
 }
 
 export const dispositionService = {
+  /**
+   * Customer portfolio — orders on institutions with a live management contract.
+   * Oversight + contractor take-over; scheduling lives on the executor dispatch desk.
+   */
   async list(ctx: PartnerContext): Promise<ConsoleRequestListDTO> {
     requirePartnerPermission(ctx, "console:disposition:view");
     return runWithoutTenantAsync(async () => {
@@ -203,14 +235,15 @@ export const dispositionService = {
         contracts.filter((c) => isLiveContract(c, now)).map((c) => [c.tenantId, c.tenant]),
       );
       const managedIds = [...liveTenants.keys()];
-
-      const orFilters: object[] = [];
-      if (managedIds.length) orFilters.push({ tenantId: { in: managedIds } });
-      orFilters.push({ executorOrg: { organisationId: ctx.organisationId } });
+      if (managedIds.length === 0) {
+        return { rows: [] };
+      }
 
       const rows = await prisma.serviceRequest.findMany({
         where: {
-          AND: [{ OR: orFilters }, { transmittedAt: { not: null } }, { state: { not: "rejected" } }],
+          tenantId: { in: managedIds },
+          transmittedAt: { not: null },
+          state: { not: "rejected" },
         },
         include: {
           executorOrg: { select: { name: true, code: true, organisationId: true } },
@@ -228,7 +261,8 @@ export const dispositionService = {
           mapRow(
             r,
             liveTenants.get(r.tenantId) ?? r.tenant,
-            liveTenants.has(r.tenantId),
+            true,
+            r.executorOrg?.organisationId === ctx.organisationId,
             r.subjectType === "instance" ? devices.get(r.subjectId) : null,
           ),
         ),
@@ -255,7 +289,7 @@ export const dispositionService = {
           state: { not: "rejected" },
         },
         include: {
-          executorOrg: { select: { name: true, code: true } },
+          executorOrg: { select: { name: true, code: true, organisationId: true } },
           assigneeUser: { select: { name: true } },
           tenant: { select: { id: true, name: true, code: true } },
         },
@@ -271,6 +305,7 @@ export const dispositionService = {
             r,
             liveTenants.get(r.tenantId) ?? r.tenant,
             liveTenants.has(r.tenantId),
+            true,
             r.subjectType === "instance" ? devices.get(r.subjectId) : null,
           ),
         ),
@@ -389,7 +424,7 @@ export const dispositionService = {
         .filter((r) => visibleTenantIds.has(r.tenantId))
         .map((r) => ({
           tenantId: r.tenantId,
-          scheduledAt: isoDate(r.scheduledAt),
+          scheduledAt: isoDateTime(r.scheduledAt),
         }));
 
       const visibleStaff = staffAssignments.filter((a) => visibleTenantIds.has(a.tenantId));
@@ -453,6 +488,7 @@ export const dispositionService = {
         },
         include: {
           assigneeUser: { select: { id: true, name: true } },
+          executorOrg: { select: { organisationId: true } },
           duty: {
             select: {
               dueAt: true,
@@ -518,6 +554,7 @@ export const dispositionService = {
           assigneeUserId: r.assigneeUserId,
           assigneeName: r.assigneeUser?.name ?? null,
           isMine: r.assigneeUserId === ctx.user.id,
+          isExecutor: r.executorOrg?.organisationId === ctx.organisationId,
         };
       });
 
@@ -661,14 +698,18 @@ export const dispositionService = {
       const managed = Boolean(contract && isLiveContract(contract, now));
       const isExecutor = row.executorOrg?.organisationId === ctx.organisationId;
       if (!managed && !isExecutor) throw forbidden();
+      // Only the executing contractor may schedule or advance — managing partners may view
+      // and reassign the contractor, but not run another org's disposition.
+      if (!isExecutor) {
+        throw unprocessable(
+          "Only the executing organisation can schedule or advance this assignment.",
+          { field: "executorOrgId" },
+        );
+      }
 
       let nextScheduled = row.scheduledAt;
       if (input.scheduledAt !== undefined) {
-        if (!input.scheduledAt || input.scheduledAt === "") {
-          nextScheduled = null;
-        } else {
-          nextScheduled = new Date(`${input.scheduledAt}T00:00:00.000Z`);
-        }
+        nextScheduled = parseAppointmentInput(input.scheduledAt);
       }
 
       // Use persisted appointment for step detection so a draft date cannot skip stages.
@@ -720,7 +761,10 @@ export const dispositionService = {
             state: nextState,
             source: "console",
             actor: ctx.user.name,
-            note: `Disposition advance → ${next}`,
+            note: dispositionHistoryNote(next, {
+              assigneeName: updated.assigneeUser?.name ?? null,
+              scheduledAt: updated.scheduledAt,
+            }),
           },
         });
       }
@@ -733,12 +777,12 @@ export const dispositionService = {
         summary: `Disposition advanced ${reference} to ${next}`,
         before: {
           state: row.state,
-          scheduledAt: isoDate(row.scheduledAt),
+          scheduledAt: isoDateTime(row.scheduledAt),
           displayState: display,
         },
         after: {
           state: updated.state,
-          scheduledAt: isoDate(updated.scheduledAt),
+          scheduledAt: isoDateTime(updated.scheduledAt),
           displayState: next,
         },
       });
@@ -748,6 +792,7 @@ export const dispositionService = {
         updated,
         updated.tenant,
         managed,
+        isExecutor,
         updated.subjectType === "instance" ? devices.get(updated.subjectId) : null,
       );
     });
@@ -790,9 +835,16 @@ export const dispositionService = {
       }
 
       let nextExecutorId = row.executorOrgId;
+      let nextExecutorOrgId: string | null = row.executorOrg?.organisationId ?? null;
       if (input.executorOrgId !== undefined) {
+        if (!managed) {
+          throw unprocessable("Only the managing organisation can change the contractor.", {
+            field: "executorOrgId",
+          });
+        }
         if (input.executorOrgId === null || input.executorOrgId === "") {
           nextExecutorId = null;
+          nextExecutorOrgId = null;
         } else {
           const org = await prisma.executorOrg.findFirst({
             where: {
@@ -803,11 +855,25 @@ export const dispositionService = {
           });
           if (!org) throw unprocessable("Unknown executor.", { field: "executorOrgId" });
           nextExecutorId = org.id;
+          nextExecutorOrgId = org.organisationId;
         }
       }
 
+      const willBeExecutor = nextExecutorOrgId === ctx.organisationId;
+      const executorChanged = nextExecutorId !== row.executorOrgId;
+
       let nextAssignee = row.assigneeUserId;
+      if (executorChanged) {
+        // Contractor change always clears the previous org's handler.
+        nextAssignee = null;
+      }
       if (input.assigneeUserId !== undefined) {
+        if (!willBeExecutor) {
+          throw unprocessable(
+            "Only the executing organisation can assign staff for this assignment.",
+            { field: "assigneeUserId" },
+          );
+        }
         if (input.assigneeUserId === null || input.assigneeUserId === "") {
           nextAssignee = null;
         } else {
@@ -850,14 +916,17 @@ export const dispositionService = {
       let nextScheduled = row.scheduledAt;
       let nextState = row.state;
       if (input.scheduledAt !== undefined) {
-        if (!input.scheduledAt || input.scheduledAt === "") {
-          nextScheduled = null;
+        if (!willBeExecutor) {
+          throw unprocessable(
+            "Only the executing organisation can schedule this assignment.",
+            { field: "scheduledAt" },
+          );
+        }
+        nextScheduled = parseAppointmentInput(input.scheduledAt);
+        if (!nextScheduled) {
           if (row.state === "scheduled") nextState = nextAssignee ? "acknowledged" : "captured";
-        } else {
-          nextScheduled = new Date(`${input.scheduledAt}T00:00:00.000Z`);
-          if (PRE_SCHEDULE.includes(row.state) || row.state === "scheduled") {
-            nextState = "scheduled";
-          }
+        } else if (PRE_SCHEDULE.includes(row.state) || row.state === "scheduled") {
+          nextState = "scheduled";
         }
       }
 
@@ -872,13 +941,18 @@ export const dispositionService = {
           state: nextState,
         },
         include: {
-          executorOrg: { select: { name: true, code: true } },
+          executorOrg: { select: { name: true, code: true, organisationId: true } },
           assigneeUser: { select: { name: true } },
           tenant: { select: { id: true, name: true, code: true } },
         },
       });
 
       if (nextState !== row.state) {
+        const displayNext = dispositionDisplayState(
+          updated.state,
+          updated.assigneeUserId,
+          updated.scheduledAt,
+        );
         await prisma.statusEvent.create({
           data: {
             tenantId: row.tenantId,
@@ -886,7 +960,10 @@ export const dispositionService = {
             state: nextState,
             source: "console",
             actor: ctx.user.name,
-            note: "Disposition update",
+            note: dispositionHistoryNote(displayNext, {
+              assigneeName: updated.assigneeUser?.name ?? null,
+              scheduledAt: updated.scheduledAt,
+            }),
           },
         });
       }
@@ -900,13 +977,13 @@ export const dispositionService = {
         before: {
           executorOrgId: row.executorOrgId,
           assigneeUserId: row.assigneeUserId,
-          scheduledAt: isoDate(row.scheduledAt),
+          scheduledAt: isoDateTime(row.scheduledAt),
           state: row.state,
         },
         after: {
           executorOrgId: updated.executorOrgId,
           assigneeUserId: updated.assigneeUserId,
-          scheduledAt: isoDate(updated.scheduledAt),
+          scheduledAt: isoDateTime(updated.scheduledAt),
           state: updated.state,
         },
       });
@@ -916,6 +993,7 @@ export const dispositionService = {
         updated,
         updated.tenant,
         managed,
+        updated.executorOrg?.organisationId === ctx.organisationId,
         updated.subjectType === "instance" ? devices.get(updated.subjectId) : null,
       );
     });
@@ -961,5 +1039,57 @@ export const dispositionService = {
           appRole: m.appRole,
         }));
     });
+  },
+
+  /**
+   * Managing partner reassigns the contractor to their own linked ExecutorOrg
+   * for the tenant (take over from another contractor such as RTS).
+   */
+  async takeOver(ctx: PartnerContext, reference: string): Promise<ConsoleRequestRowDTO> {
+    requirePartnerPermission(ctx, "console:disposition:assign");
+
+    const executorOrgId = await runWithoutTenantAsync(async () => {
+      const row = await prisma.serviceRequest.findFirst({
+        where: { reference },
+        select: { tenantId: true, transmittedAt: true, state: true },
+      });
+      if (!row) throw notFound("Service request not found.");
+      if (!row.transmittedAt) {
+        throw unprocessable(
+          "Assignment is not visible until the clinic transmits it.",
+          { field: "transmittedAt" },
+        );
+      }
+      if (row.state === "rejected") {
+        throw unprocessable("Assignment was withdrawn.", { field: "state" });
+      }
+
+      const contract = await prisma.serviceContract.findFirst({
+        where: { organisationId: ctx.organisationId, tenantId: row.tenantId },
+      });
+      if (!contract || !isLiveContract(contract)) {
+        throw unprocessable("Only the managing organisation can take over this assignment.", {
+          field: "executorOrgId",
+        });
+      }
+
+      const mine = await prisma.executorOrg.findFirst({
+        where: {
+          tenantId: row.tenantId,
+          organisationId: ctx.organisationId,
+          active: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      });
+      if (!mine) {
+        throw unprocessable(
+          "No executor organisation linked to your partner for this institution.",
+          { field: "executorOrgId" },
+        );
+      }
+      return mine.id;
+    });
+
+    return this.assign(ctx, reference, { executorOrgId });
   },
 };

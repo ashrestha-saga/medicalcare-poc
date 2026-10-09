@@ -225,14 +225,14 @@ export const CONSOLE_MENU_MODULES: readonly MenuModule[] = [
   },
   {
     id: "console-disposition",
-    label: "Orders",
+    label: "Customer portfolio",
     href: "/partner/disposition",
     slug: "console:disposition:view",
     group: "ops",
   },
   {
     id: "console-assignments",
-    label: "Inspection orders",
+    label: "Our dispatch",
     href: "/partner/inspection-orders",
     slug: "console:assignments:view",
     group: "ops",

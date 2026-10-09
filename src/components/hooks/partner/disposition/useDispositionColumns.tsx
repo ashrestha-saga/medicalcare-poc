@@ -5,8 +5,8 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronsUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ConsoleRequestRowDTO, DispositionDisplayState } from "@/interfaces/console";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 function SortHeader({
@@ -29,26 +29,53 @@ function SortHeader({
   );
 }
 
-function stateChipClass(state: DispositionDisplayState): string {
-  if (state === "erfasst") return "bg-amber-50 text-amber-900 border-amber-200";
-  if (state === "abgeschlossen") return "bg-emerald-50 text-emerald-900 border-emerald-200";
-  if (state === "abgelehnt") return "bg-rose-50 text-rose-900 border-rose-200";
-  return "bg-muted text-muted-foreground border-border";
+/** Display-state chips aligned with clinic service-request badge colours. */
+function displayStateBadge(state: DispositionDisplayState): {
+  variant: "outline" | "secondary" | "default" | "warning" | "success" | "destructive";
+  className?: string;
+} {
+  if (state === "erfasst") {
+    return {
+      variant: "outline",
+      className: "border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    };
+  }
+  if (state === "zugewiesen") {
+    return {
+      variant: "outline",
+      className: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+    };
+  }
+  if (state === "terminiert") {
+    return {
+      variant: "default",
+      className: "border-transparent bg-primary/15 text-primary",
+    };
+  }
+  if (state === "in_arbeit") {
+    return { variant: "warning" };
+  }
+  if (state === "abgeschlossen") {
+    return { variant: "success" };
+  }
+  if (state === "abgelehnt") {
+    return { variant: "destructive" };
+  }
+  return { variant: "secondary" };
 }
 
 export interface DispositionColumnActions {
-  canAdvance: boolean;
+  canManage: boolean;
   busyRef: string | null;
-  appointmentValue: (row: ConsoleRequestRowDTO) => string;
-  onDraftDate: (reference: string, value: string) => void;
-  onAdvance: (row: ConsoleRequestRowDTO) => void;
+  onAskTakeOver: (row: ConsoleRequestRowDTO) => void;
 }
 
+/** Customer portfolio columns — oversight; schedule only via Our dispatch. */
 export function useDispositionColumns(
   actions: DispositionColumnActions,
 ): ColumnDef<ConsoleRequestRowDTO>[] {
   const t = useTranslations("console");
-  const { canAdvance, busyRef, appointmentValue, onDraftDate, onAdvance } = actions;
+  const { canManage, busyRef, onAskTakeOver } = actions;
 
   return useMemo(
     () => [
@@ -65,14 +92,7 @@ export function useDispositionColumns(
         id: "institution",
         header: ({ column }) => <SortHeader label={t("colInstitution")} column={column} />,
         cell: ({ row }) => (
-          <div>
-            <p className="font-semibold text-foreground">{row.original.tenantName}</p>
-            {!row.original.managed ? (
-              <span className="mt-1 inline-block rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                {t("managedChipNo")}
-              </span>
-            ) : null}
-          </div>
+          <p className="font-semibold text-foreground">{row.original.tenantName}</p>
         ),
       },
       {
@@ -100,11 +120,22 @@ export function useDispositionColumns(
         id: "contractor",
         accessorFn: (row) => row.executorCode ?? row.executorName ?? "",
         header: ({ column }) => <SortHeader label={t("colContractor")} column={column} />,
-        cell: ({ row }) => (
-          <abbr title={row.original.executorName ?? undefined} className="no-underline">
-            {row.original.executorCode ?? row.original.executorName ?? "—"}
-          </abbr>
-        ),
+        cell: ({ row }) => {
+          const r = row.original;
+          const label = r.executorCode ?? r.executorName ?? "—";
+          return (
+            <Badge
+              variant={r.isExecutor ? "success" : "secondary"}
+              title={r.executorName ?? undefined}
+              className={cn(
+                "text-[10px] uppercase tracking-wide",
+                !r.isExecutor && "border-border bg-muted text-muted-foreground",
+              )}
+            >
+              {label}
+            </Badge>
+          );
+        },
       },
       {
         accessorKey: "assigneeName",
@@ -116,21 +147,21 @@ export function useDispositionColumns(
       },
       {
         id: "appointment",
-        accessorFn: (row) => appointmentValue(row),
+        accessorFn: (row) => row.scheduledAt ?? "",
         header: ({ column }) => <SortHeader label={t("colAppointment")} column={column} />,
-        cell: ({ row }) =>
-          canAdvance ? (
-            <Input
-              type="date"
-              className="h-8 w-[140px]"
-              value={appointmentValue(row.original)}
-              disabled={busyRef === row.original.reference}
-              onChange={(e) => onDraftDate(row.original.reference, e.target.value)}
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <span>{row.original.scheduledAt ?? "—"}</span>
-          ),
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-xs">
+            {row.original.scheduledAt
+              ? new Date(row.original.scheduledAt).toLocaleString(undefined, {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "—"}
+          </span>
+        ),
       },
       {
         accessorKey: "displayState",
@@ -138,42 +169,36 @@ export function useDispositionColumns(
         header: ({ column }) => <SortHeader label={t("colState")} column={column} />,
         cell: ({ row }) => {
           const r = row.original;
+          const badge = displayStateBadge(r.displayState);
           return (
             <div className="flex flex-col items-start gap-1.5">
-              <span
-                className={cn(
-                  "inline-block rounded border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide",
-                  stateChipClass(r.displayState),
-                )}
+              <Badge
+                variant={badge.variant}
+                className={cn("text-[10px] uppercase tracking-wide", badge.className)}
               >
                 {t(`displayState_${r.displayState}` as "displayState_erfasst")}
-              </span>
-              {canAdvance && r.nextDisplayState ? (
+              </Badge>
+              {canManage && !r.isExecutor ? (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  className="h-7 px-2 text-xs"
+                  className="h-7 px-2.5 text-xs"
                   disabled={busyRef === r.reference}
-                  data-testid={`disposition-advance-${r.reference}`}
+                  data-testid={`disposition-takeover-${r.reference}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onAdvance(r);
+                    onAskTakeOver(r);
                   }}
                 >
-                  → {t(`displayState_${r.nextDisplayState}` as "displayState_erfasst")}
+                  {t("dispositionTakeOver")}
                 </Button>
-              ) : null}
-              {r.displayState === "in_arbeit" ? (
-                <span className="text-[10px] text-muted-foreground">
-                  {t("dispositionCompleteElsewhere")}
-                </span>
               ) : null}
             </div>
           );
         },
       },
     ],
-    [t, canAdvance, busyRef, appointmentValue, onDraftDate, onAdvance],
+    [t, canManage, busyRef, onAskTakeOver],
   );
 }

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { SitePortalDTO } from "@/interfaces/console";
+import { matchesDevice } from "@/lib/barcode/matchDevice";
+import { parseIdentifier } from "@/lib/gs1";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { useActingTenantStore } from "@/store/actingTenantStore";
@@ -58,14 +60,21 @@ export function useSiteAssignments(tenantId: string) {
 
   const visible = useMemo(() => {
     const rows = data?.assignments ?? [];
-    const q = scanActive.trim().toLowerCase();
+    const q = scanActive.trim();
     if (!q) return rows;
+    const identifier = parseIdentifier(q);
     return rows.filter((row) => {
       if (!row.isMine) return false;
-      const hay = [row.inventoryNumber ?? "", row.serialNumber ?? "", row.reference, row.deviceLabel]
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(q);
+      if (
+        matchesDevice(identifier, {
+          inventoryNumber: row.inventoryNumber,
+          serialNumber: row.serialNumber,
+        })
+      ) {
+        return true;
+      }
+      const hay = [row.reference, row.deviceLabel].join(" ").toLowerCase();
+      return hay.includes(q.toLowerCase());
     });
   }, [data?.assignments, scanActive]);
 
@@ -91,8 +100,10 @@ export function useSiteAssignments(tenantId: string) {
     setSelected(new Set(selectableMine.map((r) => r.reference)));
   }, [selectableMine]);
 
-  const applyScan = useCallback(() => {
-    setScanActive(scan);
+  const applyScan = useCallback((raw?: string) => {
+    const next = (raw ?? scan).trim();
+    setScan(next);
+    setScanActive(next);
   }, [scan]);
 
   const clearScan = useCallback(() => {

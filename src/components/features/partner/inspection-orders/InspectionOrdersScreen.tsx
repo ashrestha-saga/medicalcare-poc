@@ -1,87 +1,138 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useInspectionOrdersList } from "@/components/hooks/partner/inspection-orders/useInspectionOrdersList";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
+import { DataTable } from "@/components/features/shared/shadcn/DataTable";
+import { useDispatchColumns } from "@/components/hooks/partner/inspection-orders/useDispatchColumns";
+import { useInspectionOrdersList } from "@/components/hooks/partner/inspection-orders/useInspectionOrdersList";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/Loading";
+import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/lib/providers/PermissionProvider";
+import { cn } from "@/lib/utils";
+import type { DispatchPipelineFilter } from "@/schemas/console";
 
 export function InspectionOrdersScreen() {
   const t = useTranslations("console");
-  const { filtered, error, loading, keyword, setKeyword } = useInspectionOrdersList();
+  const { checkPermission } = usePermissions();
+  const canDispatch = checkPermission("console:disposition:assign");
+  const {
+    filtered,
+    error,
+    loading,
+    keyword,
+    setKeyword,
+    busyRef,
+    pipeline,
+    setPipeline,
+    counts,
+    appointmentValue,
+    onDraftDate,
+    onAdvance,
+    onAssignHandler,
+    ensureAssignees,
+    assigneesByTenant,
+    assigneesLoading,
+  } = useInspectionOrdersList();
+
+  const columns = useDispatchColumns({
+    canDispatch,
+    busyRef,
+    appointmentValue,
+    onDraftDate,
+    onAdvance,
+    onAssignHandler,
+    ensureAssignees,
+    assigneesByTenant,
+    assigneesLoading,
+  });
+
+  const filters: { id: DispatchPipelineFilter; label: string; count: number }[] = [
+    { id: "all", label: t("dispatchFilterAll"), count: counts.all },
+    {
+      id: "needs_handler",
+      label: t("dispatchFilterNeedsHandler"),
+      count: counts.needs_handler,
+    },
+    {
+      id: "needs_appointment",
+      label: t("dispatchFilterNeedsAppointment"),
+      count: counts.needs_appointment,
+    },
+    { id: "scheduled", label: t("dispatchFilterScheduled"), count: counts.scheduled },
+    { id: "in_progress", label: t("dispatchFilterInProgress"), count: counts.in_progress },
+    { id: "done", label: t("dispatchFilterDone"), count: counts.done },
+  ];
 
   return (
     <div className="p-work" data-testid="console-inspection-orders">
       <main className="p-main">
-        <ListPageShell title={t("assignmentsTitle")} description={t("assignmentsIntro")}>
-          {loading ? (
-            <div className="p-wait">
-              <Spinner />
-            </div>
-          ) : null}
+        <ListPageShell
+          title={t("assignmentsTitle")}
+          description={t("assignmentsIntro")}
+          contentClassName="max-w-none"
+        >
           {error ? (
             <Alert variant="destructive" className="mb-4">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : null}
-          <Input
-            className="mb-3 max-w-sm"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder={t("dispositionSearch")}
-          />
-          {!loading && filtered.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("assignmentsEmpty")}</p>
-          ) : null}
-          {filtered.length > 0 ? (
-            <div className="overflow-x-auto rounded-lg border border-border bg-card">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                    <th className="px-3 py-2.5 font-semibold">{t("colAssignment")}</th>
-                    <th className="px-3 py-2.5 font-semibold">{t("colInstitution")}</th>
-                    <th className="px-3 py-2.5 font-semibold">{t("colDevice")}</th>
-                    <th className="px-3 py-2.5 font-semibold">{t("colService")}</th>
-                    <th className="px-3 py-2.5 font-semibold">{t("colHandler")}</th>
-                    <th className="px-3 py-2.5 font-semibold">{t("colState")}</th>
-                    <th className="px-3 py-2.5 font-semibold">{t("colManaged")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((row) => (
-                    <tr key={row.reference} className="border-b border-border/70 align-top last:border-0">
-                      <td className="px-3 py-3 font-mono text-xs">{row.reference}</td>
-                      <td className="px-3 py-3">
-                        <b className="font-semibold">{row.tenantName}</b>
-                        {!row.managed ? (
-                          <span className="mt-1 block w-fit rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                            {t("managedChipNo")}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-3">
-                        <div>{row.deviceLabel}</div>
-                        {row.deviceDetail ? (
-                          <div className="text-xs text-muted-foreground">{row.deviceDetail}</div>
-                        ) : null}
-                      </td>
-                      <td className="px-3 py-3 text-xs lowercase">{row.serviceType}</td>
-                      <td className="px-3 py-3">{row.assigneeName ?? "—"}</td>
-                      <td className="px-3 py-3">
-                        <span className="rounded-md border border-border bg-muted px-2 py-0.5 text-xs">
-                          {t(`displayState_${row.displayState}` as "displayState_erfasst")}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-xs">
-                        {row.managed ? t("managedYes") : t("managedNo")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div
+              className="flex flex-wrap gap-1.5"
+              role="tablist"
+              aria-label={t("dispatchFilterLabel")}
+            >
+              {filters.map((f) => (
+                <Button
+                  key={f.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={pipeline === f.id}
+                  variant={pipeline === f.id ? "default" : "outline"}
+                  size="sm"
+                  className={cn("h-8", pipeline === f.id && "shadow-sm")}
+                  onClick={() => setPipeline(f.id)}
+                >
+                  {f.label}
+                  <span className="ml-1.5 tabular-nums text-xs opacity-70">{f.count}</span>
+                </Button>
+              ))}
             </div>
+            {checkPermission("console:disposition:view") ? (
+              <Button asChild variant="secondary" size="sm" className="h-8">
+                <Link href="/partner/disposition">{t("dispatchGoPortfolio")}</Link>
+              </Button>
+            ) : null}
+          </div>
+
+          {!canDispatch ? (
+            <Alert className="mb-4">
+              <AlertDescription>{t("dispatchReadOnlyHint")}</AlertDescription>
+            </Alert>
           ) : null}
+
+          <DataTable
+            data={filtered}
+            columns={columns}
+            search
+            visibility
+            displayPagination
+            keyword={keyword}
+            setKeyword={setKeyword}
+            removeKeyword={() => setKeyword("")}
+            isLoading={loading}
+            totalItems={filtered.length}
+            getRowId={(row) => row.reference}
+            emptyMessage={t("assignmentsEmpty")}
+            searchPlaceholder={t("dispositionSearch")}
+            className="min-w-0"
+          />
+
+          <div className="mt-4 rounded-md border border-border border-l-[3px] border-l-primary bg-card px-4 py-3 text-sm leading-relaxed">
+            <b>{t("dispatchNoteTitle")}</b> {t("dispatchNoteBody")}
+          </div>
         </ListPageShell>
       </main>
     </div>

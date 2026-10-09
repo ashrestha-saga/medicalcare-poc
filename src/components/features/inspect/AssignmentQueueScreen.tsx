@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { CataloguePreviewDTO } from "@/interfaces/pruefpartner";
 import { useAssignmentQueue } from "@/components/hooks/inspect/useAssignmentQueue";
+import { OpenButton } from "@/components/features/shared/OpenButton";
 import { Spinner } from "@/components/ui/Loading";
 import { Button } from "@/components/ui/button";
 
@@ -130,9 +131,7 @@ function JobCard({ row, done }: { row: CataloguePreviewDTO; done?: boolean }) {
           ) : null}
         </div>
       </div>
-      <Link className="pp-open" href={`/inspect/${encodeURIComponent(row.reference)}`}>
-        {t("openJob")}
-      </Link>
+      <OpenButton href={`/inspect/${encodeURIComponent(row.reference)}`} className="shrink-0" />
     </article>
   );
 }

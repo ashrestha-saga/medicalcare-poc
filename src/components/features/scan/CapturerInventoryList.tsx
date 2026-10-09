@@ -8,6 +8,9 @@ import {
   deviceLocationLine,
   type useCapturerInventory,
 } from "@/components/hooks/scan/useCapturerInventory";
+import { BarcodeCapture } from "@/components/features/shared/barcode-capture";
+import { OpenButton } from "@/components/features/shared/OpenButton";
+import { identifierLookupText } from "@/lib/barcode/matchDevice";
 
 type InventoryApi = ReturnType<typeof useCapturerInventory>;
 
@@ -20,7 +23,17 @@ export function CapturerInventoryList({
 }) {
   const t = useTranslations("capturer");
   const tCommon = useTranslations("common");
-  const { devices, loading, keywordInput, setKeyword, openDevice, detailLoading } = inventory;
+  const {
+    devices,
+    loading,
+    keywordInput,
+    setKeyword,
+    room,
+    setRoom,
+    rooms,
+    openDevice,
+    detailLoading,
+  } = inventory;
 
   return (
     <div className="p-bestand" data-testid="capturer-inventory">
@@ -47,15 +60,42 @@ export function CapturerInventoryList({
         </div>
       </header>
 
-      <div className="p-bestand__search">
-        <input
-          type="search"
-          value={keywordInput}
-          onChange={(e) => setKeyword(e.target.value)}
-          placeholder={t("searchPlaceholder")}
-          data-testid="capturer-inventory-search"
-          aria-label={t("searchAria")}
-        />
+      <div className="p-bestand__filters">
+        <div className="p-bestand__search" data-testid="capturer-inventory-search">
+          <BarcodeCapture
+            data-testid="capturer-inventory-scan"
+            placeholder={t("searchPlaceholder")}
+            submitLabel={tCommon("search")}
+            showKindHint={false}
+            onCapture={(result) => {
+              setKeyword(identifierLookupText(result.identifier) || result.raw);
+            }}
+          />
+          {/* Keep typed filter in sync when user is mid-search from a prior scan */}
+          {keywordInput ? (
+            <p className="p-bestand__sub mt-1 text-xs" data-testid="capturer-inventory-active-q">
+              {keywordInput}
+            </p>
+          ) : null}
+        </div>
+        <div className="p-bestand__room">
+          <select
+            value={room}
+            onChange={(e) => setRoom(e.target.value)}
+            aria-label={t("roomFilterAria")}
+            data-testid="capturer-inventory-room"
+          >
+            <option value="">{t("allRooms")}</option>
+            {room && !rooms.includes(room) && (
+              <option value={room}>{t("roomOption", { room })}</option>
+            )}
+            {rooms.map((r) => (
+              <option key={r} value={r}>
+                {t("roomOption", { room: r })}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -70,7 +110,6 @@ export function CapturerInventoryList({
               device={device}
               busy={detailLoading}
               onOpen={() => void openDevice(device)}
-              openLabel={t("open")}
             />
           ))}
         </ul>
@@ -83,12 +122,10 @@ function InventoryRow({
   device,
   busy,
   onOpen,
-  openLabel,
 }: {
   device: DeviceInstanceDTO;
   busy: boolean;
   onOpen: () => void;
-  openLabel: string;
 }) {
   const tags = deviceInspectionTags(device);
   return (
@@ -110,15 +147,12 @@ function InventoryRow({
           </div>
         )}
       </div>
-      <button
-        type="button"
-        className="p-bestand__open"
+      <OpenButton
         onClick={onOpen}
         disabled={busy}
         data-testid="capturer-inventory-open"
-      >
-        {openLabel}
-      </button>
+        className="shrink-0"
+      />
     </li>
   );
 }

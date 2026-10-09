@@ -5,6 +5,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronsUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { TrainingEventDTO } from "@/interfaces";
+import { OpenButton } from "@/components/features/shared/OpenButton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -144,21 +145,13 @@ export function useTrainingColumns(onOpen: (id: string) => void): ColumnDef<Trai
         id: "open",
         enableHiding: false,
         enableSorting: false,
-        header: () => null,
+        header: () => <span className="sr-only">{tTable("open")}</span>,
+        meta: { className: "w-[1%] whitespace-nowrap text-right" },
         cell: ({ row }) => (
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-auto px-0 font-semibold"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen(row.original.id);
-            }}
+          <OpenButton
+            onClick={() => onOpen(row.original.id)}
             data-testid={`training-open-${row.original.id}`}
-          >
-            {tTable("open")}
-          </Button>
+          />
         ),
       },
     ],

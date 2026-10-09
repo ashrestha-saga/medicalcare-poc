@@ -48,7 +48,10 @@ export function aggregateMySitesInstitutions(
       .sort();
     const overdueCount = orders.filter((o) => {
       if (!o.scheduledAt) return false;
-      return new Date(`${o.scheduledAt}T00:00:00`) < today;
+      const when = new Date(
+        /^\d{4}-\d{2}-\d{2}$/.test(o.scheduledAt) ? `${o.scheduledAt}T00:00:00` : o.scheduledAt,
+      );
+      return when < today;
     }).length;
 
     const staff = staffByTenant.get(shell.tenantId) ?? [];

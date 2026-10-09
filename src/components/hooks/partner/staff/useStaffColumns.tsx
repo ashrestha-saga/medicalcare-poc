@@ -1,11 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronsUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { ConsoleStaffMemberDTO } from "@/interfaces/console";
+import { OpenButton } from "@/components/features/shared/OpenButton";
 import { Button } from "@/components/ui/button";
 
 function SortHeader({
@@ -122,13 +122,9 @@ export function useStaffColumns(): ColumnDef<ConsoleStaffMemberDTO>[] {
         id: "open",
         enableSorting: false,
         header: () => <span className="sr-only">{t("staffColOpen")}</span>,
+        meta: { className: "w-[1%] whitespace-nowrap text-right" },
         cell: ({ row }) => (
-          <Link
-            href={`/partner/staff/${encodeURIComponent(row.original.membershipId)}`}
-            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-          >
-            {t("staffColOpen")}
-          </Link>
+          <OpenButton href={`/partner/staff/${encodeURIComponent(row.original.membershipId)}`} />
         ),
       },
     ],

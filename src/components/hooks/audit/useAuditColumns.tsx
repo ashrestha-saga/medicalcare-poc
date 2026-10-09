@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronsUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { AuditEventDTO } from "@/interfaces";
 import { actorKindLabel, auditResourceHref } from "@/lib/audit/resourceHref";
+import { OpenButton } from "@/components/features/shared/OpenButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -128,15 +128,7 @@ export function useAuditColumns(): ColumnDef<AuditEventDTO>[] {
         cell: ({ row }) => {
           const href = auditResourceHref(row.original.resource, row.original.resourceId);
           if (!href) return null;
-          return (
-            <Link
-              href={href}
-              className="text-sm text-primary hover:underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {tTable("open")}
-            </Link>
-          );
+          return <OpenButton href={href} />;
         },
       },
     ],

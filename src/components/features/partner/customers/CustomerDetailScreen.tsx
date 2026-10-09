@@ -414,7 +414,17 @@ export function CustomerDetailScreen({ contractId }: { contractId: string }) {
                                 label={t(`displayState_${row.displayState}` as "displayState_erfasst")}
                               />
                             </td>
-                            <td className="py-2.5">{row.scheduledAt ?? "—"}</td>
+                            <td className="py-2.5 whitespace-nowrap">
+                              {row.scheduledAt
+                                ? new Date(row.scheduledAt).toLocaleString(undefined, {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "—"}
+                            </td>
                           </tr>
                         ))
                       )}

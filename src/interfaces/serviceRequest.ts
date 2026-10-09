@@ -77,6 +77,18 @@ export interface AssignmentDutyContextDTO {
   inspectionTypeCode: string;
 }
 
+/** Sealed inspection / completion summary for clinic request detail. */
+export interface AssignmentCompletionOverviewDTO {
+  result: "passed" | "passed_with_conditions" | "failed" | string;
+  note: string | null;
+  completedAt: string | null;
+  completedBy: string | null;
+  catalogueCode: string | null;
+  catalogueLabel: string | null;
+  nextDueAt: string | null;
+  status: string;
+}
+
 export interface ServiceRequestDTO {
   id: string;
   reference: string;
@@ -103,9 +115,16 @@ export interface ServiceRequestDTO {
   allocatedBy: string | null;
   transmittedAt: string | null;
   allocationLocked: boolean;
+  /** Partner disposition — assigned handler. */
+  assigneeUserId: string | null;
+  assigneeName: string | null;
+  /** Partner disposition — appointment (ISO datetime). */
+  scheduledAt: string | null;
   deviceName: string | null;
   inventoryNumber: string | null;
   duty: AssignmentDutyContextDTO | null;
+  /** Present when an inspection was sealed / assignment completed. */
+  completionOverview: AssignmentCompletionOverviewDTO | null;
   statusEvents: StatusEventDTO[];
   dispatchRecords: DispatchRecordDTO[];
   attachmentCount: number;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useCustomerList } from "@/components/hooks/partner/customers/useCustomerList";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
+import { OpenButton } from "@/components/features/shared/OpenButton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/Loading";
@@ -93,20 +94,19 @@ export function CustomersScreen() {
                     <th className="py-2 pr-3 font-medium">{t("colDevices")}</th>
                     <th className="py-2 pr-3 font-medium">{t("colContract")}</th>
                     <th className="py-2 pr-3 font-medium">{t("colScope")}</th>
-                    <th className="py-2 font-medium">{t("colStatus")}</th>
+                    <th className="py-2 pr-3 font-medium">{t("colStatus")}</th>
+                    <th className="py-2 font-medium text-right">
+                      <span className="sr-only">{t("colOpen")}</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.clinics.map((clinic) => (
                     <tr key={clinic.contractId} className="border-b border-border/70">
                       <td className="py-2.5 pr-3">
-                        <Link
-                          href={`/partner/customers/${clinic.contractId}`}
-                          className="font-medium text-primary underline-offset-4 hover:underline"
-                          data-testid={`clinic-link-${clinic.contractId}`}
-                        >
+                        <div className="font-medium" data-testid={`clinic-name-${clinic.contractId}`}>
                           {clinic.tenantName}
-                        </Link>
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {[clinic.city, clinic.tenantCode].filter(Boolean).join(" · ")}
                         </div>
@@ -126,8 +126,14 @@ export function CustomersScreen() {
                           ))}
                         </div>
                       </td>
-                      <td className="py-2.5">
+                      <td className="py-2.5 pr-3">
                         <StatusChip live={clinic.live} suspended={Boolean(clinic.suspendedAt)} terminated={Boolean(clinic.terminatedAt)} />
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <OpenButton
+                          href={`/partner/customers/${clinic.contractId}`}
+                          data-testid={`clinic-link-${clinic.contractId}`}
+                        />
                       </td>
                     </tr>
                   ))}

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { InspectionStepDraft, InspectionStepResultDTO } from "@/interfaces/pruefpartner";
 import { useInspectionProtocol } from "@/components/hooks/inspect/useInspectionProtocol";
+import { BarcodeCapture } from "@/components/features/shared/barcode-capture";
 import { Spinner } from "@/components/ui/Loading";
 import { Input } from "@/components/ui/input";
 
@@ -238,19 +239,17 @@ export function InspectionProtocolScreen({ reference }: { reference: string }) {
                   </span>
                 </p>
                 <div className="pp-scan">
-                  <Input
-                    value={p.scanCode}
-                    onChange={(e) => p.setScanCode(e.target.value)}
+                  <BarcodeCapture
+                    data-testid="inspect-device-scan"
                     placeholder={t("scanPlaceholder")}
+                    submitLabel={t("scanMatch")}
+                    busy={p.busy}
+                    allowedKinds={["inventory", "serial", "udi-di", "gtin", "unknown"]}
+                    onCapture={(result) => {
+                      p.setScanCode(result.raw);
+                      void p.confirmScan(false, result.raw);
+                    }}
                   />
-                  <button
-                    type="button"
-                    className="pp-btn pp-btn--primary"
-                    disabled={p.busy}
-                    onClick={() => void p.confirmScan(false)}
-                  >
-                    {t("scanMatch")}
-                  </button>
                 </div>
                 <button
                   type="button"

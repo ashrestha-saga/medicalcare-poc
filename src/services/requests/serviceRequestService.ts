@@ -38,6 +38,7 @@ const includeAll = {
   statusEvents: true,
   dispatchRecords: true,
   executorOrg: true,
+  assigneeUser: { select: { id: true, name: true } },
   duty: {
     select: {
       id: true,
@@ -46,6 +47,28 @@ const includeAll = {
       basisText: true,
       dueAt: true,
       inspectionTypeCode: true,
+    },
+  },
+  inspectionRuns: {
+    orderBy: { performedAt: "desc" as const },
+    take: 3,
+    select: {
+      result: true,
+      note: true,
+      performedAt: true,
+      performedByName: true,
+      dutyPerformanceId: true,
+      catalogue: { select: { code: true, label: true } },
+    },
+  },
+  performances: {
+    orderBy: { performedAt: "desc" as const },
+    take: 1,
+    select: {
+      result: true,
+      note: true,
+      performedAt: true,
+      performedBy: true,
     },
   },
   _count: { select: { attachments: true } },

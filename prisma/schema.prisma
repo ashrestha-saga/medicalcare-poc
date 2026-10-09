@@ -1208,8 +1208,8 @@ model ServiceRequest {
   /** Partner user assigned to perform the work (Disposition). */
   assigneeUserId  String?
   assigneeUser    User?               @relation("ServiceRequestAssignee", fields: [assigneeUserId], references: [id])
-  /** Appointment date — moves state to scheduled when set. */
-  scheduledAt     DateTime?           @db.Date
+  /** Appointment date/time — moves state to scheduled when set. */
+  scheduledAt     DateTime?
   statusEvents    StatusEvent[]
   attachments     Attachment[]
   dispatchRecords DispatchRecord[]

@@ -12,6 +12,7 @@ import {
   serviceRequestStateBadge,
   useRequestTransition,
 } from "@/components/hooks/requests";
+import { formatDate, formatDateTime } from "@/lib/format";
 import type { AppLocale } from "@/lib/locale";
 import { WithdrawAssignmentDialog } from "./WithdrawAssignmentDialog";
 
@@ -21,6 +22,13 @@ function MetaRow({ label, children }: { label: string; children: ReactNode }) {
       <dt className="text-sm text-muted-foreground">{label}</dt>
       <dd className="text-sm font-medium text-foreground">{children}</dd>
     </div>
+  );
+}
+
+/** Replace ISO timestamps in history notes with locale date-times. */
+function formatHistoryNote(note: string, locale: AppLocale): string {
+  return note.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z?/g, (iso) =>
+    formatDateTime(iso.endsWith("Z") ? iso : `${iso}Z`, locale),
   );
 }
 
@@ -52,6 +60,7 @@ export function RequestDetail({
   const subtitle = [request.serviceType, request.deviceName].filter(Boolean).join(" · ");
   const stateBadge = serviceRequestStateBadge(request.state);
   const selectDisabled = !canWork || !canAllocate || !allocationEditable || busy;
+  const overview = request.completionOverview;
 
   const sourceLabel = (source: string): string =>
     source === "due_date" ? t("sourceDueDate") : t("sourceUserRequest");
@@ -68,6 +77,7 @@ export function RequestDetail({
       "queued",
       "transmitted",
       "acknowledged",
+      "scheduled",
       "in_progress",
       "completed",
       "rejected",
@@ -75,6 +85,13 @@ export function RequestDetail({
     return (known as readonly string[]).includes(state)
       ? tStatus(state as (typeof known)[number])
       : stateBadge.label;
+  };
+
+  const resultLabel = (result: string): string => {
+    if (result === "passed") return t("resultPassed");
+    if (result === "passed_with_conditions") return t("resultPassedWithConditions");
+    if (result === "failed") return t("resultFailed");
+    return result;
   };
 
   return (
@@ -93,106 +110,150 @@ export function RequestDetail({
       </header>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(260px,0.9fr)] lg:items-start">
-        <section
-          className="rounded-lg border border-border bg-card p-4 sm:p-5"
-          data-testid="assignment-card"
-        >
-          <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-            {t("assignment")}
-          </p>
-
-          <dl>
-            <MetaRow label={t("device")}>{request.deviceName ?? tCommon("dash")}</MetaRow>
-            <MetaRow label={t("assetNumber")}>
-              {request.inventoryNumber ?? request.subjectId}
-            </MetaRow>
-            <MetaRow label={t("service")}>{request.serviceType}</MetaRow>
-            <MetaRow label={t("placeOfUse")}>{request.locationText}</MetaRow>
-            <MetaRow label={t("source")}>{sourceLabel(request.source)}</MetaRow>
-            <MetaRow label={t("state")}>
-              <Badge
-                variant={stateBadge.variant}
-                className={stateBadge.className}
-                data-tone={stateBadge.tone}
-              >
-                {stateLabel(request.state)}
-              </Badge>
-            </MetaRow>
-            <MetaRow label={t("accessNote")}>{request.accessHint?.trim() || tCommon("dash")}</MetaRow>
-          </dl>
-
-          <div className="mt-5 space-y-2" data-testid="allocate-block">
-            <label htmlFor="executor-org" className="text-sm text-muted-foreground">
-              {t("allocatedTo")}
-            </label>
-            <select
-              id="executor-org"
-              className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
-              value={executorOrgId}
-              disabled={selectDisabled}
-              onChange={(e) => onExecutorChange(e.target.value)}
-              data-testid="executor-select"
-            >
-              <option value="">{t("pleaseChoose")}</option>
-              {executors.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.name} · {kindLabel(ex.kind)}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {t("allocationLockedHint")}
+        <div className="space-y-4">
+          <section
+            className="rounded-lg border border-border bg-card p-4 sm:p-5"
+            data-testid="assignment-card"
+          >
+            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+              {t("assignment")}
             </p>
-          </div>
 
-          {request.source === "due_date" && request.duty ? (
-            <div
-              className="mt-4 rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm leading-relaxed text-foreground"
-              data-testid="due-date-context"
-            >
-              {t("dueDateContext", {
-                basisText: request.duty.basisText,
-                dueSuffix: request.duty.dueAt
-                  ? t("dueSuffix", { date: request.duty.dueAt.slice(0, 10) })
-                  : "",
-              })}
+            <dl>
+              <MetaRow label={t("device")}>{request.deviceName ?? tCommon("dash")}</MetaRow>
+              <MetaRow label={t("assetNumber")}>
+                {request.inventoryNumber ?? request.subjectId}
+              </MetaRow>
+              <MetaRow label={t("service")}>{request.serviceType}</MetaRow>
+              <MetaRow label={t("placeOfUse")}>{request.locationText}</MetaRow>
+              <MetaRow label={t("source")}>{sourceLabel(request.source)}</MetaRow>
+              <MetaRow label={t("state")}>
+                <Badge
+                  variant={stateBadge.variant}
+                  className={stateBadge.className}
+                  data-tone={stateBadge.tone}
+                >
+                  {stateLabel(request.state)}
+                </Badge>
+              </MetaRow>
+              <MetaRow label={t("assignee")}>
+                {request.assigneeName?.trim() || tCommon("dash")}
+              </MetaRow>
+              <MetaRow label={t("appointment")}>
+                {request.scheduledAt ? formatDateTime(request.scheduledAt, locale) : tCommon("dash")}
+              </MetaRow>
+              <MetaRow label={t("accessNote")}>{request.accessHint?.trim() || tCommon("dash")}</MetaRow>
+            </dl>
+
+            <div className="mt-5 space-y-2" data-testid="allocate-block">
+              <label htmlFor="executor-org" className="text-sm text-muted-foreground">
+                {t("allocatedTo")}
+              </label>
+              <select
+                id="executor-org"
+                className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                value={executorOrgId}
+                disabled={selectDisabled}
+                onChange={(e) => onExecutorChange(e.target.value)}
+                data-testid="executor-select"
+              >
+                <option value="">{t("pleaseChoose")}</option>
+                {executors.map((ex) => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.name} · {kindLabel(ex.kind)}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {t("allocationLockedHint")}
+              </p>
             </div>
-          ) : null}
 
-          {request.note ? (
-            <p className="mt-4 text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">{t("notePrefix")}</span>
-              {request.note}
-            </p>
-          ) : null}
+            {request.source === "due_date" && request.duty ? (
+              <div
+                className="mt-4 rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5 text-sm leading-relaxed text-foreground"
+                data-testid="due-date-context"
+              >
+                {t("dueDateContext", {
+                  basisText: request.duty.basisText,
+                  dueSuffix: request.duty.dueAt
+                    ? t("dueSuffix", { date: formatDate(request.duty.dueAt, locale) })
+                    : "",
+                })}
+              </div>
+            ) : null}
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            {canWork && !request.allocationLocked ? (
-              <Button
-                type="button"
-                disabled={busy || !canTransmit}
-                onClick={() => void transmit()}
-                data-testid="transmit-assignment"
-              >
-                {busy ? <Spinner /> : t("transmit")}
-              </Button>
+            {request.note ? (
+              <p className="mt-4 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{t("notePrefix")}</span>
+                {request.note}
+              </p>
             ) : null}
-            {canWork && canWithdraw ? (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={busy}
-                onClick={() => setWithdrawOpen(true)}
-                data-testid="withdraw-assignment"
-              >
-                {t("withdraw")}
+
+            <div className="mt-5 flex flex-wrap gap-2">
+              {canWork && !request.allocationLocked ? (
+                <Button
+                  type="button"
+                  disabled={busy || !canTransmit}
+                  onClick={() => void transmit()}
+                  data-testid="transmit-assignment"
+                >
+                  {busy ? <Spinner /> : t("transmit")}
+                </Button>
+              ) : null}
+              {canWork && canWithdraw ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setWithdrawOpen(true)}
+                  data-testid="withdraw-assignment"
+                >
+                  {t("withdraw")}
+                </Button>
+              ) : null}
+              <Button type="button" variant="outline" onClick={onBack}>
+                {t("back")}
               </Button>
-            ) : null}
-            <Button type="button" variant="outline" onClick={onBack}>
-              {t("back")}
-            </Button>
-          </div>
-        </section>
+            </div>
+          </section>
+
+          {overview ? (
+            <section
+              className="rounded-lg border border-border bg-card p-4 sm:p-5"
+              data-testid="assignment-completion-overview"
+            >
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                {t("overviewTitle")}
+              </p>
+              <p className="mb-4 text-sm text-muted-foreground">{t("overviewIntro")}</p>
+              <dl>
+                <MetaRow label={t("overviewStatus")}>{stateLabel(overview.status)}</MetaRow>
+                <MetaRow label={t("overviewResult")}>{resultLabel(overview.result)}</MetaRow>
+                <MetaRow label={t("overviewCompletedAt")}>
+                  {overview.completedAt
+                    ? formatDateTime(overview.completedAt, locale)
+                    : tCommon("dash")}
+                </MetaRow>
+                <MetaRow label={t("overviewCompletedBy")}>
+                  {overview.completedBy?.trim() || tCommon("dash")}
+                </MetaRow>
+                <MetaRow label={t("overviewProtocol")}>
+                  {overview.catalogueLabel || overview.catalogueCode || tCommon("dash")}
+                  {overview.catalogueCode && overview.catalogueLabel
+                    ? ` (${overview.catalogueCode})`
+                    : ""}
+                </MetaRow>
+                <MetaRow label={t("overviewNextDue")}>
+                  {overview.nextDueAt ? formatDate(overview.nextDueAt, locale) : tCommon("dash")}
+                </MetaRow>
+                <MetaRow label={t("overviewNotes")}>
+                  {overview.note?.trim() || tCommon("dash")}
+                </MetaRow>
+              </dl>
+            </section>
+          ) : null}
+        </div>
 
         <aside
           className="rounded-lg border border-border bg-card p-4 sm:p-5"
@@ -202,18 +263,25 @@ export function RequestDetail({
             {t("history")}
           </p>
           <ul className="space-y-2">
-            {request.statusEvents.map((e, i) => (
-              <li
-                key={`${e.changedAt}-${e.state}-${i}`}
-                className="rounded-md border border-border bg-background px-3 py-2.5"
-              >
-                <p className="text-xs text-muted-foreground">{formatWhen(e.changedAt, locale)}</p>
-                <p className="text-sm font-medium text-foreground">
-                  {e.note?.trim() || stateLabel(e.state)}
-                </p>
-                {e.actor ? <p className="text-xs text-muted-foreground">{e.actor}</p> : null}
-              </li>
-            ))}
+            {request.statusEvents.map((e, i) => {
+              const rawNote = e.note?.trim() || "";
+              const isLegacyAdvance = /^Disposition advance →/.test(rawNote);
+              const headline = isLegacyAdvance
+                ? stateLabel(e.state)
+                : rawNote
+                  ? formatHistoryNote(rawNote, locale)
+                  : stateLabel(e.state);
+              return (
+                <li
+                  key={`${e.changedAt}-${e.state}-${i}`}
+                  className="rounded-md border border-border bg-background px-3 py-2.5"
+                >
+                  <p className="text-xs text-muted-foreground">{formatWhen(e.changedAt, locale)}</p>
+                  <p className="text-sm font-medium text-foreground">{headline}</p>
+                  {e.actor ? <p className="text-xs text-muted-foreground">{e.actor}</p> : null}
+                </li>
+              );
+            })}
           </ul>
           <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
             {t("historyCallbackHint")}

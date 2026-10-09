@@ -34,6 +34,7 @@ import {
 } from "./navIcons";
 
 import type { FormFactor, MenuModule, MenuModuleId } from "@/interfaces";
+import { APP_HOME_PATH } from "@/constants/permissions";
 
 const CLINIC_NAV_GROUPS = [
   { id: "work" as const, labelKey: "groupWork" as const },
@@ -53,6 +54,7 @@ function AccountBar({
   inventoryCount,
   onOpenInventory,
   showSecurity,
+  showHome,
 }: {
   subtitle?: string;
   showLogout?: boolean;
@@ -61,6 +63,7 @@ function AccountBar({
   inventoryCount?: number | null;
   onOpenInventory?: () => void;
   showSecurity?: boolean;
+  showHome?: boolean;
 }) {
   const t = useTranslations("nav");
   const tCap = useTranslations("capturer");
@@ -86,6 +89,11 @@ function AccountBar({
         </b>
         <span>{subtitle ?? t("delivery", { line: deliveryLine })}</span>
       </div>
+      {showHome && (
+        <Link href={APP_HOME_PATH} className="k" data-testid="capturer-home-link" title={t("home")}>
+          {t("home")}
+        </Link>
+      )}
       {showInventory && onOpenInventory && (
         <button
           type="button"
@@ -198,8 +206,10 @@ export function AppShell({
   useOnlineStatus();
 
   const showNav = checkPermission("shell:nav");
-  const showCapturerInventory = !showNav && checkPermission("inventory:view");
+  const onHome = pathname === APP_HOME_PATH;
+  const showCapturerInventory = !showNav && onHome && checkPermission("inventory:view");
   const showCapturerSecurity = !showNav && checkPermission("account:security");
+  const showCapturerHome = !showNav && !onHome;
   const inventoryCount = useCapturerInventoryUi((s) => s.count);
   const openInventory = useCapturerInventoryUi((s) => s.openPanel);
   const setInventoryCount = useCapturerInventoryUi((s) => s.setCount);
@@ -313,6 +323,7 @@ export function AppShell({
           inventoryCount={inventoryCount}
           onOpenInventory={openInventory}
           showSecurity={showCapturerSecurity}
+          showHome={showCapturerHome}
         />
         <OfflineBar />
         {children}

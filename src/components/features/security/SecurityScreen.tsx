@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import type { TotpSetupConfirmDTO, TotpSetupStartDTO, TotpStatusDTO } from "@/interfaces";
+import { APP_HOME_PATH } from "@/constants/permissions";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { formatDate } from "@/lib/format";
 import type { AppLocale } from "@/lib/locale";
@@ -120,6 +122,14 @@ export function SecurityScreen() {
       <main className="p-main">
         <div className="p-settings" data-testid="security-screen">
           <section className="p-devhead p-settings__head">
+            <Link
+              href={APP_HOME_PATH}
+              className="p-close"
+              aria-label={t("backHomeAria")}
+              data-testid="security-back-home"
+            >
+              ×
+            </Link>
             <h2>{t("title")}</h2>
             <div className="codes">
               <span>{t("subtitle")}</span>
@@ -270,6 +280,16 @@ export function SecurityScreen() {
                 </div>
               )}
             </section>
+
+            <div className="p-settings__actions">
+              <Link
+                href={APP_HOME_PATH}
+                className="p-cta ghost"
+                data-testid="security-back-home-cta"
+              >
+                {t("backHome")}
+              </Link>
+            </div>
           </div>
         </div>
       </main>

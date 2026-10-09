@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { BarcodeCapture } from "@/components/features/shared/barcode-capture";
 import { CatalogModelSearchSelect } from "./CatalogModelSearchSelect";
 
 const DEVICE_ADMIN_ROLES: UserRole[] = ["device_admin"];
@@ -51,7 +52,7 @@ export function ProductIdentityStep({
   hasClassificationPrefill: boolean;
   gtinInput: string;
   setGtinInput: (v: string) => void;
-  onResolveGtin: () => void;
+  onResolveGtin: (raw?: string) => void | Promise<void>;
   onSelectCatalogModel: RegistrationWizardApi["selectCatalogModel"];
   onStartManual: (udiHint?: string) => void;
   onClearLinkedModel: () => void;
@@ -70,15 +71,6 @@ export function ProductIdentityStep({
   const [resolving, setResolving] = useState(false);
   const linked = Boolean(linkedModelId);
   const lookup = identityPhase === "lookup";
-
-  const runResolve = async () => {
-    setResolving(true);
-    try {
-      await onResolveGtin();
-    } finally {
-      setResolving(false);
-    }
-  };
 
   return (
     <section className="p-reg__step-body" data-testid="registration-step-identity">
@@ -118,31 +110,26 @@ export function ProductIdentityStep({
 
           <div className="p-field">
             <label htmlFor="gtinLookup">{t("gtinLookup")}</label>
-            <div className="p-reg__gtin-row">
-              <input
-                id="gtinLookup"
-                value={gtinInput}
-                onChange={(e) => setGtinInput(e.target.value)}
-                placeholder={t("gtinPlaceholder")}
-                disabled={busy || resolving}
-                data-testid="registration-gtin-input"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void runResolve();
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="p-cta"
-                disabled={busy || resolving || !gtinInput.trim()}
-                onClick={() => void runResolve()}
-                data-testid="registration-gtin-resolve"
-              >
-                {resolving ? tCommon("loading") : t("lookupGtin")}
-              </button>
-            </div>
+            <BarcodeCapture
+              data-testid="registration-gtin"
+              placeholder={t("gtinPlaceholder")}
+              submitLabel={resolving ? tCommon("loading") : t("lookupGtin")}
+              busy={busy || resolving}
+              allowedKinds={["gtin", "udi-di"]}
+              showKindHint
+              onCapture={async (result) => {
+                const token = result.identifier.gtin ?? result.identifier.udiDi ?? result.raw;
+                setGtinInput(token);
+                setResolving(true);
+                try {
+                  await onResolveGtin(token);
+                } finally {
+                  setResolving(false);
+                }
+              }}
+            />
+            {/* Keep gtinInput in sync for downstream wizard state (linked model apply). */}
+            <input type="hidden" id="gtinLookup" value={gtinInput} readOnly />
           </div>
 
           <div className="p-field">

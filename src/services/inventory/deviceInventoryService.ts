@@ -58,6 +58,8 @@ const include = {
 export interface DeviceListQuery {
   q?: string;
   siteId?: string;
+  /** Exact room match (trimmed); empty/undefined = no room filter. */
+  room?: string;
 }
 
 function parseCommissionedAt(value: string | null | undefined): Date | null | undefined {
@@ -241,9 +243,11 @@ export const deviceInventoryService: InventoryResolver & {
   async list(ctx, query = {}) {
     requirePermission(ctx, "inventory:view");
     const q = query.q?.trim();
+    const room = query.room?.trim();
     const where: Prisma.DeviceInstanceWhereInput = {
       tenantId: ctx.tenantId,
       ...(query.siteId ? { area: { siteId: query.siteId } } : {}),
+      ...(room ? { room } : {}),
       ...(q
         ? {
             OR: [

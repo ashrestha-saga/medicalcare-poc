@@ -4,8 +4,8 @@ import { useMemo } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useTranslations } from "next-intl";
 import type { MySitesInstitutionDTO } from "@/interfaces/console";
+import { OpenButton } from "@/components/features/shared/OpenButton";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 
 export function useMySitesColumns(
   onOpen: (row: MySitesInstitutionDTO) => void,
@@ -89,18 +89,10 @@ export function useMySitesColumns(
       },
       {
         id: "actions",
-        header: "",
+        header: () => <span className="sr-only">{t("mySitesOpen")}</span>,
         enableSorting: false,
-        cell: ({ row }) => (
-          <Button
-            type="button"
-            variant="link"
-            className="h-auto p-0"
-            onClick={() => onOpen(row.original)}
-          >
-            {t("mySitesOpen")}
-          </Button>
-        ),
+        meta: { className: "w-[1%] whitespace-nowrap text-right" },
+        cell: ({ row }) => <OpenButton onClick={() => onOpen(row.original)} />,
       },
     ],
     [onOpen, t],

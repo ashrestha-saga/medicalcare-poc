@@ -483,6 +483,18 @@ export async function seedHandoverInventory(
     const deviceModelId = asString(row.model_id)!;
     const validTo = asDate(row.valid_to);
     const openKey = validTo ? null : deviceModelId;
+    // Only one open classification per model — clear conflicting holders before upsert.
+    if (openKey) {
+      await prisma.deviceModelClassification.updateMany({
+        where: {
+          OR: [
+            { deviceModelId, validTo: null, NOT: { id } },
+            { openClassificationKey: openKey, NOT: { id } },
+          ],
+        },
+        data: { validTo: new Date(), openClassificationKey: null },
+      });
+    }
     await prisma.deviceModelClassification.upsert({
       where: { id },
       update: {

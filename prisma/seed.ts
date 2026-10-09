@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import { hashPassword } from "../src/lib/password";
 import { seedRoleGrantsIfEmpty } from "../src/services/roles/roleGrantsService";
 import { dutyService } from "../src/services/registration/dutyService";
+import { seedGoldenCatalog } from "./seeds/goldenCatalog";
 import { seedHandoverInventory } from "./seeds/handoverInventory";
 import { seedPartnerOrgs } from "./seeds/partnerOrgs";
 import { seedRegistrationRef } from "./seeds/registrationRef";
@@ -488,6 +489,9 @@ export async function seed(prisma: PrismaClient) {
   await seedStaffSkillsRefs(prisma);
   await seedPruefpartnerDemoEquipment(prisma);
 
+  // Golden catalog exemplars — full Merkmale / duties / inspection-family chain.
+  const golden = await seedGoldenCatalog(prisma, tenant.id);
+
   // Handover testdaten → existing Prisma models only; all under demo-tenant.
   const handover = await seedHandoverInventory(prisma, tenant.id);
 
@@ -498,13 +502,14 @@ export async function seed(prisma: PrismaClient) {
     users: users.length,
     sites: 2 + handover.sites,
     areas: 3 + handover.areas,
-    models: 3 + handover.models,
-    instances: 2 + handover.instances,
-    classifications: 2 + handover.classifications,
+    models: 3 + golden.models + handover.models,
+    instances: 2 + golden.instances + handover.instances,
+    classifications: 2 + golden.classifications + handover.classifications,
     dispatchTargets: orgTargets.length,
     executorOrgs: executors.length,
     roleGrantsCreated,
     partners,
+    golden,
     handover,
     dutiesBackfilled,
   };

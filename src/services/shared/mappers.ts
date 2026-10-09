@@ -182,6 +182,7 @@ export type ServiceRequestWithRelations = ServiceRequest & {
     kind: string;
     active: boolean;
   } | null;
+  assigneeUser?: { id: string; name: string } | null;
   duty?: {
     id: string;
     title: string | null;
@@ -190,6 +191,20 @@ export type ServiceRequestWithRelations = ServiceRequest & {
     dueAt: Date | null;
     inspectionTypeCode: string;
   } | null;
+  inspectionRuns?: {
+    result: string;
+    note: string | null;
+    performedAt: Date;
+    performedByName: string;
+    dutyPerformanceId: string | null;
+    catalogue: { code: string; label: string | null } | null;
+  }[];
+  performances?: {
+    result: string;
+    note: string | null;
+    performedAt: Date;
+    performedBy: string;
+  }[];
   subjectInstance?: {
     inventoryNumber: string;
     model: {
@@ -284,6 +299,9 @@ export function toServiceRequestDTO(row: ServiceRequestWithRelations): ServiceRe
     allocatedBy: row.allocatedBy ?? null,
     transmittedAt: row.transmittedAt?.toISOString() ?? null,
     allocationLocked: Boolean(row.transmittedAt),
+    assigneeUserId: row.assigneeUserId ?? null,
+    assigneeName: row.assigneeUser?.name ?? null,
+    scheduledAt: row.scheduledAt?.toISOString() ?? null,
     deviceName,
     inventoryNumber: row.subjectInstance?.inventoryNumber ?? null,
     duty: row.duty
@@ -295,6 +313,23 @@ export function toServiceRequestDTO(row: ServiceRequestWithRelations): ServiceRe
           inspectionTypeCode: row.duty.inspectionTypeCode,
         }
       : null,
+    completionOverview: (() => {
+      // Only sealed runs (dutyPerformanceId set) or completed assignments — not draft protocols.
+      const sealedRun = row.inspectionRuns?.find((r) => r.dutyPerformanceId) ?? null;
+      const performance = row.performances?.[0] ?? null;
+      if (!sealedRun && !performance && row.state !== "completed") return null;
+      return {
+        result: sealedRun?.result ?? performance?.result ?? "passed",
+        note: sealedRun?.note ?? performance?.note ?? null,
+        completedAt:
+          sealedRun?.performedAt?.toISOString() ?? performance?.performedAt?.toISOString() ?? null,
+        completedBy: sealedRun?.performedByName ?? performance?.performedBy ?? null,
+        catalogueCode: sealedRun?.catalogue?.code ?? null,
+        catalogueLabel: sealedRun?.catalogue?.label ?? null,
+        nextDueAt: row.duty?.dueAt?.toISOString() ?? null,
+        status: row.state,
+      };
+    })(),
     statusEvents: [...row.statusEvents]
       .sort((a, b) => a.changedAt.getTime() - b.changedAt.getTime())
       .map((e) => ({

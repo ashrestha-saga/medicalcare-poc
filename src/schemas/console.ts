@@ -176,34 +176,56 @@ export type ConsoleStaffQualificationCreateParsed = z.infer<
   typeof consoleStaffQualificationCreateSchema
 >;
 
+const appointmentInputSchema = z
+  .string()
+  .trim()
+  .nullable()
+  .optional()
+  .refine(
+    (v) =>
+      v == null ||
+      v === "" ||
+      /^\d{4}-\d{2}-\d{2}$/.test(v) ||
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:?\d{2})?$/.test(v),
+    {
+      message: "Appointment must be a date or date-time (YYYY-MM-DD or YYYY-MM-DDTHH:mm).",
+    },
+  );
+
 export const dispositionAssignSchema = z.object({
   executorOrgId: z.string().trim().min(1).nullable().optional(),
   assigneeUserId: z.string().trim().min(1).nullable().optional(),
-  scheduledAt: z
-    .string()
-    .trim()
-    .nullable()
-    .optional()
-    .refine((v) => v == null || v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v), {
-      message: "Schedule date must be YYYY-MM-DD or empty.",
-    }),
+  scheduledAt: appointmentInputSchema,
 });
 
 export type DispositionAssignParsed = z.infer<typeof dispositionAssignSchema>;
 
 /** Advance one disposition step; optional appointment applied on this click only. */
 export const dispositionAdvanceSchema = z.object({
-  scheduledAt: z
-    .string()
-    .trim()
-    .nullable()
-    .optional()
-    .refine((v) => v == null || v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v), {
-      message: "Schedule date must be YYYY-MM-DD or empty.",
-    }),
+  scheduledAt: appointmentInputSchema,
 });
 
 export type DispositionAdvanceParsed = z.infer<typeof dispositionAdvanceSchema>;
+
+/** Take-over has no body fields; reject unknown keys. */
+export const dispositionTakeOverSchema = z.object({}).strict();
+
+export type DispositionTakeOverParsed = z.infer<typeof dispositionTakeOverSchema>;
+
+/** Client-side portfolio contractor filter. */
+export const portfolioContractorFilterSchema = z.enum(["all", "ours", "others"]);
+export type PortfolioContractorFilter = z.infer<typeof portfolioContractorFilterSchema>;
+
+/** Client-side dispatch pipeline filter. */
+export const dispatchPipelineFilterSchema = z.enum([
+  "all",
+  "needs_handler",
+  "needs_appointment",
+  "scheduled",
+  "in_progress",
+  "done",
+]);
+export type DispatchPipelineFilter = z.infer<typeof dispatchPipelineFilterSchema>;
 
 export const consoleExternalInviteSchema = z.object({
   email: z.string().trim().email().max(200),

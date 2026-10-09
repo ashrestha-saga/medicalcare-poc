@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useExternalInspectorsList } from "@/components/hooks/partner/external-inspectors/useExternalInspectorsList";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
+import { OpenButton } from "@/components/features/shared/OpenButton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/Loading";
@@ -92,7 +93,9 @@ export function ExternalInspectorsScreen() {
                         <th className="px-3 py-2 font-semibold">{t("externalColCommission")}</th>
                         <th className="px-3 py-2 font-semibold">{t("externalColLiability")}</th>
                         <th className="px-3 py-2 font-semibold">{t("externalColDeployment")}</th>
-                        <th className="px-3 py-2 font-semibold" />
+                        <th className="px-3 py-2 font-semibold text-right">
+                          <span className="sr-only">{t("externalColOpen")}</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -163,12 +166,9 @@ export function ExternalInspectorsScreen() {
                               .join(" · ") || "—"}
                           </td>
                           <td className="px-3 py-2.5 text-right">
-                            <Link
+                            <OpenButton
                               href={`/partner/external-inspectors/${encodeURIComponent(m.membershipId)}`}
-                              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-                            >
-                              {t("externalColOpen")}
-                            </Link>
+                            />
                           </td>
                         </tr>
                       ))}

@@ -40,7 +40,7 @@ export function DueDatesScreen() {
                 {t("dueDatesOverdueOnly")}
               </Button>
               <Button type="button" variant="outline" size="sm" asChild>
-                <Link href="/partner/disposition">{t("dueDatesToDisposition")}</Link>
+                <Link href="/partner/inspection-orders">{t("dueDatesToDisposition")}</Link>
               </Button>
             </div>
           }

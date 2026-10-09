@@ -3,10 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { ConsoleRequestListDTO, ConsoleRequestRowDTO } from "@/interfaces/console";
+import {
+  portfolioContractorFilterSchema,
+  type PortfolioContractorFilter,
+} from "@/schemas/console";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { toast } from "@/store/toastStore";
 
-/** Partner console — disposition queue, drafts, and advance. */
+/** Partner console — customer portfolio (managed tenants overview + take-over). */
 export function useDispositionList() {
   const t = useTranslations("console");
   const [rows, setRows] = useState<ConsoleRequestRowDTO[]>([]);
@@ -14,7 +18,14 @@ export function useDispositionList() {
   const [loading, setLoading] = useState(true);
   const [keyword, setKeyword] = useState("");
   const [busyRef, setBusyRef] = useState<string | null>(null);
-  const [draftDates, setDraftDates] = useState<Record<string, string>>({});
+  const [pendingTakeOver, setPendingTakeOver] = useState<ConsoleRequestRowDTO | null>(null);
+  const [contractorFilter, setContractorFilterRaw] =
+    useState<PortfolioContractorFilter>("all");
+
+  const setContractorFilter = useCallback((value: string) => {
+    const parsed = portfolioContractorFilterSchema.safeParse(value);
+    if (parsed.success) setContractorFilterRaw(parsed.data);
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -33,10 +44,25 @@ export function useDispositionList() {
     void refresh();
   }, [refresh]);
 
+  const counts = useMemo(() => {
+    let ours = 0;
+    let others = 0;
+    for (const row of rows) {
+      if (row.isExecutor) ours += 1;
+      else others += 1;
+    }
+    return { all: rows.length, ours, others };
+  }, [rows]);
+
   const filtered = useMemo(() => {
+    const byContractor = rows.filter((row) => {
+      if (contractorFilter === "ours") return row.isExecutor;
+      if (contractorFilter === "others") return !row.isExecutor;
+      return true;
+    });
     const q = keyword.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((row) =>
+    if (!q) return byContractor;
+    return byContractor.filter((row) =>
       [
         row.reference,
         row.tenantName,
@@ -44,6 +70,7 @@ export function useDispositionList() {
         row.deviceDetail ?? "",
         row.serviceType,
         row.executorCode ?? "",
+        row.executorName ?? "",
         row.assigneeName ?? "",
         row.displayState,
       ]
@@ -51,41 +78,36 @@ export function useDispositionList() {
         .toLowerCase()
         .includes(q),
     );
-  }, [rows, keyword]);
+  }, [rows, keyword, contractorFilter]);
 
-  const appointmentValue = useCallback(
-    (row: ConsoleRequestRowDTO) => draftDates[row.reference] ?? row.scheduledAt ?? "",
-    [draftDates],
-  );
-
-  const onDraftDate = useCallback((reference: string, value: string) => {
-    setDraftDates((prev) => ({ ...prev, [reference]: value }));
+  const askTakeOver = useCallback((row: ConsoleRequestRowDTO) => {
+    if (!row.managed || row.isExecutor) return;
+    setPendingTakeOver(row);
   }, []);
 
-  const onAdvance = useCallback(
-    async (row: ConsoleRequestRowDTO) => {
-      setBusyRef(row.reference);
-      try {
-        const scheduledAt = appointmentValue(row) || null;
-        await api(`/api/partner/disposition/${encodeURIComponent(row.reference)}/advance`, {
-          method: "POST",
-          body: JSON.stringify({ scheduledAt }),
-        });
-        setDraftDates((prev) => {
-          const next = { ...prev };
-          delete next[row.reference];
-          return next;
-        });
-        toast.success(t("dispositionAdvanced"));
-        await refresh();
-      } catch (e) {
-        toast.error(e instanceof ApiError ? e.message : t("dispositionAdvanceFailed"));
-      } finally {
-        setBusyRef(null);
-      }
-    },
-    [appointmentValue, refresh, t],
-  );
+  const cancelTakeOver = useCallback(() => {
+    if (busyRef) return;
+    setPendingTakeOver(null);
+  }, [busyRef]);
+
+  const confirmTakeOver = useCallback(async () => {
+    const row = pendingTakeOver;
+    if (!row || row.managed === false || row.isExecutor) return;
+    setBusyRef(row.reference);
+    try {
+      await api(`/api/partner/disposition/${encodeURIComponent(row.reference)}/take-over`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      setPendingTakeOver(null);
+      toast.success(t("dispositionTookOver"));
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("dispositionTakeOverFailed"));
+    } finally {
+      setBusyRef(null);
+    }
+  }, [pendingTakeOver, refresh, t]);
 
   return {
     rows,
@@ -95,9 +117,13 @@ export function useDispositionList() {
     keyword,
     setKeyword,
     busyRef,
-    appointmentValue,
-    onDraftDate,
-    onAdvance,
+    contractorFilter,
+    setContractorFilter,
+    counts,
+    pendingTakeOver,
+    askTakeOver,
+    cancelTakeOver,
+    confirmTakeOver,
     refresh,
   };
 }

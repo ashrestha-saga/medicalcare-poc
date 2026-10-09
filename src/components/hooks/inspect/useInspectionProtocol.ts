@@ -154,15 +154,18 @@ export function useInspectionProtocol(reference: string) {
   }, [preview?.sealed, reference, occasionCode, testEquipmentId, t]);
 
   const confirmScan = useCallback(
-    async (skip = false) => {
+    async (skip = false, codeOverride?: string) => {
       if (!run) return;
+      const code = (codeOverride ?? scanCode).trim();
+      if (!skip && !code) return;
       setBusy(true);
       try {
         await api(`/api/partner/inspection-runs/${run.id}/confirm-device`, {
           method: "POST",
-          body: JSON.stringify(skip ? { skip: true } : { code: scanCode }),
+          body: JSON.stringify(skip ? { skip: true } : { code }),
         });
         setRun({ ...run, deviceConfirmed: true, deviceConfirmSkipped: skip });
+        setScanCode("");
         toast.success(skip ? t("scanSkippedNote") : t("scanConfirmed"));
       } catch (e) {
         toast.error(e instanceof ApiError ? e.message : t("scanMismatch"));
