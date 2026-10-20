@@ -18,13 +18,12 @@ interface RequestsTableProps {
 export function RequestsTable({ list, onSelect }: RequestsTableProps) {
   const tFilters = useTranslations("filters");
   const columns = useRequestsColumns(onSelect);
-  const [stateFilter, setStateFilter] = useState<string[] | null>(null);
   const [keyword, setKeyword] = useState("");
 
   const filtered = useMemo(() => {
     const q = keyword.trim().toLowerCase();
     return list.requests.filter((r) => {
-      if (stateFilter?.length && !stateFilter.includes(r.state)) return false;
+      if (list.stateFilter?.length && !list.stateFilter.includes(r.state)) return false;
       if (!q) return true;
       const haystack = [
         r.reference,
@@ -42,7 +41,7 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [list.requests, stateFilter, keyword]);
+  }, [list.requests, list.stateFilter, keyword]);
 
   return (
     <div className="space-y-3" data-testid="requests-list">
@@ -50,9 +49,11 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
         scopes={list.scopes}
         scope={list.scope}
         onScopeChange={list.setScope}
-        stateFilter={stateFilter}
-        onStateChange={(value) => setStateFilter(Array.isArray(value) ? value : value ? [value] : null)}
-        onClearAll={() => setStateFilter(null)}
+        stateFilter={list.stateFilter}
+        onStateChange={(value) =>
+          list.setStateFilter(Array.isArray(value) ? value : value ? [value] : null)
+        }
+        onClearAll={() => list.setStateFilter(null)}
       />
 
       <DataTable

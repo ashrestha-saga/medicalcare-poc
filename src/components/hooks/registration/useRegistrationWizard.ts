@@ -349,7 +349,7 @@ export function useRegistrationWizard(initialDraftId?: string) {
       try {
         const res = await api<ResolveResponse>("/api/resolve", {
           method: "POST",
-          body: JSON.stringify({ raw, context: "service" }),
+          body: JSON.stringify({ raw, context: "service", skipInventoryCandidates: true }),
         });
         if (res.stage === "capture" || !res.model?.id) {
           setNotInCatalogGtin(raw);

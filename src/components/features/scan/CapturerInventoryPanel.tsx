@@ -6,12 +6,27 @@ import { CapturerInventoryList } from "@/components/features/scan/CapturerInvent
 import { CapturerDeviceRecord } from "@/components/features/scan/CapturerDeviceRecord";
 import { useCapturerInventoryUi } from "@/store/capturerInventoryStore";
 
-/** Full-panel inventory register opened from the account-bar button. */
-export function CapturerInventoryPanel() {
-  const open = useCapturerInventoryUi((s) => s.open);
+/**
+ * Full-panel inventory register — account-bar overlay or Scan Bestand tab (`embedded`).
+ * When `onOpenDevice` is set (Scan shell), Open opens the Scan device card instead of
+ * the legacy CapturerDeviceRecord detail.
+ */
+export function CapturerInventoryPanel({
+  embedded = false,
+  onCloseTab,
+  onOpenDevice,
+}: {
+  embedded?: boolean;
+  onCloseTab?: () => void;
+  /** Prefer Scan device card (gated MORE actions) over CapturerDeviceRecord. */
+  onOpenDevice?: (deviceId: string) => void;
+}) {
+  const storeOpen = useCapturerInventoryUi((s) => s.open);
   const closePanel = useCapturerInventoryUi((s) => s.closePanel);
   const setCount = useCapturerInventoryUi((s) => s.setCount);
+  const open = embedded || storeOpen;
   const inventory = useCapturerInventory(open);
+  const useScanCard = Boolean(onOpenDevice);
 
   useEffect(() => {
     if (!open) return;
@@ -25,10 +40,17 @@ export function CapturerInventoryPanel() {
 
   if (!open) return null;
 
+  const handleClose = () => {
+    closePanel();
+    onCloseTab?.();
+  };
+
+  const showLegacyDetail = !useScanCard && (inventory.selected || inventory.detailLoading);
+
   return (
     <div className="p-bestand-panel" data-testid="capturer-inventory-panel">
       <div className="p-bestand-panel__chrome">
-        {inventory.selected || inventory.detailLoading ? (
+        {showLegacyDetail ? (
           <CapturerDeviceRecord
             device={inventory.selected}
             loading={inventory.detailLoading && !inventory.selected}
@@ -37,7 +59,11 @@ export function CapturerInventoryPanel() {
             onRequestService={(device) => void inventory.requestService(device)}
           />
         ) : (
-          <CapturerInventoryList inventory={inventory} onClose={closePanel} />
+          <CapturerInventoryList
+            inventory={inventory}
+            onClose={embedded ? onCloseTab : handleClose}
+            onOpenDevice={onOpenDevice}
+          />
         )}
       </div>
     </div>

@@ -11,6 +11,7 @@ import { useLocationsList } from "@/components/hooks/locations/useLocationsList"
 import { useLocationsColumns } from "@/components/hooks/locations/useLocationsColumns";
 import { useLocationAdminForm } from "@/components/hooks/locations/useLocationAdminForm";
 import { toast } from "@/store/toastStore";
+import { cn } from "@/lib/utils";
 import { LocationFormModal } from "../LocationFormModal";
 import { DeleteLocationDialog } from "../DeleteLocationDialog";
 
@@ -29,6 +30,10 @@ export function LocationsTable({ list }: LocationsTableProps) {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
+    setKeywordInput(list.q);
+  }, [list.q]);
+
+  useEffect(() => {
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
@@ -37,10 +42,9 @@ export function LocationsTable({ list }: LocationsTableProps) {
   const setKeyword = useCallback(
     (value: string) => {
       setKeywordInput(value);
-      list.setQ(value);
       if (searchTimer.current) clearTimeout(searchTimer.current);
       searchTimer.current = setTimeout(() => {
-        void list.refresh(value);
+        list.setQ(value);
       }, 280);
     },
     [list],
@@ -48,9 +52,8 @@ export function LocationsTable({ list }: LocationsTableProps) {
 
   const removeKeyword = useCallback(() => {
     setKeywordInput("");
-    list.setQ("");
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    void list.refresh("");
+    list.setQ("");
   }, [list]);
 
   const confirmDelete = useCallback(async () => {
@@ -86,6 +89,28 @@ export function LocationsTable({ list }: LocationsTableProps) {
   return (
     <>
       <div className="space-y-3" data-testid="locations-list">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={list.mpsb === "missing" ? "default" : "outline"}
+            className={cn("h-8")}
+            onClick={() => list.setMpsb(list.mpsb === "missing" ? null : "missing")}
+            data-testid="locations-mpsb-missing"
+          >
+            {tFilters("mpsbMissing")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={list.mpsb === "appointed" ? "default" : "outline"}
+            className={cn("h-8")}
+            onClick={() => list.setMpsb(list.mpsb === "appointed" ? null : "appointed")}
+            data-testid="locations-mpsb-appointed"
+          >
+            {tFilters("mpsbAppointed")}
+          </Button>
+        </div>
         <DataTable
           data={list.sites}
           columns={columns}

@@ -31,6 +31,8 @@ export function useInviteUserForm() {
   const [name, setName] = useState("");
   const [role, setRole] = useState<UserRole | null>(null);
   const [permissions, setPermissions] = useState<PermissionSlug[]>([]);
+  const [areaIds, setAreaIds] = useState<string[]>([]);
+  const [homeAreaId, setHomeAreaId] = useState<string | null>(null);
   const [lastInviteResult, setLastInviteResult] = useState<{
     emailSimulated: boolean;
     redeemUrl: string;
@@ -101,7 +103,14 @@ export function useInviteUserForm() {
     );
   }, []);
 
-  const canSubmit = Boolean(roleSelected && role && name.trim() && email.trim() && !busy);
+  const canSubmit = Boolean(
+    roleSelected &&
+      role &&
+      name.trim() &&
+      email.trim() &&
+      !busy &&
+      (role !== "user" || areaIds.length > 0),
+  );
 
   const submit = useCallback(async () => {
     if (!role) return;
@@ -109,11 +118,17 @@ export function useInviteUserForm() {
     setFieldErrors({});
     setLastInviteResult(null);
     try {
+      if (role === "user" && areaIds.length === 0) {
+        setFieldErrors({ areaIds: "Assign at least one work area for role User." });
+        return;
+      }
       const parsed = createClinicInviteSchema.safeParse({
         email,
         name,
         role,
         permissions,
+        areaIds,
+        homeAreaId,
       });
       if (!parsed.success) {
         setFieldErrors(zodFieldErrors(parsed.error));
@@ -146,7 +161,7 @@ export function useInviteUserForm() {
     } finally {
       setBusy(false);
     }
-  }, [email, name, role, permissions, presetFor, router]);
+  }, [email, name, role, permissions, areaIds, homeAreaId, presetFor, router]);
 
   const done = useCallback(() => {
     router.push("/users");
@@ -168,6 +183,10 @@ export function useInviteUserForm() {
     togglePermission,
     resetToPreset,
     deviationCount,
+    areaIds,
+    setAreaIds,
+    homeAreaId,
+    setHomeAreaId,
     lastInviteResult,
     canSubmit,
     submit,

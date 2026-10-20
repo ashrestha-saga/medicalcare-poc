@@ -35,6 +35,8 @@ export function useEditUserForm(userId: string) {
   const [role, setRole] = useState<UserRole>("user");
   const [active, setActive] = useState(true);
   const [permissions, setPermissions] = useState<PermissionSlug[]>([]);
+  const [areaIds, setAreaIds] = useState<string[]>([]);
+  const [homeAreaId, setHomeAreaId] = useState<string | null>(null);
   const [lastResend, setLastResend] = useState<{
     emailSimulated: boolean;
     redeemUrl: string;
@@ -89,6 +91,8 @@ export function useEditUserForm(userId: string) {
       setName(u.name);
       setRole(u.role);
       setActive(u.active);
+      setAreaIds([...(u.areaIds ?? [])]);
+      setHomeAreaId(u.homeAreaId ?? null);
       if (u.permissions != null) {
         setPermissions([...u.permissions]);
       } else {
@@ -141,12 +145,18 @@ export function useEditUserForm(userId: string) {
     setBusy(true);
     setFieldErrors({});
     try {
+      if (role === "user" && areaIds.length === 0) {
+        setFieldErrors({ areaIds: "Assign at least one work area for role User." });
+        return;
+      }
       const bodyPermissions = sameSet(permissions, presetFor(role)) ? null : permissions;
       const parsed = updateUserSchema.safeParse({
         name,
         role,
         active,
         permissions: bodyPermissions,
+        areaIds,
+        homeAreaId,
       });
       if (!parsed.success) {
         setFieldErrors(zodFieldErrors(parsed.error));
@@ -157,6 +167,8 @@ export function useEditUserForm(userId: string) {
         body: JSON.stringify(parsed.data),
       });
       setUser(res.user);
+      setAreaIds([...(res.user.areaIds ?? [])]);
+      setHomeAreaId(res.user.homeAreaId ?? null);
       toast.success("User updated.");
       router.push("/users");
     } catch (err) {
@@ -164,7 +176,7 @@ export function useEditUserForm(userId: string) {
     } finally {
       setBusy(false);
     }
-  }, [user, isInvited, name, role, active, permissions, presetFor, router]);
+  }, [user, isInvited, name, role, active, permissions, areaIds, homeAreaId, presetFor, router]);
 
   const lock = useCallback(async () => {
     if (!user || isInvited) return;
@@ -275,6 +287,10 @@ export function useEditUserForm(userId: string) {
     togglePermission,
     resetToPreset,
     deviationCount,
+    areaIds,
+    setAreaIds,
+    homeAreaId,
+    setHomeAreaId,
     roleCatalog,
     presetFor,
     isInvited,

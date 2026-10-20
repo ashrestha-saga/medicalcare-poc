@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AuditEventDTO, AuditListQuery } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
+import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { toast } from "@/store/toastStore";
 
@@ -10,10 +11,32 @@ export function useAuditList(initial: AuditListQuery = {}) {
   const { checkPermission } = usePermissions();
   const canView = checkPermission("audit:view");
   const canExport = checkPermission("audit:export");
+  const { sync } = useSyncQueryParams();
+  const actorKindParam = useQueryParam("actorKind");
+
   const [events, setEvents] = useState<AuditEventDTO[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [filters, setFilters] = useState<AuditListQuery>(initial);
+  const [filters, setFiltersState] = useState<AuditListQuery>(() => ({
+    ...initial,
+    ...(actorKindParam ? { actorKind: actorKindParam } : {}),
+  }));
+
+  useEffect(() => {
+    setFiltersState((prev) => {
+      const nextKind = actorKindParam ?? undefined;
+      if (prev.actorKind === nextKind) return prev;
+      return { ...prev, actorKind: nextKind };
+    });
+  }, [actorKindParam]);
+
+  const setFilters = useCallback(
+    (next: AuditListQuery) => {
+      setFiltersState(next);
+      sync({ actorKind: next.actorKind?.trim() || null });
+    },
+    [sync],
+  );
 
   const refresh = useCallback(
     async (next: AuditListQuery = filters) => {
@@ -52,8 +75,8 @@ export function useAuditList(initial: AuditListQuery = {}) {
 
   useEffect(() => {
     void refresh(filters);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch when the viewer can see the feed
-  }, [canView]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when filters change
+  }, [canView, filters]);
 
   const exportCsv = useCallback(async () => {
     const params = new URLSearchParams();

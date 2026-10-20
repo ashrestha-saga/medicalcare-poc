@@ -10,8 +10,20 @@ export async function GET(req: Request) {
     const ctx = await requireTenantContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
-      dueDatesQuerySchema.parse(Object.fromEntries(new URL(req.url).searchParams.entries()));
-      const board = await dueDatesService.listBoard(ctx);
+      const raw = dueDatesQuerySchema.parse(
+        Object.fromEntries(new URL(req.url).searchParams.entries()),
+      );
+      const board = await dueDatesService.listBoard(ctx, {
+        q: raw.q,
+        filter: raw.filter,
+        dutyKey: raw.dutyKey,
+        dutyId: raw.dutyId,
+        horizon: raw.horizon,
+        confidence: raw.confidence,
+        scheduled: raw.scheduled === "1" || raw.scheduled === "true",
+        limit: raw.limit,
+        offset: raw.offset,
+      });
       return Response.json(board, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {

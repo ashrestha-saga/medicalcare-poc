@@ -25,6 +25,14 @@ export const createSiteSchema = z.object({
     .optional()
     .nullable()
     .transform((v) => (v && v.length ? v : null)),
+  /** ISO Bundesland e.g. DE-NW — never derived from postal code. */
+  stateCode: z
+    .string()
+    .trim()
+    .max(16)
+    .optional()
+    .nullable()
+    .transform((v) => (v && v.length ? v : null)),
   areaNames: z.array(areaNameSchema).max(100).optional().default([]),
 });
 

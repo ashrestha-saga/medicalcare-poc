@@ -77,6 +77,10 @@ export const SCOPE_PERMISSIONS: Record<ContractScopeToken, readonly PermissionSl
   training: TRAINING_SCOPE,
 };
 
+/**
+ * Clinic-admin / clinic-only slugs stripped from partner acting capabilities.
+ * Keep in sync when adding new clinic-admin APIs (see docs/security-api.md).
+ */
 export const PARTNER_FORBIDDEN_PERMISSIONS: readonly PermissionSlug[] = [
   "users:view",
   "users:create",
@@ -88,7 +92,12 @@ export const PARTNER_FORBIDDEN_PERMISSIONS: readonly PermissionSlug[] = [
   "training:view",
   "settings:view",
   "settings:oxid",
+  "settings:smtp",
   "catalog:update",
+  /** K10 clinic-admin / sensitive — partners use console scopes, not these. */
+  "incidents:manage",
+  "reprocessing:release",
+  "authority:view",
 ];
 
 const FORBIDDEN = new Set<PermissionSlug>(PARTNER_FORBIDDEN_PERMISSIONS);

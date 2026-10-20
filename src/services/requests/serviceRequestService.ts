@@ -23,6 +23,7 @@ import type {
 } from "@/schemas/serviceRequest";
 import { dispatchService } from "@/services/dispatch/dispatchService";
 import { computeDutyDueAt } from "@/services/registration/dueDate";
+import { assertDeviceInWorkAreas } from "@/services/users/userAreaScope";
 import { recordDutyCompletion } from "@/services/registration/recordDutyCompletion";
 import {
   toServiceRequestDTO,
@@ -94,14 +95,19 @@ export function requestFingerprint(input: CreateServiceRequestInput): string {
   });
 }
 
-async function assertSubject(input: CreateServiceRequestInput, tenantId: string) {
+async function assertSubject(
+  input: CreateServiceRequestInput,
+  tenantId: string,
+  ctx?: TenantWorkContext,
+) {
   switch (input.subjectType) {
     case "instance": {
       const row = await prisma.deviceInstance.findFirst({
         where: { id: input.subjectId, tenantId },
-        select: { id: true },
+        select: { id: true, areaId: true },
       });
       if (!row) throw unprocessable("Unknown device instance.", { field: "subjectId" });
+      if (ctx) await assertDeviceInWorkAreas(ctx, row.areaId);
       return;
     }
     case "model": {
@@ -202,7 +208,7 @@ export const serviceRequestService = {
       select: { id: true },
     });
     if (!site) throw unprocessable("Please choose a site.", { field: "site" });
-    await assertSubject(input, tenantId);
+    await assertSubject(input, tenantId, ctx);
 
     if (input.dutyId) {
       const duty = await prisma.deviceDuty.findFirst({

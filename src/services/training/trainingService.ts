@@ -337,6 +337,7 @@ export const trainingService = {
         instructed,
       ),
       form,
+      viewerPersonId: ctx.user.id,
     };
   },
 

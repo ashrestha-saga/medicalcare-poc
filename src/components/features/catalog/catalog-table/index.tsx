@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
 import { useCatalogColumns } from "@/components/hooks/catalog/useCatalogColumns";
 import { useCatalogTable } from "@/components/hooks/catalog/useCatalogTable";
+import { cn } from "@/lib/utils";
 import { CatalogImportDialog } from "../CatalogImportDialog";
 import { CatalogModelFormDialog } from "../CatalogModelFormDialog";
 
@@ -47,9 +48,24 @@ export function CatalogTable({ list, onSelect, onEdit }: CatalogTableProps) {
   return (
     <div className="space-y-3" data-testid="catalog-list">
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-        <span data-testid="catalog-count">
-          Models {list.models.length} of {list.models.length}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span data-testid="catalog-count">
+            Models {list.models.length} of {list.models.length}
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            variant={list.missingClassification ? "default" : "outline"}
+            className={cn("h-8")}
+            onClick={() => list.setMissingClassification(!list.missingClassification)}
+            data-testid="catalog-filter-missing-classification"
+            aria-pressed={list.missingClassification}
+          >
+            {list.missingClassification
+              ? tFilters("missingClassificationActive")
+              : tFilters("missingClassification")}
+          </Button>
+        </div>
       </div>
 
       <DataTable

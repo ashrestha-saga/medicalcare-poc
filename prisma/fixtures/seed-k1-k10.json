@@ -1,0 +1,231 @@
+{
+ "_hinweis": "Erzeugt mit export_k10_seed.py. Geraetebezogene Routinekontrollen aus devicecare-bestand-backoffice-v20.html uebernommen; Kachelkatalog und Pruefliste sind Entwurfsentscheidungen.",
+ "RefReprocessingCheck": [
+  {
+   "code": "RC-rdg-1",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "rdg",
+   "label": "Sichtprüfung von Siebkörben, Düsen und Sprüharmen auf Freigängigkeit",
+   "cadence": "daily",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-rdg-2",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "rdg",
+   "label": "Prozessprotokoll mit Temperatur-Zeit-Verlauf, A0-Wert",
+   "cadence": "per_batch",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-rdg-3",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "rdg",
+   "label": "Prüfung der Reinigungsleistung mit Prüfanschmutzung nach DIN EN ISO 15883-5",
+   "cadence": "quarterly",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-klein-1",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "klein",
+   "label": "Vakuumtest und Dampfdurchdringungstest (Helix oder Bowie-Dick, je nach Beladungstyp)",
+   "cadence": "daily",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-klein-2",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "klein",
+   "label": "Chargenprotokoll, Behandlungsindikator, Prüfung der Verpackungsunversehrtheit",
+   "cadence": "per_batch",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-gross-1",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "gross",
+   "label": "Vakuumtest und Bowie-Dick-Test",
+   "cadence": "daily",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-gross-2",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "gross",
+   "label": "Chargenprotokoll, Behandlungsindikator, gegebenenfalls Bioindikator",
+   "cadence": "per_batch",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-gross-3",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "gross",
+   "label": "Prüfung der Dampfqualität nach DIN EN 285",
+   "cadence": "quarterly",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-siegel-1",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "siegel",
+   "label": "Siegelnahtprüfung (Seal-Check oder Tintentest)",
+   "cadence": "daily",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-siegel-2",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "siegel",
+   "label": "Kontrolle von Siegeltemperatur, Anpressdruck und Vorschubgeschwindigkeit",
+   "cadence": "daily",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-siegel-3",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "equipment",
+   "equipmentTypeCode": "siegel",
+   "label": "Sichtprüfung der Naht auf Kanäle, Falten und Durchgängigkeit",
+   "cadence": "per_batch",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-WASSER-1",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "water",
+   "equipmentTypeCode": null,
+   "label": "Leitfähigkeit des Schlussspülwassers",
+   "cadence": "daily",
+   "legalBasis": "DIN EN ISO 15883-1 · Leitlinie DGKH/DGSV/AKI",
+   "unit": "µS/cm",
+   "limitText": "≤ 30",
+   "limitSource": "standard",
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-WASSER-2",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "water",
+   "equipmentTypeCode": null,
+   "label": "Mikrobiologische Untersuchung des Schlussspülwassers",
+   "cadence": "quarterly",
+   "legalBasis": "KRINKO/BfArM · Leitlinie DGKH/DGSV/AKI",
+   "unit": null,
+   "limitText": null,
+   "limitSource": null,
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-CHEMIE-1",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "chemistry",
+   "equipmentTypeCode": null,
+   "label": "Dosierung der Prozesschemikalien kontrolliert und dokumentiert",
+   "cadence": "daily",
+   "legalBasis": "§ 8 MPBetreibV · Herstellerangabe",
+   "unit": null,
+   "limitText": null,
+   "limitSource": null,
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-CHEMIE-2",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "chemistry",
+   "equipmentTypeCode": null,
+   "label": "Chargenfreigabe und Haltbarkeit der eingesetzten Prozesschemie geprüft",
+   "cadence": "monthly",
+   "legalBasis": "Herstellerangabe",
+   "unit": null,
+   "limitText": null,
+   "limitSource": null,
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-STERIL-1",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "sterile_storage",
+   "equipmentTypeCode": null,
+   "label": "Verpackungsunversehrtheit des gelagerten Sterilguts geprüft",
+   "cadence": "weekly",
+   "legalBasis": "DIN EN ISO 11607 · KRINKO/BfArM",
+   "unit": null,
+   "limitText": null,
+   "limitSource": null,
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-STERIL-2",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "sterile_storage",
+   "equipmentTypeCode": null,
+   "label": "Lagerbedingungen kontrolliert: trocken, staubgeschützt, nicht am Boden",
+   "cadence": "weekly",
+   "legalBasis": "KRINKO/BfArM",
+   "unit": null,
+   "limitText": null,
+   "limitSource": null,
+   "confidence": "determination"
+  },
+  {
+   "code": "RC-STERIL-3",
+   "ruleSetId": "rs-mpbetreibv",
+   "scope": "sterile_storage",
+   "equipmentTypeCode": null,
+   "label": "Sterilgut mit überschrittener Lagerfrist ausgesondert",
+   "cadence": "monthly",
+   "legalBasis": "KRINKO/BfArM",
+   "unit": null,
+   "limitText": null,
+   "limitSource": null,
+   "confidence": "determination"
+  }
+ ],
+ "RefInspectionType_neu": [
+  {
+   "code": "DGUV",
+   "ruleSetId": "rs-mpbetreibv",
+   "label": "Prüfung elektrischer Betriebsmittel",
+   "legalBasis": "ArbSchG · BetrSichV · DGUV Vorschrift 3",
+   "deadlineAnchor": "month_end",
+   "defaultInterval": null,
+   "intervalUnit": null,
+   "category": "inspection",
+   "confidence": "determination",
+   "addressee": "employer",
+   "authorityKind": "occupational_safety",
+   "evidenceHint": "Prüfprotokoll mit Prüfer, Datum und Ergebnis; Prüfplakette am Gerät",
+   "sourceRef": "DGUV Vorschrift 3 — Frist aus der Gefährdungsbeurteilung"
+  }
+ ],
+ "RefInspectionTypeOverlap": [
+  {
+   "inspectionTypeCode": "DGUV",
+   "satisfiedByCode": "STK",
+   "conditionText": "Eine sicherheitstechnische Kontrolle nach DIN EN 62353 kann die Prüfung elektrischer Betriebsmittel abdecken, wenn Umfang, Frist und Dokumentation den Vorgaben des Arbeitgebers genügen.",
+   "legalNote": "Adressat und Rechtsgrundlage sind verschieden: Betreiber nach MPBetreibV gegen Arbeitgeber nach ArbSchG. Die Festlegung trifft der Betreiber mit seiner Fachkraft, nicht das System."
+  }
+ ]
+}

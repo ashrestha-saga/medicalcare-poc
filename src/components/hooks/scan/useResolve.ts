@@ -39,7 +39,7 @@ export function useResolve() {
         const result = await api<ResolveResponse>("/api/resolve", { method: "POST", body: JSON.stringify(requestBody) });
         log(
           "resolve",
-          `Response stage=${result.stage} source=${result.source.system}${result.source.cached ? " (cached)" : ""}${result.model ? ` model=${result.model.tradeName ?? result.model.id}` : ""}${result.device ? ` device=${result.device.id}` : ""}`,
+          `Response stage=${result.stage} source=${result.source.system}${result.source.cached ? " (cached)" : ""}${result.model ? ` model=${result.model.tradeName ?? result.model.id}` : ""}${result.device ? ` device=${result.device.id}` : ""}${result.candidates?.length ? ` candidates=${result.candidates.length}` : ""}`,
         );
         resetForm();
         if (result.device?.location) {

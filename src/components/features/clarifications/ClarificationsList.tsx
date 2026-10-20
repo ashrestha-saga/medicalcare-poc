@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import type {
   ClarificationIssue,
+  ClarificationIssueCode,
   ClarificationItemDTO,
   ClarificationSeverity,
   ClarificationSummaryDTO,
@@ -71,17 +72,37 @@ function SummaryCard({
   value,
   label,
   hint,
+  active,
+  onClick,
+  testId,
 }: {
   value: number;
   label: string;
   hint: string;
+  active?: boolean;
+  onClick: () => void;
+  testId: string;
 }) {
   return (
-    <div className="rounded-md border border-border bg-card/40 px-4 py-3" data-testid="clarification-summary-card">
-      <p className="text-2xl font-semibold tabular-nums text-amber-700 dark:text-amber-400">{value}</p>
-      <p className="mt-1 text-sm font-medium text-foreground">{label}</p>
-      <p className="text-xs text-muted-foreground">{hint}</p>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-left"
+      data-testid={testId}
+      aria-pressed={active}
+    >
+      <div
+        className={cn(
+          "rounded-md border bg-card/40 px-4 py-3 transition-colors",
+          active ? "border-foreground/40 bg-muted/40" : "border-border",
+        )}
+        data-testid="clarification-summary-card"
+      >
+        <p className="text-2xl font-semibold tabular-nums text-amber-700 dark:text-amber-400">{value}</p>
+        <p className="mt-1 text-sm font-medium text-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      </div>
+    </button>
   );
 }
 
@@ -90,6 +111,11 @@ interface ClarificationsListProps {
   items: ClarificationItemDTO[];
   loading: boolean;
   canEdit: boolean;
+  issue: ClarificationIssueCode | null;
+  severity: ClarificationSeverity | null;
+  onIssueChange: (issue: ClarificationIssueCode | null) => void;
+  onSeverityChange: (severity: ClarificationSeverity | null) => void;
+  onClearFilters: () => void;
   onEdit: (item: ClarificationItemDTO) => void;
 }
 
@@ -98,10 +124,22 @@ export function ClarificationsList({
   items,
   loading,
   canEdit,
+  issue,
+  severity,
+  onIssueChange,
+  onSeverityChange,
+  onClearFilters,
   onEdit,
 }: ClarificationsListProps) {
   const t = useTranslations("pages.clarifications");
   const tIssues = useTranslations("clarificationsIssues");
+  const tFilters = useTranslations("filters");
+
+  const toggleIssue = (code: ClarificationIssueCode | null) => {
+    onIssueChange(issue === code ? null : code);
+  };
+
+  const hasFilters = Boolean(issue || severity);
 
   return (
     <div className="space-y-4" data-testid="clarifications-list">
@@ -110,22 +148,62 @@ export function ClarificationsList({
           value={summary.openCases}
           label={t("openCases")}
           hint={t("openCasesHint")}
+          active={!issue && !severity}
+          onClick={() => onClearFilters()}
+          testId="clarification-card-open"
         />
         <SummaryCard
           value={summary.duplicates}
           label={t("duplicates")}
           hint={t("duplicatesHint")}
+          active={issue === "duplicate_serial"}
+          onClick={() => toggleIssue("duplicate_serial")}
+          testId="clarification-card-duplicates"
         />
         <SummaryCard
           value={summary.derivedClassification}
           label={t("derived")}
           hint={t("derivedHint")}
+          active={issue === "derived_classification"}
+          onClick={() => toggleIssue("derived_classification")}
+          testId="clarification-card-derived"
         />
         <SummaryCard
           value={summary.missingResponsible}
           label={t("missingResponsible")}
           hint={t("missingResponsibleHint")}
+          active={issue === "missing_responsible"}
+          onClick={() => toggleIssue("missing_responsible")}
+          testId="clarification-card-responsible"
         />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {(["high", "medium", "low"] as const).map((s) => (
+          <Button
+            key={s}
+            type="button"
+            size="sm"
+            variant={severity === s ? "default" : "outline"}
+            className="h-8"
+            onClick={() => onSeverityChange(severity === s ? null : s)}
+            data-testid={`clarification-severity-${s}`}
+          >
+            {tIssues(severityLabelKey(s))}
+          </Button>
+        ))}
+        {hasFilters ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8"
+            onClick={onClearFilters}
+            data-testid="clarification-filters-clear"
+          >
+            {tFilters("clearAll")}
+          </Button>
+        ) : null}
       </div>
 
       {loading ? (
@@ -172,7 +250,7 @@ export function ClarificationsList({
                   </p>
                   <p className="text-sm text-amber-800 dark:text-amber-300">
                     {item.issues.length > 0
-                      ? item.issues.map((issue) => translateIssue(tIssues, issue)).join(" · ")
+                      ? item.issues.map((iss) => translateIssue(tIssues, iss)).join(" · ")
                       : item.reasonText}
                   </p>
                   {item.sourceLabel && (

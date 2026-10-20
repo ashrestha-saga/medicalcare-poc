@@ -19,19 +19,27 @@ describe("RBAC defaults & path guards", () => {
     expect(hasPermission("superadmin", "duties:view")).toBe(true);
     expect(permissionsForRole("superadmin")).toEqual(ROLE_PERMISSIONS.superadmin);
     expect(menuForRole("superadmin").map((m) => m.id)).toEqual([
+      "dashboard",
       "registration",
       "clarifications",
       "inventory",
       "due-dates",
       "requests",
       "training",
+      "duty-overlap",
+      "device-book",
+      "incidents",
+      "field-safety",
+      "reprocessing",
+      "constancy-cadence",
+      "authority",
       "management",
       "users",
       "catalog",
       "locations",
       "roles",
-      "activity",
       "security",
+      "activity",
       "settings",
     ]);
   });
@@ -53,17 +61,27 @@ describe("RBAC defaults & path guards", () => {
     expect(hasPermission("device_admin", "locations:view")).toBe(false);
     expect(hasPermission("device_admin", "roles:view")).toBe(false);
     expect(hasPermission("device_admin", "settings:view")).toBe(false);
+    expect(hasPermission("device_admin", "reprocessing:release")).toBe(true);
+    expect(hasPermission("device_admin", "authority:view")).toBe(true);
     expect(menuForRole("device_admin").map((m) => m.id)).toEqual([
+      "dashboard",
       "registration",
       "clarifications",
       "inventory",
       "due-dates",
       "requests",
       "training",
+      "duty-overlap",
+      "device-book",
+      "incidents",
+      "field-safety",
+      "reprocessing",
+      "constancy-cadence",
+      "authority",
       "management",
       "catalog",
-      "activity",
       "security",
+      "activity",
     ]);
   });
 

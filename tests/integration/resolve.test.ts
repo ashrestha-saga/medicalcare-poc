@@ -38,6 +38,23 @@ describe("resolution chain — FA-100 (AC #1, #2, #9)", () => {
     expect(r.device).toBeUndefined();
   });
 
+  it("stage 1b: GTIN with inventory exemplars → candidates picker + skip path", async () => {
+    const r = await resolveService.resolve(parseIdentifier("04012345678901"), TENANT, cid);
+    expect(r.stage).toBe("inventory-candidates");
+    expect(r.candidates?.length).toBeGreaterThan(0);
+    expect(r.candidates?.some((d) => d.inventoryNumber === "INV-10001")).toBe(true);
+    expect(r.continueWithoutSelection?.stage).toBe("catalog");
+    expect(r.device).toBeUndefined();
+  });
+
+  it("stage 1b: skipInventoryCandidates bypasses picker for same GTIN", async () => {
+    const r = await resolveService.resolve(parseIdentifier("04012345678901"), TENANT, cid, undefined, undefined, {
+      skipInventoryCandidates: true,
+    });
+    expect(r.stage).toBe("catalog");
+    expect(r.candidates).toBeUndefined();
+  });
+
   it("stage 2: GTIN with no instance → local article master, no DeviceInstance created (FA-102)", async () => {
     const before = await prisma.deviceInstance.count();
     const r = await resolveService.resolve(parseIdentifier("04012345678925"), TENANT, cid);
@@ -46,9 +63,16 @@ describe("resolution chain — FA-100 (AC #1, #2, #9)", () => {
     expect(r.device).toBeUndefined();
     expect(await prisma.deviceInstance.count()).toBe(before);
 
+    // Monitor GTIN may already have inventory exemplars in seed → picker or catalog.
     const other = await resolveService.resolve(parseIdentifier("04012345678918"), TENANT, cid);
-    expect(other.stage).toBe("catalog");
-    expect(other.model).toBeTruthy();
+    if (other.stage === "inventory-candidates") {
+      expect(other.candidates?.length).toBeGreaterThan(0);
+      expect(other.continueWithoutSelection?.stage).toBe("catalog");
+      expect(other.continueWithoutSelection?.model).toBeTruthy();
+    } else {
+      expect(other.stage).toBe("catalog");
+      expect(other.model).toBeTruthy();
+    }
   });
 
   it("stage 2: OXID (mock) catalog adapter answers for a GTIN unknown locally", async () => {

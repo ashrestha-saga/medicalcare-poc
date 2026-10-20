@@ -42,6 +42,11 @@ export function ClarificationsScreen() {
               items={list.items}
               loading={list.loading}
               canEdit={list.canUpdate}
+              issue={list.issue}
+              severity={list.severity}
+              onIssueChange={list.setIssue}
+              onSeverityChange={list.setSeverity}
+              onClearFilters={list.clearFilters}
               onEdit={(item) =>
                 void editor.openEdit({
                   id: item.deviceId,
@@ -73,6 +78,7 @@ export function ClarificationsScreen() {
                   maintenanceStatus: "unset",
                   classification: null,
                   inspectionTags: [],
+                  isReprocessingEquipment: false,
                   catalogPending: false,
                 })
               }

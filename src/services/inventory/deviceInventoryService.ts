@@ -18,6 +18,12 @@ import {
 } from "@/lib/maintenance/schedule";
 import { listDutiesForInstance, nextObligationDueAt, syncWartungDutyOnComplete } from "@/services/registration/dutyService";
 import type { CreateDeviceInput, UpdateDeviceInput } from "@/schemas/device";
+import {
+  assertDeviceInWorkAreas,
+  deviceAreaWhere,
+  getAssignedAreaIds,
+  getEffectiveAreaScope,
+} from "@/services/users/userAreaScope";
 import { userOptionsService } from "@/services/users/userOptionsService";
 import { Prisma } from "@prisma/client";
 
@@ -47,6 +53,8 @@ export async function allocateInventoryNumber(
  */
 export interface InventoryResolver {
   find(identifier: ParsedIdentifier, tenantId: string): Promise<DeviceInstanceDTO | null>;
+  /** All inventory exemplars whose linked model matches GTIN/UDI-DI. */
+  listByGtin(tenantId: string, gtin: string): Promise<DeviceInstanceDTO[]>;
 }
 
 const include = {
@@ -60,6 +68,14 @@ export interface DeviceListQuery {
   siteId?: string;
   /** Exact room match (trimmed); empty/undefined = no room filter. */
   room?: string;
+  /** draft | review | released | retired | not_released */
+  state?: string;
+  /**
+   * When true, restrict to the caller's assigned work areas
+   * (home ∪ UserAreaAssignment), even for unscoped admin roles.
+   * Scoped roles (e.g. user) are always filtered by effective areas.
+   */
+  mineArea?: boolean;
 }
 
 function parseCommissionedAt(value: string | null | undefined): Date | null | undefined {
@@ -116,11 +132,12 @@ async function buildDeviceCourse(
   const [unitEvents, audits] = await Promise.all([
     prisma.deviceUnitEvent.findMany({
       where: { deviceInstanceId: row.id, tenantId: row.tenantId },
-      orderBy: { occurredAt: "asc" },
+      orderBy: { occurredAt: "desc" },
+      take: 200,
     }),
     prisma.auditEvent.findMany({
       where: { tenantId: row.tenantId, resource: "device", resourceId: row.id },
-      orderBy: { occurredAt: "asc" },
+      orderBy: { occurredAt: "desc" },
       take: 80,
     }),
   ]);
@@ -240,14 +257,55 @@ export const deviceInventoryService: InventoryResolver & {
     return null;
   },
 
+  async listByGtin(tenantId, gtin) {
+    const code = gtin.trim();
+    if (!code) return [];
+    const rows = await prisma.deviceInstance.findMany({
+      where: {
+        tenantId,
+        state: { not: "retired" },
+        model: {
+          OR: [{ udiDi: code }, { basicUdiDi: code }, { gtins: { contains: `"${code}"` } }],
+        },
+      },
+      include,
+      orderBy: [{ inventoryNumber: "asc" }],
+      take: 100,
+    });
+    return rows.map(toDeviceInstanceDTO);
+  },
+
   async list(ctx, query = {}) {
     requirePermission(ctx, "inventory:view");
     const q = query.q?.trim();
     const room = query.room?.trim();
+    const state = query.state?.trim();
+
+    let areaClause: Prisma.DeviceInstanceWhereInput | undefined;
+    if (query.mineArea) {
+      const assigned = await getAssignedAreaIds(ctx);
+      if (assigned.length === 0) return [];
+      areaClause = { areaId: { in: assigned } };
+    } else {
+      const scope = await getEffectiveAreaScope(ctx);
+      const frag = deviceAreaWhere(scope);
+      if (frag === "empty") return [];
+      if (frag) areaClause = frag;
+    }
+
+    const stateWhere: Prisma.DeviceInstanceWhereInput | undefined =
+      state === "not_released"
+        ? { state: { not: "released" } }
+        : state === "draft" || state === "review" || state === "released" || state === "retired"
+          ? { state }
+          : undefined;
+
     const where: Prisma.DeviceInstanceWhereInput = {
       tenantId: ctx.tenantId,
       ...(query.siteId ? { area: { siteId: query.siteId } } : {}),
+      ...(areaClause ?? {}),
       ...(room ? { room } : {}),
+      ...(stateWhere ?? {}),
       ...(q
         ? {
             OR: [
@@ -279,6 +337,7 @@ export const deviceInventoryService: InventoryResolver & {
     requirePermission(ctx, "inventory:view");
     const row = await loadInstance(id, ctx.tenantId);
     if (!row) throw notFound("Device not found.");
+    await assertDeviceInWorkAreas(ctx, row.areaId);
     return toDetailDTO(row);
   },
 
@@ -294,7 +353,9 @@ export const deviceInventoryService: InventoryResolver & {
       },
       include,
     });
-    return row ? toDeviceInstanceDTO(row) : null;
+    if (!row) return null;
+    // Tenant-wide duplicate lookup — area scope enforced on get / resolve / list.
+    return toDeviceInstanceDTO(row);
   },
 
   async create(ctx, input) {
@@ -312,6 +373,12 @@ export const deviceInventoryService: InventoryResolver & {
         where: { id: input.areaId, site: { tenantId: ctx.tenantId } },
       });
       if (!area) throw unprocessable("Unknown area for this tenant.", { field: "areaId" });
+      await assertDeviceInWorkAreas(ctx, input.areaId);
+    } else {
+      const scope = await getEffectiveAreaScope(ctx);
+      if (scope.mode === "areas" || scope.mode === "none") {
+        throw unprocessable("Choose a work area you are assigned to.", { field: "areaId" });
+      }
     }
 
     const existing = await prisma.deviceInstance.findFirst({
@@ -406,6 +473,7 @@ export const deviceInventoryService: InventoryResolver & {
     requirePermission(ctx, "inventory:update");
     const existing = await loadInstance(id, ctx.tenantId);
     if (!existing) throw notFound("Device not found.");
+    await assertDeviceInWorkAreas(ctx, existing.areaId);
 
     if (existing.model?.state && existing.model.state !== "released") {
       throw unprocessable(
@@ -463,6 +531,7 @@ export const deviceInventoryService: InventoryResolver & {
         where: { id: input.areaId, site: { tenantId: ctx.tenantId } },
       });
       if (!area) throw unprocessable("Unknown area for this tenant.", { field: "areaId" });
+      await assertDeviceInWorkAreas(ctx, input.areaId);
     }
 
     if (
@@ -642,6 +711,7 @@ export const deviceInventoryService: InventoryResolver & {
     requirePermission(ctx, "inventory:update");
     const existing = await loadInstance(id, ctx.tenantId);
     if (!existing) throw notFound("Device not found.");
+    await assertDeviceInWorkAreas(ctx, existing.areaId);
 
     const cycle = existing.maintenanceCycleMonths;
     if (cycle == null || cycle <= 0) {

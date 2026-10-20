@@ -159,6 +159,7 @@ export function TrainingScreen() {
   const t = useTranslations("pages.training");
   const tCards = useTranslations("trainingCards");
   const tDetail = useTranslations("trainingDetail");
+  const tFilters = useTranslations("filters");
   const {
     data,
     error,
@@ -168,6 +169,11 @@ export function TrainingScreen() {
     matrixModels,
     matrixPeople,
     cellMap,
+    filteredEvents,
+    mine,
+    setMine,
+    expiringDays,
+    setExpiring,
     goOverview,
     openEvent,
     openMatrix,
@@ -250,30 +256,52 @@ export function TrainingScreen() {
                       testId="training-kpi-without-record"
                     />
                   </div>
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={openMatrix}
-                      data-testid="training-open-matrix"
-                    >
-                      {t("matrix")}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={openRecord}
-                      data-testid="training-open-record"
-                    >
-                      {t("record")}
-                    </Button>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={mine ? "default" : "outline"}
+                        onClick={() => setMine(!mine)}
+                        data-testid="training-filter-mine"
+                      >
+                        {tFilters("mineOnly")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={expiringDays === 365 ? "default" : "outline"}
+                        onClick={() => setExpiring(expiringDays === 365 ? null : 365)}
+                        data-testid="training-filter-expiring"
+                      >
+                        {tFilters("expiring")}
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={openMatrix}
+                        data-testid="training-open-matrix"
+                      >
+                        {t("matrix")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={openRecord}
+                        data-testid="training-open-record"
+                      >
+                        {t("record")}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               }
             >
               <div className="space-y-4">
-                <TrainingEventsTable events={data.events} loading={loading} onOpen={openEvent} />
+                <TrainingEventsTable events={filteredEvents} loading={loading} onOpen={openEvent} />
 
                 <aside
                   className="rounded-md border border-border border-l-4 border-l-primary bg-muted/40 px-4 py-3 text-sm text-muted-foreground"

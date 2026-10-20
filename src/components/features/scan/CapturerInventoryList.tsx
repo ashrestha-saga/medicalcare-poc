@@ -17,9 +17,12 @@ type InventoryApi = ReturnType<typeof useCapturerInventory>;
 export function CapturerInventoryList({
   inventory,
   onClose,
+  onOpenDevice,
 }: {
   inventory: InventoryApi;
   onClose?: () => void;
+  /** When set, Open hands off to Scan device card instead of loading detail in-panel. */
+  onOpenDevice?: (deviceId: string) => void;
 }) {
   const t = useTranslations("capturer");
   const tCommon = useTranslations("common");
@@ -108,8 +111,14 @@ export function CapturerInventoryList({
             <InventoryRow
               key={device.id}
               device={device}
-              busy={detailLoading}
-              onOpen={() => void openDevice(device)}
+              busy={!onOpenDevice && detailLoading}
+              onOpen={() => {
+                if (onOpenDevice) {
+                  onOpenDevice(device.id);
+                  return;
+                }
+                void openDevice(device);
+              }}
             />
           ))}
         </ul>
@@ -127,7 +136,11 @@ function InventoryRow({
   busy: boolean;
   onOpen: () => void;
 }) {
-  const tags = deviceInspectionTags(device);
+  const t = useTranslations("capturer");
+  const tags = [
+    ...(device.isReprocessingEquipment ? [t("tagReprocessing")] : []),
+    ...deviceInspectionTags(device),
+  ];
   return (
     <li className="p-bestand__row">
       <div className="p-bestand__row-main">

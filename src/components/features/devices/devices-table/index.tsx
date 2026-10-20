@@ -50,11 +50,14 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
   const t = useTranslations("pages.inventory");
   const sites = useSites();
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [siteFilter, setSiteFilter] = useState<string | null>(null);
   const [keywordInput, setKeywordInput] = useState(list.q);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [scanOpen, setScanOpen] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
+
+  useEffect(() => {
+    setKeywordInput(list.q);
+  }, [list.q]);
 
   useEffect(() => {
     return () => {
@@ -65,10 +68,9 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
   const setKeyword = useCallback(
     (value: string) => {
       setKeywordInput(value);
-      list.setQ(value);
       if (searchTimer.current) clearTimeout(searchTimer.current);
       searchTimer.current = setTimeout(() => {
-        void list.refresh(value);
+        list.setQ(value);
       }, 280);
     },
     [list],
@@ -76,9 +78,8 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
 
   const removeKeyword = useCallback(() => {
     setKeywordInput("");
-    list.setQ("");
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    void list.refresh("");
+    list.setQ("");
   }, [list]);
 
   const printOne = useCallback((device: DeviceInstanceDTO) => {
@@ -97,14 +98,9 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
 
   const columns = useDevicesColumns(columnActions);
 
-  const filtered = useMemo(() => {
-    if (!siteFilter) return list.devices;
-    return list.devices.filter((d) => d.location?.siteId === siteFilter);
-  }, [list.devices, siteFilter]);
-
   const selectedDevices = useMemo(
-    () => filtered.filter((d) => rowSelection[d.id]),
-    [filtered, rowSelection],
+    () => list.devices.filter((d) => rowSelection[d.id]),
+    [list.devices, rowSelection],
   );
 
   const printSelected = useCallback(() => {
@@ -123,7 +119,7 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
         const res = await api<{ devices: DeviceInstanceDTO[] }>(
           `/api/devices?q=${encodeURIComponent(token)}`,
         );
-        await list.refresh(token);
+        await list.refresh({ q: token });
 
         const hits = res.devices.filter((d) =>
           matchesDevice(result.identifier, {
@@ -152,16 +148,31 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
     <div className="space-y-3" data-testid="devices-list">
       <DevicesFilterToolbar
         sites={sites}
-        siteFilter={siteFilter}
+        siteFilter={list.siteFilter}
         onSiteChange={(value) => {
           const next = typeof value === "string" ? value : Array.isArray(value) ? value[0] : null;
-          setSiteFilter(next);
+          list.setSiteFilter(next);
         }}
-        onClearAll={() => setSiteFilter(null)}
+        stateFilter={list.stateFilter}
+        onStateChange={(value) => {
+          const next = typeof value === "string" ? value : Array.isArray(value) ? value[0] : null;
+          list.setStateFilter(
+            next === "draft" ||
+              next === "review" ||
+              next === "released" ||
+              next === "retired" ||
+              next === "not_released"
+              ? next
+              : null,
+          );
+        }}
+        mineArea={list.mineArea}
+        onMineAreaChange={list.setMineArea}
+        onClearAll={() => list.clearListFilters()}
       />
 
       <DataTable
-        data={filtered}
+        data={list.devices}
         columns={columns}
         search
         visibility
@@ -170,7 +181,7 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
         setKeyword={setKeyword}
         removeKeyword={removeKeyword}
         isLoading={list.loading}
-        totalItems={filtered.length}
+        totalItems={list.devices.length}
         getRowId={(row) => row.id}
         emptyMessage="No devices in this inventory."
         searchPlaceholder={tFilters("searchDevices")}

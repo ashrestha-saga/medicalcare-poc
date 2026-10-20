@@ -91,6 +91,8 @@ export interface TrainingOverviewDTO {
   staff: TrainingPersonDTO[];
   matrix: TrainingMatrixCellDTO[];
   form: TrainingFormOptionsDTO;
+  /** Signed-in clinic user id — used for `?mine=1` deep-links. */
+  viewerPersonId: string;
 }
 
 export interface CreateTrainingEventResultDTO {

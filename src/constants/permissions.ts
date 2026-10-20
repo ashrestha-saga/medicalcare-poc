@@ -43,6 +43,13 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "testequipment:manage",
   "qualifications:view",
   "qualifications:manage",
+  "incidents:view",
+  "incidents:manage",
+  "fieldsafety:view",
+  "devicebook:view",
+  "reprocessing:view",
+  "reprocessing:release",
+  "authority:view",
 ] as const;
 
 /** Staff who manage the service queue — includes the nav rail. */
@@ -81,8 +88,22 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
     "catalogues:view",
     "qualifications:view",
     "audit:view",
+    "devicebook:view",
+    "fieldsafety:view",
+    "incidents:view",
+    "incidents:manage",
+    "reprocessing:view",
+    "reprocessing:release",
+    "authority:view",
   ],
-  security_officer: [...SERVICE_STAFF, "requests:view-all"],
+  security_officer: [
+    ...SERVICE_STAFF,
+    "requests:view-all",
+    "incidents:view",
+    "incidents:manage",
+    "fieldsafety:view",
+    "devicebook:view",
+  ],
   // No shell:nav → Inventory-only chrome; /requests is blocked by RouteGuard.
   // /security is allowed without shell:nav (see canAccessPath).
   user: ["inventory:view", "requests:create", "parts:request", "requests:view-mine", "account:security"],
@@ -118,6 +139,13 @@ export const PERMISSION_GROUPS: readonly {
       { slug: "inventory:update", description: "Change and release device records" },
       { slug: "clarifications:view", description: "View clarifications list" },
       { slug: "duties:view", description: "View duties and due dates" },
+      { slug: "devicebook:view", description: "View medical device book entries" },
+      { slug: "incidents:view", description: "View device incidents" },
+      { slug: "incidents:manage", description: "Assess, report and close incidents" },
+      { slug: "fieldsafety:view", description: "View field safety actions and recalls" },
+      { slug: "reprocessing:view", description: "View reprocessing checks and batches" },
+      { slug: "reprocessing:release", description: "Release or reject reprocessing batches" },
+      { slug: "authority:view", description: "View authority inspections and findings" },
     ],
   },
   {
@@ -190,30 +218,54 @@ export const CRITICAL_PERMISSIONS: ReadonlySet<PermissionSlug> = new Set(
   PERMISSION_GROUPS.filter((g) => g.critical).flatMap((g) => g.items.map((i) => i.slug)),
 );
 
-/** Sidebar modules. Visibility = `shell:nav` + module slug. Groups match mockup: WORK / MASTER DATA. */
+/**
+ * Sidebar modules. Visibility = `shell:nav` + module slug.
+ * Groups and item order match mockup v22: Überblick → Arbeit → Sicherheit →
+ * Aufbereitung → Strahlenschutz → Behörde → Stammdaten → Ausgabe.
+ */
 export const MENU_MODULES: readonly MenuModule[] = [
+  // Überblick
+  { id: "dashboard", label: "Dashboard", href: "/dashboard", slug: "duties:view", group: "overview" },
+  // Arbeit
   { id: "registration", label: "Registration", href: "/registration", slug: "inventory:update", group: "work" },
   { id: "clarifications", label: "Clarifications", href: "/clarifications", slug: "clarifications:view", group: "work" },
   { id: "inventory", label: "Inventory", href: "/devices", slug: "inventory:view", group: "work" },
   { id: "due-dates", label: "Due dates", href: "/due-dates", slug: "duties:view", group: "work" },
   { id: "requests", label: "Requests", href: "/requests", slug: "requests:view-mine", group: "work" },
   { id: "training", label: "Training", href: "/training", slug: "training:view", group: "work" },
+  { id: "duty-overlap", label: "Duty overlap", href: "/duty-overlap", slug: "duties:view", group: "work" },
+  // Sicherheit
+  { id: "device-book", label: "Device book", href: "/device-book", slug: "devicebook:view", group: "safety" },
+  { id: "incidents", label: "Incidents", href: "/incidents", slug: "incidents:view", group: "safety" },
+  { id: "field-safety", label: "Field safety", href: "/field-safety", slug: "fieldsafety:view", group: "safety" },
+  // Aufbereitung
+  { id: "reprocessing", label: "Reprocessing", href: "/reprocessing", slug: "reprocessing:view", group: "aufbereitung" },
+  // Strahlenschutz
+  { id: "constancy-cadence", label: "Constancy takt", href: "/constancy-cadence", slug: "duties:view", group: "radiation" },
+  // Behörde
+  { id: "authority", label: "Authority", href: "/authority", slug: "authority:view", group: "authority" },
+  // Stammdaten
   { id: "management", label: "Management", href: "/management", slug: "management:view", group: "master" },
   { id: "users", label: "Users", href: "/users", slug: "users:view", group: "master" },
   { id: "catalog", label: "Catalog", href: "/catalog", slug: "catalog:view", group: "master" },
   { id: "locations", label: "Locations", href: "/locations", slug: "locations:view", group: "master" },
   { id: "roles", label: "Roles", href: "/roles", slug: "roles:view", group: "master" },
-  { id: "activity", label: "Activity", href: "/activity", slug: "audit:view", group: "master" },
   { id: "security", label: "Security", href: "/security", slug: "account:security", group: "master" },
+  // Ausgabe
+  { id: "activity", label: "Activity", href: "/activity", slug: "audit:view", group: "output" },
   { id: "settings", label: "Settings", href: "/settings", slug: "settings:view" },
 ];
 
 /** Exact path → required resource slug (in addition to shell:nav for non-home). */
 export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/": "inventory:view",
+  "/dashboard": "duties:view",
+  "/dashboard/assignments": "roles:view",
   "/devices": "inventory:view",
   "/registration": "inventory:update",
   "/due-dates": "duties:view",
+  "/constancy-cadence": "duties:view",
+  "/duty-overlap": "duties:view",
   "/training": "training:view",
   "/catalog": "catalog:view",
   "/clarifications": "clarifications:view",
@@ -225,6 +277,11 @@ export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/activity": "audit:view",
   "/security": "account:security",
   "/settings": "settings:view",
+  "/incidents": "incidents:view",
+  "/field-safety": "fieldsafety:view",
+  "/device-book": "devicebook:view",
+  "/reprocessing": "reprocessing:view",
+  "/authority": "authority:view",
 };
 
 export const APP_HOME_PATH = "/";
@@ -263,6 +320,8 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   if (pathname.startsWith("/devices")) return "inventory:view";
   if (pathname.startsWith("/registration")) return "inventory:update";
   if (pathname.startsWith("/due-dates")) return "duties:view";
+  if (pathname.startsWith("/constancy-cadence")) return "duties:view";
+  if (pathname.startsWith("/duty-overlap")) return "duties:view";
   if (pathname.startsWith("/training")) return "training:view";
   if (pathname.startsWith("/catalog")) return "catalog:view";
   if (pathname.startsWith("/clarifications")) return "clarifications:view";
@@ -274,6 +333,12 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   if (pathname.startsWith("/activity")) return "audit:view";
   if (pathname.startsWith("/security")) return "account:security";
   if (pathname.startsWith("/settings")) return "settings:view";
+  if (pathname.startsWith("/dashboard")) return "duties:view";
+  if (pathname.startsWith("/incidents")) return "incidents:view";
+  if (pathname.startsWith("/field-safety")) return "fieldsafety:view";
+  if (pathname.startsWith("/device-book")) return "devicebook:view";
+  if (pathname.startsWith("/reprocessing")) return "reprocessing:view";
+  if (pathname.startsWith("/authority")) return "authority:view";
   return null;
 }
 

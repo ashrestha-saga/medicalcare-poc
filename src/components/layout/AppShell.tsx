@@ -10,10 +10,13 @@ import { useSessionStore } from "@/store/sessionStore";
 import { useSites } from "@/components/hooks/location/useSites";
 import { OfflineBar } from "@/components/ui/OfflineBar";
 import { LocaleToggle } from "@/components/features/shared/LocaleToggle";
+import { AccountCornerMenu } from "@/components/layout/AccountCornerMenu";
 import { PartnerActingBar } from "@/components/layout/PartnerActingBar";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { api } from "@/lib/http/apiClient";
+import { ScanTabBar } from "@/components/features/scan/ScanTabBar";
 import { useCapturerInventoryUi } from "@/store/capturerInventoryStore";
+import { useCapturerScanNav } from "@/store/capturerScanNavStore";
 import {
   CatalogIcon,
   ClarificationsIcon,
@@ -36,8 +39,14 @@ import {
 import type { FormFactor, MenuModule, MenuModuleId } from "@/interfaces";
 import { APP_HOME_PATH } from "@/constants/permissions";
 
+/** Group order and labels match mockup v22 (`Überblick` … `Ausgabe`). */
 const CLINIC_NAV_GROUPS = [
+  { id: "overview" as const, labelKey: "groupOverview" as const },
   { id: "work" as const, labelKey: "groupWork" as const },
+  { id: "safety" as const, labelKey: "groupSafety" as const },
+  { id: "aufbereitung" as const, labelKey: "groupAufbereitung" as const },
+  { id: "radiation" as const, labelKey: "groupRadiation" as const },
+  { id: "authority" as const, labelKey: "groupAuthority" as const },
   { id: "master" as const, labelKey: "groupMaster" as const },
   { id: "output" as const, labelKey: "groupOutput" as const },
 ];
@@ -55,6 +64,8 @@ function AccountBar({
   onOpenInventory,
   showSecurity,
   showHome,
+  showScanTabs,
+  useCornerMenu,
 }: {
   subtitle?: string;
   showLogout?: boolean;
@@ -64,6 +75,10 @@ function AccountBar({
   onOpenInventory?: () => void;
   showSecurity?: boolean;
   showHome?: boolean;
+  /** Desktop capturer: Scan · Today · Inventory · Batches pills in the status bar. */
+  showScanTabs?: boolean;
+  /** Capturer chrome: 2FA / language / logout in hamburger corner menu. */
+  useCornerMenu?: boolean;
 }) {
   const t = useTranslations("nav");
   const tCap = useTranslations("capturer");
@@ -79,9 +94,13 @@ function AccountBar({
   const countLabel = inventoryCount == null ? "…" : String(inventoryCount);
   const roleKey = user?.role;
   const roleText = roleKey ? tRoles(roleKey) : "—";
+  const scanTabs = useCapturerScanNav((s) => s.tabs);
+  const scanActive = useCapturerScanNav((s) => s.active);
+  const setScanActive = useCapturerScanNav((s) => s.setActive);
+  const scanNavReady = showScanTabs && scanTabs.length > 0;
 
   return (
-    <div className="p-acctbar on">
+    <div className={["p-acctbar", "on", scanNavReady ? "p-acctbar--scan-tabs" : ""].filter(Boolean).join(" ")}>
       <div className="a">
         <b data-testid="current-user">
           {user?.name}
@@ -89,37 +108,53 @@ function AccountBar({
         </b>
         <span>{subtitle ?? t("delivery", { line: deliveryLine })}</span>
       </div>
-      {showHome && (
-        <Link href={APP_HOME_PATH} className="k" data-testid="capturer-home-link" title={t("home")}>
-          {t("home")}
-        </Link>
-      )}
-      {showInventory && onOpenInventory && (
-        <button
-          type="button"
-          className="k p-acctbar__inventory"
-          onClick={onOpenInventory}
-          data-testid="capturer-inventory-button"
-          title={tCap("buttonTitle")}
-        >
-          {tCap("button")}
-          <span className="p-acctbar__inventory-count">{countLabel}</span>
-        </button>
-      )}
-      {showSecurity && (
-        <Link href="/security" className="k" data-testid="capturer-security-link" title={tCap("security")}>
-          2FA
-        </Link>
-      )}
-      <span className="k" data-testid="user-role">
-        {roleText}
-      </span>
-      <LocaleToggle />
-      {showLogout && (
-        <button type="button" className="k" onClick={onSignOut} data-testid="sign-out" title={t("logout")}>
-          {t("logout")}
-        </button>
-      )}
+      <div className="p-acctbar__right">
+        {scanNavReady ? (
+          <ScanTabBar variant="top" tabs={scanTabs} active={scanActive} onChange={setScanActive} />
+        ) : null}
+        {showHome && (
+          <Link href={APP_HOME_PATH} className="k" data-testid="capturer-home-link" title={t("home")}>
+            {t("home")}
+          </Link>
+        )}
+        {showInventory && onOpenInventory && (
+          <button
+            type="button"
+            className="k p-acctbar__inventory"
+            onClick={onOpenInventory}
+            data-testid="capturer-inventory-button"
+            title={tCap("buttonTitle")}
+          >
+            {tCap("button")}
+            <span className="p-acctbar__inventory-count">{countLabel}</span>
+          </button>
+        )}
+        {useCornerMenu ? (
+          <AccountCornerMenu
+            showSecurity={showSecurity}
+            showLogout={showLogout}
+            onSignOut={onSignOut}
+            roleText={roleText}
+          />
+        ) : (
+          <>
+            {showSecurity && (
+              <Link href="/security" className="k" data-testid="capturer-security-link" title={tCap("security")}>
+                2FA
+              </Link>
+            )}
+            <span className="k" data-testid="user-role">
+              {roleText}
+            </span>
+            <LocaleToggle />
+            {showLogout && (
+              <button type="button" className="k" onClick={onSignOut} data-testid="sign-out" title={t("logout")}>
+                {t("logout")}
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -206,13 +241,17 @@ export function AppShell({
   useOnlineStatus();
 
   const showNav = checkPermission("shell:nav");
+  const isCapturerChrome = !showNav;
   const onHome = pathname === APP_HOME_PATH;
   const showCapturerInventory = !showNav && onHome && checkPermission("inventory:view");
   const showCapturerSecurity = !showNav && checkPermission("account:security");
   const showCapturerHome = !showNav && !onHome;
+  /** Desktop status-bar Scan tabs; phone/tablet use bottom bar — Inventory lives in those tabs. */
+  const showDesktopScanTabs = showCapturerInventory && form === "full";
   const inventoryCount = useCapturerInventoryUi((s) => s.count);
   const openInventory = useCapturerInventoryUi((s) => s.openPanel);
   const setInventoryCount = useCapturerInventoryUi((s) => s.setCount);
+  const scanNavEnabled = useCapturerScanNav((s) => s.enabled);
   const menu = showNav ? (permissionData?.menu ?? []) : [];
   const primary = menu.filter((m) => m.id !== "settings");
   const settingsItem = menu.find((m) => m.id === "settings");
@@ -319,11 +358,13 @@ export function AppShell({
           subtitle={accountSubtitle}
           showLogout={!showNav}
           onSignOut={() => void signOut()}
-          showInventory={showCapturerInventory}
+          showInventory={false}
           inventoryCount={inventoryCount}
           onOpenInventory={openInventory}
           showSecurity={showCapturerSecurity}
           showHome={showCapturerHome}
+          showScanTabs={showDesktopScanTabs && scanNavEnabled}
+          useCornerMenu={isCapturerChrome}
         />
         <OfflineBar />
         {children}

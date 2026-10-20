@@ -25,6 +25,7 @@ import type { CapturedArticle } from "@prisma/client";
 import { inspectionTagsFromFlags } from "@/lib/inspectionTags";
 import { parseJson } from "@/lib/json";
 import { deriveMaintenanceStatus } from "@/lib/maintenance/schedule";
+import { isReprocessingEquipmentDevice } from "@/services/registration/reprocessingLinkService";
 
 export { inspectionTagsFromFlags };
 
@@ -151,6 +152,10 @@ export function toDeviceInstanceDTO(row: DeviceInstanceWithRelations): DeviceIns
     maintenanceStatus: deriveMaintenanceStatus(row.nextMaintenanceDueAt),
     classification,
     inspectionTags: inspectionTagsFromFlags(classification),
+    isReprocessingEquipment: isReprocessingEquipmentDevice({
+      productKindCode: row.productKindCode,
+      characteristicsJson: row.characteristicsJson,
+    }),
     catalogPending: Boolean(modelState && modelState !== "released"),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -396,7 +401,9 @@ export function toSiteDTO(row: {
   code: string | null;
   address: string | null;
   deliveryAddress: string | null;
+  stateCode?: string | null;
   areas: { id: string; name: string; _count?: { instances: number } }[];
+  mpsbStatus?: "appointed" | "missing";
 }): SiteDTO {
   return {
     id: row.id,
@@ -404,7 +411,9 @@ export function toSiteDTO(row: {
     code: row.code,
     address: row.address,
     deliveryAddress: row.deliveryAddress,
+    stateCode: row.stateCode ?? null,
     areas: row.areas.map((a) => ({ id: a.id, name: a.name })),
     deviceCount: row.areas.reduce((sum, a) => sum + (a._count?.instances ?? 0), 0),
+    ...(row.mpsbStatus ? { mpsbStatus: row.mpsbStatus } : {}),
   };
 }

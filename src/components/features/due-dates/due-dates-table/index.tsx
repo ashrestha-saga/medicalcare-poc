@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
 import { useDueDatesColumns } from "@/components/hooks/due-dates/useDueDatesColumns";
@@ -10,42 +10,53 @@ type ListApi = ReturnType<typeof useDueDatesList>;
 
 export function DueDatesTable({ list }: { list: ListApi }) {
   const tFilters = useTranslations("filters");
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeywordInput] = useState(list.q);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const columns = useDueDatesColumns({
     canAssign: list.canAssign,
     assigningId: list.assigningId,
     onAssign: (id) => void list.createAssignment(id),
   });
 
-  const filtered = keyword.trim()
-    ? list.rows.filter((row) => {
-        const q = keyword.trim().toLowerCase();
-        return [
-          row.deviceName,
-          row.inventoryNumber,
-          row.inspectionTypeLabel,
-          row.basisText,
-          row.deadlineAnchorLabel,
-          row.assignment?.reference ?? "",
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(q);
-      })
-    : list.rows;
+  useEffect(() => {
+    setKeywordInput(list.q);
+  }, [list.q]);
+
+  useEffect(() => {
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, []);
+
+  const setKeyword = useCallback(
+    (value: string) => {
+      setKeywordInput(value);
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+      searchTimer.current = setTimeout(() => {
+        list.setQ(value);
+      }, 280);
+    },
+    [list],
+  );
+
+  const removeKeyword = useCallback(() => {
+    setKeywordInput("");
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    list.setQ("");
+  }, [list]);
 
   return (
     <DataTable
-      data={filtered}
+      data={list.rows}
       columns={columns}
       search
       visibility
       displayPagination
       keyword={keyword}
       setKeyword={setKeyword}
-      removeKeyword={() => setKeyword("")}
+      removeKeyword={removeKeyword}
       isLoading={list.loading}
-      totalItems={filtered.length}
+      totalItems={list.rows.length}
       getRowId={(row) => row.id}
       emptyMessage="No frozen duties with due dates yet. Release a device or reclassify a model."
       searchPlaceholder={tFilters("searchDueDates")}

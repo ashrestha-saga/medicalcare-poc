@@ -16,6 +16,11 @@ import {
   samePermissionSet,
   sanitizeClinicPermissions,
 } from "@/services/roles/roleGrantsService";
+import {
+  parseInviteAreaIds,
+  resolveAreaAssignmentInput,
+  syncUserAreaAssignments,
+} from "@/services/users/userAreaScope";
 import type { Prisma } from "@prisma/client";
 
 const clinicStaff = (tenantId: string) =>
@@ -38,10 +43,15 @@ function toAdminUserDTO(row: {
   status?: AdminUserDTO["status"];
   invitationId?: string | null;
   expiresAt?: string | null;
+  homeAreaId?: string | null;
+  areaIds?: string[];
 }): AdminUserDTO {
   const role = (USER_ROLES.includes(row.role as UserRole) ? row.role : DEFAULT_USER_ROLE) as UserRole;
   const status =
     row.status ?? (row.active ? ("active" as const) : ("inactive" as const));
+  const areaIds = [...new Set(row.areaIds ?? [])];
+  const homeAreaId = row.homeAreaId ?? null;
+  if (homeAreaId && !areaIds.includes(homeAreaId)) areaIds.unshift(homeAreaId);
   return {
     id: row.id,
     email: row.email,
@@ -50,11 +60,23 @@ function toAdminUserDTO(row: {
     active: row.active,
     status,
     permissions: row.permissions ?? null,
+    homeAreaId,
+    areaIds,
     invitationId: row.invitationId ?? null,
     expiresAt: row.expiresAt ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function areaIdsFromUser(row: {
+  homeAreaId: string | null;
+  areaAssignments?: { areaId: string }[];
+}): string[] {
+  const ids = new Set<string>();
+  if (row.homeAreaId) ids.add(row.homeAreaId);
+  for (const a of row.areaAssignments ?? []) ids.add(a.areaId);
+  return [...ids];
 }
 
 function parseInvitePermissions(raw: Prisma.JsonValue | null | undefined): PermissionSlug[] | null {
@@ -84,7 +106,10 @@ export const userAdminService = {
             }
           : {}),
       },
-      include: { permissions: { select: { permission: true } } },
+      include: {
+        permissions: { select: { permission: true } },
+        areaAssignments: { select: { areaId: true } },
+      },
       orderBy: [{ active: "desc" }, { name: "asc" }],
     });
 
@@ -97,6 +122,8 @@ export const userAdminService = {
         ...row,
         permissions: snap,
         status: row.active ? "active" : "inactive",
+        homeAreaId: row.homeAreaId,
+        areaIds: areaIdsFromUser(row),
       });
     });
 
@@ -118,8 +145,9 @@ export const userAdminService = {
       orderBy: { createdAt: "desc" },
     });
 
-    const invited: AdminUserDTO[] = invites.map((inv) =>
-      toAdminUserDTO({
+    const invited: AdminUserDTO[] = invites.map((inv) => {
+      const areaIds = parseInviteAreaIds(inv.areaIds);
+      return toAdminUserDTO({
         id: `invite:${inv.id}`,
         email: inv.email,
         name: inv.name?.trim() || inv.email,
@@ -131,8 +159,10 @@ export const userAdminService = {
         permissions: parseInvitePermissions(inv.permissions),
         invitationId: inv.id,
         expiresAt: inv.expiresAt.toISOString(),
-      }),
-    );
+        homeAreaId: inv.homeAreaId,
+        areaIds,
+      });
+    });
 
     return [...invited, ...users];
   },
@@ -152,6 +182,7 @@ export const userAdminService = {
         },
       });
       if (!inv) throw notFound("Invitation not found.");
+      const areaIds = parseInviteAreaIds(inv.areaIds);
       return toAdminUserDTO({
         id: `invite:${inv.id}`,
         email: inv.email,
@@ -164,12 +195,17 @@ export const userAdminService = {
         permissions: parseInvitePermissions(inv.permissions),
         invitationId: inv.id,
         expiresAt: inv.expiresAt.toISOString(),
+        homeAreaId: inv.homeAreaId,
+        areaIds,
       });
     }
 
     const row = await prisma.user.findFirst({
       where: { id, ...clinicStaff(ctx.tenantId), NOT: { email: { startsWith: "staff-" } } },
-      include: { permissions: { select: { permission: true } } },
+      include: {
+        permissions: { select: { permission: true } },
+        areaAssignments: { select: { areaId: true } },
+      },
     });
     if (!row) throw notFound("User not found.");
     const snap =
@@ -180,6 +216,8 @@ export const userAdminService = {
       ...row,
       permissions: snap,
       status: row.active ? "active" : "inactive",
+      homeAreaId: row.homeAreaId,
+      areaIds: areaIdsFromUser(row),
     });
   },
 
@@ -217,7 +255,13 @@ export const userAdminService = {
       );
       return created;
     });
-    return toAdminUserDTO({ ...row, permissions: null, status: row.active ? "active" : "inactive" });
+    return toAdminUserDTO({
+      ...row,
+      permissions: null,
+      status: row.active ? "active" : "inactive",
+      homeAreaId: row.homeAreaId,
+      areaIds: areaIdsFromUser(row),
+    });
   },
 
   async update(ctx: TenantContext, userId: string, input: UpdateUserInput): Promise<AdminUserDTO> {
@@ -225,7 +269,10 @@ export const userAdminService = {
     await ensureRoleGrantCache();
     const row = await prisma.user.findFirst({
       where: { id: userId, ...clinicStaff(ctx.tenantId) },
-      include: { permissions: { select: { permission: true } } },
+      include: {
+        permissions: { select: { permission: true } },
+        areaAssignments: { select: { areaId: true } },
+      },
     });
     if (!row) throw notFound("User not found.");
 
@@ -235,6 +282,22 @@ export const userAdminService = {
       if (input.permissions !== undefined) {
         throw unprocessable("You cannot change your own permissions.");
       }
+      if (input.areaIds !== undefined || input.homeAreaId !== undefined) {
+        throw unprocessable("You cannot change your own work areas.");
+      }
+    }
+
+    let resolvedAreas: Awaited<ReturnType<typeof resolveAreaAssignmentInput>> | undefined;
+    if (input.areaIds !== undefined || input.homeAreaId !== undefined) {
+      const baseIds =
+        input.areaIds ?? areaIdsFromUser(row);
+      resolvedAreas = await resolveAreaAssignmentInput(ctx.tenantId, {
+        areaIds: baseIds,
+        homeAreaId: input.homeAreaId !== undefined ? input.homeAreaId : row.homeAreaId,
+        role: input.role,
+      });
+    } else if (input.role === "user" && areaIdsFromUser(row).length === 0) {
+      throw unprocessable("Assign at least one work area for role User.", { field: "areaIds" });
     }
 
     if (row.role === "superadmin" && input.role !== "superadmin") {
@@ -288,11 +351,13 @@ export const userAdminService = {
       { name: row.name, role: row.role, active: row.active },
       next,
     );
+    const previousAreaIds = areaIdsFromUser(row);
     const updated = await prisma.$transaction(async (tx) => {
       const revoke =
         next.active !== row.active ||
         next.role !== row.role ||
-        nextSnapshot !== undefined
+        nextSnapshot !== undefined ||
+        resolvedAreas !== undefined
           ? { sessionsValidFrom: new Date() }
           : {};
       const saved = await tx.user.update({
@@ -319,6 +384,15 @@ export const userAdminService = {
         }
       }
 
+      if (resolvedAreas) {
+        await syncUserAreaAssignments(tx, {
+          tenantId: ctx.tenantId,
+          userId: row.id,
+          homeAreaId: resolvedAreas.homeAreaId,
+          areaIds: resolvedAreas.areaIds,
+        });
+      }
+
       const afterPerms =
         nextSnapshot === undefined
           ? previousEffective
@@ -326,6 +400,11 @@ export const userAdminService = {
       const permChanged =
         nextSnapshot !== undefined &&
         !samePermissionSet(previousEffective, afterPerms);
+      const areasChanged =
+        resolvedAreas !== undefined &&
+        (resolvedAreas.homeAreaId !== row.homeAreaId ||
+          resolvedAreas.areaIds.length !== previousAreaIds.length ||
+          resolvedAreas.areaIds.some((id) => !previousAreaIds.includes(id)));
 
       await recordAudit(
         {
@@ -337,10 +416,16 @@ export const userAdminService = {
           before: {
             ...(diff?.before ?? {}),
             ...(permChanged ? { permissions: previousEffective } : {}),
+            ...(areasChanged
+              ? { homeAreaId: row.homeAreaId, areaIds: previousAreaIds }
+              : {}),
           },
           after: {
             ...(diff?.after ?? {}),
             ...(permChanged ? { permissions: afterPerms } : {}),
+            ...(areasChanged && resolvedAreas
+              ? { homeAreaId: resolvedAreas.homeAreaId, areaIds: resolvedAreas.areaIds }
+              : {}),
           },
           required: true,
         },
@@ -353,8 +438,14 @@ export const userAdminService = {
       nextSnapshot !== undefined
         ? nextSnapshot
         : await getUserPermissionSnapshot(updated.id);
+    const refreshed = await prisma.user.findFirst({
+      where: { id: updated.id },
+      include: { areaAssignments: { select: { areaId: true } } },
+    });
     return toAdminUserDTO({
       ...updated,
+      homeAreaId: refreshed?.homeAreaId ?? null,
+      areaIds: refreshed ? areaIdsFromUser(refreshed) : [],
       permissions: snap,
       status: updated.active ? "active" : "inactive",
     });

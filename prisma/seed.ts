@@ -14,6 +14,8 @@ import { seedPartnerOrgs } from "./seeds/partnerOrgs";
 import { seedRegistrationRef } from "./seeds/registrationRef";
 import { seedStaffSkillsRefs } from "./seeds/staffSkillsRefs";
 import { seedPruefpartnerDemoEquipment, seedRefPruefpartner } from "./seeds/refPruefpartner";
+import { seedK1K10Ref } from "./seeds/seedK1K10Ref";
+import { seedK10Tiles } from "./seeds/seedK10Tiles";
 
 export const SEED = {
   tenantId: "demo-tenant",
@@ -70,6 +72,8 @@ export const SEED = {
 
 export async function seed(prisma: PrismaClient) {
   await seedRegistrationRef(prisma);
+  await seedK1K10Ref(prisma);
+  await seedK10Tiles(prisma);
   await seedRefPruefpartner(prisma);
 
   const tenant = await prisma.tenant.upsert({

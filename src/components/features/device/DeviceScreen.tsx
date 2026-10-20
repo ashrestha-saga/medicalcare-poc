@@ -8,12 +8,16 @@ import type {
   CatalogActionViewProps,
   CatalogModelViewProps,
   InventoryDeviceViewProps,
+  InventoryScanExtraAction,
 } from "@/interfaces";
 import { useCatalogAdopt } from "@/components/hooks/device/useCatalogAdopt";
+import { useInventoryCandidates } from "@/components/hooks/device/useInventoryCandidates";
 import { useRequestStore } from "@/store/requestStore";
 import { inspectionTagsFromFlags } from "@/lib/inspectionTags";
 import { intlLocale, type AppLocale } from "@/lib/locale";
+import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { DeviceHeader } from "./DeviceHeader";
+import { InventoryCandidatesView } from "./InventoryCandidatesView";
 import { InventoryLocationCheck } from "./InventoryLocationCheck";
 
 function formatFetchedAt(iso: string, locale: AppLocale): string {
@@ -180,32 +184,42 @@ function BeudamedExternalView({ resolution, onAdopt, onClose }: BeudamedExternal
   );
 }
 
-/** Stage 1 — device already in inventory: confirm place of use, then service / parts. */
-function InventoryDeviceView({ resolution, onService, onParts, onClose }: InventoryDeviceViewProps) {
+/** Stage 1 — device already in inventory: confirm place of use, then service / parts / K10 extras. */
+function InventoryDeviceView({
+  resolution,
+  onService,
+  onParts,
+  onClose,
+  onExtraAction,
+}: InventoryDeviceViewProps) {
   const t = useTranslations("device");
+  const tActions = useTranslations("scan.device.actions");
+  const { checkPermission } = usePermissions();
   const device = resolution.device!;
   const siteId = useRequestStore((s) => s.form.siteId);
   const [locError, setLocError] = useState<string | null>(null);
 
   const inv = device.inventoryNumber;
   const tags = inspectionTagsFromFlags(device.classification ?? null);
+  const canStoerung = Boolean(onExtraAction) && checkPermission("devicebook:view");
+  const canReproc = Boolean(onExtraAction) && checkPermission("reprocessing:view");
+  const showEquipmentActions = canReproc && device.isReprocessingEquipment;
+  const showIfu = Boolean(onExtraAction);
 
-  const goService = () => {
+  const requireSite = (next: () => void) => {
     if (!siteId.trim()) {
       setLocError(t("selectSiteError"));
       return;
     }
     setLocError(null);
-    onService();
+    next();
   };
 
-  const goParts = () => {
-    if (!siteId.trim()) {
-      setLocError(t("selectSiteError"));
-      return;
-    }
+  const goService = () => requireSite(onService);
+  const goParts = () => requireSite(onParts);
+  const goExtra = (action: InventoryScanExtraAction) => {
     setLocError(null);
-    onParts();
+    onExtraAction?.(action);
   };
 
   return (
@@ -254,12 +268,55 @@ function InventoryDeviceView({ resolution, onService, onParts, onClose }: Invent
           <b>{t("orderSpareParts")}</b>
           <span>{t("orderSparePartsHint")}</span>
         </button>
+        {canStoerung ? (
+          <button
+            type="button"
+            className="p-big"
+            onClick={() => goExtra("stoerung")}
+            data-testid="inventory-report-malfunction"
+          >
+            <b>{tActions("stoerung")}</b>
+            <span>{tActions("stoerungHint")}</span>
+          </button>
+        ) : null}
+        {showIfu ? (
+          <button type="button" className="p-big" onClick={() => goExtra("ifu")} data-testid="inventory-ifu">
+            <b>{tActions("ifu")}</b>
+            <span>{tActions("ifuMissing")}</span>
+          </button>
+        ) : null}
+        {showEquipmentActions ? (
+          <button
+            type="button"
+            className="p-big"
+            onClick={() => goExtra("routine")}
+            data-testid="inventory-daily-check"
+          >
+            <b>{tActions("routine")}</b>
+            <span>{tActions("routineHint")}</span>
+          </button>
+        ) : null}
+        {showEquipmentActions ? (
+          <button
+            type="button"
+            className="p-big"
+            onClick={() => goExtra("charge")}
+            data-testid="inventory-batches"
+          >
+            <b>{tActions("batches")}</b>
+            <span>{tActions("batchesDoneHint")}</span>
+          </button>
+        ) : null}
       </div>
     </div>
   );
 }
 
-export function DeviceScreen() {
+export function DeviceScreen({
+  onInventoryExtraAction,
+}: {
+  onInventoryExtraAction?: (action: InventoryScanExtraAction) => void;
+} = {}) {
   const t = useTranslations("device");
   const {
     resolution,
@@ -268,6 +325,7 @@ export function DeviceScreen() {
     isCatalogModel,
     isBeudamed,
     isInventory,
+    isInventoryCandidates,
     catalogAdopted,
     adoptCatalog,
     backFromActions,
@@ -275,6 +333,20 @@ export function DeviceScreen() {
     openParts,
     reset,
   } = useCatalogAdopt();
+  const candidates = useInventoryCandidates();
+
+  if (isInventoryCandidates && resolution) {
+    return (
+      <InventoryCandidatesView
+        resolution={resolution}
+        onSelect={(id) => void candidates.selectDevice(id)}
+        onSkip={candidates.skipCandidates}
+        onClose={reset}
+        selecting={candidates.selecting}
+        selectError={candidates.selectError}
+      />
+    );
+  }
 
   if (isCatalogModel && resolution) {
     if (!catalogAdopted) {
@@ -308,6 +380,7 @@ export function DeviceScreen() {
         onService={continueToServiceRequest}
         onParts={openParts}
         onClose={reset}
+        onExtraAction={onInventoryExtraAction}
       />
     );
   }

@@ -10,6 +10,7 @@ describe("dutyKeys", () => {
     expect(canonicalDutyKey("zub-0")).toBe("zubehoer");
     expect(canonicalDutyKey("konstanz-aufnahme")).toBe("konstanz");
     expect(canonicalDutyKey("netz")).toBe("vernetzung");
+    expect(canonicalDutyKey("dguv")).toBe("dguv");
   });
 
   it("normalizes interval units and legacy guess confidence", () => {

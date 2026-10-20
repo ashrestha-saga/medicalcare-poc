@@ -14,6 +14,9 @@ export const createClinicInviteSchema = z.object({
   role: userRoleSchema,
   /** Optional full permission snapshot; omit/null ⇒ redeem uses role RoleGrant only. */
   permissions: z.array(permissionSlugSchema).optional().nullable(),
+  /** Work areas for Scan / inventory scope. Required when role is user. */
+  areaIds: z.array(z.string().trim().min(1)).optional().nullable(),
+  homeAreaId: z.string().trim().min(1).optional().nullable(),
 });
 
 export const createPartnerInviteSchema = z.object({

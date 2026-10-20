@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { SUPERADMIN_LOCKED_PERMISSIONS } from "@/constants/permissions";
@@ -145,6 +146,7 @@ function RoleEditor({
 /** DB-backed role catalog — editable with roles:update (Phase B). */
 export function RolesScreen() {
   const t = useTranslations("pages.roles");
+  const tDash = useTranslations("pages.dashboard");
   const tCommon = useTranslations("common");
   const {
     roles,
@@ -172,6 +174,11 @@ export function RolesScreen() {
     <div className="p-work" data-testid="roles-page">
       <main className="p-main">
         <ListPageShell title={t("title")} description={t("description")}>
+          <p className="mb-4 text-sm">
+            <Link href="/dashboard/assignments" className="underline" data-testid="roles-tile-assignments-link">
+              {tDash("tileAssignments")}
+            </Link>
+          </p>
           {loading ? (
             <div className="p-wait">
               <Spinner />

@@ -85,6 +85,8 @@ export interface DeviceInstanceDTO {
    * from open model classification on the linked DeviceModel.
    */
   inspectionTags: string[];
+  /** True when this exemplar is reprocessing equipment (Aufbereitungsgerät). */
+  isReprocessingEquipment: boolean;
   /** True when linked catalog model is not yet released. */
   catalogPending: boolean;
   createdAt?: string;
@@ -149,7 +151,11 @@ export interface SiteDTO {
   address: string | null;
   /** Goods receiving — spare parts; distinct from deployment address. */
   deliveryAddress: string | null;
+  /** ISO Bundesland e.g. DE-NW for authority checklists. */
+  stateCode: string | null;
   areas: { id: string; name: string }[];
   /** Devices mapped via areas under this site. */
   deviceCount: number;
+  /** Current § 6 safety officer appointment status when enriched. */
+  mpsbStatus?: "appointed" | "missing";
 }

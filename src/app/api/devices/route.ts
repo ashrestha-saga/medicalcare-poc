@@ -20,7 +20,9 @@ export async function GET(req: Request) {
       const q = params.get("q") ?? undefined;
       const siteId = params.get("siteId") ?? undefined;
       const room = params.get("room") ?? undefined;
-      const devices = await deviceInventoryService.list(ctx, { q, siteId, room });
+      const state = params.get("state") ?? undefined;
+      const mineArea = params.get("mineArea") === "1";
+      const devices = await deviceInventoryService.list(ctx, { q, siteId, room, state, mineArea });
       return Response.json({ devices }, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {

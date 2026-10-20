@@ -1,7 +1,15 @@
 import type { DeviceInstanceDTO, DeviceModelDTO } from "./device";
 
-/** FA-100 — the four stages, in order. */
-export type ResolutionStage = "inventory" | "catalog" | "beudamed" | "capture";
+/**
+ * FA-100 — stages in order.
+ * `inventory-candidates` = GTIN matched several inventory exemplars; user picks or skips.
+ */
+export type ResolutionStage =
+  | "inventory"
+  | "inventory-candidates"
+  | "catalog"
+  | "beudamed"
+  | "capture";
 /** @deprecated Prefer ResolutionStage */
 export type ResolveStage = ResolutionStage;
 
@@ -40,4 +48,11 @@ export interface ResolveResponse {
   model?: DeviceModelDTO;
   source: ResolveSource;
   correlationId: string;
+  /**
+   * GTIN/UDI hit several inventory exemplars.
+   * User picks one (→ select) or skips (→ `continueWithoutSelection`).
+   */
+  candidates?: DeviceInstanceDTO[];
+  /** Precomputed catalog/BEUDAMED/capture path when the user declines the picker. */
+  continueWithoutSelection?: ResolveResponse;
 }

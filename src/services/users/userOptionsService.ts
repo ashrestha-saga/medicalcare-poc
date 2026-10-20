@@ -27,7 +27,13 @@ function toOption(row: {
  */
 export const userOptionsService = {
   async list(ctx: TenantWorkContext, query: UserOptionsQuery = {}): Promise<UserOptionDTO[]> {
-    requirePermission(ctx, "inventory:view", "inventory:update", "requests:create");
+    requirePermission(
+      ctx,
+      "inventory:view",
+      "inventory:update",
+      "requests:create",
+      "incidents:manage",
+    );
 
     const roles =
       query.roles?.filter((r) => USER_ROLES.includes(r)) ??

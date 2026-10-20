@@ -9,9 +9,9 @@ import type { CapturedArticleDTO, InventarizeOffer, ResolveResponse, ServiceRequ
  *
  * idle → resolving | manual-entry
  * manual-entry → resolving | idle
- * resolving → device (inventory/catalog/beudamed) | manual-capture (capture)
+ * resolving → device (inventory/catalog/beudamed/candidates) | manual-capture (capture)
  * manual-capture → device | idle
- * device → service-request | parts | idle
+ * device → service-request | parts | idle | manual-capture | device (candidate skip / re-resolve)
  * service-request → submitting | queued | device
  * submitting → success | queued
  * queued → success | idle
@@ -77,7 +77,7 @@ const ALLOWED: Record<WorkflowPhase, WorkflowPhase[]> = {
   "manual-entry": ["resolving", "idle"],
   resolving: ["device", "manual-capture", "idle"],
   "manual-capture": ["device", "idle"],
-  device: ["service-request", "parts", "idle"],
+  device: ["service-request", "parts", "idle", "manual-capture", "device"],
   "service-request": ["submitting", "queued", "device", "idle"],
   parts: ["submitting", "queued", "device", "idle"],
   submitting: ["success", "queued", "service-request", "parts"],

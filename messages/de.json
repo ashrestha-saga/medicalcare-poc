@@ -3,6 +3,14 @@
     "inventory": "Bestand",
     "registration": "Erstanlage",
     "due-dates": "Fristen",
+    "dashboard": "Dashboard",
+    "constancy-cadence": "Konstanz-Takt",
+    "duty-overlap": "Pflichtüberlappung",
+    "incidents": "Vorkommnisse",
+    "field-safety": "Rückrufe",
+    "device-book": "MP-Buch",
+    "reprocessing": "Aufbereitung",
+    "authority": "Begehung",
     "training": "Einweisung",
     "catalog": "Katalog",
     "clarifications": "Klärungen",
@@ -18,6 +26,10 @@
     "expand": "Navigation öffnen",
     "collapse": "Navigation schließen",
     "logout": "Abmelden",
+    "accountMenu": "Kontomenü",
+    "language": "Sprache",
+    "inSync": "synchron",
+    "offline": "offline",
     "delivery": "Lieferung: {line}",
     "subtitleInventory": "Gerätebestand",
     "subtitleCatalog": "Modellkatalog",
@@ -34,7 +46,12 @@
     "subtitleClarifications": "Klärungen",
     "subtitleSecurity": "Sicherheit",
     "home": "Start",
+    "groupOverview": "Überblick",
     "groupWork": "Arbeit",
+    "groupSafety": "Sicherheit",
+    "groupAufbereitung": "Aufbereitung",
+    "groupRadiation": "Strahlenschutz",
+    "groupAuthority": "Behörde",
     "groupMaster": "Stammdaten",
     "groupOutput": "Ausgabe"
   },
@@ -565,12 +582,379 @@
       "title": "Aufträge",
       "description": "Verlauf und offene Instandhaltungsaufträge"
     },
+    "deviceBook": {
+      "title": "Medizinproduktebuch",
+      "description": "§ 13 MPBetreibV — zusammengesetzt aus Bestand, Pflichten, Einweisung, Bucheinträgen, Vorkommnissen und IFU-Nachweisen. Kein zweites Lager.",
+      "denied": "Sie haben keine Berechtigung, das Medizinproduktebuch anzusehen.",
+      "loading": "Laden…",
+      "empty": "Keine buchpflichtigen Geräte (STK- oder MTK-Klassifikation erforderlich).",
+      "notFound": "Für dieses Exemplar wurde kein Buch gefunden.",
+      "count": "{shown} von {total} Geräten",
+      "search": {
+        "label": "Suche",
+        "placeholder": "Name, Inventar, Serie, GTIN / UDI, Bereich…",
+        "noMatch": "Keine Geräte passen zur Suche."
+      },
+      "col": {
+        "inventory": "Inventar",
+        "name": "Bezeichnung",
+        "serial": "Serie",
+        "place": "Bereich / Raum",
+        "ifu": "GA / IFU"
+      },
+      "ifu": {
+        "label": "Gebrauchsanweisung",
+        "present": "GA vorhanden",
+        "missing": "GA fehlt",
+        "empty": "Keine Gebrauchsanweisung / IFU für dieses Exemplar hinterlegt.",
+        "uploadTitle": "GA hochladen oder verknüpfen",
+        "externalRef": "Externe Referenz",
+        "externalPlaceholder": "z. B. Herstellerportal-URL oder Dokument-ID"
+      },
+      "sections": {
+        "documents": "Dokumente",
+        "identity": "Identität und Inventarnummer",
+        "inspections": "Prüfungen mit Datum und Durchführendem",
+        "instruction": "Einweisung und eingewiesene Personen",
+        "malfunctions": "Störungen und Bedienungsfehler",
+        "incidents": "Vorkommnis-Meldungen"
+      },
+      "duty": {
+        "duty": "Pflicht",
+        "basis": "Grundlage",
+        "last": "Zuletzt",
+        "next": "Nächste"
+      },
+      "emptyDuties": "Keine Prüfungspflichten erfasst.",
+      "emptyTrainings": "Keine Einweisung für dieses Modell erfasst.",
+      "emptyEntries": "Keine Einträge.",
+      "emptyIncidents": "Keine Vorkommnisse erfasst.",
+      "instructor": "Einweisender",
+      "consequence": "Folge",
+      "incident": {
+        "unassessed": "nicht bewertet",
+        "reported": "gemeldet",
+        "unreported": "meldepflichtig, nicht gemeldet",
+        "notSerious": "nicht schwerwiegend"
+      },
+      "actions": {
+        "back": "Zurück zur Liste",
+        "openIfu": "Öffnen",
+        "uploadFile": "Datei hochladen",
+        "saveRef": "Referenz speichern"
+      }
+    },
+    "constancyCadence": {
+      "title": "Takt der Konstanzprüfungen",
+      "description": "§ 115 StrlSchV begründet die Pflicht je Prüfgegenstand. Der Abstand ist eine Festlegung des Betreibers — ohne Takt bleibt dueAt null (Takt festzulegen). QS-RL-Text ist Vorschlag, nie eingefrorene Frist.",
+      "denied": "Sie haben keine Berechtigung, den Konstanz-Takt anzusehen.",
+      "loading": "Laden…",
+      "empty": "Keine Prüfgegenstände im Umfang.",
+      "notSet": "nicht festgelegt",
+      "notSetHint": "QS-RL „{cadence}“ ist noch keine Frist",
+      "kpi": {
+        "objects": "Prüfgegenstände",
+        "objectsHint": "an Geräten mit Strahlung",
+        "missing": "Ohne Takt",
+        "missingHint": "Pflicht ohne Termin",
+        "set": "Festgelegt",
+        "setHint": "mit Grundlage und Datum"
+      },
+      "banner": {
+        "title": "{count, plural, one {# Prüfgegenstand hat keinen festgelegten Takt.} other {# Prüfgegenstände haben keinen festgelegten Takt.}}",
+        "body": "Bis der Takt festliegt, erscheinen sie als fällig ohne Termin — nicht als überfällig und nicht als erfüllt."
+      },
+      "col": {
+        "device": "Gerät",
+        "object": "Prüfgegenstand",
+        "interval": "Abstand",
+        "basis": "Grundlage",
+        "determined": "Festgelegt"
+      },
+      "unit": {
+        "months": "Monate",
+        "years": "Jahre"
+      },
+      "role": {
+        "superadmin": "Superadmin",
+        "device_admin": "Gerätebeauftragter",
+        "security_officer": "Medizinprodukte-Sicherheitsbeauftragter",
+        "user": "Benutzer"
+      },
+      "form": {
+        "title": "Takt festlegen · {object}",
+        "hint": "Die Qualitätssicherungs-Richtlinie nennt „{cadence}“. Das ist ein Vorschlag — keine Frist — bis Sie bestätigen oder einen anderen Abstand wählen.",
+        "interval": "Abstand",
+        "unit": "Einheit",
+        "basis": "Grundlage der Festlegung",
+        "basisPlaceholder": "Etwa: QS-RL Röntgendiagnostik, Abschnitt zur Konstanzprüfung",
+        "basisPrefill": "Qualitätssicherungs-Richtlinie: {cadence}",
+        "basisNote": "Eine Festlegung ohne Grundlage ist in der Begehung nicht vorzeigbar.",
+        "determinedBy": "Festgelegt von",
+        "determinedAt": "Festgelegt am"
+      },
+      "actions": {
+        "set": "Takt festlegen",
+        "save": "Speichern",
+        "cancel": "Abbrechen"
+      }
+    },
+    "reprocessing": {
+      "title": "Ausführungsnachweise der Aufbereitung",
+      "description": "§ 8 MPBetreibV verlangt ein geeignetes validiertes Verfahren. Die Validierung ist eine Pflicht am Gerät und steht dort. Hier steht, was die Ausführung belegt: die Routinekontrollen nach ihrem Takt und die Chargen mit ihrer Freigabe. Eine Charge ohne Freigabeentscheidung ist weder freigegeben noch gesperrt, und genau dieser Zustand ist der gefährliche.",
+      "denied": "Sie haben keine Berechtigung, Ausführungsnachweise anzusehen.",
+      "loading": "Laden…",
+      "emptyChecks": "Für diesen Bereich sind keine Kontrollen hinterlegt.",
+      "emptyBatches": "Keine Chargen erfasst.",
+      "value": "Wert",
+      "limit": "Grenze",
+      "noLimit": "kein Grenzwert hinterlegt",
+      "site": "Standort {name}",
+      "protocol": "Protokoll",
+      "itemsCount": "{count, plural, one {# Posten} other {# Posten}}",
+      "kpi": {
+        "openToday": "heute offen",
+        "unreleased": "Chargen ohne Freigabe",
+        "failed": "Beanstandet",
+        "blocked": "Chargen gesperrt"
+      },
+      "banner": {
+        "unevaluatedTitle": "{count, plural, one {# Messwert ist erfasst, aber nicht bewertet.} other {# Messwerte sind erfasst, aber nicht bewertet.}}",
+        "unevaluatedBody": "Der Wert allein sagt nicht, ob der Grenzwert eingehalten ist. Wo kein Grenzwert hinterlegt ist, kann das System die Bewertung nicht nachholen."
+      },
+      "tabs": {
+        "equipment": "Aufbereitungsgeräte",
+        "water": "Wasser und Chemie",
+        "sterile": "Sterilgutlagerung",
+        "batches": "Chargen"
+      },
+      "col": {
+        "check": "Kontrolle",
+        "cadence": "Takt",
+        "basis": "Grundlage",
+        "last": "Zuletzt",
+        "stand": "Stand",
+        "batch": "Charge",
+        "deviceProg": "Gerät und Programm",
+        "run": "Lauf",
+        "items": "Inhalt",
+        "release": "Freigabe"
+      },
+      "cadence": {
+        "daily": "arbeitstäglich",
+        "per_batch": "je Charge",
+        "per_use": "je Anwendung",
+        "weekly": "wöchentlich",
+        "monthly": "monatlich",
+        "quarterly": "vierteljährlich",
+        "yearly": "jährlich"
+      },
+      "stand": {
+        "ok": "erfüllt",
+        "openToday": "heute offen",
+        "never": "kein Nachweis",
+        "overdue": "überfällig",
+        "overdueHint": "{age} Tage, Takt {days}",
+        "event": "je Ereignis",
+        "eventHint": "nicht datumsbezogen",
+        "failed": "beanstandet",
+        "unevaluated": "nicht bewertet"
+      },
+      "batch": {
+        "noDecision": "keine Entscheidung",
+        "released": "freigegeben",
+        "conditional": "mit Auflagen",
+        "blocked": "gesperrt"
+      },
+      "actions": {
+        "decide": "Freigabe entscheiden",
+        "save": "Speichern",
+        "cancel": "Abbrechen"
+      },
+      "release": {
+        "title": "Chargenfreigabe",
+        "released": "Freigeben",
+        "conditional": "Mit Auflagen",
+        "rejected": "Ablehnen",
+        "noteRequired": "Notiz (erforderlich)",
+        "noteOptional": "Notiz (optional)"
+      }
+    },
+    "fieldSafety": {
+      "title": "Rückrufe und Sicherheitskorrekturmaßnahmen",
+      "description": "Kommt von außen herein und betrifft Modelle, nicht Exemplare. Welche Exemplare betroffen sind, entsteht als Abgleich gegen den Bestand. Der Abgleich ist eine Abfrage, sein Ergebnis ein Datensatz.",
+      "denied": "Sie haben keine Berechtigung, Rückrufe anzusehen.",
+      "loading": "Laden…",
+      "empty": "Keine Rückrufe in dieser Ansicht.",
+      "noDevices": "Noch keine Geräte im Abgleich — Modelle hinzufügen und vorschlagen, oder Geräte hinzufügen.",
+      "requiredAction": "Verlangte Maßnahme.",
+      "scopeLabel": "Umfang:",
+      "status": {
+        "open": "offen",
+        "closed": "geschlossen"
+      },
+      "affected": {
+        "yes": "betroffen",
+        "no": "nicht betroffen",
+        "check": "noch zu prüfen"
+      },
+      "views": {
+        "all": "Alle",
+        "open": "Offen",
+        "unmatched": "Ohne Abgleich"
+      },
+      "col": {
+        "device": "Gerät",
+        "affected": "Betroffen",
+        "done": "Erledigt",
+        "note": "Notiz"
+      },
+      "meta": {
+        "issued": "erlassen",
+        "received": "eingegangen",
+        "due": "Frist",
+        "closed": "geschlossen"
+      },
+      "banner": {
+        "unmatchedTitle": "{count, plural, one {# Gerät ist noch nicht geprüft.} other {# Geräte sind noch nicht geprüft.}}",
+        "unmatchedBody": "Ein Rückruf ohne abgeschlossenen Abgleich ist der gefährliche Zustand, nicht der mit betroffenen Geräten."
+      },
+      "actions": {
+        "record": "Rückruf eintragen",
+        "addModels": "Modelle",
+        "suggest": "Abgleich vorschlagen",
+        "addDevices": "Geräte",
+        "close": "Schließen",
+        "measureDone": "Maßnahme erledigt",
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "done": "Fertig",
+        "remove": "Entfernen"
+      },
+      "form": {
+        "createTitle": "Rückruf / FSCA eintragen",
+        "createHint": "Kommt von außen und betrifft Modelle. Modellumfänge schlagen Bestand vor; Geräte im Abgleich starten als „noch zu prüfen“.",
+        "reference": "Referenz",
+        "manufacturer": "Hersteller",
+        "titleField": "Titel",
+        "requiredAction": "Verlangte Maßnahme",
+        "scope": "Umfang (wie im Schreiben)",
+        "issued": "Erlassen",
+        "received": "Eingegangen",
+        "due": "Frist (optional)",
+        "models": "Betroffene Modelle (strukturiert)",
+        "modelsHint": "Nur Vorschlag — markiert Geräte nicht als betroffen.",
+        "devices": "Geräte für Abgleich (optional)",
+        "catalogModel": "Katalogmodell (optional)",
+        "noModels": "Keine Katalogmodelle geladen.",
+        "udi": "Basic UDI-DI (optional)",
+        "serialFrom": "Seriennummer von",
+        "serialTo": "Seriennummer bis",
+        "addScope": "Modellumfang hinzufügen",
+        "addModelsTitle": "Betroffene Modellumfänge",
+        "addModelsHint": "Strukturierter Umfang aus dem Schreiben. Danach Abgleich vorschlagen.",
+        "addDevicesTitle": "Geräte zum Abgleich",
+        "addDevicesHint": "Hinzugefügte Geräte starten als „noch zu prüfen“."
+      }
+    },
+    "incidents": {
+      "title": "Vorkommnisse",
+      "description": "Die Kernaufgabe des Beauftragten für Medizinproduktesicherheit nach § 6. Die Verordnung kennt die Frage, ob ein mutmaßlich schwerwiegendes Vorkommnis vorliegt — daran hängt die Meldepflicht. Es gibt keine Schweregradskala.",
+      "denied": "Sie haben keine Berechtigung, Vorkommnisse anzusehen.",
+      "loading": "Laden…",
+      "empty": "Keine Vorkommnisse in dieser Ansicht.",
+      "modelLevel": "Modellbezogen",
+      "assigned": "Zugewiesen: {name}",
+      "closed": "Geschlossen {date}",
+      "kpi": {
+        "unassessed": "Nicht bewertet",
+        "unassessedHint": "ohne Einschätzung der Schwere",
+        "unreported": "Meldepflichtig, offen",
+        "unreportedHint": "bejaht, aber nicht gemeldet",
+        "total": "Erfasst",
+        "totalHint": "insgesamt"
+      },
+      "banner": {
+        "unassessedTitle": "{count, plural, one {# Vorkommnis ist nicht bewertet.} other {# Vorkommnisse sind nicht bewertet.}}",
+        "unassessedBody": "Solange die Frage offen ist, läuft keine Meldefrist und es ist auch keine abgelaufen. Offen ist hier nicht derselbe Zustand wie unbedenklich."
+      },
+      "views": {
+        "all": "Alle",
+        "unassessed": "Nicht bewertet",
+        "unreported": "Ungemeldet",
+        "open": "Offen"
+      },
+      "col": {
+        "date": "Datum",
+        "device": "Gerät",
+        "incident": "Vorkommnis",
+        "severity": "Schwere",
+        "report": "Meldung"
+      },
+      "chip": {
+        "unassessed": "nicht bewertet",
+        "undecided": "noch nicht entschieden",
+        "serious": "mutmaßlich schwerwiegend",
+        "notSerious": "nicht schwerwiegend",
+        "unreported": "meldepflichtig, nicht gemeldet"
+      },
+      "report": {
+        "none": "keine Meldepflicht festgestellt",
+        "manufacturer": "Hersteller {date}"
+      },
+      "actions": {
+        "assess": "Bewerten",
+        "assign": "Zuweisen",
+        "close": "Schließen",
+        "save": "Speichern",
+        "cancel": "Abbrechen"
+      },
+      "mask": {
+        "title": "Vorkommnis bewerten · {code}",
+        "question": "Liegt ein mutmaßlich schwerwiegendes Vorkommnis vor?",
+        "yes": "ja — meldepflichtig",
+        "no": "nein",
+        "undecided": "noch nicht entschieden",
+        "hint": "Die Verordnung kennt keine Schweregradskala, sondern diese eine Frage. Solange sie offen ist, läuft keine Meldefrist.",
+        "reason": "Begründung *",
+        "assessedMeta": "Bewertet von {by} am {at}",
+        "assessedBy": "Bewertet von",
+        "assessedAt": "Bewertet am",
+        "assessedByPending": "Aktueller Benutzer ({role}) — wird beim Speichern gesetzt",
+        "reportSection": "Meldung",
+        "reportModelNote": "Diese Felder legen eine AuthorityNotification an. Das System überträgt nicht — Sie dokumentieren, dass eine benannte Person gemeldet hat.",
+        "recipient": "Empfänger",
+        "channel": "Weg",
+        "sentAt": "Abgesendet am",
+        "ref": "Aktenzeichen des Empfängers",
+        "manufacturerAt": "Hersteller benachrichtigt am",
+        "manufacturer": "Hersteller",
+        "both": "BfArM und Hersteller",
+        "choose": "— bitte wählen —",
+        "mpamivHint": "Keine Frist hinterlegt: § 3 MPAMIV verlangt unverzüglich und nennt keine Tageszahl. Alter seit Bekanntwerden: {days} Tage."
+      },
+      "channel": {
+        "portal": "Behördenportal",
+        "email": "E-Mail",
+        "post": "Post",
+        "fax": "Fax",
+        "other": "Sonstiges"
+      },
+      "assign": {
+        "title": "Vorkommnis zuweisen",
+        "hint": "Wer Bewertung oder Meldung schuldet (MPSB-Workflow).",
+        "user": "Zuständig",
+        "due": "Fällig (optional)"
+      }
+    },
     "dueDates": {
       "title": "Fristen",
       "description": "Aus den Pflichten freigegebener Geräte. Der Fristenanker wird angezeigt, weil er die Berechnung steuert — er ist nicht für jede Prüfart gleich.",
       "denied": "Sie haben keine Berechtigung, Fristen einzusehen.",
       "hintTitle": "Von der Frist zur Zuweisung.",
-      "hintBody": "Öffnen Sie eine Zeile, um einen Ausführenden zuzuweisen und einen Serviceauftrag anzulegen."
+      "hintBody": "Öffnen Sie eine Zeile, um einen Ausführenden zuzuweisen und einen Serviceauftrag anzulegen.",
+      "showingCount": "{shown} von {total} angezeigt",
+      "loadMore": "Mehr laden"
     },
     "training": {
       "title": "Einweisung",
@@ -664,6 +1048,283 @@
     "registration": {
       "title": "Erstanlage",
       "description": "Neues Gerät anlegen (Produktart, Merkmale, Pflichten)"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "Kachelkatalog nach Anwendungsrolle. Zone 1 zeigt höchstens drei dringende Kacheln; der Rest bleibt im Arbeitsvorrat erreichbar.",
+      "denied": "Das Dashboard erfordert Navigationszugriff.",
+      "tileAssignments": "Kacheln je Rolle",
+      "zones": {
+        "decides": "Entscheidet den Tag",
+        "worklist": "Arbeitsvorrat",
+        "watch": "Beobachtung"
+      },
+      "overview": {
+        "title": "Was geführt wird",
+        "subtitle": "Bestandsverzeichnis nach § 14 MPBetreibV · Stand {date}",
+        "footnote": "Diese Zahlen beschreiben das Verzeichnis, nicht das Haus. Ob Ihr Bestand vollständig erfasst ist, kann das System nicht wissen — es kennt nur, was eingetragen wurde.",
+        "segments": {
+          "released": "freigegeben",
+          "draft": "Entwurf",
+          "retired": "außer Betrieb",
+          "blocked": "gesperrt",
+          "validation": "Validierung",
+          "otherDuties": "andere Pflichten",
+          "classified": "mit Einstufung",
+          "missingClassification": "ohne",
+          "verified": "am Verordnungstext belegt",
+          "derived": "abgeleitet",
+          "appointed": "mit benanntem Beauftragten",
+          "missing": "ohne",
+          "malfunction": "Funktionsstörung",
+          "operating_error": "Bedienfehler",
+          "note": "Hinweis",
+          "cadenceSet": "Takt festgelegt",
+          "cadenceOpen": "offen"
+        }
+      },
+      "band": {
+        "title": "Wann es fällig wird",
+        "subtitle": "{count} Termine aus Fälligkeiten, Befunden und Rückrufen · Heute ist der {date}",
+        "overdue": "überschritten",
+        "within30": "in 30 Tagen",
+        "later": "später",
+        "today": "heute",
+        "daysLater": "+{days} T",
+        "daysEarlier": "{days} T",
+        "noDatesInRange": "kein Termin in diesem Zeitraum",
+        "laterCount": "{count} später",
+        "appointmentOne": "1 Termin",
+        "appointmentMany": "{count} Termine",
+        "none": "keiner",
+        "beyondRange": "{earlier} vor −{past} T · {later} nach +{future} T — an den Rändern gezählt, nicht aufgetragen.",
+        "horizonLabel": "Darstellungszeitraum ab heute",
+        "rangePast": "−{days} T",
+        "rangeFuture": "+{days} T",
+        "earlierCount": "{count} früher",
+        "daysOverdue": "{days} Tage überschritten",
+        "inDays": "in {days} Tagen",
+        "groups": {
+          "pruefung": "Prüfungen und Fristen",
+          "behoerde": "Behördliche Befunde",
+          "rueckruf": "Rückrufe"
+        }
+      },
+      "tile": {
+        "view": "ansehen",
+        "notRecorded": "nicht hinterlegt.",
+        "of": "von {count} {unit}"
+      },
+      "roles": {
+        "device_admin": "Gerätebeauftragte(r)",
+        "security_officer": "Sicherheitsbeauftragte(r)",
+        "user": "Anwenderin am Gerät",
+        "superadmin": "Verwaltung und Leitung"
+      },
+      "assignments": {
+        "title": "Kacheln je Rolle",
+        "description": "Vorbelegung aus dem Kachelkatalog je Anwendungsrolle. Jede Person mit dieser Rolle sieht dieselben Kacheln (gefiltert nach Rechten).",
+        "requiresRolesView": "Erfordert roles:view.",
+        "backDashboard": "← Dashboard",
+        "rolesLink": "Rollen",
+        "roleLabel": "Anwendungsrolle",
+        "rolePlaceholder": "Rolle wählen",
+        "pickRole": "Wählen Sie eine Rolle, um die Vorbelegung zu bearbeiten.",
+        "selectedCount": "{selected} von {total} Kacheln",
+        "overviewBadge": "Übersicht",
+        "save": "Rolle speichern",
+        "saving": "Speichern…",
+        "saved": "{role}: {count} Kacheln gespeichert."
+      },
+      "userHome": {
+        "title": "Mein Arbeitsplatz"
+      },
+      "tiles": {
+        "ueberfaellig": {
+          "title": "Überfällig",
+          "question": "Was ist schon zu spät?"
+        },
+        "faellig-30": {
+          "title": "Fällig in 30 Tagen",
+          "question": "Was muss ich jetzt beauftragen?"
+        },
+        "freigabe-blockiert": {
+          "title": "Freigabe blockiert",
+          "question": "Was liegt und kommt nicht weiter?"
+        },
+        "klaerliste": {
+          "title": "Klärliste",
+          "question": "Was fehlt woran?"
+        },
+        "fristen-ohne-beleg": {
+          "title": "Pflichten mit Termin",
+          "question": "Welche Fristen sind am Verordnungstext belegt?"
+        },
+        "auftraege-termin": {
+          "title": "Aufträge mit Termin",
+          "question": "Wer kommt wann?"
+        },
+        "bestand-zustand": {
+          "title": "Bestand nach Zustand",
+          "question": "Wie vollständig ist das Verzeichnis?"
+        },
+        "modelle-ohne-einstufung": {
+          "title": "Modelle im Katalog",
+          "question": "Wo fehlt die Grundlage?"
+        },
+        "vorkommnis-unbewertet": {
+          "title": "Vorkommnisse ohne Bewertung",
+          "question": "Was muss ich einschätzen?"
+        },
+        "vorkommnis-ungemeldet": {
+          "title": "Meldepflichtig, nicht gemeldet",
+          "question": "Wo läuft eine Frist gegen mich?"
+        },
+        "rueckruf-offen": {
+          "title": "Rückrufe offen",
+          "question": "Was hat der Hersteller verlangt?"
+        },
+        "rueckruf-abgleich": {
+          "title": "Rückruf ohne Bestandsabgleich",
+          "question": "Welche Geräte sind betroffen?"
+        },
+        "buch-stoerungen": {
+          "title": "Gerätebuch",
+          "question": "Häuft sich etwas?"
+        },
+        "mpsb-bestellung": {
+          "title": "Standorte",
+          "question": "Welche Standorte haben einen benannten Beauftragten?"
+        },
+        "mpsb-fehlt": {
+          "title": "Standorte ohne MPSB",
+          "question": "Wo fehlt ein Beauftragter?"
+        },
+        "implantat-doku": {
+          "title": "Implantatdokumentation offen",
+          "question": "Wo fehlt der Nachweis?"
+        },
+        "meine-geraete": {
+          "title": "Geräte in meinem Bereich",
+          "question": "Darf ich das benutzen?"
+        },
+        "meine-einweisungen": {
+          "title": "Meine Einweisungen",
+          "question": "Bin ich eingewiesen?"
+        },
+        "stoerung-melden": {
+          "title": "Störung melden",
+          "question": "Das Gerät geht nicht."
+        },
+        "gesperrte-geraete": {
+          "title": "Gesperrte Geräte im Bereich",
+          "question": "Warum steht das hier?"
+        },
+        "validierung-geraete": {
+          "title": "Validierung je Aufbereitungsgerät",
+          "question": "Ist die Maschine validiert?"
+        },
+        "routine-heute": {
+          "title": "Routinekontrollen heute",
+          "question": "Was ist arbeitstäglich zu tun?"
+        },
+        "charge-offen": {
+          "title": "Chargen ohne Freigabe",
+          "question": "Was darf nicht verwendet werden?"
+        },
+        "wasser-chemie": {
+          "title": "Wasser und Chemie",
+          "question": "Stimmen die Betriebsmittel?"
+        },
+        "sterilgut": {
+          "title": "Sterilgutlagerung",
+          "question": "Ist die Lagerung in Ordnung?"
+        },
+        "kopplung-historie": {
+          "title": "Kopplung Produkt zu Gerät",
+          "question": "Worauf läuft was, seit wann?"
+        },
+        "aufb-extern": {
+          "title": "Beauftragte Aufbereitung",
+          "question": "Wann habe ich den Dienstleister geprüft?"
+        },
+        "sachkunde-aufb": {
+          "title": "Sachkunde des Personals",
+          "question": "Wer darf aufbereiten?"
+        },
+        "konstanz-heute": {
+          "title": "Konstanzprüfung heute",
+          "question": "Was ist heute dran?"
+        },
+        "konstanz-takt-offen": {
+          "title": "Strahlenprüfobjekte",
+          "question": "Wofür fehlt die Festlegung?"
+        },
+        "bezugswerte": {
+          "title": "Bezugswerte gesetzt oder fehlend",
+          "question": "Kann ich überhaupt bewerten?"
+        },
+        "abnahme-offen": {
+          "title": "Abnahmeprüfung offen",
+          "question": "Was darf noch nicht in Betrieb?"
+        },
+        "aerztliche-stelle": {
+          "title": "Ärztliche Stelle",
+          "question": "Wann kommt die Anforderung?"
+        },
+        "sv-zulassung": {
+          "title": "Sachverständige und Zulassung",
+          "question": "Anzeige oder Genehmigung?"
+        },
+        "dguv-faellig": {
+          "title": "DGUV-Prüfung fällig",
+          "question": "Was verlangt der Arbeitsschutz?"
+        },
+        "dguv-ohne-festlegung": {
+          "title": "DGUV ohne Festlegung",
+          "question": "Deckt die STK sie ab, oder nicht?"
+        },
+        "befund-frist": {
+          "title": "Begehungsbefunde mit Frist",
+          "question": "Was hat die Behörde gesetzt?"
+        },
+        "befund-nachweis": {
+          "title": "Behoben, Nachweis fehlt",
+          "question": "Was ist zu belegen?"
+        },
+        "begehung-vorbereitung": {
+          "title": "Vorbereitungsmodus",
+          "question": "Was würde die Behörde vermissen?"
+        },
+        "auditfaehigkeit": {
+          "title": "Auditfähigkeit",
+          "question": "Würden wir eine Prüfung überstehen?"
+        },
+        "offene-punkte-standort": {
+          "title": "Offene Punkte je Standort",
+          "question": "Wo brennt es?"
+        },
+        "bestandsverzeichnis": {
+          "title": "Bestandsverzeichnis exportieren",
+          "question": "Der Prüfer sitzt im Haus."
+        },
+        "pruefungen-quartal": {
+          "title": "Prüfungen im nächsten Quartal",
+          "question": "Was kommt auf uns zu?"
+        },
+        "betreuung-zugriffe": {
+          "title": "Betreuung",
+          "question": "Wer sieht unsere Daten?"
+        },
+        "befaehigung-auslaufend": {
+          "title": "Auslaufende Befähigung",
+          "question": "Wen müssen wir schulen?"
+        },
+        "traegerschaft-luecke": {
+          "title": "Pflichten ohne Träger",
+          "question": "Was sieht niemand?"
+        }
+      }
     }
   },
   "roles": {
@@ -712,7 +1373,8 @@
     "requestServiceBusy": "Wird gestartet…",
     "button": "Bestand",
     "buttonTitle": "Bestandsverzeichnis",
-    "security": "Sicherheit"
+    "security": "Sicherheit",
+    "tagReprocessing": "Aufbereitung"
   },
   "inventarize": {
     "title": "Gerät zur Erstanlage anlegen",
@@ -808,7 +1470,10 @@
       "address": "Adresse",
       "deliveryAddress": "Lieferanschrift",
       "areas": "Bereiche",
-      "devices": "Geräte"
+      "devices": "Geräte",
+      "mpsb": "MPSB",
+      "mpsbAppointed": "Bestellt",
+      "mpsbMissing": "Fehlt"
     },
     "catalog": {
       "status": "Status",
@@ -908,7 +1573,27 @@
     "deliveryPlaceholder": "Straße, Nr., PLZ Ort — z. B. Warenannahme Haus B",
     "scopeMine": "Meine",
     "scopeOpen": "Offen",
-    "scopeAll": "Alle"
+    "scopeAll": "Alle",
+    "dutyKey": "Pflicht",
+    "horizon": "Horizont",
+    "horizonDays": "Nächste {days} Tage",
+    "confidence": "Beleg",
+    "confidenceUnverified": "Nicht belegt",
+    "confidenceVerified": "Belegt",
+    "mineArea": "Mein Bereich",
+    "mineAreaActive": "Nur Heimatbereich",
+    "stateDraft": "Entwurf",
+    "stateReview": "Prüfung",
+    "stateReleased": "Freigegeben",
+    "stateRetired": "Außer Betrieb",
+    "stateNotReleased": "Nicht freigegeben",
+    "scheduledOnly": "Mit Termin",
+    "missingClassification": "Ohne Einstufung",
+    "missingClassificationActive": "Ohne Einstufung (aktiv)",
+    "mpsbMissing": "Ohne MPSB",
+    "mpsbAppointed": "MPSB bestellt",
+    "expiring": "Auslaufend",
+    "mineOnly": "Nur meine"
   },
   "dueDatesCards": {
     "due": "Fällig",
@@ -1285,7 +1970,289 @@
     "channelsSummary": "{ok}/{total} Kanäle erfolgreich",
     "channelsFailedSuffix": " · {fail} fehlgeschlagen",
     "scanNext": "Nächstes scannen",
-    "deviceFallbackTitle": "Gerät"
+    "deviceFallbackTitle": "Gerät",
+    "tabs": {
+      "aria": "Scan-Navigation",
+      "scan": "Scan",
+      "heute": "Heute",
+      "bestand": "Bestand",
+      "chargen": "Chargen",
+      "badge": "{count} Einträge"
+    },
+    "heute": {
+      "title": "Heute",
+      "subtitle": "Geräte in Ihren Arbeitsbereichen",
+      "refresh": "Aktualisieren",
+      "loading": "Laden…",
+      "empty": "Keine offenen Aufgaben für heute in Ihren Bereichen.",
+      "noAreas": "Kein Arbeitsbereich zugewiesen. Bitte einen Admin um Bereiche bitten.",
+      "openBatches": "{count, plural, one {# offene Charge} other {# offene Chargen}}",
+      "openKonstanz": "Konstanz fällig",
+      "openDaily": "Tageskontrolle offen",
+      "dailyDone": "Tageskontrolle erledigt",
+      "band": {
+        "blocked": "Gesperrt",
+        "open": "Offen",
+        "notice": "Auflage",
+        "done": "Erledigt"
+      }
+    },
+    "chargen": {
+      "title": "Chargen",
+      "subtitle": "Aufbereitungschargen in Ihren Bereichen",
+      "refresh": "Aktualisieren",
+      "loading": "Laden…",
+      "empty": "Keine offenen Chargen in Ihren Bereichen.",
+      "open": "Offen",
+      "noBeleg": "Beleg fehlt",
+      "newViaScan": "Gerät scannen / öffnen",
+      "errLoad": "Chargen konnten nicht geladen werden."
+    },
+    "charge": {
+      "neuTitle": "Neue Charge",
+      "freigabeTitle": "Charge freigeben",
+      "cancel": "Abbrechen",
+      "later": "Später",
+      "back": "Zurück",
+      "save": "Charge speichern",
+      "sign": "Unterschreiben & speichern",
+      "saving": "Speichern…",
+      "loading": "Laden…",
+      "batchNumber": "Chargennummer",
+      "programme": "Programm / Zyklus",
+      "loadPattern": "Beladungsmuster (optional)",
+      "startedAt": "Beginn",
+      "finishedAt": "Ende",
+      "items": "Beladung",
+      "itemPlaceholder": "Bezeichnung (z. B. Sieb OP)",
+      "quantity": "Menge",
+      "addItem": "Hinzufügen",
+      "removeItem": "Entfernen",
+      "beleg": "Prozessprotokoll des Geräts",
+      "belegPick": "Foto / PDF wählen",
+      "belegPresent": "Beleg gespeichert · SHA {sha}…",
+      "belegMissing": "Beleg fehlt — ohne Protokoll keine Freigabe.",
+      "belegOk": "Beleg übernommen.",
+      "belegSha": "Beleg-SHA",
+      "uploading": "Hochladen…",
+      "decision": "Entscheidung",
+      "note": "Hinweis / Auflage",
+      "notePlaceholder": "Bei Auflage oder Ablehnung Begründung angeben",
+      "confirmSign": "Ich bestätige die Freigabe mit meiner Sachkunde (Unterschrift).",
+      "pass": "In Ordnung",
+      "defect": "Mangel",
+      "value": "Messwert",
+      "batchMeta": "Charge {number} · {programme}",
+      "signedBy": "Unterschrieben von",
+      "alreadyDone": "Bereits entschieden: {result}",
+      "result": {
+        "released": "Freigeben",
+        "released_with_conditions": "Mit Auflage",
+        "rejected": "Ablehnen"
+      },
+      "okCreated": "Charge erfasst — noch nicht freigegeben",
+      "releasedOk": {
+        "released": "Charge freigegeben",
+        "released_with_conditions": "Charge mit Auflage freigegeben",
+        "rejected": "Charge abgelehnt"
+      },
+      "hintReleaseNext": "Als Nächstes Belegfoto und Freigabe unter Chargen.",
+      "hintRejected": "Charge darf nicht verwendet werden.",
+      "errLoad": "Charge konnte nicht geladen werden.",
+      "errSave": "Speichern fehlgeschlagen.",
+      "errBeleg": "Beleg konnte nicht gespeichert werden.",
+      "errBatchNumber": "Chargennummer angeben.",
+      "errProgramme": "Programm angeben.",
+      "errItem": "Bezeichnung der Beladung angeben.",
+      "errItems": "Mindestens eine Beladung hinzufügen.",
+      "errDecision": "Entscheidung wählen.",
+      "errSign": "Unterschrift bestätigen.",
+      "errNote": "Hinweis bei Auflage oder Ablehnung erforderlich.",
+      "errHurdles": "Freigabe ist noch blockiert.",
+      "errMangelRelease": "Bei Mangel nur mit Auflage freigeben oder ablehnen.",
+      "errIncomplete": "Alle Chargenprüfungen beantworten."
+    },
+    "device": {
+      "loading": "Gerät wird geladen…",
+      "missing": "Gerät nicht gefunden oder außerhalb Ihrer Arbeitsbereiche.",
+      "back": "Zurück",
+      "location": "Einsatzort",
+      "now": "Jetzt",
+      "further": "Weitere",
+      "comingSoon": "Dieser Erfassungsweg folgt als Nächstes.",
+      "stoerungDenied": "Für die Störungsmeldung brauchen Sie die Gerätebuch-Berechtigung.",
+      "routineDenied": "Für die Tageskontrolle brauchen Sie die Aufbereitungs-Berechtigung.",
+      "chargeDenied": "Für Chargen brauchen Sie die Aufbereitungs-Berechtigung.",
+      "noticeOnly": "Auflage beachten — hier wird nichts erfasst.",
+      "lage": {
+        "ok": "Frei",
+        "stop": "Gesperrt — nicht anwenden",
+        "warn": "Betrieb mit Auflage"
+      },
+      "lageOkHint": "Keine offene Störung, keine nicht bestandene Kontrolle, kein offener Rückruf.",
+      "actions": {
+        "stoerung": "Störung melden",
+        "stoerungHint": "Eintrag ins Gerätebuch; bei Schaden zur Bewertung an den MPSB",
+        "service": "Service anfragen",
+        "serviceHint": "Reparatur — die letzte Störung kommt mit in die Notiz",
+        "serviceGenericHint": "Prüfung, Wartung, Reparatur beim Partner",
+        "serviceOpenHint": "Offene Anfrage · {ref}",
+        "requestOpen": "Anfrage läuft · {ref}",
+        "requestOpenHint": "Offene Service-Anfrage an diesem Gerät",
+        "routine": "Tageskontrolle",
+        "routineHint": "Arbeitstägliche Kontrollen noch offen",
+        "routineDoneHint": "Tageskontrolle heute erledigt",
+        "chargeRelease": "Charge freigeben",
+        "chargeReleaseHint": "Lauf beendet · ohne Entscheidung",
+        "chargeNew": "Neue Charge erfassen",
+        "chargeNewHint": "Tageskontrolle erledigt — Lauf eintragen",
+        "batches": "Chargen",
+        "batchesDoneHint": "Alle Chargen entschieden",
+        "konstanz": "Konstanzprüfung",
+        "konstanzHint": "Konstanz fällig oder überfällig",
+        "konstanzFailedHint": "Letzte Konstanz nicht bestanden — erneut prüfen",
+        "konstanzDoneHint": "Keine offene Konstanzprüfung",
+        "parts": "Ersatzteile bestellen",
+        "partsHint": "Artikel zum Modell über plusorder",
+        "notice": "Auflage beachten",
+        "noticeHint": "Rückruf / Auflage noch offen",
+        "recallStop": "Nicht anwenden — Rückruf",
+        "recallStopHint": "Vom offenen Rückruf betroffen; Maßnahme noch nicht dokumentiert",
+        "ifu": "Gebrauchsanweisung",
+        "ifuHint": "§ 4 · {ref}",
+        "ifuMissing": "§ 4 · noch nicht hinterlegt"
+      },
+      "ifuOpen": "Gebrauchsanweisung: {ref}",
+      "ifuMissingToast": "Keine Gebrauchsanweisung hinterlegt (§ 4)."
+    },
+    "konstanz": {
+      "title": "Konstanzprüfung",
+      "cancel": "Abbrechen",
+      "later": "Später",
+      "back": "Zurück",
+      "submit": "Speichern",
+      "saving": "Speichern…",
+      "loading": "Laden…",
+      "allDone": "Keine offene Konstanzprüfung an diesem Gerät.",
+      "progress": "Prüfung {current} von {total}",
+      "dueAt": "fällig {date}",
+      "duty": "Prüfgegenstand",
+      "performedAt": "Durchgeführt",
+      "nextDue": "Nächste Fälligkeit",
+      "noteOptional": "Anmerkung (optional)",
+      "noteRequired": "Anmerkung erforderlich",
+      "notePlaceholder": "Messwert, Auffälligkeit oder Auflage",
+      "result": {
+        "passed": "Bestanden",
+        "passed_with_conditions": "Mit Auflage",
+        "failed": "Nicht bestanden"
+      },
+      "status": {
+        "due": "Heute fällig",
+        "overdue": "Überfällig",
+        "failed": "Zuletzt nicht bestanden",
+        "missing_cadence": "Takt noch festzulegen",
+        "baseline_missing": "Abnahme / Bezugswerte fehlen",
+        "ok": "Erledigt"
+      },
+      "ok": {
+        "passed": "Konstanzprüfung bestanden",
+        "passed_with_conditions": "Konstanzprüfung mit Auflage",
+        "failed": "Konstanzprüfung nicht bestanden"
+      },
+      "hintFailed": "Gerät mit Auflage / Sperre — Konstanz wiederholen oder Service.",
+      "errLoad": "Konstanzprüfungen konnten nicht geladen werden.",
+      "errSave": "Speichern fehlgeschlagen.",
+      "errResult": "Ergebnis wählen.",
+      "errNote": "Bei Auflage oder Nichtbestehen ist eine Anmerkung nötig."
+    },
+    "stoerung": {
+      "title": "Störung melden",
+      "cancel": "Abbrechen",
+      "submit": "Melden",
+      "saving": "Speichern…",
+      "kind": "Art",
+      "kindMalfunction": "Störung",
+      "kindOperating": "Bedienfehler",
+      "kindNote": "Hinweis",
+      "noticed": "Wann bemerkt",
+      "what": "Was ist geschehen",
+      "whatPlaceholder": "So, wie Sie es gesehen haben. Keine Ursache raten.",
+      "harm": "Ist eine Person zu Schaden gekommen oder hätte es dazu kommen können?",
+      "harmHint": "Ob es ein meldepflichtiges Vorkommnis ist, entscheidet der MPSB — nicht diese Frage.",
+      "yes": "Ja",
+      "no": "Nein",
+      "unknown": "Weiß nicht",
+      "outOfService": "Gerät außer Betrieb genommen?",
+      "outYes": "Ja, gesperrt",
+      "outNo": "Nein, in Betrieb",
+      "consequence": "Folge, Maßnahme",
+      "consequencePlaceholder": "Was wurde getan? Etwa: Pumpe getauscht, Patient überwacht.",
+      "consequenceWarn": "Schaden bejaht, Gerät in Betrieb — bitte im Feld darunter sagen, warum.",
+      "progress": "{filled} von {total} Pflichtfeldern",
+      "errKind": "Bitte die Art wählen: Störung, Bedienfehler oder Hinweis.",
+      "errDate": "Das Datum fehlt oder liegt in der Zukunft.",
+      "errDescription": "Bitte beschreiben, was geschehen ist — ein Satz reicht.",
+      "errHarm": "Bitte beantworten, ob eine Person zu Schaden kam — auch „Weiß nicht“ ist eine Antwort.",
+      "errOut": "Bitte sagen, ob das Gerät außer Betrieb genommen wurde.",
+      "errConsequence": "Schaden bejaht, Gerät in Betrieb — das braucht eine Begründung unter „Folge, Maßnahme“.",
+      "errSave": "Meldung konnte nicht gespeichert werden.",
+      "okIncident": "Störung gemeldet",
+      "okBook": "Eintrag im Gerätebuch angelegt",
+      "hintMpsb": "Geht zur Bewertung an den Beauftragten für Medizinproduktesicherheit. Die App setzt kein Urteil.",
+      "hintBlocked": "Das Gerät ist ab jetzt als gesperrt sichtbar.",
+      "kindLabel": {
+        "malfunction": "Störung",
+        "operating_error": "Bedienfehler",
+        "note": "Hinweis"
+      },
+      "harmLabel": {
+        "yes": "Ja",
+        "no": "Nein",
+        "unknown": "Weiß nicht"
+      }
+    },
+    "confirm": {
+      "toDevice": "Zum Gerät",
+      "toHeute": "Zur Heute-Liste",
+      "kind": "Art",
+      "device": "Gerät",
+      "harm": "Schaden",
+      "status": "Gerätestatus"
+    },
+    "routine": {
+      "title": "Tageskontrolle",
+      "cancel": "Abbrechen",
+      "later": "Später",
+      "back": "Zurück",
+      "loading": "Kontrollen werden geladen…",
+      "errLoad": "Tageskontrollen konnten nicht geladen werden.",
+      "errSave": "Kontrollen konnten nicht gespeichert werden.",
+      "errPassFail": "Bitte „In Ordnung“ oder „Mangel“ wählen.",
+      "errMeasure": "Bitte den abgelesenen Wert eintragen.",
+      "errIncomplete": "Bitte jede offene Kontrolle beantworten.",
+      "errNote": "Ein Mangel braucht eine Anmerkung.",
+      "allDone": "Alle arbeitstäglichen Kontrollen für dieses Gerät sind heute erledigt.",
+      "progress": "Schritt {current} von {total}",
+      "answered": "{filled} von {total} beantwortet",
+      "ok": "In Ordnung",
+      "defect": "Mangel",
+      "value": "Messwert",
+      "valuePlaceholder": "Wie am Gerät abgelesen",
+      "siteScope": "Standortkontrolle · {site}",
+      "next": "Weiter",
+      "toNote": "Weiter",
+      "submit": "Kontrolle eintragen",
+      "saving": "Speichern…",
+      "noteRequired": "Anmerkung — bei einem Mangel Pflicht",
+      "noteOptional": "Anmerkung (optional)",
+      "notePlaceholder": "Was aufgefallen ist.",
+      "mangelWarn": "Ein Mangel sperrt das Gerät. Chargen aus diesem Gerät können nicht freigegeben werden, bis eine bestandene Kontrolle vorliegt.",
+      "ready": "Alles erfasst. Bestätigen, um den Nachweis zu schreiben.",
+      "okOk": "Tageskontrolle eingetragen",
+      "okMangel": "Kontrolle eingetragen — Gerät gesperrt",
+      "hintMangel": "Keine Freigabe aus diesem Gerät, bis eine bestandene Kontrolle vorliegt."
+    }
   },
   "device": {
     "scanAnotherAria": "Anderes scannen",
@@ -1324,6 +2291,14 @@
     "requestServiceHint": "Prüfung, Wartung oder Reparatur beim Servicepartner anfordern",
     "orderSpareParts": "Ersatzteile bestellen",
     "orderSparePartsHint": "Passende Artikel für dieses Gerät über plusorder bestellen",
+    "candidatesTitle": "Geräte im Bestand",
+    "candidatesSubtitle": "{count, plural, one {# Gerät} other {# Geräte}} passen zu GTIN {gtin}. Bitte wählen oder ohne Auswahl fortfahren.",
+    "candidatesSerial": "SN {serial}",
+    "candidatesContinue": "Mit gewähltem Gerät fortfahren",
+    "candidatesContinueHint": "Diesen Bestandsdatensatz für den Auftrag nutzen",
+    "candidatesSelecting": "Wird geprüft…",
+    "candidatesSkip": "Nicht in dieser Liste",
+    "candidatesSkipHint": "Mit Artikelstamm / Herstellerdaten fortfahren",
     "sourceManualServiceOnly": "Manuell erfasst, nur Service",
     "sourceManualNotForSale": "Nur Service — nicht verkaufbar",
     "sourceBeudamed": "BEUDAMED · EUDAMED-Spiegel",

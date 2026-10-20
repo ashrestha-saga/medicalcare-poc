@@ -13,7 +13,14 @@ export async function POST(req: Request) {
       correlationId = ctx.correlationId;
       const input = resolveRequestSchema.parse(await req.json());
       const identifier = parseIdentifier(input.raw); // FA-101 — same parser as the client
-      const result = await resolveService.resolve(identifier, ctx.tenantId, ctx.correlationId, ctx.user.id);
+      const result = await resolveService.resolve(
+        identifier,
+        ctx.tenantId,
+        ctx.correlationId,
+        ctx.user.id,
+        ctx,
+        { skipInventoryCandidates: input.skipInventoryCandidates },
+      );
       return Response.json(result, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {

@@ -33,4 +33,16 @@ describe("SEC-01 tenant prisma guard", () => {
     });
     expect(other).toEqual([]);
   });
+
+  it("scopes InspectionRun and BaselineMeasurement to the bound tenant", async () => {
+    const runs = await runWithTenantAsync("tenant-that-does-not-exist", async () => {
+      return prisma.inspectionRun.findMany({ take: 5 });
+    });
+    expect(runs).toEqual([]);
+
+    const baselines = await runWithTenantAsync("tenant-that-does-not-exist", async () => {
+      return prisma.baselineMeasurement.findMany({ take: 5 });
+    });
+    expect(baselines).toEqual([]);
+  });
 });

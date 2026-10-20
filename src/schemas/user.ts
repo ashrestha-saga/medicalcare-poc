@@ -28,6 +28,10 @@ export const updateUserSchema = z.object({
   active: z.boolean(),
   /** When set, replaces UserPermission rows. Omit to leave grants unchanged. Empty/equal-to-preset clears to pure role. */
   permissions: z.array(z.string()).optional(),
+  /** Work areas (physical Areas under Sites). Required when role is user. */
+  areaIds: z.array(z.string().trim().min(1)).optional(),
+  /** Primary area; must be in areaIds when both set. Defaults to first areaId. */
+  homeAreaId: z.string().trim().min(1).optional().nullable(),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

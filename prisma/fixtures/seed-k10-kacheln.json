@@ -1,0 +1,1039 @@
+{
+ "_hinweis": "Erzeugt mit export_k10_kacheln.py. Kachelkatalog und Pruefliste sind Entwurfsentscheidungen; `covered` bezeichnet den Stand nach Umsetzung von K1, K2 und K9.",
+ "RefDashboardTile": [
+  {
+   "key": "ueberfaellig",
+   "title": "Überfällig",
+   "question": "Was ist schon zu spät?",
+   "zone": "decides",
+   "sortOrder": 1,
+   "dutyKey": null,
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "faellig-30",
+   "title": "Fällig in 30 Tagen",
+   "question": "Was muss ich jetzt beauftragen?",
+   "zone": "decides",
+   "sortOrder": 2,
+   "dutyKey": null,
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "freigabe-blockiert",
+   "title": "Freigabe blockiert",
+   "question": "Was liegt und kommt nicht weiter?",
+   "zone": "decides",
+   "sortOrder": 3,
+   "dutyKey": null,
+   "requiredPermission": "clarifications:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "klaerliste",
+   "title": "Klärliste",
+   "question": "Was fehlt woran?",
+   "zone": "worklist",
+   "sortOrder": 1,
+   "dutyKey": null,
+   "requiredPermission": "clarifications:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "fristen-ohne-beleg",
+   "title": "Pflichten mit Termin",
+   "question": "Welche Fristen sind am Verordnungstext belegt?",
+   "zone": "worklist",
+   "sortOrder": 2,
+   "dutyKey": null,
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "auftraege-termin",
+   "title": "Aufträge mit Termin",
+   "question": "Wer kommt wann?",
+   "zone": "worklist",
+   "sortOrder": 3,
+   "dutyKey": null,
+   "requiredPermission": "requests:view-open",
+   "partnerOnly": false
+  },
+  {
+   "key": "bestand-zustand",
+   "title": "Bestand nach Zustand",
+   "question": "Wie vollständig ist das Verzeichnis?",
+   "zone": "watch",
+   "sortOrder": 1,
+   "dutyKey": null,
+   "requiredPermission": "inventory:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "modelle-ohne-einstufung",
+   "title": "Modelle im Katalog",
+   "question": "Wo fehlt die Grundlage?",
+   "zone": "watch",
+   "sortOrder": 2,
+   "dutyKey": null,
+   "requiredPermission": "catalog:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "vorkommnis-unbewertet",
+   "title": "Vorkommnisse ohne Bewertung",
+   "question": "Was muss ich einschätzen?",
+   "zone": "decides",
+   "sortOrder": 4,
+   "dutyKey": null,
+   "requiredPermission": "incidents:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "vorkommnis-ungemeldet",
+   "title": "Meldepflichtig, nicht gemeldet",
+   "question": "Wo läuft eine Frist gegen mich?",
+   "zone": "decides",
+   "sortOrder": 5,
+   "dutyKey": null,
+   "requiredPermission": "incidents:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "rueckruf-offen",
+   "title": "Rückrufe offen",
+   "question": "Was hat der Hersteller verlangt?",
+   "zone": "decides",
+   "sortOrder": 6,
+   "dutyKey": null,
+   "requiredPermission": "fieldsafety:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "rueckruf-abgleich",
+   "title": "Rückruf ohne Bestandsabgleich",
+   "question": "Welche Geräte sind betroffen?",
+   "zone": "worklist",
+   "sortOrder": 4,
+   "dutyKey": null,
+   "requiredPermission": "fieldsafety:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "buch-stoerungen",
+   "title": "Gerätebuch",
+   "question": "Häuft sich etwas?",
+   "zone": "worklist",
+   "sortOrder": 5,
+   "dutyKey": null,
+   "requiredPermission": "devicebook:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "mpsb-bestellung",
+   "title": "Standorte",
+   "question": "Welche Standorte haben einen benannten Beauftragten?",
+   "zone": "watch",
+   "sortOrder": 3,
+   "dutyKey": null,
+   "requiredPermission": "inventory:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "mpsb-fehlt",
+   "title": "Standorte ohne MPSB",
+   "question": "Wo fehlt ein Beauftragter?",
+   "zone": "decides",
+   "sortOrder": 7,
+   "dutyKey": null,
+   "requiredPermission": "locations:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "implantat-doku",
+   "title": "Implantatdokumentation offen",
+   "question": "Wo fehlt der Nachweis?",
+   "zone": "worklist",
+   "sortOrder": 6,
+   "dutyKey": "implantat",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "meine-geraete",
+   "title": "Geräte in meinem Bereich",
+   "question": "Darf ich das benutzen?",
+   "zone": "decides",
+   "sortOrder": 8,
+   "dutyKey": null,
+   "requiredPermission": "inventory:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "meine-einweisungen",
+   "title": "Meine Einweisungen",
+   "question": "Bin ich eingewiesen?",
+   "zone": "decides",
+   "sortOrder": 9,
+   "dutyKey": null,
+   "requiredPermission": "inventory:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "stoerung-melden",
+   "title": "Störung melden",
+   "question": "Das Gerät geht nicht.",
+   "zone": "worklist",
+   "sortOrder": 7,
+   "dutyKey": null,
+   "requiredPermission": "requests:create",
+   "partnerOnly": false
+  },
+  {
+   "key": "gesperrte-geraete",
+   "title": "Gesperrte Geräte im Bereich",
+   "question": "Warum steht das hier?",
+   "zone": "watch",
+   "sortOrder": 4,
+   "dutyKey": null,
+   "requiredPermission": "inventory:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "validierung-geraete",
+   "title": "Validierung je Aufbereitungsgerät",
+   "question": "Ist die Maschine validiert?",
+   "zone": "decides",
+   "sortOrder": 10,
+   "dutyKey": "validierung",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "routine-heute",
+   "title": "Routinekontrollen heute",
+   "question": "Was ist arbeitstäglich zu tun?",
+   "zone": "decides",
+   "sortOrder": 11,
+   "dutyKey": null,
+   "requiredPermission": "reprocessing:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "charge-offen",
+   "title": "Chargen ohne Freigabe",
+   "question": "Was darf nicht verwendet werden?",
+   "zone": "decides",
+   "sortOrder": 12,
+   "dutyKey": null,
+   "requiredPermission": "reprocessing:release",
+   "partnerOnly": false
+  },
+  {
+   "key": "wasser-chemie",
+   "title": "Wasser und Chemie",
+   "question": "Stimmen die Betriebsmittel?",
+   "zone": "worklist",
+   "sortOrder": 8,
+   "dutyKey": null,
+   "requiredPermission": "reprocessing:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "sterilgut",
+   "title": "Sterilgutlagerung",
+   "question": "Ist die Lagerung in Ordnung?",
+   "zone": "worklist",
+   "sortOrder": 9,
+   "dutyKey": null,
+   "requiredPermission": "reprocessing:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "kopplung-historie",
+   "title": "Kopplung Produkt zu Gerät",
+   "question": "Worauf läuft was, seit wann?",
+   "zone": "worklist",
+   "sortOrder": 10,
+   "dutyKey": null,
+   "requiredPermission": "inventory:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "aufb-extern",
+   "title": "Beauftragte Aufbereitung",
+   "question": "Wann habe ich den Dienstleister geprüft?",
+   "zone": "worklist",
+   "sortOrder": 11,
+   "dutyKey": "kontrolle",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "sachkunde-aufb",
+   "title": "Sachkunde des Personals",
+   "question": "Wer darf aufbereiten?",
+   "zone": "watch",
+   "sortOrder": 5,
+   "dutyKey": null,
+   "requiredPermission": "qualifications:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "konstanz-heute",
+   "title": "Konstanzprüfung heute",
+   "question": "Was ist heute dran?",
+   "zone": "decides",
+   "sortOrder": 13,
+   "dutyKey": "konstanz",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "konstanz-takt-offen",
+   "title": "Strahlenprüfobjekte",
+   "question": "Wofür fehlt die Festlegung?",
+   "zone": "decides",
+   "sortOrder": 14,
+   "dutyKey": "konstanz",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "bezugswerte",
+   "title": "Bezugswerte gesetzt oder fehlend",
+   "question": "Kann ich überhaupt bewerten?",
+   "zone": "decides",
+   "sortOrder": 15,
+   "dutyKey": null,
+   "requiredPermission": "inspections:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "abnahme-offen",
+   "title": "Abnahmeprüfung offen",
+   "question": "Was darf noch nicht in Betrieb?",
+   "zone": "worklist",
+   "sortOrder": 12,
+   "dutyKey": "abnahme",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "aerztliche-stelle",
+   "title": "Ärztliche Stelle",
+   "question": "Wann kommt die Anforderung?",
+   "zone": "worklist",
+   "sortOrder": 13,
+   "dutyKey": "aerztl",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "sv-zulassung",
+   "title": "Sachverständige und Zulassung",
+   "question": "Anzeige oder Genehmigung?",
+   "zone": "watch",
+   "sortOrder": 6,
+   "dutyKey": "sv",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "dguv-faellig",
+   "title": "DGUV-Prüfung fällig",
+   "question": "Was verlangt der Arbeitsschutz?",
+   "zone": "decides",
+   "sortOrder": 16,
+   "dutyKey": "dguv",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "dguv-ohne-festlegung",
+   "title": "DGUV ohne Festlegung",
+   "question": "Deckt die STK sie ab, oder nicht?",
+   "zone": "worklist",
+   "sortOrder": 14,
+   "dutyKey": "dguv",
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "befund-frist",
+   "title": "Begehungsbefunde mit Frist",
+   "question": "Was hat die Behörde gesetzt?",
+   "zone": "decides",
+   "sortOrder": 17,
+   "dutyKey": null,
+   "requiredPermission": "authority:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "befund-nachweis",
+   "title": "Behoben, Nachweis fehlt",
+   "question": "Was ist zu belegen?",
+   "zone": "worklist",
+   "sortOrder": 15,
+   "dutyKey": null,
+   "requiredPermission": "authority:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "begehung-vorbereitung",
+   "title": "Vorbereitungsmodus",
+   "question": "Was würde die Behörde vermissen?",
+   "zone": "worklist",
+   "sortOrder": 16,
+   "dutyKey": null,
+   "requiredPermission": "authority:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "auditfaehigkeit",
+   "title": "Auditfähigkeit",
+   "question": "Würden wir eine Prüfung überstehen?",
+   "zone": "decides",
+   "sortOrder": 18,
+   "dutyKey": null,
+   "requiredPermission": "inventory:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "offene-punkte-standort",
+   "title": "Offene Punkte je Standort",
+   "question": "Wo brennt es?",
+   "zone": "decides",
+   "sortOrder": 19,
+   "dutyKey": null,
+   "requiredPermission": "inventory:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "bestandsverzeichnis",
+   "title": "Bestandsverzeichnis exportieren",
+   "question": "Der Prüfer sitzt im Haus.",
+   "zone": "worklist",
+   "sortOrder": 17,
+   "dutyKey": null,
+   "requiredPermission": "inventory:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "pruefungen-quartal",
+   "title": "Prüfungen im nächsten Quartal",
+   "question": "Was kommt auf uns zu?",
+   "zone": "worklist",
+   "sortOrder": 18,
+   "dutyKey": null,
+   "requiredPermission": "duties:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "betreuung-zugriffe",
+   "title": "Betreuung und Zugriffe",
+   "question": "Wer sieht unsere Daten?",
+   "zone": "watch",
+   "sortOrder": 7,
+   "dutyKey": null,
+   "requiredPermission": "settings:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "befaehigung-auslaufend",
+   "title": "Auslaufende Befähigung",
+   "question": "Wen müssen wir schulen?",
+   "zone": "watch",
+   "sortOrder": 8,
+   "dutyKey": null,
+   "requiredPermission": "qualifications:view",
+   "partnerOnly": false
+  },
+  {
+   "key": "traegerschaft-luecke",
+   "title": "Pflichten ohne Träger",
+   "question": "Was sieht niemand?",
+   "zone": "decides",
+   "sortOrder": 20,
+   "dutyKey": null,
+   "requiredPermission": "roles:view",
+   "partnerOnly": false
+  }
+ ],
+ "DashboardTileGrant": [
+  {
+   "role": "device_admin",
+   "tileKey": "ueberfaellig"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "ueberfaellig"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "faellig-30"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "faellig-30"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "freigabe-blockiert"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "freigabe-blockiert"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "klaerliste"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "klaerliste"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "fristen-ohne-beleg"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "fristen-ohne-beleg"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "auftraege-termin"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "auftraege-termin"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "bestand-zustand"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "bestand-zustand"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "modelle-ohne-einstufung"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "modelle-ohne-einstufung"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "vorkommnis-unbewertet"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "vorkommnis-unbewertet"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "vorkommnis-ungemeldet"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "vorkommnis-ungemeldet"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "rueckruf-offen"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "rueckruf-offen"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "rueckruf-abgleich"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "rueckruf-abgleich"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "buch-stoerungen"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "buch-stoerungen"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "buch-stoerungen"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "mpsb-bestellung"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "mpsb-bestellung"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "mpsb-bestellung"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "mpsb-fehlt"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "mpsb-fehlt"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "implantat-doku"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "implantat-doku"
+  },
+  {
+   "role": "user",
+   "tileKey": "meine-geraete"
+  },
+  {
+   "role": "user",
+   "tileKey": "meine-einweisungen"
+  },
+  {
+   "role": "user",
+   "tileKey": "stoerung-melden"
+  },
+  {
+   "role": "user",
+   "tileKey": "gesperrte-geraete"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "validierung-geraete"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "routine-heute"
+  },
+  {
+   "role": "user",
+   "tileKey": "routine-heute"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "charge-offen"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "wasser-chemie"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "sterilgut"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "kopplung-historie"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "aufb-extern"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "sachkunde-aufb"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "konstanz-heute"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "konstanz-takt-offen"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "konstanz-takt-offen"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "bezugswerte"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "abnahme-offen"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "aerztliche-stelle"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "sv-zulassung"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "dguv-faellig"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "dguv-faellig"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "dguv-ohne-festlegung"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "dguv-ohne-festlegung"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "befund-frist"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "befund-frist"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "befund-nachweis"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "befund-nachweis"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "begehung-vorbereitung"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "begehung-vorbereitung"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "auditfaehigkeit"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "offene-punkte-standort"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "bestandsverzeichnis"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "bestandsverzeichnis"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "pruefungen-quartal"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "betreuung-zugriffe"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "befaehigung-auslaufend"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "traegerschaft-luecke"
+  }
+ ],
+ "RefAuthorityChecklist": [
+  {
+   "code": "CL-MP-DE",
+   "authorityKind": "device_authority",
+   "stateCode": null,
+   "label": "Medizinprodukteaufsicht, allgemein",
+   "sourceRef": "Behördliche Überwachung von Arztpraxen, Hygiene und Medizinprodukte, Fassung 2024 — Reihenfolge der Prüfpunkte",
+   "sourceDate": "2024-01-01"
+  },
+  {
+   "code": "CL-HYG-DE",
+   "authorityKind": "health_office",
+   "stateCode": null,
+   "label": "Gesundheitsamt, Infektionshygiene",
+   "sourceRef": "Behördliche Überwachung von Arztpraxen, Hygiene und Medizinprodukte, Fassung 2024 — Reihenfolge der Prüfpunkte",
+   "sourceDate": "2024-01-01"
+  },
+  {
+   "code": "CL-AS-DE",
+   "authorityKind": "occupational_safety",
+   "stateCode": null,
+   "label": "Arbeitsschutz und BGW",
+   "sourceRef": "Behördliche Überwachung von Arztpraxen, Hygiene und Medizinprodukte, Fassung 2024 — Reihenfolge der Prüfpunkte",
+   "sourceDate": "2024-01-01"
+  }
+ ],
+ "RefAuthorityChecklistItem": [
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 1,
+   "label": "Bestandsverzeichnis",
+   "legalBasis": "§ 14 MPBetreibV",
+   "mapsToSection": "bestandsverzeichnis",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 2,
+   "label": "Medizinproduktebuch",
+   "legalBasis": "§ 13 MPBetreibV",
+   "mapsToSection": "medizinproduktebuch",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 3,
+   "label": "Dokumentation implantierbarer Produkte",
+   "legalBasis": "§ 16 MPBetreibV",
+   "mapsToSection": "nachweise",
+   "covered": false
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 4,
+   "label": "Gebrauchsanweisung vorhanden und zugänglich",
+   "legalBasis": "§ 4 MPBetreibV",
+   "mapsToSection": "nachweise",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 5,
+   "label": "Einweisung in die Handhabung",
+   "legalBasis": "§ 4 Absatz 3 MPBetreibV",
+   "mapsToSection": "einweisungen",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 6,
+   "label": "Instandhaltungsvorgaben des Herstellers",
+   "legalBasis": "§ 7 MPBetreibV",
+   "mapsToSection": "nachweise",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 7,
+   "label": "Instandhaltung durchgeführt",
+   "legalBasis": "§ 7 MPBetreibV",
+   "mapsToSection": "pruefungen",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 8,
+   "label": "Benennung des Sicherheitsbeauftragten",
+   "legalBasis": "§ 6 MPBetreibV",
+   "mapsToSection": "deckblatt",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 9,
+   "label": "Sicherheitstechnische und messtechnische Kontrolle",
+   "legalBasis": "§ 12, § 15 MPBetreibV",
+   "mapsToSection": "pruefungen",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 10,
+   "label": "Funktionsprüfung bei Erstinbetriebnahme",
+   "legalBasis": "§ 11 MPBetreibV",
+   "mapsToSection": "pruefungen",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 11,
+   "label": "Prüfung elektrischer Produkte nach DGUV",
+   "legalBasis": "ArbSchG · DGUV Vorschrift 3",
+   "mapsToSection": "pruefungen",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 12,
+   "label": "Aufbereitung: Risikobewertung und Einstufung",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 13,
+   "label": "Aufbereitung: Qualifikation des Personals",
+   "legalBasis": "§ 8 MPBetreibV",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 14,
+   "label": "Aufbereitung: Arbeitsanweisungen je Schritt",
+   "legalBasis": "§ 8 MPBetreibV",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 15,
+   "label": "Aufbereitung: Prozessvalidierung",
+   "legalBasis": "§ 8 MPBetreibV",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 16,
+   "label": "Aufbereitung: Routinekontrollen",
+   "legalBasis": "§ 8 MPBetreibV",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 17,
+   "label": "Aufbereitung: Wasserqualität und Chemie",
+   "legalBasis": "§ 8 MPBetreibV",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 18,
+   "label": "Sterilgutlagerung",
+   "legalBasis": "§ 8 MPBetreibV · DIN EN ISO 11607",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 19,
+   "label": "Chargendokumentation und Chargenfreigabe",
+   "legalBasis": "§ 8 MPBetreibV",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 20,
+   "label": "Externe Aufbereitung geregelt",
+   "legalBasis": "§ 8 MPBetreibV",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 21,
+   "label": "Keine abgelaufenen Produkte im Einsatz",
+   "legalBasis": "MPDG",
+   "mapsToSection": "offene-punkte",
+   "covered": false
+  },
+  {
+   "checklistCode": "CL-MP-DE",
+   "position": 22,
+   "label": "Meldung mutmaßlicher Vorkommnisse",
+   "legalBasis": "MPAMIV",
+   "mapsToSection": "medizinproduktebuch",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-HYG-DE",
+   "position": 1,
+   "label": "Hygieneplan vorhanden und aktuell",
+   "legalBasis": "§ 23 IfSG · KRINKO",
+   "mapsToSection": "offene-punkte",
+   "covered": false
+  },
+  {
+   "checklistCode": "CL-HYG-DE",
+   "position": 2,
+   "label": "Händehygiene und Flächendesinfektion",
+   "legalBasis": "KRINKO",
+   "mapsToSection": "offene-punkte",
+   "covered": false
+  },
+  {
+   "checklistCode": "CL-HYG-DE",
+   "position": 3,
+   "label": "Abfallentsorgung",
+   "legalBasis": "KRINKO · AbfallR",
+   "mapsToSection": "offene-punkte",
+   "covered": false
+  },
+  {
+   "checklistCode": "CL-HYG-DE",
+   "position": 4,
+   "label": "Trinkwasser und Spülpläne",
+   "legalBasis": "§ 15a, § 37 IfSG",
+   "mapsToSection": "offene-punkte",
+   "covered": false
+  },
+  {
+   "checklistCode": "CL-HYG-DE",
+   "position": 5,
+   "label": "Aufbereitung von Medizinprodukten",
+   "legalBasis": "§ 8 MPBetreibV · KRINKO/BfArM",
+   "mapsToSection": "aufbereitung",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-AS-DE",
+   "position": 1,
+   "label": "Gefährdungsbeurteilung",
+   "legalBasis": "§ 5 ArbSchG",
+   "mapsToSection": "offene-punkte",
+   "covered": false
+  },
+  {
+   "checklistCode": "CL-AS-DE",
+   "position": 2,
+   "label": "Betriebsanweisungen",
+   "legalBasis": "GefStoffV · BioStoffV",
+   "mapsToSection": "offene-punkte",
+   "covered": false
+  },
+  {
+   "checklistCode": "CL-AS-DE",
+   "position": 3,
+   "label": "Prüfung elektrischer Betriebsmittel",
+   "legalBasis": "DGUV Vorschrift 3",
+   "mapsToSection": "pruefungen",
+   "covered": true
+  },
+  {
+   "checklistCode": "CL-AS-DE",
+   "position": 4,
+   "label": "Biostoff- und Gefahrstoffverzeichnis",
+   "legalBasis": "BioStoffV · GefStoffV",
+   "mapsToSection": "offene-punkte",
+   "covered": false
+  },
+  {
+   "checklistCode": "CL-AS-DE",
+   "position": 5,
+   "label": "Vorsorge und Impfungen",
+   "legalBasis": "ArbMedVV",
+   "mapsToSection": "offene-punkte",
+   "covered": false
+  }
+ ]
+}

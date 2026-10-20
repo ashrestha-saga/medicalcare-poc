@@ -58,7 +58,14 @@ export type PermissionSlug =
   | "inspections:view"
   | "testequipment:manage"
   | "qualifications:view"
-  | "qualifications:manage";
+  | "qualifications:manage"
+  | "incidents:view"
+  | "incidents:manage"
+  | "fieldsafety:view"
+  | "devicebook:view"
+  | "reprocessing:view"
+  | "reprocessing:release"
+  | "authority:view";
 
 export type MenuModuleId =
   | "inventory"
@@ -75,6 +82,14 @@ export type MenuModuleId =
   | "security"
   | "management"
   | "activity"
+  | "dashboard"
+  | "constancy-cadence"
+  | "duty-overlap"
+  | "incidents"
+  | "field-safety"
+  | "device-book"
+  | "reprocessing"
+  | "authority"
   | "console-customers"
   | "console-due-dates"
   | "console-disposition"
@@ -86,14 +101,27 @@ export type MenuModuleId =
   | "console-activity"
   | "console-settings";
 
+/** Clinic groups mirror mockup v22; console keeps ops | org. */
+export type MenuGroupId =
+  | "overview"
+  | "work"
+  | "safety"
+  | "aufbereitung"
+  | "radiation"
+  | "authority"
+  | "master"
+  | "output"
+  | "ops"
+  | "org";
+
 export interface MenuModule {
   id: MenuModuleId;
   label: string;
   /** App path for this module. */
   href: string;
   slug: PermissionSlug;
-  /** Nav section: clinic work | master | output; console ops | org. */
-  group?: "work" | "master" | "output" | "ops" | "org";
+  /** Nav section grouping (clinic mockup or partner console). */
+  group?: MenuGroupId;
 }
 
 export interface CapabilitiesResponse {
@@ -117,6 +145,10 @@ export interface AdminUserDTO {
    * For invited rows: snapshot from invitation, or null for role-only.
    */
   permissions: PermissionSlug[] | null;
+  /** Primary work area (User.homeAreaId). */
+  homeAreaId: string | null;
+  /** All assigned work areas (home ∪ UserAreaAssignment). */
+  areaIds: string[];
   /** Set when status === "invited". */
   invitationId?: string | null;
   /** Invite expiry ISO string when status === "invited". */

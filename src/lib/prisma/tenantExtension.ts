@@ -5,6 +5,15 @@ import { getTenantStore } from "@/lib/auth/tenantStore";
  * Models that always carry tenantId and must be filtered / stamped by the extension.
  * Global / non-tenant models (Ref*, RoleGrant, Organisation, DeviceModel, …) are omitted.
  */
+/**
+ * Models with a required `tenantId` that the Prisma extension must filter/stamp.
+ *
+ * Intentionally excluded (nullable or cross-tenant by design):
+ * - User, AuditEvent, ExternalCallLog, SmtpSettings, UserInvitation (org invites)
+ *
+ * PartnerStaffAssignment is tenant-scoped for clinic reads; partner console
+ * mutates it under `runWithoutTenantAsync` (bypass).
+ */
 export const TENANT_SCOPED_MODELS = new Set([
   "TenantOxidConnection",
   "Site",
@@ -17,6 +26,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "DeviceReleaseSnapshot",
   "DeviceDuty",
   "DutyPerformance",
+  "PartnerStaffAssignment",
   "ServiceContract",
   "TrainingEvent",
   "TrainingRecord",
@@ -36,8 +46,35 @@ export const TENANT_SCOPED_MODELS = new Set([
   "DeviceClarification",
   "DeviceEvidence",
   "ReprocessingOnDevice",
-  "UserInvitation",
   "PasswordResetToken",
+  /** Clinic invites (tenantId set). Org invites use bypass + null tenantId. */
+  "UserInvitation",
+  // Prüfpartner / inspect
+  "InspectionRun",
+  "BaselineMeasurement",
+  // K1–K10
+  "DeviceBookEntry",
+  "DeviceIncident",
+  "FieldSafetyAction",
+  "FieldSafetyDeviceAction",
+  "FieldSafetyAffectedModel",
+  "ReprocessingCheck",
+  "ReprocessingBatch",
+  "ReprocessingBatchItem",
+  "ConstancyCadence",
+  "UserDashboardTile",
+  "AuthorityInspection",
+  "AuthorityFinding",
+  "DisclosureSession",
+  "DutyOverlapDecision",
+  "UserAreaAssignment",
+  "AuthorityNotification",
+  "NotificationDocument",
+]);
+
+/** Required-tenantId models that stay off the guard (must filter manually or use bypass). */
+export const TENANT_GUARD_EXCLUSIONS = new Set<string>([
+  // none today — all required tenantId models are guarded
 ]);
 
 const READ_OPS = new Set([

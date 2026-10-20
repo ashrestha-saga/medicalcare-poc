@@ -22,11 +22,30 @@ type SiteListRow = {
   code: string | null;
   address: string | null;
   deliveryAddress: string | null;
+  stateCode: string | null;
   areas: { id: string; name: string; _count?: { instances: number } }[];
 };
 
-function mapSite(row: SiteListRow): SiteDTO {
-  return toSiteDTO(row);
+function mapSite(row: SiteListRow, mpsbStatus?: "appointed" | "missing"): SiteDTO {
+  return toSiteDTO({ ...row, ...(mpsbStatus ? { mpsbStatus } : {}) });
+}
+
+async function activeMpsbSiteIds(tenantId: string, asOf = new Date()): Promise<Set<string>> {
+  const today = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), asOf.getUTCDate()));
+  const rows = await prisma.safetyOfficerAppointment.findMany({
+    where: {
+      tenantId,
+      appointedFrom: { lte: today },
+      OR: [{ appointedTo: null }, { appointedTo: { gte: today } }],
+    },
+    select: { siteId: true },
+  });
+  return new Set(rows.map((r) => r.siteId));
+}
+
+async function withMpsbStatus(rows: SiteListRow[], tenantId: string): Promise<SiteDTO[]> {
+  const covered = await activeMpsbSiteIds(tenantId);
+  return rows.map((row) => mapSite(row, covered.has(row.id) ? "appointed" : "missing"));
 }
 
 async function assertUniqueCode(tenantId: string, code: string | null, excludeId?: string) {
@@ -92,12 +111,16 @@ export const locationService = {
       include: siteInclude,
       orderBy: { name: "asc" },
     });
-    return (rows as unknown as SiteListRow[]).map(mapSite);
+    return withMpsbStatus(rows as unknown as SiteListRow[], tenantId);
   },
 
-  async list(ctx: TenantWorkContext, q?: string): Promise<SiteDTO[]> {
+  async list(
+    ctx: TenantWorkContext,
+    opts: { q?: string; mpsb?: "missing" | "appointed" } | string = {},
+  ): Promise<SiteDTO[]> {
     requirePermission(ctx, "locations:view");
-    const needle = q?.trim().toLowerCase();
+    const query = typeof opts === "string" ? { q: opts } : opts;
+    const needle = query.q?.trim().toLowerCase();
     const where = {
       tenantId: ctx.tenantId,
       ...(needle
@@ -116,7 +139,11 @@ export const locationService = {
       include: siteInclude,
       orderBy: { name: "asc" },
     });
-    return (rows as unknown as SiteListRow[]).map(mapSite);
+    let sites = await withMpsbStatus(rows as unknown as SiteListRow[], ctx.tenantId);
+    if (query.mpsb === "missing" || query.mpsb === "appointed") {
+      sites = sites.filter((s) => s.mpsbStatus === query.mpsb);
+    }
+    return sites;
   },
 
   async create(ctx: TenantWorkContext, input: CreateSiteInput): Promise<SiteDTO> {
@@ -128,6 +155,7 @@ export const locationService = {
       code: input.code,
       address: input.address,
       deliveryAddress: input.deliveryAddress,
+      stateCode: input.stateCode,
     } as Prisma.SiteUncheckedCreateInput;
     const row = await prisma.site.create({ data });
     if (input.areaNames?.length) {
@@ -158,6 +186,7 @@ export const locationService = {
       code: input.code,
       address: input.address,
       deliveryAddress: input.deliveryAddress,
+      stateCode: input.stateCode,
     } as Prisma.SiteUncheckedUpdateInput;
     await prisma.site.update({
       where: { id: siteId },
@@ -170,6 +199,7 @@ export const locationService = {
         code: existing.code,
         address: existing.address,
         deliveryAddress: existing.deliveryAddress,
+        stateCode: existing.stateCode,
         areaNames: existing.areas.map((a) => a.name),
       },
       {
@@ -177,6 +207,7 @@ export const locationService = {
         code: input.code,
         address: input.address,
         deliveryAddress: input.deliveryAddress,
+        stateCode: input.stateCode,
         areaNames: input.areaNames ?? [],
       },
     );

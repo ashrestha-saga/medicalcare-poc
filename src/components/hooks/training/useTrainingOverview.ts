@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { TrainingEventDTO, TrainingOverviewDTO } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
+import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
 
 export type TrainingView = "overview" | "matrix" | "detail" | "record";
 
 export function useTrainingOverview() {
+  const { sync } = useSyncQueryParams();
+  const mineParam = useQueryParam("mine");
+  const expiringParam = useQueryParam("expiring");
+  const mine = mineParam === "1" || mineParam === "true";
+  const expiringDays = expiringParam && Number(expiringParam) > 0 ? Number(expiringParam) : null;
+
   const [data, setData] = useState<TrainingOverviewDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,6 +92,38 @@ export function useTrainingOverview() {
     [refresh],
   );
 
+  const filteredEvents = useMemo(() => {
+    if (!data) return [];
+    const horizonMs = expiringDays != null ? expiringDays * 86400000 : null;
+    const now = Date.now();
+    return data.events.filter((event) => {
+      if (mine && !event.records.some((r) => r.personId === data.viewerPersonId)) return false;
+      if (horizonMs != null) {
+        const expiring = event.records.some((r) => {
+          if (!r.validUntil) return false;
+          const until = new Date(r.validUntil).getTime();
+          return until <= now + horizonMs;
+        });
+        if (!expiring && event.statusKind !== "overdue") return false;
+      }
+      return true;
+    });
+  }, [data, mine, expiringDays]);
+
+  const setMine = useCallback(
+    (next: boolean) => {
+      sync({ mine: next ? "1" : null });
+    },
+    [sync],
+  );
+
+  const setExpiring = useCallback(
+    (days: number | null) => {
+      sync({ expiring: days == null ? null : String(days) });
+    },
+    [sync],
+  );
+
   return {
     data,
     error,
@@ -94,6 +133,11 @@ export function useTrainingOverview() {
     matrixModels,
     matrixPeople,
     cellMap,
+    filteredEvents,
+    mine,
+    setMine,
+    expiringDays,
+    setExpiring,
     goOverview,
     openEvent,
     openMatrix,

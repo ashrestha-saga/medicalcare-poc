@@ -24,11 +24,25 @@ export interface BeudamedExternalViewProps {
   onClose: () => void;
 }
 
+/** Extra K10 actions from the post-scan inventory confirm screen. */
+export type InventoryScanExtraAction = "stoerung" | "routine" | "charge" | "ifu";
+
 export interface InventoryDeviceViewProps {
   resolution: ResolveResponse;
   onService: () => void;
   onParts: () => void;
   onClose: () => void;
+  /** Report malfunction / daily check / batches / IFU — wired by Scan shell. */
+  onExtraAction?: (action: InventoryScanExtraAction) => void;
+}
+
+export interface InventoryCandidatesViewProps {
+  resolution: ResolveResponse;
+  onSelect: (deviceId: string) => void;
+  onSkip: () => void;
+  onClose: () => void;
+  selecting?: boolean;
+  selectError?: string | null;
 }
 
 export interface LocationFormProps {

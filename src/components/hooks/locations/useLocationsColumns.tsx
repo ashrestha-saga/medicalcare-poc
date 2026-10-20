@@ -107,6 +107,19 @@ export function useLocationsColumns(actions: LocationsTableActions): ColumnDef<S
         meta: { className: "w-[1%] whitespace-nowrap text-right" },
       },
       {
+        id: "mpsb",
+        accessorFn: (row) => row.mpsbStatus ?? "missing",
+        header: ({ column }) => <SortHeader label={t("mpsb")} column={column} />,
+        cell: ({ row }) => {
+          const status = row.original.mpsbStatus ?? "missing";
+          if (status === "appointed") {
+            return <Badge variant="success">{t("mpsbAppointed")}</Badge>;
+          }
+          return <Badge variant="warning">{t("mpsbMissing")}</Badge>;
+        },
+        meta: { className: "w-[1%] whitespace-nowrap" },
+      },
+      {
         id: "actions",
         enableHiding: false,
         enableSorting: false,

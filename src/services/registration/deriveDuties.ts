@@ -237,6 +237,31 @@ export function deriveDuties({
     );
   }
 
+  // K8 — DGUV Vorschrift 3 for electrically operated (active) products.
+  // No invented interval: dueAt stays null until the employer sets one from the risk assessment.
+  if (m.aktiv) {
+    out.push(
+      withMeta({
+        id: "dguv",
+        art: "DGUV",
+        titel: "Electrical equipment inspection (DGUV V3)",
+        grund: "ArbSchG · BetrSichV · DGUV Vorschrift 3",
+        einschlaegig: true,
+        frist: null,
+        einheit: null,
+        bezug: "intervall",
+        nachweis: "Protocol with inspector, date and result; inspection label on the product",
+        zustaendig: "Employer / competent person",
+        vertrauen: "determination",
+        hinweis:
+          "Interval comes from the risk assessment — not invented by the system. Until set, the duty applies without a due date.",
+        inspectionTypeCode: "DGUV",
+        deadlineAnchor: "interval",
+        category: "inspection",
+      }),
+    );
+  }
+
   const z = annex2 && !annex2.isGroup ? annex2 : null;
   const verfahrenNote =
     z?.itemNo === "1.5.3" && m.anlage2Verfahren

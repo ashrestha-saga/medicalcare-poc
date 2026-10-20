@@ -3,18 +3,21 @@ import { errorResponse } from "@/lib/errors";
 import { createSiteSchema } from "@/schemas/site";
 import { locationService } from "@/services/location/locationService";
 
-/** GET /api/sites?q= — tenant sites + areas (auth). Admin search when locations:view. */
+/** GET /api/sites?q=&mpsb=missing|appointed — tenant sites + areas (auth). */
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireActingContext(req);
     correlationId = ctx.correlationId;
     return await withTenantStore(ctx, async () => {
-      const q = new URL(req.url).searchParams.get("q") ?? undefined;
-      // Form consumers call without q; admin list may pass q (still tenant-scoped).
-      const sites = q
-        ? await locationService.list(ctx, q)
-        : await locationService.listSites(ctx.tenantId);
+      const params = new URL(req.url).searchParams;
+      const q = params.get("q") ?? undefined;
+      const mpsbRaw = params.get("mpsb");
+      const mpsb = mpsbRaw === "missing" || mpsbRaw === "appointed" ? mpsbRaw : undefined;
+      const sites =
+        q || mpsb
+          ? await locationService.list(ctx, { q, mpsb })
+          : await locationService.listSites(ctx.tenantId);
       return Response.json({ sites }, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {

@@ -9,23 +9,56 @@ import type {
   CatalogModelWriteDTO,
 } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
+import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { toast } from "@/store/toastStore";
+
+function buildListQuery(opts: { q: string; missingClassification: boolean }): string {
+  const sp = new URLSearchParams();
+  if (opts.q.trim()) sp.set("q", opts.q.trim());
+  if (opts.missingClassification) sp.set("missingClassification", "1");
+  const qs = sp.toString();
+  return qs ? `?${qs}` : "";
+}
 
 export function useCatalogModels() {
   const t = useTranslations("pages.catalog");
   const { checkPermission } = usePermissions();
   const canView = checkPermission("catalog:view");
   const canUpdate = checkPermission("catalog:update");
+  const { sync } = useSyncQueryParams();
+
+  const qParam = useQueryParam("q");
+  const missingParam = useQueryParam("missingClassification");
+  const missingClassification = missingParam === "1" || missingParam === "true";
 
   const [models, setModels] = useState<CatalogModelListItemDTO[]>([]);
-  const [q, setQ] = useState("");
+  const [q, setQState] = useState(qParam ?? "");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<CatalogModelDetailDTO | CatalogModelListItemDTO | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  useEffect(() => {
+    setQState(qParam ?? "");
+  }, [qParam]);
+
+  const setQ = useCallback(
+    (value: string) => {
+      setQState(value);
+      sync({ q: value.trim() || null });
+    },
+    [sync],
+  );
+
+  const setMissingClassification = useCallback(
+    (value: boolean) => {
+      sync({ missingClassification: value ? "1" : null });
+    },
+    [sync],
+  );
+
   const refresh = useCallback(
-    async (search = q) => {
+    async (override?: { q?: string; missingClassification?: boolean }) => {
       if (!canView) {
         setModels([]);
         setLoading(false);
@@ -33,7 +66,13 @@ export function useCatalogModels() {
       }
       setLoading(true);
       try {
-        const qs = search.trim() ? `?q=${encodeURIComponent(search.trim())}` : "";
+        const qs = buildListQuery({
+          q: override?.q ?? q,
+          missingClassification:
+            override?.missingClassification !== undefined
+              ? override.missingClassification
+              : missingClassification,
+        });
         const res = await api<{ models: CatalogModelListItemDTO[] }>(`/api/catalog/models${qs}`);
         setModels(res.models);
       } catch (err) {
@@ -43,14 +82,16 @@ export function useCatalogModels() {
         setLoading(false);
       }
     },
-    [canView, q, t],
+    [canView, q, missingClassification, t],
   );
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch on mount / canView change
-    void refresh("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount / gate fetch
-  }, [canView]);
+    void refresh({
+      q: qParam ?? "",
+      missingClassification: missingParam === "1" || missingParam === "true",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when URL filters change
+  }, [canView, qParam, missingParam]);
 
   const selectModelById = useCallback(
     async (id: string) => {
@@ -127,6 +168,8 @@ export function useCatalogModels() {
     models,
     q,
     setQ,
+    missingClassification,
+    setMissingClassification,
     loading,
     refresh,
     create,

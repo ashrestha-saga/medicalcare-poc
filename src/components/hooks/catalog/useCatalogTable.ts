@@ -11,6 +11,10 @@ export function useCatalogTable(list: CatalogModelsListApi) {
   const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
+    setKeywordInput(list.q);
+  }, [list.q]);
+
+  useEffect(() => {
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
     };
@@ -19,10 +23,9 @@ export function useCatalogTable(list: CatalogModelsListApi) {
   const setKeyword = useCallback(
     (value: string) => {
       setKeywordInput(value);
-      list.setQ(value);
       if (searchTimer.current) clearTimeout(searchTimer.current);
       searchTimer.current = setTimeout(() => {
-        void list.refresh(value);
+        list.setQ(value);
       }, 280);
     },
     [list],
@@ -30,9 +33,8 @@ export function useCatalogTable(list: CatalogModelsListApi) {
 
   const removeKeyword = useCallback(() => {
     setKeywordInput("");
-    list.setQ("");
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    void list.refresh("");
+    list.setQ("");
   }, [list]);
 
   const openCreate = useCallback(() => setCreateOpen(true), []);

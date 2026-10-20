@@ -17,6 +17,11 @@ import {
   samePermissionSet,
   sanitizeClinicPermissions,
 } from "@/services/roles/roleGrantsService";
+import {
+  parseInviteAreaIds,
+  resolveAreaAssignmentInput,
+  syncUserAreaAssignments,
+} from "@/services/users/userAreaScope";
 import type { Prisma } from "@prisma/client";
 import nodemailer from "nodemailer";
 
@@ -110,6 +115,8 @@ export const invitationService = {
       name?: string | null;
       role: string;
       permissions?: string[] | null;
+      areaIds?: string[] | null;
+      homeAreaId?: string | null;
     },
   ) {
     requirePermission(ctx, "users:create");
@@ -121,6 +128,12 @@ export const invitationService = {
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) throw conflict("A user with this email already exists.");
+
+    const areas = await resolveAreaAssignmentInput(ctx.tenantId, {
+      areaIds: input.areaIds,
+      homeAreaId: input.homeAreaId,
+      role: role as UserRole,
+    });
 
     let permissionsJson: Prisma.InputJsonValue | undefined;
     if (input.permissions != null) {
@@ -140,6 +153,8 @@ export const invitationService = {
         name: input.name?.trim() || null,
         role,
         permissions: permissionsJson ?? undefined,
+        homeAreaId: areas.homeAreaId,
+        areaIds: areas.areaIds.length > 0 ? areas.areaIds : undefined,
         tokenHash: hashToken(token),
         expiresAt: new Date(Date.now() + INVITE_TTL_MS),
         createdByUserId: ctx.user.id,
@@ -165,6 +180,8 @@ export const invitationService = {
         role,
         invitationId: row.id,
         permissions: permissionsJson ?? null,
+        homeAreaId: areas.homeAreaId,
+        areaIds: areas.areaIds,
       },
     });
 
@@ -417,16 +434,21 @@ export const invitationService = {
 
       if (invite.tenantId) {
         const snapshot = parseInvitePermissions(invite.permissions);
+        const inviteAreaIds = parseInviteAreaIds(invite.areaIds);
+        const role =
+          (invite.role as "superadmin" | "device_admin" | "security_officer" | "user" | null) ??
+          "user";
         const user = await prisma.$transaction(async (tx) => {
           const created = await tx.user.create({
             data: {
               tenantId: invite.tenantId,
               email: invite.email,
               name: displayName,
-              role: (invite.role as "superadmin" | "device_admin" | "security_officer" | "user" | null) ?? "user",
+              role,
               accountKind: "clinic",
               passwordHash: hashPassword(password),
               active: true,
+              homeAreaId: invite.homeAreaId,
             },
           });
           if (snapshot && snapshot.length > 0) {
@@ -435,6 +457,14 @@ export const invitationService = {
                 userId: created.id,
                 permission,
               })),
+            });
+          }
+          if (inviteAreaIds.length > 0 && invite.tenantId) {
+            await syncUserAreaAssignments(tx, {
+              tenantId: invite.tenantId,
+              userId: created.id,
+              homeAreaId: invite.homeAreaId ?? inviteAreaIds[0]!,
+              areaIds: inviteAreaIds,
             });
           }
           await tx.userInvitation.update({

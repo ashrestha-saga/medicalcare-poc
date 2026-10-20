@@ -41,6 +41,7 @@ const DUTY_KEY: Record<string, string> = {
   zub: "zubehoer",
   netz: "vernetzung",
   impl: "implantat",
+  dguv: "dguv",
 };
 
 const ANNEX2: Record<

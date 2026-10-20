@@ -25,4 +25,4 @@ export * from "./theme";
 export * from "./training";
 export * from "./ui";
 export * from "./userOptions";
-
+export * from "./k10";

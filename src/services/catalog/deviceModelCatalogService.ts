@@ -158,19 +158,27 @@ function normalizeGtins(gtins: string[] | null | undefined): string | null {
 }
 
 export const deviceModelCatalogService = {
-  async list(ctx: TenantWorkContext, q?: string): Promise<CatalogModelListItemDTO[]> {
+  async list(
+    ctx: TenantWorkContext,
+    opts: { q?: string; missingClassification?: boolean } = {},
+  ): Promise<CatalogModelListItemDTO[]> {
     requirePermission(ctx, "catalog:view");
-    const where: Prisma.DeviceModelWhereInput = q?.trim()
-      ? {
-          OR: [
-            { tradeName: { contains: q.trim() } },
-            { modelName: { contains: q.trim() } },
-            { manufacturer: { contains: q.trim() } },
-            { udiDi: { contains: q.trim() } },
-            { basicUdiDi: { contains: q.trim() } },
-          ],
-        }
-      : {};
+    const q = opts.q?.trim();
+    const where: Prisma.DeviceModelWhereInput = {
+      ...(q
+        ? {
+            OR: [
+              { tradeName: { contains: q } },
+              { modelName: { contains: q } },
+              { manufacturer: { contains: q } },
+              { udiDi: { contains: q } },
+              { basicUdiDi: { contains: q } },
+            ],
+          }
+        : {}),
+      // Match dashboard tile modelle-ohne-einstufung: no open (validTo=null) classification.
+      ...(opts.missingClassification ? { classifications: { none: { validTo: null } } } : {}),
+    };
     const rows = await prisma.deviceModel.findMany({
       where,
       include: listIncludeForTenant(ctx.tenantId),

@@ -120,8 +120,10 @@ export interface CatalogModelsListApi {
   models: CatalogModelListItemDTO[];
   q: string;
   setQ: (value: string) => void;
+  missingClassification: boolean;
+  setMissingClassification: (value: boolean) => void;
   loading: boolean;
-  refresh: (search?: string) => Promise<void>;
+  refresh: (override?: { q?: string; missingClassification?: boolean }) => Promise<void>;
   create: (input: CatalogModelWriteDTO) => Promise<CatalogModelListItemDTO>;
   update: (id: string, input: CatalogModelWriteDTO) => Promise<CatalogModelDetailDTO>;
   importFile: (file: File) => Promise<CatalogModelImportResult>;

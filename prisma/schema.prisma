@@ -79,6 +79,7 @@ enum DutyKey {
   zubehoer
   vernetzung
   implantat
+  dguv
 }
 
 enum FieldState {
@@ -186,6 +187,108 @@ enum LimitSource {
   operator
 }
 
+
+// ---------------------------------------------------------------------------
+// K1–K10 enums
+// ---------------------------------------------------------------------------
+
+enum BookEntryKind {
+  malfunction
+  operating_error
+  note
+}
+
+enum ReprocessingCheckScope {
+  equipment
+  water
+  chemistry
+  sterile_storage
+}
+
+enum CheckCadence {
+  per_use
+  daily
+  weekly
+  monthly
+  quarterly
+  yearly
+  per_batch
+}
+
+enum BatchReleaseResult {
+  released
+  released_with_conditions
+  rejected
+}
+
+enum TileZone {
+  decides
+  worklist
+  watch
+}
+
+enum AuthorityKind {
+  health_office
+  device_authority
+  occupational_safety
+  metrology
+  medical_board
+  other
+}
+
+enum FindingStatus {
+  open
+  remediated
+  proven
+  disputed
+  closed
+}
+
+/// Outbound authority / manufacturer notifications (replaces IncidentReport-only).
+enum NotificationKind {
+  /// Mutmaßlich schwerwiegendes Vorkommnis, § 3 MPAMIV.
+  incident
+  /// Abhilfenachweis zu einem Begehungsbefund.
+  finding_remediation
+  /// Anzeige oder Genehmigungsantrag nach Strahlenschutzrecht.
+  radiation
+  /// Unfallanzeige an den Unfallversicherungsträger.
+  accident
+  /// Mitteilung an die Eichbehörde.
+  metrology
+  other
+}
+
+enum NotificationChannel {
+  authority_portal
+  manufacturer_portal
+  email
+  post
+  fax
+  other
+}
+
+enum NotificationState {
+  draft
+  sent
+  acknowledged
+  closed
+  withdrawn
+}
+
+enum NotificationDocumentRole {
+  submission
+  acknowledgement
+  response
+  attachment
+}
+
+enum DutyAddressee {
+  operator
+  employer
+  both
+}
+
 enum ClinicRole {
   superadmin
   device_admin
@@ -264,6 +367,23 @@ model Tenant {
   smtpSettings        SmtpSettings?
   inspectionRuns      InspectionRun[]
   baselineMeasurements BaselineMeasurement[]
+  deviceBookEntries   DeviceBookEntry[]
+  deviceIncidents     DeviceIncident[]
+  fieldSafetyActions  FieldSafetyAction[]
+  fieldSafetyDeviceActions FieldSafetyDeviceAction[]
+  fieldSafetyAffectedModels FieldSafetyAffectedModel[]
+  reprocessingChecks  ReprocessingCheck[]
+  reprocessingBatches ReprocessingBatch[]
+  reprocessingBatchItems ReprocessingBatchItem[]
+  constancyCadences   ConstancyCadence[]
+  userDashboardTiles  UserDashboardTile[]
+  authorityInspections AuthorityInspection[]
+  authorityFindings   AuthorityFinding[]
+  disclosureSessions  DisclosureSession[]
+  dutyOverlapDecisions DutyOverlapDecision[]
+  userAreaAssignments UserAreaAssignment[]
+  authorityNotifications AuthorityNotification[]
+  notificationDocuments NotificationDocument[]
 
   @@index([institutionOrgId])
 }
@@ -317,10 +437,46 @@ model User {
   qualifications       PersonQualification[]
   skills               PersonSkill[]
   inspectionRuns       InspectionRun[] @relation("InspectionPerformer")
+  dashboardTiles       UserDashboardTile[]
+  disclosureSessions   DisclosureSession[]
+  areaAssignments      UserAreaAssignment[]
+  releasedBatches      ReprocessingBatch[] @relation("BatchReleasedBy")
+  performedChecks      ReprocessingCheck[] @relation("CheckPerformedBy")
+  bookEntriesRecorded  DeviceBookEntry[] @relation("BookEntryRecorder")
+  incidentsRecorded    DeviceIncident[] @relation("IncidentRecorder")
+  incidentsAssessed    DeviceIncident[] @relation("IncidentAssessor")
+  incidentsClosed      DeviceIncident[] @relation("IncidentCloser")
+  incidentsAssigned    DeviceIncident[] @relation("IncidentAssignee")
+  fieldSafetyRecorded  FieldSafetyAction[] @relation("FieldSafetyRecorder")
+  fieldSafetyDeviceRecorded FieldSafetyDeviceAction[] @relation("FieldSafetyDeviceRecorder")
+  batchesRecorded      ReprocessingBatch[] @relation("BatchRecorder")
+  cadencesDetermined   ConstancyCadence[] @relation("CadenceDeterminer")
+  inspectionsRecorded  AuthorityInspection[] @relation("InspectionRecorder")
+  findingsRecorded     AuthorityFinding[] @relation("FindingRecorder")
+  notificationsSent    AuthorityNotification[] @relation("NotificationSender")
+  notificationsRecorded AuthorityNotification[] @relation("NotificationRecorder")
 
   @@index([tenantId])
   @@index([accountKind])
   @@index([homeAreaId])
+}
+
+/** Work areas for clinic staff (Scan / inventory scope). homeAreaId remains the primary. */
+model UserAreaAssignment {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  areaId    String
+  area      Area      @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  validFrom DateTime  @db.Date
+  validTo   DateTime? @db.Date
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, areaId])
+  @@index([tenantId, userId])
+  @@index([areaId])
 }
 
 /** Per-user clinic permission snapshot. Empty set ⇒ fall back to RoleGrant for User.role. */
@@ -381,11 +537,16 @@ model Site {
   postalCode                String?
   city                      String?
   country                   String?                    @default("DE")
+  /** ISO Bundesland code e.g. DE-NW — selects authority checklist; not derived from PLZ. */
+  stateCode                 String?
   deliveryAddress           String?                    @db.Text
   tenant                    Tenant                     @relation(fields: [tenantId], references: [id])
   areas                     Area[]
   headcounts                SiteHeadcount[]
   safetyOfficerAppointments SafetyOfficerAppointment[]
+  reprocessingChecks        ReprocessingCheck[]
+  authorityInspections      AuthorityInspection[]
+  authorityNotifications    AuthorityNotification[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -400,6 +561,7 @@ model Area {
   site      Site             @relation(fields: [siteId], references: [id])
   instances DeviceInstance[]
   homeUsers User[]           @relation("UserHomeArea")
+  userAssignments UserAreaAssignment[]
 
   @@index([siteId])
   @@index([tenantId])
@@ -466,6 +628,8 @@ model DeviceModel {
   externalRecords        ExternalSourceRecord[]
   classifications        DeviceModelClassification[]
   trainingEvents         TrainingEvent[]
+  incidents              DeviceIncident[]
+  fieldSafetyAffectedModels FieldSafetyAffectedModel[]
 
   @@index([udiDi])
   @@index([manufacturer, modelName])
@@ -514,6 +678,10 @@ model DeviceInstance {
   parentInstance         DeviceInstance?          @relation("DeviceAccessory", fields: [parentInstanceId], references: [id])
   childInstances         DeviceInstance[]         @relation("DeviceAccessory")
   retiredAt              DateTime?
+  /// Legal decommission date (§ 13 retention clock). Distinct from retiredAt (workflow).
+  decommissionedAt       DateTime?                @db.Date
+  /// Book/evidence may be purged only after this date (set when decommissioned).
+  retainUntil            DateTime?                @db.Date
   mergedIntoId           String?
   createdByUserId        String?
   createdByUser          User?                    @relation("DeviceCreatedBy", fields: [createdByUserId], references: [id])
@@ -535,6 +703,16 @@ model DeviceInstance {
   usedForReprocessing    ReprocessingOnDevice[]   @relation("ReprocessingEquipment")
   inspectionRuns         InspectionRun[]
   baselineMeasurements   BaselineMeasurement[]
+  bookEntries            DeviceBookEntry[]
+  incidents              DeviceIncident[]
+  fieldSafetyDeviceActions FieldSafetyDeviceAction[]
+  reprocessingChecksAsEquipment ReprocessingCheck[] @relation("ReprocessingCheckEquipment")
+  reprocessingBatchesAsEquipment ReprocessingBatch[] @relation("ReprocessingBatchEquipment")
+  reprocessingBatchItems ReprocessingBatchItem[] @relation("ReprocessingBatchItemDevice")
+  constancyCadences      ConstancyCadence[]
+  dutyOverlapDecisions   DutyOverlapDecision[]
+  authorityFindings      AuthorityFinding[]
+  authorityNotifications AuthorityNotification[] @relation("NotificationDevice")
 
   @@unique([tenantId, inventoryNumber])
   /** SCH-01 — same serial under the same model is rejected (NULLs allowed). */
@@ -543,6 +721,7 @@ model DeviceInstance {
   @@index([tenantId, nextMaintenanceDueAt])
   @@index([tenantId, state])
   @@index([responsibleUserId])
+  @@index([tenantId, retainUntil])
 }
 
 model MaintenanceEvent {
@@ -605,6 +784,7 @@ model RefRuleSet {
   commissioningPrerequisites RefCommissioningPrerequisite[]
   inspectionCatalogues       RefInspectionCatalogue[]
   qualifications             RefQualification[]
+  reprocessingChecks         RefReprocessingCheck[]
 
   @@unique([code, versionLabel])
 }
@@ -622,9 +802,13 @@ model RefInspectionType {
   category         DutyCategory   @default(inspection)
   confidence       Confidence     @default(derived)
   sourceRef        String?
+  addressee        DutyAddressee  @default(operator)
+  authorityKind    AuthorityKind?
   duties           DeviceDuty[]
   catalogues       RefInspectionCatalogue[]
   qualificationRules RefQualificationRule[]
+  overlapsCovered  RefInspectionTypeOverlap[] @relation("OverlapCovered")
+  overlapsCovering RefInspectionTypeOverlap[] @relation("OverlapCovering")
 }
 
 model RefAnnex2Item {
@@ -683,8 +867,9 @@ model RefReprocessingEquipmentType {
   revalidationMonths  Int
   intervalDisputed    Boolean @default(false)
   intervalSource      String  @db.Text
-  routineChecks       String  @db.Text // JSON string[]
+  routineChecks       String  @db.Text // JSON string[] — superseded by RefReprocessingCheck; kept for cutover
   releaseRule         String? @db.Text
+  checks              RefReprocessingCheck[]
 }
 
 model RefRadiationApplication {
@@ -705,6 +890,7 @@ model RefConstancyObject {
   label           String
   defaultCadence  String
   duties          DeviceDuty[]
+  cadences        ConstancyCadence[]
 }
 
 model RefTrainingType {
@@ -851,7 +1037,10 @@ model DeviceDuty {
   @@index([deviceInstanceId])
   @@index([tenantId])
   @@index([snapshotId])
-  @@index([tenantId, suspendedAt, dueAt])
+  /** Hot path: dashboard counts + due-dates board (`applicable` + active + dueAt). */
+  @@index([tenantId, applicable, suspendedAt, dueAt])
+  /** Tile filters that scope by dutyKey (konstanz, validierung, …). */
+  @@index([tenantId, dutyKey, applicable, suspendedAt])
   @@index([referenceDeviceId])
 }
 
@@ -1263,10 +1452,17 @@ model AttachmentBlob {
   dataUrl     String   @db.LongText
   contentType String?
   byteSize    Int?
+  /// SHA-256 of file bytes (hex). Client computes; server re-hashes on receive.
+  sha256      String?  @db.VarChar(64)
   createdAt   DateTime @default(now())
   evidence    DeviceEvidence[]
+  authorityFindings AuthorityFinding[]
+  processRecordOf   ReprocessingBatch[] @relation("BatchProcessRecord")
+  bookEntries       DeviceBookEntry[]
+  notificationDocuments NotificationDocument[]
 
   @@index([tenantId])
+  @@index([tenantId, sha256])
 }
 
 model DispatchTarget {
@@ -1568,6 +1764,10 @@ model UserInvitation {
   appRole          PartnerAppRole?
   /** Optional full permission snapshot; null ⇒ redeem uses role RoleGrant preset only. */
   permissions      Json?
+  /** Primary work area (must be in areaIds when set). Applied on redeem. */
+  homeAreaId       String?
+  /** JSON string[] of Area ids the invitee may work. */
+  areaIds          Json?
   tokenHash        String        @unique
   expiresAt        DateTime
   acceptedAt       DateTime?
@@ -1809,4 +2009,787 @@ model BaselineMeasurement {
 
   @@index([tenantId, deviceInstanceId, measureKey, validTo])
   @@index([runId])
+}
+
+// ---------------------------------------------------------------------------
+// K1–K10 operational and reference models
+// ---------------------------------------------------------------------------
+
+/// § 13 Absatz 2 — Datum, Art und Folgen. Der Eintrag, für den es bisher
+/// keinen Ort gab. Append-only: ein Buch, aus dem gelöscht werden kann, ist
+/// kein Buch. Korrekturen entstehen als neuer Eintrag mit `correctsEntryId`.
+model DeviceBookEntry {
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  deviceInstanceId String
+  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
+  kind             BookEntryKind
+  occurredAt       DateTime       @db.Date
+  /// Was geschehen ist.
+  description      String         @db.Text
+  /// Welche Folgen es hatte, einschließlich Außerbetriebnahme.
+  consequence      String?        @db.Text
+  /// Bei wiederholtem Bedienungsfehler: wie oft bisher beobachtet.
+  repeatCount      Int?
+  /// Gesetzt, wenn aus dem Eintrag ein Vorkommnis geworden ist.
+  incidentId       String?
+  incident         DeviceIncident? @relation(fields: [incidentId], references: [id])
+  /// Korrektur eines früheren Eintrags, statt ihn zu ändern.
+  correctsEntryId  String?
+  correctsEntry    DeviceBookEntry? @relation("BookEntryCorrection", fields: [correctsEntryId], references: [id])
+  corrections      DeviceBookEntry[] @relation("BookEntryCorrection")
+  /// Optional photo of the malfunction / nameplate.
+  attachmentBlobId String?
+  attachmentBlob   AttachmentBlob? @relation(fields: [attachmentBlobId], references: [id])
+  /// Frozen display name at write time (survives user rename/delete).
+  recordedBy       String
+  recordedByUserId String?
+  recordedByUser   User?          @relation("BookEntryRecorder", fields: [recordedByUserId], references: [id])
+  recordedAt       DateTime       @default(now())
+
+  @@index([tenantId, deviceInstanceId, occurredAt])
+  @@index([tenantId, kind])
+  @@index([incidentId])
+  @@index([attachmentBlobId])
+  @@index([recordedByUserId])
+}
+
+/// Vorkommnis nach MPAMIV. Die Kernaufgabe des Sicherheitsbeauftragten
+/// nach § 6, die bisher kein Arbeitsobjekt hatte.
+///
+/// Bewusst KEINE Schweregradskala: Die Verordnung kennt die Frage, ob ein
+/// mutmaßlich schwerwiegendes Vorkommnis vorliegt, und daran hängt die
+/// Meldepflicht. Eine erfundene drei- oder fünfstufige Skala würde eine
+/// Einschätzung suggerieren, die niemand getroffen hat.
+model DeviceIncident {
+  id                String         @id @default(cuid())
+  tenantId          String
+  tenant            Tenant         @relation(fields: [tenantId], references: [id])
+  /// Das betroffene Exemplar. Null, wenn nur das Modell bekannt ist.
+  deviceInstanceId  String?
+  deviceInstance    DeviceInstance? @relation(fields: [deviceInstanceId], references: [id])
+  /// Fällt das Vorkommnis bei einem Modell auf, bevor das Exemplar klar ist.
+  deviceModelId     String?
+  deviceModel       DeviceModel?   @relation(fields: [deviceModelId], references: [id])
+  occurredAt        DateTime       @db.Date
+  noticedAt         DateTime       @db.Date
+  description       String         @db.Text
+  /// Folge für Patient, Anwender oder Dritte, in Worten des Betreibers.
+  harmDescription   String?        @db.Text
+  /// Die Bewertung, an der die Meldepflicht hängt. Null heißt: noch nicht
+  /// bewertet, und genau das ist ein offener Punkt für den MPSB.
+  suspectedSerious  Boolean?
+  assessedBy        String?
+  assessedByUserId  String?
+  assessedByUser    User?          @relation("IncidentAssessor", fields: [assessedByUserId], references: [id])
+  assessedAt        DateTime?      @db.Date
+  assessmentNote    String?        @db.Text
+  /// Convenience stamps; authoritative reporting is AuthorityNotification.
+  /// `reportedAt` leer bei bejahter Schwere bleibt die Dashboard-Kennzahl.
+  reportedAt        DateTime?      @db.Date
+  reportReference   String?
+  reportedTo        String?
+  /// Meldung an den Hersteller, getrennt von der Behördenmeldung.
+  manufacturerNotifiedAt DateTime? @db.Date
+  /// Maßnahme des Betreibers, etwa Sperrung des Produkts.
+  measureTaken      String?        @db.Text
+  closedAt          DateTime?      @db.Date
+  closedBy          String?
+  closedByUserId    String?
+  closedByUser      User?          @relation("IncidentCloser", fields: [closedByUserId], references: [id])
+  recordedBy        String
+  recordedByUserId  String?
+  recordedByUser    User?          @relation("IncidentRecorder", fields: [recordedByUserId], references: [id])
+  recordedAt        DateTime       @default(now())
+  /// Who owes the assessment/report (MPSB workflow). Empty ⇒ nobody owns it.
+  assignedUserId    String?
+  assignedUser      User?          @relation("IncidentAssignee", fields: [assignedUserId], references: [id])
+  assignedUserName  String?
+  assignedAt        DateTime?
+  assignmentDueAt   DateTime?      @db.Date
+  bookEntries       DeviceBookEntry[]
+  authorityNotifications AuthorityNotification[]
+
+  @@index([tenantId, occurredAt])
+  @@index([tenantId, suspectedSerious, reportedAt])
+  @@index([deviceInstanceId])
+  @@index([deviceModelId])
+  @@index([recordedByUserId])
+  @@index([assessedByUserId])
+  @@index([closedByUserId])
+  @@index([assignedUserId])
+}
+
+/// Rückruf oder Sicherheitskorrekturmaßnahme des Herstellers (FSCA/FSN).
+/// Kommt von außen herein und betrifft Modelle, nicht Exemplare. Welche
+/// Exemplare betroffen sind, entsteht als Abgleich gegen den Bestand.
+model FieldSafetyAction {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  /// Referenz des Herstellers oder der Behörde.
+  reference        String
+  manufacturer     String
+  title            String   @db.Text
+  /// Was zu tun ist, im Wortlaut der Mitteilung.
+  requiredAction   String   @db.Text
+  issuedAt         DateTime @db.Date
+  receivedAt       DateTime @db.Date
+  /// Frist des Herstellers oder der Behörde. Wie beim Begehungsbefund eine
+  /// Frist von außen, nicht aus der Verordnung.
+  dueAt            DateTime? @db.Date
+  /// Betroffene Modelle und Chargen, als Text wie in der Mitteilung.
+  affectedScope    String   @db.Text
+  documentRef      String?
+  closedAt         DateTime? @db.Date
+  recordedBy       String
+  recordedByUserId String?
+  recordedByUser   User?    @relation("FieldSafetyRecorder", fields: [recordedByUserId], references: [id])
+  recordedAt       DateTime @default(now())
+  deviceActions    FieldSafetyDeviceAction[]
+  /// Structured scope from the manufacturer letter — drives candidate suggestion.
+  affectedModels   FieldSafetyAffectedModel[]
+
+  @@unique([tenantId, reference])
+  @@index([tenantId, dueAt])
+  @@index([tenantId, closedAt])
+  @@index([recordedByUserId])
+}
+
+/// Which models / serial ranges / lots the recall names. Suggestion only —
+/// a device is affected only after Abgleich confirms it.
+model FieldSafetyAffectedModel {
+  id                  String            @id @default(cuid())
+  tenantId            String
+  tenant              Tenant            @relation(fields: [tenantId], references: [id])
+  fieldSafetyActionId String
+  fieldSafetyAction   FieldSafetyAction @relation(fields: [fieldSafetyActionId], references: [id], onDelete: Cascade)
+  deviceModelId       String?
+  deviceModel         DeviceModel?      @relation(fields: [deviceModelId], references: [id])
+  basicUdiDi          String?
+  serialFrom          String?
+  serialTo            String?
+  lotNumber           String?
+  note                String?           @db.Text
+
+  @@index([fieldSafetyActionId])
+  @@index([tenantId])
+  @@index([deviceModelId])
+}
+
+/// Ein betroffenes Exemplar und was damit geschehen ist. Entsteht aus dem
+/// Abgleich der Mitteilung gegen den Bestand; der Abgleich selbst ist eine
+/// Abfrage, sein Ergebnis gehört festgehalten.
+model FieldSafetyDeviceAction {
+  id                  String            @id @default(cuid())
+  tenantId            String
+  tenant              Tenant            @relation(fields: [tenantId], references: [id])
+  fieldSafetyActionId String
+  fieldSafetyAction   FieldSafetyAction @relation(fields: [fieldSafetyActionId], references: [id], onDelete: Cascade)
+  deviceInstanceId    String
+  deviceInstance      DeviceInstance    @relation(fields: [deviceInstanceId], references: [id])
+  /// Betroffen, nicht betroffen oder noch zu prüfen (null).
+  affected            Boolean?
+  actionTakenAt       DateTime?         @db.Date
+  actionNote          String?           @db.Text
+  recordedBy          String?
+  recordedByUserId    String?
+  recordedByUser      User?             @relation("FieldSafetyDeviceRecorder", fields: [recordedByUserId], references: [id])
+  recordedAt          DateTime          @default(now())
+
+  @@unique([fieldSafetyActionId, deviceInstanceId])
+  @@index([tenantId, affected, actionTakenAt])
+  @@index([deviceInstanceId])
+  @@index([recordedByUserId])
+}
+
+// ===========================================================================
+// B · K2 und K9 — Ausführungsnachweise der Aufbereitung
+// ===========================================================================
+//
+// Vier Punkte der Behördenprüfliste ohne Datenhaltung: Routinekontrollen,
+// Chargendokumentation samt Freigabe, Wasserqualität und Aufbereitungschemie,
+// Sterilgutlagerung.
+//
+// Sie werden als EIN Nachweismodell gebaut und nicht als vier. Alle vier sind
+// derselbe Vorgang: eine festgelegte Kontrolle, zu einem Takt, mit Ergebnis
+// und verantwortlicher Person. Was sie unterscheidet, ist der Gegenstand, und
+// der ist ein Feld.
+
+/// Referenzdaten: welche Kontrolle in welchem Takt zu welchem Gegenstand
+/// gehört. Aus `RefReprocessingEquipmentType.routineChecks` übernommen, das
+/// bisher nur eine JSON-Liste ohne Takt und ohne Gegenstand war.
+model RefReprocessingCheck {
+  code               String                 @id
+  ruleSetId          String
+  ruleSet            RefRuleSet             @relation(fields: [ruleSetId], references: [id])
+  scope              ReprocessingCheckScope
+  /// Gesetzt bei scope=equipment: für welchen Gerätetyp.
+  equipmentTypeCode  String?
+  equipmentType      RefReprocessingEquipmentType? @relation(fields: [equipmentTypeCode], references: [code])
+  label              String                 @db.Text
+  cadence            CheckCadence
+  legalBasis         String?                @db.Text
+  /// Messgröße, wo gemessen wird; leer bei Sichtkontrollen.
+  unit               String?
+  limitText          String?
+  limitSource        LimitSource?
+  /// Die Frist ist in aller Regel eine Festlegung des Betreibers, nicht der
+  /// Verordnung. Damit sie nicht als belegt gelesen wird.
+  confidence         Confidence             @default(determination)
+  note               String?                @db.Text
+  checks             ReprocessingCheck[]
+
+  @@index([scope, equipmentTypeCode])
+}
+
+/// Die Durchführung. Genau das, was der Behörde heute fehlt.
+model ReprocessingCheck {
+  id                String                 @id @default(cuid())
+  tenantId          String
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id])
+  checkCode         String
+  check             RefReprocessingCheck   @relation(fields: [checkCode], references: [code])
+  /// Bei scope=equipment das Gerät, sonst leer.
+  equipmentDeviceId String?
+  equipmentDevice   DeviceInstance?        @relation("ReprocessingCheckEquipment", fields: [equipmentDeviceId], references: [id])
+  /// Bei Wasser, Chemie und Lagerung der Standort.
+  siteId            String?
+  site              Site?                  @relation(fields: [siteId], references: [id])
+  /// Bei per_batch die Charge.
+  batchId           String?
+  batch             ReprocessingBatch?     @relation(fields: [batchId], references: [id])
+  performedAt       DateTime               @db.Date
+  /// Display name (legacy); attribution is performedById.
+  performedBy       String
+  performedById     String?
+  performedByUser   User?                  @relation("CheckPerformedBy", fields: [performedById], references: [id])
+  /// Sichtkontrollen: true oder false. Messungen: der Wert in `measuredValue`.
+  passed            Boolean?
+  measuredValue     String?
+  withinLimit       Boolean?
+  note              String?                @db.Text
+  recordedAt        DateTime               @default(now())
+
+  @@index([tenantId, checkCode, performedAt])
+  @@index([tenantId, equipmentDeviceId, performedAt])
+  @@index([tenantId, siteId, performedAt])
+  @@index([batchId])
+  @@index([performedById])
+}
+
+/// Charge mit Freigabe durch die sachkundige Person. In v20 war
+/// „Chargenfreigabe" ein Begriff ohne Objekt; dies ist das Objekt.
+model ReprocessingBatch {
+  id                String         @id @default(cuid())
+  tenantId          String
+  tenant            Tenant         @relation(fields: [tenantId], references: [id])
+  equipmentDeviceId String
+  equipmentDevice   DeviceInstance @relation("ReprocessingBatchEquipment", fields: [equipmentDeviceId], references: [id])
+  /// Chargennummer der Einrichtung.
+  batchNumber       String
+  /// Programm oder Zyklus, wie am Gerät gewählt.
+  programme         String?
+  startedAt         DateTime
+  finishedAt        DateTime?
+  /// Beladungsmuster, auf das die Validierung sich bezieht.
+  loadPattern       String?
+  /// Prozessprotokoll des Geräts, etwa Temperatur-Zeit-Verlauf oder A0-Wert.
+  processRecordRef  String?
+  /// Process record as stored blob (checksum on AttachmentBlob.sha256).
+  processRecordBlobId String?
+  processRecordBlob   AttachmentBlob? @relation("BatchProcessRecord", fields: [processRecordBlobId], references: [id])
+  /// Die Freigabe selbst. Offen heißt: die Charge darf nicht verwendet werden.
+  releaseResult     BatchReleaseResult?
+  /// Display name (legacy); signature is releasedById (E2).
+  releasedBy        String?
+  releasedById      String?
+  releasedByUser    User?          @relation("BatchReleasedBy", fields: [releasedById], references: [id])
+  releasedAt        DateTime?
+  releaseNote       String?        @db.Text
+  recordedBy        String
+  recordedByUserId  String?
+  recordedByUser    User?          @relation("BatchRecorder", fields: [recordedByUserId], references: [id])
+  recordedAt        DateTime       @default(now())
+  items             ReprocessingBatchItem[]
+  checks            ReprocessingCheck[]
+
+  @@unique([tenantId, equipmentDeviceId, batchNumber])
+  @@index([tenantId, startedAt])
+  @@index([tenantId, releaseResult])
+  @@index([processRecordBlobId])
+  @@index([releasedById])
+  @@index([recordedByUserId])
+}
+
+/// Was in der Charge war. Die Rückverfolgbarkeit, nach der im Rückruffall
+/// und bei einem Vorkommnis gefragt wird.
+model ReprocessingBatchItem {
+  id               String            @id @default(cuid())
+  tenantId         String
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  batchId          String
+  batch            ReprocessingBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  /// Das aufbereitete Produkt, wenn es ein geführtes Exemplar ist.
+  deviceInstanceId String?
+  deviceInstance   DeviceInstance?   @relation("ReprocessingBatchItemDevice", fields: [deviceInstanceId], references: [id])
+  /// Sonst die Bezeichnung, etwa bei Sieben ohne eigene Inventarnummer.
+  label            String?
+  quantity         Int               @default(1)
+
+  @@index([tenantId, batchId])
+  @@index([deviceInstanceId])
+}
+
+// ===========================================================================
+// C · K3 — Takt der Konstanzprüfung
+// ===========================================================================
+//
+// ENTSCHEIDUNG C1 (Phase 0, 2026-10-20): ConstancyCadence is the sole source
+// of Konstanz dueAt. DeviceDuty remains the applicable-duty row; its dueAt
+// for dutyKey=konstanz is derived from an open ConstancyCadence only.
+// RefConstancyObject.defaultCadence is a suggestion text, never a frozen
+// interval. No open cadence ⇒ duty applicable, dueAt null („Takt festzulegen").
+// See also k10HardRules.konstanzDueAtFromCadence.
+
+model ConstancyCadence {
+  id                  String             @id @default(cuid())
+  tenantId            String
+  tenant              Tenant             @relation(fields: [tenantId], references: [id])
+  deviceInstanceId    String
+  deviceInstance      DeviceInstance     @relation(fields: [deviceInstanceId], references: [id])
+  constancyObjectCode String
+  constancyObject     RefConstancyObject @relation(fields: [constancyObjectCode], references: [code])
+  intervalValue       Int
+  intervalUnit        IntervalUnit
+  /// Worauf die Festlegung sich stützt, etwa die QS-Richtlinie oder die
+  /// Herstellerangabe. Freitext, weil es die Begründung des Betreibers ist.
+  basisText           String             @db.Text
+  determinedBy        String
+  determinedByUserId  String?
+  determinedByUser    User?              @relation("CadenceDeterminer", fields: [determinedByUserId], references: [id])
+  determinedAt        DateTime           @db.Date
+  /// Historisiert statt überschrieben: Ändert sich der Takt, wird die alte
+  /// Festlegung geschlossen. Was damals galt, bleibt lesbar.
+  validFrom           DateTime           @default(now())
+  validTo             DateTime?
+  /// Genau eine offene Festlegung je Exemplar und Prüfgegenstand.
+  openCadenceKey      String?            @unique @db.VarChar(191)
+
+  @@index([tenantId, deviceInstanceId, validTo])
+  @@index([constancyObjectCode])
+  @@index([determinedByUserId])
+}
+
+// ===========================================================================
+// D · K6 und K5 — Trägerschaft der Kacheln, und der Ort für die Anwenderin
+// ===========================================================================
+//
+// ENTSCHEIDUNG K6: Vorbelegung aus der ANWENDUNGSROLLE, nicht aus der
+// Einrichtungsart. Drei Gründe, der dritte entscheidet:
+//
+//   1. Die Anwendungsrolle existiert, wird gepflegt und steuert bereits den
+//      Zugang. Eine Einrichtungsart gibt es im Schema nicht und müsste als
+//      neues Feld eingeführt und gepflegt werden, mit stummen Fehlern.
+//   2. Die Einrichtungsart gilt je Mandant, die Trägerschaft je Person. Aus
+//      einem Mandantenmerkmal vorzubelegen gäbe jeder Person dieselben
+//      Kacheln. In einer Praxis ist das zufällig richtig, im Klinikum falsch.
+//   3. Eine Vorbelegung nach Einrichtungsart würde genau die Kopplung
+//      wiedereinführen, die bei der Erstanlage abgelehnt wurde: dass die Art
+//      der Einrichtung bestimmt, was überhaupt erreichbar ist. Sortieren,
+//      nicht ausblenden, gilt hier genauso.
+//
+// Die Lesart folgt bewusst UserPermission gegen RoleGrant, damit es nur eine
+// Regel zu lernen gibt: keine Zeile in UserDashboardTile ⇒ die Vorbelegung
+// der Rolle gilt. Mindestens eine Zeile ⇒ diese sind die vollständige Menge.
+
+// RENDERREGEL ZONE 1, verbindlich und nicht im Schema erzwingbar:
+//
+// Zone 1 zeigt höchstens drei Kacheln. Die Vorbelegung nach Anwendungsrolle
+// überbelegt sie zwangsläufig: `device_admin` trägt elf Kacheln der Zone 1,
+// `superadmin` dreizehn. Das ist keine Fehlkonfiguration, sondern die Folge
+// davon, dass vier Rollen sieben Personas vorbelegen.
+//
+// Aufgelöst wird es beim Anzeigen, nicht beim Zuweisen: Von den Kacheln der
+// Zone 1 werden die drei dringendsten gezeigt, bemessen an ihrem Inhalt und
+// nicht an `sortOrder` — überfällig geht vor fällig, fällig vor leer. Die
+// übrigen rutschen in den Arbeitsvorrat und bleiben erreichbar.
+//
+// Sortieren, nicht ausblenden: Keine Kachel verschwindet, nur ihre Stelle
+// ändert sich. Eine leere Kachel der Zone 1 gehört nach unten, nicht weg —
+// sonst ist nicht unterscheidbar, ob nichts anliegt oder nichts erfasst ist.
+
+/// Der Kachelkatalog. Eine Kachel ist eine Frage mit einer Datenquelle,
+/// nicht ein Bildschirmelement.
+model RefDashboardTile {
+  key                String   @id
+  title              String
+  /// Die Frage, die die Kachel beantwortet. Steht auch in der Oberfläche,
+  /// weil eine Kachel ohne Frage eine Zahl ohne Anlass ist.
+  question           String   @db.Text
+  zone               TileZone
+  /// Reihenfolge innerhalb der Zone.
+  sortOrder          Int      @default(0)
+  /// Pflichtbezug, über den die Trägerschaft läuft. Null bei Kacheln ohne
+  /// Pflichtbezug, etwa der Auditfähigkeitsquote.
+  dutyKey            DutyKey?
+  /// Berechtigung, ohne die die Kachel nicht gezeigt wird.
+  requiredPermission String?
+  /// Nur für Mandanten mit betreuender Organisation sinnvoll.
+  partnerOnly        Boolean  @default(false)
+  note               String?  @db.Text
+  roleGrants         DashboardTileGrant[]
+  userTiles          UserDashboardTile[]
+
+  @@index([zone, sortOrder])
+}
+
+/// Vorbelegung je Anwendungsrolle. Gesät, auf einer Oberfläche änderbar,
+/// analog RoleGrant.
+model DashboardTileGrant {
+  id       String           @id @default(cuid())
+  role     ClinicRole
+  tileKey  String
+  tile     RefDashboardTile @relation(fields: [tileKey], references: [key], onDelete: Cascade)
+
+  @@unique([role, tileKey])
+  @@index([role])
+}
+
+/// Abweichung je Person. Keine Zeile heißt: die Vorbelegung der Rolle gilt.
+model UserDashboardTile {
+  id       String           @id @default(cuid())
+  tenantId String
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  userId   String
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tileKey  String
+  tile     RefDashboardTile @relation(fields: [tileKey], references: [key], onDelete: Cascade)
+  /// Wer die Zuweisung vorgenommen hat. Trägerschaft ist eine Entscheidung,
+  /// und sie wird zurechenbar festgehalten.
+  assignedBy String
+  assignedAt DateTime       @default(now())
+
+  @@unique([userId, tileKey])
+  @@index([tenantId, userId])
+}
+
+// ===========================================================================
+// E · K7 — Behördliche Begehung und ihr Protokoll
+// ===========================================================================
+//
+// Der einzige Vorgang im System mit einer Frist, die nicht aus einer
+// Verordnung stammt, sondern aus einem Bescheid. Deshalb ausdrücklich NICHT
+// als DeviceDuty modelliert: Eine Pflicht trägt eine Beleggüte, ein Befund
+// trägt eine Anordnung. Beides in eine Tabelle zu legen würde die
+// Vertrauenskennzeichnung sinnlos machen.
+
+model AuthorityInspection {
+  id             String        @id @default(cuid())
+  tenantId       String
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  siteId         String?
+  site           Site?         @relation(fields: [siteId], references: [id])
+  authorityKind  AuthorityKind
+  authorityName  String
+  legalBasis     String?       @db.Text
+  /// Angekündigt mit Fragebogen und Unterlagenliste, oder unangekündigt.
+  announcedAt    DateTime?     @db.Date
+  visitedAt      DateTime      @db.Date
+  /// Das Protokoll kommt Tage bis Wochen später.
+  protocolReceivedAt DateTime? @db.Date
+  protocolRef    String?
+  /// Begehungen sind gebührenpflichtig. Der Betrag gehört zum Vorgang,
+  /// nicht in die zurückgestellte Kostenbetrachtung des Dashboards.
+  feeEur         Float?
+  /// Welche Prüfliste zugrunde lag, siehe Abschnitt G.
+  checklistCode  String?
+  checklist      RefAuthorityChecklist? @relation(fields: [checklistCode], references: [code])
+  /// Die Offenlegungssitzung, in der gezeigt wurde.
+  disclosureSessionId String?  @unique
+  disclosureSession   DisclosureSession? @relation(fields: [disclosureSessionId], references: [id])
+  note           String?       @db.Text
+  closedAt       DateTime?     @db.Date
+  recordedBy     String
+  recordedByUserId String?
+  recordedByUser User?         @relation("InspectionRecorder", fields: [recordedByUserId], references: [id])
+  recordedAt     DateTime      @default(now())
+  findings       AuthorityFinding[]
+
+  @@index([tenantId, visitedAt])
+  @@index([tenantId, authorityKind])
+  @@index([siteId])
+  @@index([recordedByUserId])
+}
+
+/// Ein Mangel mit behördlich gesetzter Frist. Die Behebung ist fristgerecht
+/// nachzuweisen und wird geprüft.
+model AuthorityFinding {
+  id                  String              @id @default(cuid())
+  tenantId            String
+  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+  inspectionId        String
+  inspection          AuthorityInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  /// Nummer im Protokoll der Behörde.
+  itemNo              String?
+  description         String              @db.Text
+  legalBasis          String?             @db.Text
+  /// Die Frist aus dem Bescheid. Kein `confidence`, weil hier nichts
+  /// abgeleitet ist: sie ist gesetzt.
+  dueAt               DateTime?           @db.Date
+  status              FindingStatus       @default(open)
+  /// Betrifft der Befund ein bestimmtes Exemplar, wird es verknüpft.
+  deviceInstanceId    String?
+  deviceInstance      DeviceInstance?     @relation(fields: [deviceInstanceId], references: [id])
+  remediationNote     String?             @db.Text
+  remediatedAt        DateTime?           @db.Date
+  /// Nachweis der Behebung, als Beleg wie bei den Voraussetzungen.
+  evidenceBlobId      String?
+  evidenceBlob        AttachmentBlob?     @relation(fields: [evidenceBlobId], references: [id])
+  provenAt            DateTime?           @db.Date
+  recordedBy          String
+  recordedByUserId    String?
+  recordedByUser      User?               @relation("FindingRecorder", fields: [recordedByUserId], references: [id])
+  recordedAt          DateTime            @default(now())
+  authorityNotifications AuthorityNotification[]
+
+  @@index([tenantId, status, dueAt])
+  @@index([inspectionId])
+  @@index([deviceInstanceId])
+  @@index([recordedByUserId])
+}
+
+/// Der Begehungsmodus als Vorgang: zeitlich begrenzt, im Umfang vom
+/// Betreiber gewählt, vollständig protokolliert.
+///
+/// Der Prüfer bekommt keinen Zugang. Was offengelegt wird, entscheidet der
+/// Betreiber. Diese Zeile ist der Beleg, dass und in welchem Umfang er es
+/// entschieden hat, und sie nützt später ihm.
+model DisclosureSession {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  /// Wer die Sitzung eröffnet hat. Nicht der Prüfer, sondern der Betreiber.
+  openedByUserId String?
+  openedByUser   User?   @relation(fields: [openedByUserId], references: [id])
+  openedAt      DateTime @default(now())
+  /// Harte Grenze. Nach Ablauf ist die Sitzung zu, ohne Zutun.
+  expiresAt     DateTime
+  closedAt      DateTime?
+  /// Für wen offengelegt wird, in Worten des Betreibers.
+  audience      String
+  purpose       String?  @db.Text
+  /// Welche Teile der Mappe freigegeben sind. JSON string[] der
+  /// Abschnittsschlüssel, damit der Umfang nachweisbar bleibt.
+  scope         String   @db.Text
+  /// Verknüpfung in das Prüfprotokoll: jeder Aufruf während der Sitzung
+  /// trägt diese Kennung als correlationId im AuditEvent.
+  inspection    AuthorityInspection?
+
+  @@index([tenantId, openedAt])
+  @@index([tenantId, expiresAt])
+}
+
+// ===========================================================================
+// F · K8 — Prüfung elektrischer Produkte nach DGUV
+// ===========================================================================
+//
+// ENTSCHEIDUNG: als Pflichtart im bestehenden Pflichtensystem, nicht als
+// eigenes Modell.
+//
+// Begründung: Es ist eine wiederkehrende Prüfung mit einer Frist an einem
+// Gerät. Genau das leistet DeviceDuty, einschließlich Fälligkeit, Erinnerung
+// und Durchführungsnachweis. Ein zweites Pflichtensystem daneben hätte zwei
+// Fälligkeitslisten erzeugt.
+//
+// Was sich von der STK unterscheidet, und was deshalb festzuhalten ist:
+//
+//   Adressat         Arbeitgeber nach ArbSchG, nicht Betreiber nach MPBetreibV
+//   Rechtsgrundlage  ArbSchG, BetrSichV, DGUV Vorschrift 3
+//   Frist            Festlegung des Arbeitgebers aus der Gefährdungs-
+//                    beurteilung, keine Frist der Verordnung
+//   Behörde          Arbeitsschutzbehörde und BGW, nicht die
+//                    Medizinprodukteaufsicht
+//
+// Offen und ausdrücklich nicht entschieden: ob eine Prüfung nach
+// DIN EN 62353 beide Pflichten abdeckt. Das ist eine Rechtsfrage, die der
+// Betreiber mit seiner Fachkraft klärt. Das System hält die Festlegung fest,
+// es trifft sie nicht.
+
+/// Welche Pflichtart eine andere abdecken KANN, unter welcher Bedingung.
+/// Referenzdaten, nicht Automatik: Die Zeile sagt, dass die Frage sich
+/// stellt, und nennt die Bedingung. Die Antwort gibt der Betreiber.
+model RefInspectionTypeOverlap {
+  id                 String            @id @default(cuid())
+  /// Die Pflicht, die abgedeckt werden könnte.
+  inspectionTypeCode String
+  inspectionType     RefInspectionType @relation("OverlapCovered", fields: [inspectionTypeCode], references: [code])
+  /// Die Pflicht, die sie abdecken könnte.
+  satisfiedByCode    String
+  satisfiedBy        RefInspectionType @relation("OverlapCovering", fields: [satisfiedByCode], references: [code])
+  conditionText      String            @db.Text
+  legalNote          String?           @db.Text
+
+  @@unique([inspectionTypeCode, satisfiedByCode])
+}
+
+/// Die Festlegung des Betreibers zu einer Überlappung, je Exemplar.
+/// Ohne Festlegung sind beide Pflichten getrennt fällig, und das ist die
+/// sichere Vorbelegung.
+model DutyOverlapDecision {
+  id                 String         @id @default(cuid())
+  tenantId           String
+  tenant             Tenant         @relation(fields: [tenantId], references: [id])
+  deviceInstanceId   String
+  deviceInstance     DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
+  /// Welche Pflicht als abgedeckt gilt.
+  coveredDutyKey     DutyKey
+  /// Durch welche.
+  satisfiedByDutyKey DutyKey
+  /// Die Begründung des Betreibers. Pflichtfeld: eine Festlegung ohne
+  /// Begründung ist in der Begehung nicht vorzeigbar.
+  reasonText         String         @db.Text
+  decidedBy          String
+  decidedAt          DateTime       @db.Date
+  validFrom          DateTime       @default(now())
+  validTo            DateTime?
+  openDecisionKey    String?        @unique @db.VarChar(191)
+
+  @@index([tenantId, deviceInstanceId, validTo])
+}
+
+// ===========================================================================
+// G · K10 — Prüflisten je Bundesland und Behördenart
+// ===========================================================================
+//
+// Welche Behörde eine Praxis begeht und in welcher Reihenfolge sie fragt,
+// unterscheidet sich je Land. Die Mappe folgt deshalb einer Prüfliste, und
+// die Prüfliste ist Referenzdatum.
+//
+// Eine Mappe, die sich „die amtliche Checkliste" nennt, wäre falsch. Jede
+// Liste nennt ihre Quelle und ihren Stand, und wo keine Landesliste
+// hinterlegt ist, greift eine allgemeine.
+
+model RefAuthorityChecklist {
+  code          String        @id
+  authorityKind AuthorityKind
+  /// ISO-Kürzel des Landes, etwa DE-NW oder DE-BY. Leer heißt: allgemein.
+  stateCode     String?
+  label         String
+  /// Woher die Reihenfolge stammt, mit Stand. Ohne Quelle keine Liste.
+  sourceRef     String        @db.Text
+  sourceDate    DateTime?     @db.Date
+  items         RefAuthorityChecklistItem[]
+  inspections   AuthorityInspection[]
+
+  @@unique([authorityKind, stateCode])
+  @@index([stateCode])
+}
+
+model RefAuthorityChecklistItem {
+  id            String                @id @default(cuid())
+  checklistCode String
+  checklist     RefAuthorityChecklist @relation(fields: [checklistCode], references: [code], onDelete: Cascade)
+  position      Int
+  label         String                @db.Text
+  legalBasis    String?               @db.Text
+  /// Auf welchen Abschnitt der Begehungsmappe der Punkt zeigt. Schlüssel
+  /// aus dem Mappenaufbau, damit die Reihenfolge wirklich steuert und nicht
+  /// nur beschreibt.
+  mapsToSection String?
+  /// Punkte, für die DeviceCare keine Daten hält, werden als solche geführt
+  /// statt weggelassen. Die Lücke ist dann im Vorbereitungsmodus sichtbar.
+  covered       Boolean               @default(true)
+  note          String?               @db.Text
+
+  @@unique([checklistCode, position])
+  @@index([checklistCode])
+}
+
+// ===========================================================================
+// H · Behördenmeldungen (Phase 0)
+// ===========================================================================
+//
+// One model for five notification kinds. The system does not transmit;
+// it drafts, records that a named person sent, and stores acknowledgement.
+// Exactly one of incidentId / findingId / deviceInstanceId / siteId is set
+// (enforced in application code).
+
+/// Outgoing notification. Prefer this over DeviceIncident.reported* stamps.
+model AuthorityNotification {
+  id               String               @id @default(cuid())
+  tenantId         String
+  tenant           Tenant               @relation(fields: [tenantId], references: [id])
+
+  kind             NotificationKind
+  state            NotificationState    @default(draft)
+
+  authorityKind    AuthorityKind?
+  recipientName    String
+  channel          NotificationChannel
+
+  incidentId       String?
+  incident         DeviceIncident?      @relation(fields: [incidentId], references: [id])
+  findingId        String?
+  finding          AuthorityFinding?    @relation(fields: [findingId], references: [id])
+  deviceInstanceId String?
+  deviceInstance   DeviceInstance?      @relation("NotificationDevice", fields: [deviceInstanceId], references: [id])
+  siteId           String?
+  site             Site?                @relation(fields: [siteId], references: [id])
+
+  subject          String               @db.Text
+  bodyText         String?              @db.Text
+
+  /// Operator-entered when a legal deadline exists; never invented for MPAMIV.
+  dueAt            DateTime?            @db.Date
+
+  sentAt           DateTime?            @db.Date
+  sentByUserId     String?
+  sentByUser       User?                @relation("NotificationSender", fields: [sentByUserId], references: [id])
+  sentByName       String?
+
+  acknowledgedAt   DateTime?            @db.Date
+  reference        String?
+  outcomeText      String?              @db.Text
+  closedAt         DateTime?            @db.Date
+
+  supersedesId     String?
+  supersedes       AuthorityNotification?  @relation("NotificationChain", fields: [supersedesId], references: [id])
+  superseded       AuthorityNotification[] @relation("NotificationChain")
+
+  documents        NotificationDocument[]
+
+  recordedByUserId String?
+  recordedByUser   User?                @relation("NotificationRecorder", fields: [recordedByUserId], references: [id])
+  recordedByName   String
+  recordedAt       DateTime             @default(now())
+
+  @@index([tenantId, kind, state])
+  @@index([tenantId, dueAt])
+  @@index([incidentId])
+  @@index([findingId])
+  @@index([deviceInstanceId])
+  @@index([siteId])
+  @@index([sentByUserId])
+  @@index([recordedByUserId])
+}
+
+model NotificationDocument {
+  id             String                   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant                   @relation(fields: [tenantId], references: [id])
+  notificationId String
+  notification   AuthorityNotification    @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  role           NotificationDocumentRole
+  blobId         String?
+  blob           AttachmentBlob?          @relation(fields: [blobId], references: [id])
+  externalRef    String?
+  addedByUserId  String?
+  addedByName    String
+  addedAt        DateTime                 @default(now())
+
+  @@index([notificationId])
+  @@index([tenantId])
+  @@index([blobId])
 }

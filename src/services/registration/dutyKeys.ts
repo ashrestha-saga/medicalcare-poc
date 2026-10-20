@@ -36,6 +36,7 @@ export function canonicalDutyKey(id: string): DutyKey {
     vernetzung: "vernetzung",
     impl: "implantat",
     implantat: "implantat",
+    dguv: "dguv",
   };
   return map[id] ?? map[stem] ?? "wartung";
 }

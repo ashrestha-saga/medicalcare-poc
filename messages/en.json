@@ -3,6 +3,14 @@
     "inventory": "Inventory",
     "registration": "Registration",
     "due-dates": "Due dates",
+    "dashboard": "Dashboard",
+    "constancy-cadence": "Constancy takt",
+    "duty-overlap": "Duty overlap",
+    "incidents": "Incidents",
+    "field-safety": "Field safety",
+    "device-book": "Device book",
+    "reprocessing": "Reprocessing",
+    "authority": "Authority",
     "training": "Training",
     "catalog": "Catalog",
     "clarifications": "Clarifications",
@@ -18,6 +26,10 @@
     "expand": "Expand navigation",
     "collapse": "Collapse navigation",
     "logout": "Logout",
+    "accountMenu": "Account menu",
+    "language": "Language",
+    "inSync": "in sync",
+    "offline": "offline",
     "delivery": "Delivery: {line}",
     "subtitleInventory": "Device inventory",
     "subtitleCatalog": "Model catalog",
@@ -34,7 +46,12 @@
     "subtitleClarifications": "Clarifications",
     "subtitleSecurity": "Security",
     "home": "Home",
+    "groupOverview": "Overview",
     "groupWork": "Work",
+    "groupSafety": "Safety",
+    "groupAufbereitung": "Reprocessing",
+    "groupRadiation": "Radiation protection",
+    "groupAuthority": "Authority",
     "groupMaster": "Master data",
     "groupOutput": "Output"
   },
@@ -565,12 +582,379 @@
       "title": "Requests",
       "description": "History and open maintenance work"
     },
+    "deviceBook": {
+      "title": "Medical device book",
+      "description": "§ 13 MPBetreibV — composed from inventory, duties, training, book entries, incidents and IFU evidence. Not a second store.",
+      "denied": "You do not have permission to view the device book.",
+      "loading": "Loading…",
+      "empty": "No book-obliged devices (STK or MTK classification required).",
+      "notFound": "Device book not found for this unit.",
+      "count": "{shown} of {total} devices",
+      "search": {
+        "label": "Search",
+        "placeholder": "Name, inventory, serial, GTIN / UDI, area…",
+        "noMatch": "No devices match this search."
+      },
+      "col": {
+        "inventory": "Inventory",
+        "name": "Name",
+        "serial": "Serial",
+        "place": "Area / room",
+        "ifu": "IFU"
+      },
+      "ifu": {
+        "label": "Instructions for use",
+        "present": "IFU on file",
+        "missing": "IFU missing",
+        "empty": "No Gebrauchsanweisung / IFU recorded for this unit.",
+        "uploadTitle": "Upload or link IFU",
+        "externalRef": "External reference",
+        "externalPlaceholder": "e.g. manufacturer portal URL or document ID"
+      },
+      "sections": {
+        "documents": "Documents",
+        "identity": "Identity and inventory number",
+        "inspections": "Inspections with date and performer",
+        "instruction": "Instruction and instructed persons",
+        "malfunctions": "Malfunctions and operating errors",
+        "incidents": "Incident reports"
+      },
+      "duty": {
+        "duty": "Duty",
+        "basis": "Basis",
+        "last": "Last",
+        "next": "Next"
+      },
+      "emptyDuties": "No inspection duties on record.",
+      "emptyTrainings": "No instruction recorded for this model.",
+      "emptyEntries": "No entries.",
+      "emptyIncidents": "No incidents recorded.",
+      "instructor": "instructor",
+      "consequence": "Consequence",
+      "incident": {
+        "unassessed": "unassessed",
+        "reported": "reported",
+        "unreported": "reportable, not reported",
+        "notSerious": "not serious"
+      },
+      "actions": {
+        "back": "Back to list",
+        "openIfu": "Open",
+        "uploadFile": "Upload file",
+        "saveRef": "Save reference"
+      }
+    },
+    "constancyCadence": {
+      "title": "Constancy test takt",
+      "description": "§ 115 StrlSchV creates the duty per test object. The interval is an employer determination — without takt, dueAt stays null (takt to be set). QS-RL wording is a suggestion, never a frozen deadline.",
+      "denied": "You do not have permission to view constancy takt.",
+      "loading": "Loading…",
+      "empty": "No constancy test objects in scope.",
+      "notSet": "not set",
+      "notSetHint": "QS-RL “{cadence}” is not yet a deadline",
+      "kpi": {
+        "objects": "Test objects",
+        "objectsHint": "on devices with radiation",
+        "missing": "Without takt",
+        "missingHint": "duty without a date",
+        "set": "Set",
+        "setHint": "with basis and date"
+      },
+      "banner": {
+        "title": "{count, plural, one {# test object has no set takt.} other {# test objects have no set takt.}}",
+        "body": "Until a takt is set, these appear as due without a date — not as overdue, and not as fulfilled."
+      },
+      "col": {
+        "device": "Device",
+        "object": "Test object",
+        "interval": "Interval",
+        "basis": "Basis",
+        "determined": "Set"
+      },
+      "unit": {
+        "months": "Months",
+        "years": "Years"
+      },
+      "role": {
+        "superadmin": "Superadmin",
+        "device_admin": "Device officer",
+        "security_officer": "Medical device safety officer",
+        "user": "User"
+      },
+      "form": {
+        "title": "Set takt · {object}",
+        "hint": "The quality assurance guideline suggests “{cadence}”. That is a suggestion — not a deadline — until you confirm or choose another interval.",
+        "interval": "Interval",
+        "unit": "Unit",
+        "basis": "Basis of determination",
+        "basisPlaceholder": "e.g. QS-RL diagnostic radiology, section on constancy testing",
+        "basisPrefill": "Quality assurance guideline: {cadence}",
+        "basisNote": "A determination without basis is not presentable in an inspection.",
+        "determinedBy": "Set by",
+        "determinedAt": "Set on"
+      },
+      "actions": {
+        "set": "Set takt",
+        "save": "Save",
+        "cancel": "Cancel"
+      }
+    },
+    "reprocessing": {
+      "title": "Records of reprocessing performance",
+      "description": "§ 8 MPBetreibV requires a suitable validated process. Validation is a duty on the device. Here is what proves execution: routine checks by their takt, and batches with a release decision. A batch without a release decision is neither released nor blocked — and that is the dangerous state.",
+      "denied": "You do not have permission to view reprocessing evidence.",
+      "loading": "Loading…",
+      "emptyChecks": "No checks catalogue for this area.",
+      "emptyBatches": "No batches recorded.",
+      "value": "Value",
+      "limit": "limit",
+      "noLimit": "no limit stored",
+      "site": "Site {name}",
+      "protocol": "Protocol",
+      "itemsCount": "{count, plural, one {# item} other {# items}}",
+      "kpi": {
+        "openToday": "open today",
+        "unreleased": "batches without release",
+        "failed": "objected",
+        "blocked": "batches blocked"
+      },
+      "banner": {
+        "unevaluatedTitle": "{count, plural, one {# measured value is recorded but not evaluated.} other {# measured values are recorded but not evaluated.}}",
+        "unevaluatedBody": "The value alone does not say whether the limit is met. Where no limit is stored, the system cannot invent the evaluation."
+      },
+      "tabs": {
+        "equipment": "Reprocessing equipment",
+        "water": "Water and chemistry",
+        "sterile": "Sterile storage",
+        "batches": "Batches"
+      },
+      "col": {
+        "check": "Control",
+        "cadence": "Takt",
+        "basis": "Basis",
+        "last": "Last",
+        "stand": "Status",
+        "batch": "Batch",
+        "deviceProg": "Device and programme",
+        "run": "Run",
+        "items": "Contents",
+        "release": "Release"
+      },
+      "cadence": {
+        "daily": "working day",
+        "per_batch": "per batch",
+        "per_use": "per use",
+        "weekly": "weekly",
+        "monthly": "monthly",
+        "quarterly": "quarterly",
+        "yearly": "yearly"
+      },
+      "stand": {
+        "ok": "fulfilled",
+        "openToday": "open today",
+        "never": "no evidence",
+        "overdue": "overdue",
+        "overdueHint": "{age} days, takt {days}",
+        "event": "per event",
+        "eventHint": "not date-based",
+        "failed": "objected",
+        "unevaluated": "not evaluated"
+      },
+      "batch": {
+        "noDecision": "no decision",
+        "released": "released",
+        "conditional": "with conditions",
+        "blocked": "blocked"
+      },
+      "actions": {
+        "decide": "Decide release",
+        "save": "Save",
+        "cancel": "Cancel"
+      },
+      "release": {
+        "title": "Batch release decision",
+        "released": "Release",
+        "conditional": "With conditions",
+        "rejected": "Reject",
+        "noteRequired": "Note (required)",
+        "noteOptional": "Note (optional)"
+      }
+    },
+    "fieldSafety": {
+      "title": "Recalls and field safety corrective actions",
+      "description": "Comes from outside and concerns models, not copies. Which devices are affected is decided by matching against inventory. Matching is a query; its result is a record.",
+      "denied": "You do not have permission to view field safety actions.",
+      "loading": "Loading…",
+      "empty": "No field safety actions in this view.",
+      "noDevices": "No devices on Abgleich yet — add models and suggest, or add devices.",
+      "requiredAction": "Required action.",
+      "scopeLabel": "Scope:",
+      "status": {
+        "open": "open",
+        "closed": "closed"
+      },
+      "affected": {
+        "yes": "affected",
+        "no": "not affected",
+        "check": "still to be checked"
+      },
+      "views": {
+        "all": "All",
+        "open": "Open",
+        "unmatched": "Unmatched"
+      },
+      "col": {
+        "device": "Device",
+        "affected": "Affected",
+        "done": "Completed",
+        "note": "Note"
+      },
+      "meta": {
+        "issued": "issued",
+        "received": "received",
+        "due": "due",
+        "closed": "closed"
+      },
+      "banner": {
+        "unmatchedTitle": "{count, plural, one {# device is still to be checked.} other {# devices are still to be checked.}}",
+        "unmatchedBody": "A recall without finished Abgleich is the dangerous state — not the one with affected devices."
+      },
+      "actions": {
+        "record": "Record field safety action",
+        "addModels": "Add models",
+        "suggest": "Suggest Abgleich",
+        "addDevices": "Add devices",
+        "close": "Close",
+        "measureDone": "Action completed",
+        "save": "Save",
+        "cancel": "Cancel",
+        "done": "Done",
+        "remove": "Remove"
+      },
+      "form": {
+        "createTitle": "Record recall / FSCA",
+        "createHint": "Comes from outside and concerns models. Model scopes suggest inventory; devices on Abgleich start as “to check”.",
+        "reference": "Reference",
+        "manufacturer": "Manufacturer",
+        "titleField": "Title",
+        "requiredAction": "Required action",
+        "scope": "Scope (as in letter)",
+        "issued": "Issued",
+        "received": "Received",
+        "due": "Due (optional)",
+        "models": "Affected models (structured)",
+        "modelsHint": "Suggestion only — does not mark devices affected.",
+        "devices": "Devices for Abgleich (optional)",
+        "catalogModel": "Catalog model (optional)",
+        "noModels": "No catalog models loaded.",
+        "udi": "Basic UDI-DI (optional)",
+        "serialFrom": "Serial from",
+        "serialTo": "Serial to",
+        "addScope": "Add model scope",
+        "addModelsTitle": "Add affected model scopes",
+        "addModelsHint": "Structured scope from the letter. Use Suggest Abgleich afterwards to queue inventory.",
+        "addDevicesTitle": "Add devices to Abgleich",
+        "addDevicesHint": "Added devices start as “to check” until someone decides."
+      }
+    },
+    "incidents": {
+      "title": "Incidents",
+      "description": "Core duty of the medical device safety officer (§ 6). The ordinance asks whether a suspected serious incident exists — that alone drives the reporting duty. There is no severity scale.",
+      "denied": "You do not have permission to view incidents.",
+      "loading": "Loading…",
+      "empty": "No incidents in this view.",
+      "modelLevel": "Model-level",
+      "assigned": "Assigned: {name}",
+      "closed": "Closed {date}",
+      "kpi": {
+        "unassessed": "Not assessed",
+        "unassessedHint": "without seriousness assessment",
+        "unreported": "Reportable, open",
+        "unreportedHint": "affirmed, but not reported",
+        "total": "Recorded",
+        "totalHint": "in total"
+      },
+      "banner": {
+        "unassessedTitle": "{count, plural, one {# incident is not assessed.} other {# incidents are not assessed.}}",
+        "unassessedBody": "While the question is open, no reporting deadline is running — and none has expired. Open is not the same as harmless."
+      },
+      "views": {
+        "all": "All",
+        "unassessed": "Unassessed",
+        "unreported": "Unreported",
+        "open": "Open"
+      },
+      "col": {
+        "date": "Date",
+        "device": "Device",
+        "incident": "Incident",
+        "severity": "Seriousness",
+        "report": "Report"
+      },
+      "chip": {
+        "unassessed": "not assessed",
+        "undecided": "still undecided",
+        "serious": "suspected serious",
+        "notSerious": "not serious",
+        "unreported": "reportable, not reported"
+      },
+      "report": {
+        "none": "no reporting duty established",
+        "manufacturer": "Manufacturer {date}"
+      },
+      "actions": {
+        "assess": "Assess",
+        "assign": "Assign",
+        "close": "Close",
+        "save": "Save",
+        "cancel": "Cancel"
+      },
+      "mask": {
+        "title": "Assess incident · {code}",
+        "question": "Is this a suspected serious incident?",
+        "yes": "yes — reportable",
+        "no": "no",
+        "undecided": "not yet decided",
+        "hint": "The ordinance has this one question, not a severity scale. While it is open, no reporting deadline runs.",
+        "reason": "Reason *",
+        "assessedMeta": "Assessed by {by} on {at}",
+        "assessedBy": "Assessed by",
+        "assessedAt": "Assessed on",
+        "assessedByPending": "Current user ({role}) — stamped on save",
+        "reportSection": "Report",
+        "reportModelNote": "These fields create an AuthorityNotification. The system does not transmit — you record that a named person sent the report.",
+        "recipient": "Recipient",
+        "channel": "Channel",
+        "sentAt": "Sent on",
+        "ref": "Recipient reference",
+        "manufacturerAt": "Manufacturer notified on",
+        "manufacturer": "Manufacturer",
+        "both": "BfArM and manufacturer",
+        "choose": "— please choose —",
+        "mpamivHint": "No numeric deadline: § 3 MPAMIV requires reporting without undue delay (unverzüglich). Age since discovery: {days} days."
+      },
+      "channel": {
+        "portal": "Authority portal",
+        "email": "Email",
+        "post": "Post",
+        "fax": "Fax",
+        "other": "Other"
+      },
+      "assign": {
+        "title": "Assign incident",
+        "hint": "Who owns the assessment or report (MPSB workflow).",
+        "user": "Assignee",
+        "due": "Due (optional)"
+      }
+    },
     "dueDates": {
       "title": "Due dates",
       "description": "From the duties of released devices. The deadline anchor is shown because it governs the calculation — it is not the same for every inspection type.",
       "denied": "You don't have permission to view due dates.",
       "hintTitle": "From due date to assignment.",
-      "hintBody": "Open a row to assign an executor and create a service request."
+      "hintBody": "Open a row to assign an executor and create a service request.",
+      "showingCount": "Showing {shown} of {total}",
+      "loadMore": "Load more"
     },
     "training": {
       "title": "Training",
@@ -664,6 +1048,283 @@
     "registration": {
       "title": "Registration",
       "description": "Register a new device (product kind, characteristics, duties)"
+    },
+    "dashboard": {
+      "title": "Dashboard",
+      "description": "Tile catalogue by application role. Zone 1 shows at most three urgent tiles; the rest stay reachable in the worklist.",
+      "denied": "Dashboard requires navigation access.",
+      "tileAssignments": "Tiles by role",
+      "zones": {
+        "decides": "Decides the day",
+        "worklist": "Worklist",
+        "watch": "Watch"
+      },
+      "overview": {
+        "title": "What is on record",
+        "subtitle": "Inventory register under § 14 MPBetreibV · as of {date}",
+        "footnote": "These figures describe the register, not the site. Whether your inventory is complete cannot be known by the system — it only knows what was entered.",
+        "segments": {
+          "released": "released",
+          "draft": "Draft",
+          "retired": "out of service",
+          "blocked": "blocked",
+          "validation": "validation",
+          "otherDuties": "other duties",
+          "classified": "with classification",
+          "missingClassification": "without",
+          "verified": "evidenced in the regulation",
+          "derived": "derived",
+          "appointed": "with a named officer",
+          "missing": "without",
+          "malfunction": "Malfunction",
+          "operating_error": "Operating error",
+          "note": "note",
+          "cadenceSet": "cycle set",
+          "cadenceOpen": "open"
+        }
+      },
+      "band": {
+        "title": "When it falls due",
+        "subtitle": "{count} dates from due items, findings and recalls · Today is {date}",
+        "overdue": "overdue",
+        "within30": "within 30 days",
+        "later": "later",
+        "today": "today",
+        "daysLater": "+{days} d",
+        "daysEarlier": "{days} d",
+        "noDatesInRange": "no date in this period",
+        "laterCount": "{count} later",
+        "appointmentOne": "1 date",
+        "appointmentMany": "{count} dates",
+        "none": "none",
+        "beyondRange": "{earlier} earlier than −{past} d · {later} later than +{future} d — counted at the edges, not plotted.",
+        "horizonLabel": "Plot range from today",
+        "rangePast": "−{days} d",
+        "rangeFuture": "+{days} d",
+        "earlierCount": "{count} earlier",
+        "daysOverdue": "{days} days overdue",
+        "inDays": "in {days} days",
+        "groups": {
+          "pruefung": "Inspections and deadlines",
+          "behoerde": "Authority findings",
+          "rueckruf": "Recalls"
+        }
+      },
+      "tile": {
+        "view": "view",
+        "notRecorded": "not recorded.",
+        "of": "of {count} {unit}"
+      },
+      "roles": {
+        "device_admin": "Device officer",
+        "security_officer": "Safety officer",
+        "user": "Device user",
+        "superadmin": "Administration and management"
+      },
+      "assignments": {
+        "title": "Tiles by role",
+        "description": "Default assignment from the tile catalogue per application role. Everyone with this role sees the same tiles (filtered by permissions).",
+        "requiresRolesView": "Requires roles:view.",
+        "backDashboard": "← Dashboard",
+        "rolesLink": "Roles",
+        "roleLabel": "Application role",
+        "rolePlaceholder": "Select role",
+        "pickRole": "Select a role to edit its defaults.",
+        "selectedCount": "{selected} of {total} tiles",
+        "overviewBadge": "Overview",
+        "save": "Save role",
+        "saving": "Saving…",
+        "saved": "{role}: {count} tiles saved."
+      },
+      "userHome": {
+        "title": "My workplace"
+      },
+      "tiles": {
+        "ueberfaellig": {
+          "title": "Overdue",
+          "question": "What is already too late?"
+        },
+        "faellig-30": {
+          "title": "Due within 30 days",
+          "question": "What do I need to commission now?"
+        },
+        "freigabe-blockiert": {
+          "title": "Release blocked",
+          "question": "What is stuck and not moving?"
+        },
+        "klaerliste": {
+          "title": "Clarification list",
+          "question": "What is missing, and why?"
+        },
+        "fristen-ohne-beleg": {
+          "title": "Duties with a date",
+          "question": "Which deadlines are evidenced in the regulation?"
+        },
+        "auftraege-termin": {
+          "title": "Scheduled jobs",
+          "question": "Who is coming when?"
+        },
+        "bestand-zustand": {
+          "title": "Inventory by state",
+          "question": "How complete is the register?"
+        },
+        "modelle-ohne-einstufung": {
+          "title": "Models in the catalogue",
+          "question": "Where is the basis missing?"
+        },
+        "vorkommnis-unbewertet": {
+          "title": "Incidents without assessment",
+          "question": "What do I need to assess?"
+        },
+        "vorkommnis-ungemeldet": {
+          "title": "Reportable, not reported",
+          "question": "Where is a deadline running against me?"
+        },
+        "rueckruf-offen": {
+          "title": "Open field safety actions",
+          "question": "What has the manufacturer required?"
+        },
+        "rueckruf-abgleich": {
+          "title": "Recall without stock match",
+          "question": "Which devices are affected?"
+        },
+        "buch-stoerungen": {
+          "title": "Device log book",
+          "question": "Is something accumulating?"
+        },
+        "mpsb-bestellung": {
+          "title": "Locations",
+          "question": "Which sites have a named safety officer?"
+        },
+        "mpsb-fehlt": {
+          "title": "Sites without MPSB",
+          "question": "Where is an officer missing?"
+        },
+        "implantat-doku": {
+          "title": "Implant documentation open",
+          "question": "Where is evidence missing?"
+        },
+        "meine-geraete": {
+          "title": "Devices in my area",
+          "question": "May I use this?"
+        },
+        "meine-einweisungen": {
+          "title": "My instructions",
+          "question": "Have I been instructed?"
+        },
+        "stoerung-melden": {
+          "title": "Report a malfunction",
+          "question": "The device does not work."
+        },
+        "gesperrte-geraete": {
+          "title": "Blocked devices in area",
+          "question": "Why is this here?"
+        },
+        "validierung-geraete": {
+          "title": "Validation per reprocessor",
+          "question": "Is the machine validated?"
+        },
+        "routine-heute": {
+          "title": "Routine checks today",
+          "question": "What is due daily?"
+        },
+        "charge-offen": {
+          "title": "Batches without release",
+          "question": "What must not be used?"
+        },
+        "wasser-chemie": {
+          "title": "Water and chemistry",
+          "question": "Are consumables in order?"
+        },
+        "sterilgut": {
+          "title": "Sterile storage",
+          "question": "Is storage in order?"
+        },
+        "kopplung-historie": {
+          "title": "Product–device coupling",
+          "question": "What runs on what, since when?"
+        },
+        "aufb-extern": {
+          "title": "Contracted reprocessing",
+          "question": "When did I last audit the provider?"
+        },
+        "sachkunde-aufb": {
+          "title": "Staff competence",
+          "question": "Who may reprocess?"
+        },
+        "konstanz-heute": {
+          "title": "Constancy test today",
+          "question": "What is due today?"
+        },
+        "konstanz-takt-offen": {
+          "title": "Radiation test objects",
+          "question": "What still needs a decision?"
+        },
+        "bezugswerte": {
+          "title": "Reference values set or missing",
+          "question": "Can I evaluate at all?"
+        },
+        "abnahme-offen": {
+          "title": "Acceptance test open",
+          "question": "What must not yet operate?"
+        },
+        "aerztliche-stelle": {
+          "title": "Medical board",
+          "question": "When is the request due?"
+        },
+        "sv-zulassung": {
+          "title": "Experts and authorisation",
+          "question": "Notification or approval?"
+        },
+        "dguv-faellig": {
+          "title": "DGUV inspection due",
+          "question": "What does occupational safety require?"
+        },
+        "dguv-ohne-festlegung": {
+          "title": "DGUV without decision",
+          "question": "Does STK cover it, or not?"
+        },
+        "befund-frist": {
+          "title": "Inspection findings with deadline",
+          "question": "What did the authority set?"
+        },
+        "befund-nachweis": {
+          "title": "Remedied, evidence missing",
+          "question": "What still needs proof?"
+        },
+        "begehung-vorbereitung": {
+          "title": "Preparation mode",
+          "question": "What would the authority miss?"
+        },
+        "auditfaehigkeit": {
+          "title": "Audit readiness",
+          "question": "Would we pass an inspection?"
+        },
+        "offene-punkte-standort": {
+          "title": "Open items by site",
+          "question": "Where is it burning?"
+        },
+        "bestandsverzeichnis": {
+          "title": "Export inventory register",
+          "question": "The inspector is on site."
+        },
+        "pruefungen-quartal": {
+          "title": "Inspections next quarter",
+          "question": "What is coming at us?"
+        },
+        "betreuung-zugriffe": {
+          "title": "Management",
+          "question": "Who sees our data?"
+        },
+        "befaehigung-auslaufend": {
+          "title": "Expiring competence",
+          "question": "Whom do we need to train?"
+        },
+        "traegerschaft-luecke": {
+          "title": "Duties without owner",
+          "question": "What does nobody see?"
+        }
+      }
     }
   },
   "roles": {
@@ -712,7 +1373,8 @@
     "requestServiceBusy": "Starting…",
     "button": "Inventory",
     "buttonTitle": "Inventory register",
-    "security": "Security"
+    "security": "Security",
+    "tagReprocessing": "Reprocessing"
   },
   "inventarize": {
     "title": "Add device for registration",
@@ -808,7 +1470,10 @@
       "address": "Address",
       "deliveryAddress": "Delivery address",
       "areas": "Areas",
-      "devices": "Devices"
+      "devices": "Devices",
+      "mpsb": "MPSB",
+      "mpsbAppointed": "Appointed",
+      "mpsbMissing": "Missing"
     },
     "catalog": {
       "status": "Status",
@@ -908,7 +1573,27 @@
     "deliveryPlaceholder": "Street, number, postcode city — e.g. Goods receiving Building B",
     "scopeMine": "Mine",
     "scopeOpen": "Open",
-    "scopeAll": "All"
+    "scopeAll": "All",
+    "dutyKey": "Duty",
+    "horizon": "Horizon",
+    "horizonDays": "Next {days} days",
+    "confidence": "Confidence",
+    "confidenceUnverified": "Not verified",
+    "confidenceVerified": "Verified",
+    "mineArea": "My area",
+    "mineAreaActive": "Home area only",
+    "stateDraft": "Draft",
+    "stateReview": "Review",
+    "stateReleased": "Released",
+    "stateRetired": "Retired",
+    "stateNotReleased": "Not released",
+    "scheduledOnly": "With due date",
+    "missingClassification": "Without classification",
+    "missingClassificationActive": "Without classification (on)",
+    "mpsbMissing": "Without MPSB",
+    "mpsbAppointed": "MPSB appointed",
+    "expiring": "Expiring",
+    "mineOnly": "Mine only"
   },
   "dueDatesCards": {
     "due": "Due",
@@ -1285,7 +1970,289 @@
     "channelsSummary": "{ok}/{total} channels succeeded",
     "channelsFailedSuffix": " · {fail} failed",
     "scanNext": "Scan next",
-    "deviceFallbackTitle": "Device"
+    "deviceFallbackTitle": "Device",
+    "tabs": {
+      "aria": "Scan navigation",
+      "scan": "Scan",
+      "heute": "Today",
+      "bestand": "Inventory",
+      "chargen": "Batches",
+      "badge": "{count} items"
+    },
+    "heute": {
+      "title": "Today",
+      "subtitle": "Devices in your work areas",
+      "refresh": "Refresh",
+      "loading": "Loading…",
+      "empty": "No open tasks for today in your areas.",
+      "noAreas": "No work areas assigned. Ask an admin to assign areas.",
+      "openBatches": "{count, plural, one {# open batch} other {# open batches}}",
+      "openKonstanz": "Constancy due",
+      "openDaily": "Daily check open",
+      "dailyDone": "Daily check done",
+      "band": {
+        "blocked": "Blocked",
+        "open": "Open",
+        "notice": "Notice",
+        "done": "Done"
+      }
+    },
+    "chargen": {
+      "title": "Batches",
+      "subtitle": "Reprocessing charges in your areas",
+      "refresh": "Refresh",
+      "loading": "Loading…",
+      "empty": "No open batches in your areas.",
+      "open": "Open",
+      "noBeleg": "Record missing",
+      "newViaScan": "Scan / open a device",
+      "errLoad": "Could not load batches."
+    },
+    "charge": {
+      "neuTitle": "New batch",
+      "freigabeTitle": "Release batch",
+      "cancel": "Cancel",
+      "later": "Later",
+      "back": "Back",
+      "save": "Save batch",
+      "sign": "Sign & save",
+      "saving": "Saving…",
+      "loading": "Loading…",
+      "batchNumber": "Batch number",
+      "programme": "Programme / cycle",
+      "loadPattern": "Load pattern (optional)",
+      "startedAt": "Started",
+      "finishedAt": "Finished",
+      "items": "Load",
+      "itemPlaceholder": "Label (e.g. tray OR)",
+      "quantity": "Quantity",
+      "addItem": "Add",
+      "removeItem": "Remove",
+      "beleg": "Device process record",
+      "belegPick": "Choose photo / PDF",
+      "belegPresent": "Record stored · SHA {sha}…",
+      "belegMissing": "Record missing — no release without protocol.",
+      "belegOk": "Record attached.",
+      "belegSha": "Record SHA",
+      "uploading": "Uploading…",
+      "decision": "Decision",
+      "note": "Note / conditions",
+      "notePlaceholder": "Required for conditional release or rejection",
+      "confirmSign": "I confirm this release with my Sachkunde (signature).",
+      "pass": "OK",
+      "defect": "Defect",
+      "value": "Value",
+      "batchMeta": "Batch {number} · {programme}",
+      "signedBy": "Signed by",
+      "alreadyDone": "Already decided: {result}",
+      "result": {
+        "released": "Release",
+        "released_with_conditions": "With conditions",
+        "rejected": "Reject"
+      },
+      "okCreated": "Batch recorded — not released yet",
+      "releasedOk": {
+        "released": "Batch released",
+        "released_with_conditions": "Batch released with conditions",
+        "rejected": "Batch rejected"
+      },
+      "hintReleaseNext": "Next: attach process record and release under Batches.",
+      "hintRejected": "Batch must not be used.",
+      "errLoad": "Could not load batch.",
+      "errSave": "Save failed.",
+      "errBeleg": "Could not store process record.",
+      "errBatchNumber": "Enter a batch number.",
+      "errProgramme": "Enter a programme.",
+      "errItem": "Enter a load label.",
+      "errItems": "Add at least one load item.",
+      "errDecision": "Choose a decision.",
+      "errSign": "Confirm the signature.",
+      "errNote": "Note required for conditions or rejection.",
+      "errHurdles": "Release is still blocked.",
+      "errMangelRelease": "On defect, release only with conditions or reject.",
+      "errIncomplete": "Answer all per-batch checks."
+    },
+    "device": {
+      "loading": "Loading device…",
+      "missing": "Device not found or outside your work areas.",
+      "back": "Back",
+      "location": "Location",
+      "now": "Now",
+      "further": "More",
+      "comingSoon": "This capture flow is next — not wired yet.",
+      "stoerungDenied": "You need device-book permission to report a malfunction.",
+      "routineDenied": "You need reprocessing permission for the daily check.",
+      "chargeDenied": "You need reprocessing permission for batches.",
+      "noticeOnly": "Observe the notice — no capture on this step.",
+      "lage": {
+        "ok": "Clear — ready to use",
+        "stop": "Blocked — do not use",
+        "warn": "In use with notice"
+      },
+      "lageOkHint": "No open malfunction, failed check, or open recall.",
+      "actions": {
+        "stoerung": "Report malfunction",
+        "stoerungHint": "Entry in the device book; harm goes to the MPSB for assessment",
+        "service": "Request service",
+        "serviceHint": "Repair — last malfunction note will be prefilled",
+        "serviceGenericHint": "Inspection, maintenance or repair with the partner",
+        "serviceOpenHint": "Open request · {ref}",
+        "requestOpen": "Request in progress · {ref}",
+        "requestOpenHint": "Open service request on this device",
+        "routine": "Daily check",
+        "routineHint": "Daily reprocessing checks still open",
+        "routineDoneHint": "Daily checks done for today",
+        "chargeRelease": "Release batch",
+        "chargeReleaseHint": "Batch finished — no decision yet",
+        "chargeNew": "Record new batch",
+        "chargeNewHint": "Daily check done — enter a run",
+        "batches": "Batches",
+        "batchesDoneHint": "All batches decided",
+        "konstanz": "Constancy check",
+        "konstanzHint": "Constancy due or overdue",
+        "konstanzFailedHint": "Last constancy failed — check again",
+        "konstanzDoneHint": "No open constancy check",
+        "parts": "Order spare parts",
+        "partsHint": "Articles for this model via plusorder",
+        "notice": "Observe notice",
+        "noticeHint": "Field safety / recall action still open",
+        "recallStop": "Do not use — recall",
+        "recallStopHint": "Affected by open field safety action; measure not recorded yet",
+        "ifu": "Instructions for use",
+        "ifuHint": "§ 4 · {ref}",
+        "ifuMissing": "§ 4 · not stored yet"
+      },
+      "ifuOpen": "Instructions for use: {ref}",
+      "ifuMissingToast": "No instructions for use on file (§ 4)."
+    },
+    "konstanz": {
+      "title": "Constancy check",
+      "cancel": "Cancel",
+      "later": "Later",
+      "back": "Back",
+      "submit": "Save",
+      "saving": "Saving…",
+      "loading": "Loading…",
+      "allDone": "No open constancy check on this device.",
+      "progress": "Check {current} of {total}",
+      "dueAt": "due {date}",
+      "duty": "Object",
+      "performedAt": "Performed",
+      "nextDue": "Next due",
+      "noteOptional": "Note (optional)",
+      "noteRequired": "Note required",
+      "notePlaceholder": "Reading, finding or condition",
+      "result": {
+        "passed": "Passed",
+        "passed_with_conditions": "With conditions",
+        "failed": "Failed"
+      },
+      "status": {
+        "due": "Due today",
+        "overdue": "Overdue",
+        "failed": "Last check failed",
+        "missing_cadence": "Cadence not set yet",
+        "baseline_missing": "Acceptance / baselines missing",
+        "ok": "Done"
+      },
+      "ok": {
+        "passed": "Constancy check passed",
+        "passed_with_conditions": "Constancy check with conditions",
+        "failed": "Constancy check failed"
+      },
+      "hintFailed": "Device under notice / block — repeat constancy or request service.",
+      "errLoad": "Could not load constancy checks.",
+      "errSave": "Save failed.",
+      "errResult": "Choose a result.",
+      "errNote": "A note is required for conditions or failure."
+    },
+    "stoerung": {
+      "title": "Report malfunction",
+      "cancel": "Cancel",
+      "submit": "Report",
+      "saving": "Saving…",
+      "kind": "Kind",
+      "kindMalfunction": "Malfunction",
+      "kindOperating": "Operating error",
+      "kindNote": "Note",
+      "noticed": "When noticed",
+      "what": "What happened",
+      "whatPlaceholder": "As you saw it. Do not guess the cause.",
+      "harm": "Was anyone harmed, or could they have been?",
+      "harmHint": "Whether this is a reportable incident is decided by the MPSB — not by this answer.",
+      "yes": "Yes",
+      "no": "No",
+      "unknown": "Unknown",
+      "outOfService": "Device taken out of service?",
+      "outYes": "Yes, blocked",
+      "outNo": "No, in use",
+      "consequence": "Consequence / measure",
+      "consequencePlaceholder": "What was done? e.g. pump replaced, patient monitored.",
+      "consequenceWarn": "Harm affirmed, device still in use — please explain why below.",
+      "progress": "{filled} of {total} required fields",
+      "errKind": "Choose kind: malfunction, operating error or note.",
+      "errDate": "Date is missing or in the future.",
+      "errDescription": "Describe what happened — one sentence is enough.",
+      "errHarm": "Answer whether someone was or could have been harmed — Unknown is valid.",
+      "errOut": "Say whether the device was taken out of service.",
+      "errConsequence": "Harm yes + device in use needs a consequence note.",
+      "errSave": "Could not save the report.",
+      "okIncident": "Malfunction reported",
+      "okBook": "Device book entry created",
+      "hintMpsb": "Goes to the MPSB for assessment. The app does not judge severity.",
+      "hintBlocked": "The device is now shown as blocked.",
+      "kindLabel": {
+        "malfunction": "Malfunction",
+        "operating_error": "Operating error",
+        "note": "Note"
+      },
+      "harmLabel": {
+        "yes": "Yes",
+        "no": "No",
+        "unknown": "Unknown"
+      }
+    },
+    "confirm": {
+      "toDevice": "To device",
+      "toHeute": "To Today list",
+      "kind": "Kind",
+      "device": "Device",
+      "harm": "Harm",
+      "status": "Device status"
+    },
+    "routine": {
+      "title": "Daily check",
+      "cancel": "Cancel",
+      "later": "Later",
+      "back": "Back",
+      "loading": "Loading checks…",
+      "errLoad": "Could not load daily checks.",
+      "errSave": "Could not save checks.",
+      "errPassFail": "Choose OK or Defect.",
+      "errMeasure": "Enter the measured value.",
+      "errIncomplete": "Answer every open check.",
+      "errNote": "A defect requires a note.",
+      "allDone": "All daily checks for this device are done today.",
+      "progress": "Step {current} of {total}",
+      "answered": "{filled} of {total} answered",
+      "ok": "OK",
+      "defect": "Defect",
+      "value": "Measured value",
+      "valuePlaceholder": "As read on the instrument",
+      "siteScope": "Site check · {site}",
+      "next": "Next",
+      "toNote": "Continue",
+      "submit": "Record checks",
+      "saving": "Saving…",
+      "noteRequired": "Note — required for a defect",
+      "noteOptional": "Note (optional)",
+      "notePlaceholder": "What was noticed.",
+      "mangelWarn": "A defect blocks this device. Batches from it must not be released until a passed check exists.",
+      "ready": "All answers captured. Confirm to write the evidence.",
+      "okOk": "Daily check recorded",
+      "okMangel": "Check recorded — device blocked",
+      "hintMangel": "No release from this device until a passed check is recorded."
+    }
   },
   "device": {
     "scanAnotherAria": "Scan another",
@@ -1324,6 +2291,14 @@
     "requestServiceHint": "Request inspection, maintenance, or repair from the service partner",
     "orderSpareParts": "Order spare parts",
     "orderSparePartsHint": "Order matching articles for this device via plusorder",
+    "candidatesTitle": "Devices in inventory",
+    "candidatesSubtitle": "{count, plural, one {# device} other {# devices}} match GTIN {gtin}. Choose one or continue without selection.",
+    "candidatesSerial": "SN {serial}",
+    "candidatesContinue": "Continue with selected device",
+    "candidatesContinueHint": "Use this inventory record for the request",
+    "candidatesSelecting": "Checking…",
+    "candidatesSkip": "Not in this list",
+    "candidatesSkipHint": "Continue with the article master / manufacturer data",
     "sourceManualServiceOnly": "Manually captured, service only",
     "sourceManualNotForSale": "Service only — not for sale",
     "sourceBeudamed": "BEUDAMED · EUDAMED mirror",
@@ -1711,7 +2686,6 @@
     "stepMeasureWithUnit": "Value {unit}",
     "stepOk": "pass",
     "stepDefect": "fail",
-
     "stepRatingAria": "Step result",
     "limitHint": "Limit",
     "baselineHint": "Baseline",

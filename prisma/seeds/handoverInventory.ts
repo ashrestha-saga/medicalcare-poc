@@ -27,6 +27,7 @@ const RULE_SET_BY_CODE: Record<string, string> = {
 const DUTY_KEY_BY_INSPECTION: Record<string, string> = {
   MAINT: "wartung",
   STK: "stk",
+  DGUV: "dguv",
   MTK: "mtk",
   ACCEPT: "abnahme",
   CONSTANCY: "konstanz",

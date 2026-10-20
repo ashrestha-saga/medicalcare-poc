@@ -27,7 +27,11 @@ describe("partner permission intersection", () => {
     expect(admin).not.toContain("roles:update");
     expect(admin).not.toContain("training:view");
     expect(admin).not.toContain("settings:oxid");
+    expect(admin).not.toContain("settings:smtp");
     expect(admin).not.toContain("catalog:update");
+    expect(admin).not.toContain("incidents:manage");
+    expect(admin).not.toContain("reprocessing:release");
+    expect(admin).not.toContain("authority:view");
     expect(admin).toContain("inventory:update");
     expect(admin).toContain("audit:export");
   });

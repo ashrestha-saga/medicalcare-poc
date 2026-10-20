@@ -8,6 +8,7 @@ import { ROLES, roleLabel } from "@/constants/roles";
 import type { PermissionSlug } from "@/interfaces/permissions";
 import type { UserRole } from "@/interfaces/session";
 import { useEditUserForm } from "@/components/hooks/users/useEditUserForm";
+import { UserWorkAreasFields } from "@/components/features/users/UserWorkAreasFields";
 import { useResourceAudit } from "@/components/hooks/audit/useResourceAudit";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
@@ -358,6 +359,18 @@ export function EditUserScreen({ params }: { params: Promise<{ id: string }> }) 
                 onSelect={form.selectRole}
               />
             </div>
+
+            <UserWorkAreasFields
+              role={form.role}
+              areaIds={form.areaIds}
+              homeAreaId={form.homeAreaId}
+              permissions={form.permissions}
+              onAreaIdsChange={form.setAreaIds}
+              onHomeAreaIdChange={form.setHomeAreaId}
+              onTogglePermission={form.togglePermission}
+              disabled={form.busy || readOnlyInvite || !canUpdate || isSelf}
+              fieldErrors={form.fieldErrors}
+            />
 
             <div className="rounded-lg border border-border bg-muted/30 p-4" data-testid="edit-permissions-section">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">

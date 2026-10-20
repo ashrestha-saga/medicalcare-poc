@@ -9,6 +9,7 @@ import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import type { CreateOrderRequestInput } from "@/schemas/orderRequest";
 import { toOrderRequestDTO } from "@/services/shared/mappers";
+import { assertDeviceInWorkAreas } from "@/services/users/userAreaScope";
 
 /**
  * Section 37 — spare-parts order *requests*. A separate business operation from
@@ -35,6 +36,14 @@ export const orderRequestService = {
     if (!input.deliveryAddress.trim()) throw unprocessable("Please enter the delivery address.", { field: "deliveryAddress" });
     if (input.items.length === 0) throw unprocessable("Add at least one spare part.", { field: "items" });
 
+    if (input.subjectType === "instance" && input.subjectId) {
+      const device = await prisma.deviceInstance.findFirst({
+        where: { id: input.subjectId, tenantId },
+        select: { id: true, areaId: true },
+      });
+      if (!device) throw unprocessable("Unknown device instance.", { field: "subjectId" });
+      await assertDeviceInWorkAreas(ctx, device.areaId);
+    }
     if (input.subjectType === "captured" && input.subjectId) {
       // A manual capture is a service-only subject (DAT-302a); orders may reference it
       // for context, but it must still belong to this tenant.

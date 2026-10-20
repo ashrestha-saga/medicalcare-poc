@@ -3,15 +3,18 @@ import { errorResponse } from "@/lib/errors";
 import { createCatalogModelSchema } from "@/schemas/catalogModel";
 import { deviceModelCatalogService } from "@/services/catalog/deviceModelCatalogService";
 
-/** GET /api/catalog/models?q= — central DeviceModel list (catalog:view). */
+/** GET /api/catalog/models?q=&missingClassification=1 — central DeviceModel list (catalog:view). */
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
-      const q = new URL(req.url).searchParams.get("q") ?? undefined;
-      const models = await deviceModelCatalogService.list(ctx, q);
+      const params = new URL(req.url).searchParams;
+      const q = params.get("q") ?? undefined;
+      const missingClassification =
+        params.get("missingClassification") === "1" || params.get("missingClassification") === "true";
+      const models = await deviceModelCatalogService.list(ctx, { q, missingClassification });
       return Response.json({ models }, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {

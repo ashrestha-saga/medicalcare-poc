@@ -22,6 +22,7 @@ export function useCatalogAdopt() {
   const isCatalogModel = resolution?.stage === "catalog" && !captured;
   const isBeudamed = resolution?.stage === "beudamed" && !captured;
   const isInventory = resolution?.stage === "inventory" && !captured;
+  const isInventoryCandidates = resolution?.stage === "inventory-candidates" && !captured;
   const partsAllowed = !captured;
 
   return {
@@ -31,6 +32,7 @@ export function useCatalogAdopt() {
     isCatalogModel,
     isBeudamed,
     isInventory,
+    isInventoryCandidates,
     catalogAdopted,
     adoptCatalog: () => setCatalogAdopted(true),
     backFromActions: () => setCatalogAdopted(false),
