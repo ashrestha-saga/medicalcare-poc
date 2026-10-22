@@ -29,6 +29,8 @@ export const MODEL_OWNED_FIELDS = [
   "istAufbGeraet",
   "eigenTyp",
   "einmalprodukt",
+  "kompaktThermometer",
+  "manometerTyp",
 ] as const;
 
 /** Instance-owned — stay on DeviceInstance / characteristicsJson. */

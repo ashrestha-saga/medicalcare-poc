@@ -2,7 +2,7 @@
 
 import { useCallback, useState, type FormEvent } from "react";
 import type { LoginApiResponse, LoginResponse } from "@/interfaces";
-import { AUTH_HOME, PARTNER_HOME } from "@/constants/authRoutes";
+import { clinicHomePath, PARTNER_HOME } from "@/constants/authRoutes";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { loginSchema, totpVerifySchema } from "@/schemas/auth";
 import { zodFieldErrors } from "@/schemas/formErrors";
@@ -27,7 +27,9 @@ export function useSignIn(door: Door = "clinic") {
     useLogStore.getState().log("auth", `Signed in as ${res.user.name} (${label ?? "user"})`);
     const dest =
       res.homePath ??
-      (res.user.accountKind === "partner" || door === "partner" ? PARTNER_HOME : AUTH_HOME);
+      (res.user.accountKind === "partner" || door === "partner"
+        ? PARTNER_HOME
+        : clinicHomePath(res.user.role));
     window.location.replace(dest);
   }, [door]);
 

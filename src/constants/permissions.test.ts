@@ -99,6 +99,7 @@ describe("RBAC defaults & path guards", () => {
     expect(hasPermission("user", "inventory:update")).toBe(false);
     expect(hasPermission("user", "requests:create")).toBe(true);
     expect(hasPermission("user", "account:security")).toBe(true);
+    expect(hasPermission("user", "devicebook:view")).toBe(true);
     expect(hasPermission("user", "audit:view")).toBe(false);
     expect(menuForRole("user")).toEqual([]);
 
@@ -106,6 +107,7 @@ describe("RBAC defaults & path guards", () => {
     expect(canAccessPath("/activity", granted)).toBe(false);
     expect(canAccessPath("/", granted)).toBe(true);
     expect(canAccessPath("/security", granted)).toBe(true);
+    expect(canAccessPath("/device-book", granted)).toBe(true);
     expect(canAccessPath("/requests", granted)).toBe(false);
     expect(canAccessPath("/users", granted)).toBe(false);
     expect(canAccessPath("/roles", granted)).toBe(false);

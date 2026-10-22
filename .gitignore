@@ -30,6 +30,9 @@ test-results/
 npm-debug.log*
 *.tsbuildinfo
 
+# local object-storage dual-read (Phase 6)
+.data/
+
 # local implementation / UX / architecture notes (not part of the app)
 DeviceCare_Implementation_Guide_Continued.md
 DeviceCare_Mobile_Tablet_UX_Exact_Cursor_Spec.md

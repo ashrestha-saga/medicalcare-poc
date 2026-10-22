@@ -1,4 +1,5 @@
 import type { TenantContext } from "@/interfaces";
+import type { PermissionSlug } from "@/interfaces/permissions";
 import type { UserRole } from "@/interfaces/session";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { actorFromTenant } from "@/lib/auth/actorContext";
@@ -17,8 +18,7 @@ export type ResolvedTile = {
   zone: "decides" | "worklist" | "watch";
   sortOrder: number;
   dutyKey: string | null;
-  requiredPermission: string | null;
-  partnerOnly: boolean;
+  requiredPermission: PermissionSlug | null;
 };
 
 /**
@@ -55,8 +55,7 @@ export const dashboardTileService = {
         zone: t.zone,
         sortOrder: t.sortOrder,
         dutyKey: t.dutyKey,
-        requiredPermission: t.requiredPermission,
-        partnerOnly: t.partnerOnly,
+        requiredPermission: (t.requiredPermission as PermissionSlug | null) ?? null,
       }))
       .sort((a, b) => a.zone.localeCompare(b.zone) || a.sortOrder - b.sortOrder);
   },

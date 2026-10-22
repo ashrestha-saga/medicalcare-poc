@@ -23,6 +23,7 @@ import {
 import type { EvidenceKind, RegistrationCharacteristics } from "./types";
 import { writeDuty } from "./writeDuty";
 import { isReprocessingEquipmentDevice } from "./reprocessingLinkService";
+import { recomputeDutyProjection } from "@/services/duties/dutyProjection";
 
 const APP_VERSION = "reclassify-1.0";
 
@@ -422,6 +423,7 @@ export const reclassifyService = {
             attachmentBlobId: blobIdsByCode[code] ?? null,
             externalRecordRef: e.externalRecordRef?.trim() || null,
             recordedBy: ctx.user.name,
+            recordedByUserId: ctx.user.id,
             recordedAt: now,
           };
           const existing = await tx.deviceEvidence.findUnique({
@@ -504,6 +506,8 @@ export const reclassifyService = {
             lastMaintainedAt: inst.lastMaintainedAt,
           });
         }
+
+        await recomputeDutyProjection(tx, inst.id, now);
 
         if (characteristics.aufbereitung && characteristics.aufbKlasse) {
           await tx.deviceReprocessingProfile.upsert({

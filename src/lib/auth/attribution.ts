@@ -1,10 +1,11 @@
-import type { TenantContext } from "@/interfaces";
+import type { TenantWorkContext } from "@/interfaces";
 
 /**
  * Frozen display name + optional User FK for legally relevant actions.
  * Spec: FK binds the account; name survives rename/deletion (InspectionRun pattern).
+ * Accepts clinic TenantContext or partner ActingContext.
  */
-export function actorAttribution(ctx: TenantContext): {
+export function actorAttribution(ctx: TenantWorkContext): {
   userId: string;
   name: string;
 } {
@@ -15,10 +16,19 @@ export function actorAttribution(ctx: TenantContext): {
 }
 
 /** recordedBy (name) + recordedByUserId for append-only operational rows. */
-export function recordedByAttribution(ctx: TenantContext): {
+export function recordedByAttribution(ctx: TenantWorkContext): {
   recordedBy: string;
   recordedByUserId: string;
 } {
   const a = actorAttribution(ctx);
   return { recordedBy: a.name, recordedByUserId: a.userId };
+}
+
+/** performedBy (name) + performedByUserId for DutyPerformance rows. */
+export function performedByAttribution(ctx: TenantWorkContext): {
+  performedBy: string;
+  performedByUserId: string;
+} {
+  const a = actorAttribution(ctx);
+  return { performedBy: a.name, performedByUserId: a.userId };
 }

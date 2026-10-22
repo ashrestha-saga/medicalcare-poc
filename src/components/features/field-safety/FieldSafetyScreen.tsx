@@ -430,17 +430,19 @@ export function FieldSafetyScreen() {
           title={t("title")}
           description={t("description")}
           headerExtra={
-            <Button
-              size="sm"
-              onClick={() => {
-                setScopes([]);
-                setScopeDraft(emptyScope());
-                setCreateOpen(true);
-              }}
-              data-testid="field-safety-create"
-            >
-              {t("actions.record")}
-            </Button>
+            list.canCreate ? (
+              <Button
+                size="sm"
+                onClick={() => {
+                  setScopes([]);
+                  setScopeDraft(emptyScope());
+                  setCreateOpen(true);
+                }}
+                data-testid="field-safety-create"
+              >
+                {t("actions.record")}
+              </Button>
+            ) : undefined
           }
         >
           <div className="mb-4 flex flex-wrap gap-2">
@@ -507,7 +509,7 @@ export function FieldSafetyScreen() {
                               : ""}
                           </p>
                         </div>
-                        {open ? (
+                        {open && list.canCreate ? (
                           <div className="flex flex-wrap gap-1.5">
                             <Button
                               size="sm"
@@ -582,7 +584,7 @@ export function FieldSafetyScreen() {
                                       </b>
                                     </td>
                                     <td className="px-3 py-3 align-top">
-                                      {open ? (
+                                      {open && list.canCreate ? (
                                         <TernaryAffected
                                           value={d.affected}
                                           disabled={busy}
@@ -597,7 +599,7 @@ export function FieldSafetyScreen() {
                                         <span className="font-mono">
                                           {formatDate(d.actionTakenAt)}
                                         </span>
-                                      ) : open && measurePending ? (
+                                      ) : open && list.canCreate && measurePending ? (
                                         <button
                                           type="button"
                                           className="font-semibold text-primary hover:underline"
@@ -610,7 +612,7 @@ export function FieldSafetyScreen() {
                                       )}
                                     </td>
                                     <td className="px-3 py-3 align-top">
-                                      {open ? (
+                                      {open && list.canCreate ? (
                                         <Input
                                           className="h-8 max-w-[220px] text-xs"
                                           value={noteVal}

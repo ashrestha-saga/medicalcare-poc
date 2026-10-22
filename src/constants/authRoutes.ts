@@ -3,11 +3,32 @@
  * Route group names like (auth)/(app) do not appear in these paths.
  */
 
+import type { UserRole } from "@/interfaces/session";
+
 export const AUTH_ROUTES = ["/login"] as const;
 
+/** Capturer / scan home — role `user` without shell:nav. */
 export const AUTH_HOME = "/";
 
+/** Persona dashboard — default for clinic managers after sign-in. */
+export const DASHBOARD_HOME = "/dashboard";
+
 export const PARTNER_HOME = "/partner";
+
+/** Roles that land on the dashboard instead of the scan home. */
+const DASHBOARD_HOME_ROLES: readonly UserRole[] = [
+  "superadmin",
+  "device_admin",
+  "security_officer",
+];
+
+/** Clinic post-login / session home by role. */
+export function clinicHomePath(role: UserRole | string | null | undefined): string {
+  if (role && (DASHBOARD_HOME_ROLES as readonly string[]).includes(role)) {
+    return DASHBOARD_HOME;
+  }
+  return AUTH_HOME;
+}
 
 /**
  * Paths that skip route-level permission checks inside the authenticated shell.

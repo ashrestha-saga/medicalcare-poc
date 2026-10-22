@@ -302,6 +302,73 @@ export const remediateFindingSchema = z.object({
 });
 export type RemediateFindingInput = z.infer<typeof remediateFindingSchema>;
 
+const notificationChannel = z.enum([
+  "authority_portal",
+  "manufacturer_portal",
+  "email",
+  "post",
+  "fax",
+  "other",
+]);
+
+const notificationKind = z.enum([
+  "incident",
+  "finding_remediation",
+  "radiation",
+  "accident",
+  "metrology",
+  "other",
+]);
+
+const authorityKind = z.enum([
+  "health_office",
+  "device_authority",
+  "occupational_safety",
+  "metrology",
+  "medical_board",
+  "other",
+]);
+
+/** Explicit record of an outbound authority/manufacturer notification (does not transmit). */
+export const recordAuthorityNotificationSchema = z
+  .object({
+    kind: notificationKind,
+    recipientName: z.string().trim().min(1),
+    channel: notificationChannel,
+    subject: z.string().trim().min(1),
+    bodyText: z.string().optional().nullable(),
+    sentAt: dateOnly,
+    reference: z.string().optional().nullable(),
+    dueAt: dateOnly.optional().nullable(),
+    authorityKind: authorityKind.optional().nullable(),
+    incidentId: z.string().min(1).optional().nullable(),
+    findingId: z.string().min(1).optional().nullable(),
+    deviceInstanceId: z.string().min(1).optional().nullable(),
+    siteId: z.string().min(1).optional().nullable(),
+    documents: z
+      .array(
+        z.object({
+          role: z.enum(["submission", "acknowledgement", "response", "attachment"]),
+          externalRef: z.string().optional().nullable(),
+          dataUrl: z.string().trim().max(8_000_000).optional().nullable(),
+        }),
+      )
+      .max(5)
+      .optional(),
+  })
+  .superRefine((val, ctx) => {
+    const subjects = [val.incidentId, val.findingId, val.deviceInstanceId, val.siteId].filter(
+      Boolean,
+    );
+    if (subjects.length !== 1) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Exactly one of incidentId, findingId, deviceInstanceId, siteId is required",
+      });
+    }
+  });
+export type RecordAuthorityNotificationInput = z.infer<typeof recordAuthorityNotificationSchema>;
+
 export const openDisclosureSchema = z.object({
   expiresAt: z.string().min(1),
   audience: z.string().min(1),

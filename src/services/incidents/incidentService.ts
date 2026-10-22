@@ -239,8 +239,11 @@ export const incidentService = {
     if (existing.suspectedSerious !== true) {
       throw badRequest("Only suspected-serious incidents require authority reporting");
     }
+    if (existing.reportedAt) {
+      throw badRequest("Incident already reported — open Authority notifications to amend");
+    }
 
-    // Authoritative record; stamps on DeviceIncident stay as dashboard convenience.
+    // AuthorityNotification is authoritative; DeviceIncident.reportedAt is derived there.
     await authorityNotificationService.recordIncidentReport(ctx, {
       incidentId: id,
       recipientName: input.reportedTo?.trim() || "BfArM",
@@ -254,9 +257,6 @@ export const incidentService = {
     const row = await prisma.deviceIncident.update({
       where: { id },
       data: {
-        reportedAt: new Date(`${input.reportedAt}T00:00:00.000Z`),
-        reportReference: input.reportReference ?? null,
-        reportedTo: input.reportedTo ?? null,
         manufacturerNotifiedAt: input.manufacturerNotifiedAt
           ? new Date(`${input.manufacturerNotifiedAt}T00:00:00.000Z`)
           : null,

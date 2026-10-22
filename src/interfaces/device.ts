@@ -89,6 +89,14 @@ export interface DeviceInstanceDTO {
   isReprocessingEquipment: boolean;
   /** True when linked catalog model is not yet released. */
   catalogPending: boolean;
+  /** Workflow retire timestamp. */
+  retiredAt: string | null;
+  /** § 13 legal decommission day (retention clock start). */
+  decommissionedAt: string | null;
+  /** § 13 Abs. 3 — book may be purged only on/after this date. */
+  retainUntil: string | null;
+  /** Derived: none | under_retention | purge_allowed */
+  retentionStatus: "none" | "under_retention" | "purge_allowed";
   createdAt?: string;
   updatedAt?: string;
 }

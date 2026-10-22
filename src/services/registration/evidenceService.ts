@@ -1,8 +1,9 @@
 import type { TenantWorkContext } from "@/interfaces";
+import { recordedByAttribution } from "@/lib/auth/attribution";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { blobMetaFromDataUrl } from "@/lib/blobMeta";
 import { notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { createAttachmentFromDataUrl } from "@/services/storage/attachmentBlobService";
 import type { EvidenceKind } from "./types";
 
 export interface UpsertEvidenceInput {
@@ -33,6 +34,7 @@ export const evidenceService = {
       issuedAt: r.issuedAt?.toISOString() ?? null,
       validUntil: r.validUntil?.toISOString() ?? null,
       recordedBy: r.recordedBy,
+      recordedByUserId: r.recordedByUserId,
       recordedAt: r.recordedAt.toISOString(),
     }));
   },
@@ -62,16 +64,10 @@ export const evidenceService = {
 
     let attachmentBlobId: string | null = null;
     if (input.dataUrl?.trim()) {
-      const dataUrl = input.dataUrl.trim();
-      const meta = blobMetaFromDataUrl(dataUrl);
-      const blob = await prisma.attachmentBlob.create({
-        data: {
-          tenantId: ctx.tenantId,
-          kind: `evidence:${code}`,
-          dataUrl,
-          contentType: meta.contentType,
-          byteSize: meta.byteSize,
-        },
+      const blob = await createAttachmentFromDataUrl(prisma, {
+        tenantId: ctx.tenantId,
+        kind: `evidence:${code}`,
+        dataUrl: input.dataUrl.trim(),
       });
       attachmentBlobId = blob.id;
     }
@@ -82,6 +78,7 @@ export const evidenceService = {
       },
     });
 
+    const attr = recordedByAttribution(ctx);
     const data = {
       evidenceKind: input.evidenceKind,
       attachmentBlobId: attachmentBlobId ?? existing?.attachmentBlobId ?? null,
@@ -89,7 +86,8 @@ export const evidenceService = {
       issuedBy: input.issuedBy?.trim() || null,
       issuedAt: input.issuedAt ? new Date(input.issuedAt) : null,
       validUntil: input.validUntil ? new Date(input.validUntil) : null,
-      recordedBy: ctx.user.name,
+      recordedBy: attr.recordedBy,
+      recordedByUserId: attr.recordedByUserId,
       recordedAt: new Date(),
     };
 

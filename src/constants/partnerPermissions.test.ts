@@ -44,6 +44,8 @@ describe("partner permission intersection", () => {
     expect(granted).not.toContain("inventory:update");
     expect(granted).not.toContain("requests:transition");
     expect(granted).not.toContain("duties:view");
+    expect(granted).not.toContain("fieldsafety:view");
+    expect(granted).not.toContain("fieldsafety:create");
   });
 
   it("gives admin request + inventory when both scopes are present", () => {
@@ -51,8 +53,17 @@ describe("partner permission intersection", () => {
     expect(granted).toContain("inventory:update");
     expect(granted).toContain("requests:transition");
     expect(granted).toContain("audit:export");
+    expect(granted).toContain("fieldsafety:view");
+    expect(granted).toContain("fieldsafety:create");
     expect(granted).not.toContain("duties:view");
     expect(granted).not.toContain("users:view");
+  });
+
+  it("grants fieldsafety create via inspection scope for inspector", () => {
+    const granted = partnerActingPermissions("inspector", ["inspection"]);
+    expect(granted).toContain("fieldsafety:view");
+    expect(granted).toContain("fieldsafety:create");
+    expect(granted).not.toContain("incidents:manage");
   });
 
   it("returns nothing when the contract has no recognised scope", () => {

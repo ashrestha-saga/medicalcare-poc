@@ -83,6 +83,8 @@ export const TRACKED_FIELDS = [
   "messvariante",
   "anlage2Choice",
   "anlage2Verfahren",
+  "kompaktThermometer",
+  "manometerTyp",
 ] as const;
 
 export type TrackedField = (typeof TRACKED_FIELDS)[number];
@@ -113,6 +115,8 @@ const FIELD_LABELS: Record<TrackedField, string> = {
   messvariante: "Measured quantity — variant",
   anlage2Choice: "Measuring function per Anlage 2",
   anlage2Verfahren: "Anlage 2 procedure (1.5.3)",
+  kompaktThermometer: "Compact electronic fever thermometer (§ 3 Abs. 4)",
+  manometerTyp: "Blood-pressure manometer type (§ 3 Abs. 4)",
 };
 
 /** Sentinel: explicit “no measuring function” (FA-211). */
@@ -454,9 +458,13 @@ export function answerMessgroesse(
     ...next,
     messvariante: undefined,
     anlage2Verfahren: undefined,
+    kompaktThermometer: undefined,
+    manometerTyp: undefined,
   };
   next = clearMetaField(next, "messvariante");
   next = clearMetaField(next, "anlage2Verfahren");
+  next = clearMetaField(next, "kompaktThermometer");
+  next = clearMetaField(next, "manometerTyp");
 
   const g = messgroesseByKey(key);
   if (!g || key === "keine") {
@@ -489,6 +497,10 @@ export function answerMessvariante(
   annex2Leaves?: { id: string; itemNo: string; wahlweiseNach?: string[] | null }[],
 ): RegistrationCharacteristics {
   let next = answerField(m, "messvariante", variante, actor);
+  if (variante !== "elektro" || next.messgroesse !== "temperatur") {
+    next = { ...next, kompaktThermometer: undefined };
+    next = clearMetaField(next, "kompaktThermometer");
+  }
   const z = zifferAus({ messgroesse: next.messgroesse, messvariante: variante });
   return applyDerivedZiffer(next, z, actor, annex2Leaves);
 }
@@ -663,6 +675,16 @@ export function unansweredVisibleFields(
     if (fieldMeta(hydrated, "anlage2Verfahren") && needsAnswer(hydrated, "anlage2Verfahren")) {
       add("anlage2Verfahren");
     }
+    if (
+      hydrated.messgroesse === "temperatur" &&
+      hydrated.messvariante === "elektro" &&
+      isAnswered(fieldMeta(hydrated, "messvariante"))
+    ) {
+      add("kompaktThermometer");
+    }
+    if (hydrated.messgroesse === "blutdruck" && isAnswered(fieldMeta(hydrated, "messgroesse"))) {
+      add("manometerTyp");
+    }
   }
 
   if (show("strahlung")) {
@@ -728,6 +750,11 @@ function formatAnswerValue(field: string, m: RegistrationCharacteristics): strin
   }
   if (field === "zulassung") {
     return v === "anzeige" ? "Notification § 19 StrlSchG" : "Licence § 12 StrlSchG";
+  }
+  if (field === "manometerTyp") {
+    if (v === "quecksilber") return "Mercury manometer";
+    if (v === "aneroid") return "Aneroid manometer";
+    if (v === "other") return "Other manometer";
   }
   return String(v);
 }

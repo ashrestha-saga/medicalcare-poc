@@ -17,6 +17,11 @@ import type {
   UploadDeviceBookIfuInput,
 } from "@/schemas/k10";
 import { encodeOutOfServiceConsequence } from "@/services/scan/scanPrimaryAction";
+import { modelDocumentService } from "@/services/catalog/modelDocumentService";
+import {
+  isMpbetreibV34BookException,
+  parseCharacteristicsJson,
+} from "@/services/registration/bookException";
 import { evidenceService } from "@/services/registration/evidenceService";
 import {
   assertDeviceInWorkAreas,
@@ -48,6 +53,8 @@ function mapEvidence(row: {
     evidenceKind: row.evidenceKind,
     attachmentBlobId: row.attachmentBlobId,
     contentType: row.attachmentBlob?.contentType ?? null,
+    source: "device_evidence",
+    openUrl: row.attachmentBlobId ? `/api/attachments/${row.attachmentBlobId}` : null,
     externalRecordRef: row.externalRecordRef,
     recordedBy: row.recordedBy,
     recordedAt: row.recordedAt.toISOString(),
@@ -247,7 +254,7 @@ export const deviceBookService = {
 
   /**
    * Devices subject to § 13 book (Anlage 1 STK or Anlage 2 MTK), non-draft.
-   * Composed view — not a second inventory.
+   * Excludes § 3 Abs. 4 book exceptions (Kompaktthermometer / Hg|aneroid manometer).
    */
   async listBookableDevices(ctx: TenantContext): Promise<ComposedBookDeviceOptionDTO[]> {
     requirePermission(ctx, "devicebook:view");
@@ -274,14 +281,22 @@ export const deviceBookService = {
         udiDi: true,
         room: true,
         state: true,
+        characteristicsJson: true,
+        modelId: true,
         model: {
           select: {
+            id: true,
             modelName: true,
             tradeName: true,
             manufacturer: true,
             basicUdiDi: true,
             udiDi: true,
             gtins: true,
+            documents: {
+              where: { kind: "ifu", supersededAt: null },
+              select: { id: true },
+              take: 1,
+            },
           },
         },
         area: { select: { name: true, site: { select: { name: true } } } },
@@ -295,22 +310,24 @@ export const deviceBookService = {
       take: 500,
     });
 
-    return rows.map((r) => ({
-      id: r.id,
-      inventoryNumber: r.inventoryNumber,
-      name: r.model?.tradeName || r.model?.modelName || r.inventoryNumber,
-      manufacturer: r.model?.manufacturer ?? null,
-      serialNumber: r.serialNumber,
-      modelName: r.model?.modelName ?? null,
-      basicUdiDi: r.model?.basicUdiDi ?? null,
-      udiDi: r.udiDi || r.model?.udiDi || null,
-      gtins: r.model?.gtins ?? null,
-      areaName: r.area?.name ?? null,
-      siteName: r.area?.site?.name ?? null,
-      room: r.room,
-      state: r.state,
-      hasIfu: r.evidence.length > 0,
-    }));
+    return rows
+      .filter((r) => !isMpbetreibV34BookException(parseCharacteristicsJson(r.characteristicsJson)))
+      .map((r) => ({
+        id: r.id,
+        inventoryNumber: r.inventoryNumber,
+        name: r.model?.tradeName || r.model?.modelName || r.inventoryNumber,
+        manufacturer: r.model?.manufacturer ?? null,
+        serialNumber: r.serialNumber,
+        modelName: r.model?.modelName ?? null,
+        basicUdiDi: r.model?.basicUdiDi ?? null,
+        udiDi: r.udiDi || r.model?.udiDi || null,
+        gtins: r.model?.gtins ?? null,
+        areaName: r.area?.name ?? null,
+        siteName: r.area?.site?.name ?? null,
+        room: r.room,
+        state: r.state,
+        hasIfu: r.evidence.length > 0 || (r.model?.documents.length ?? 0) > 0,
+      }));
   },
 
   /** Aggregate § 13 Abs. 2 from existing sources for one device. */
@@ -338,7 +355,7 @@ export const deviceBookService = {
     const deviceLabel =
       device.model?.tradeName || device.model?.modelName || device.inventoryNumber;
 
-    const [duties, trainings, entries, incidents, evidenceRows] = await Promise.all([
+    const [duties, trainings, entries, incidents, evidenceRows, modelIfu] = await Promise.all([
       prisma.deviceDuty.findMany({
         where: { deviceInstanceId, applicable: true, suspendedAt: null },
         include: {
@@ -378,6 +395,7 @@ export const deviceBookService = {
         include: { attachmentBlob: { select: { contentType: true } } },
         orderBy: { recordedAt: "desc" },
       }),
+      modelDocumentService.currentIfuForModel(ctx, device.modelId),
     ]);
 
     return {
@@ -395,8 +413,10 @@ export const deviceBookService = {
         areaName: device.area?.name ?? null,
         siteName: device.area?.site?.name ?? null,
         room: device.room,
+        modelId: device.modelId,
       },
       evidence: evidenceRows.map(mapEvidence),
+      modelIfu,
       duties: duties.map((d) => ({
         dutyKey: d.dutyKey,
         title: d.title ?? d.dutyKey,
@@ -443,13 +463,16 @@ export const deviceBookService = {
     };
   },
 
-  /** Upload / replace IFU on a book-obliged device (uses DeviceEvidence, not a second store). */
+  /**
+   * Upload IFU: instance DeviceEvidence (accessibility) + when model-linked and
+   * user can update catalog, also publish ModelDocument (Bauart).
+   */
   async uploadIfu(ctx: TenantContext, input: UploadDeviceBookIfuInput): Promise<ComposedBookEvidenceDTO> {
     requirePermission(ctx, "devicebook:view");
     requirePermission(ctx, "inventory:update");
     const device = await prisma.deviceInstance.findFirst({
       where: { id: input.deviceInstanceId },
-      select: { id: true, areaId: true, state: true },
+      select: { id: true, areaId: true, state: true, modelId: true },
     });
     if (!device) throw notFound("Device not found");
     if (device.state === "draft") throw unprocessable("Draft devices have no book yet.");
@@ -461,6 +484,27 @@ export const deviceBookService = {
       dataUrl: input.dataUrl,
       externalRecordRef: input.externalRecordRef,
     });
+
+    const canPublishModel =
+      Boolean(device.modelId) &&
+      (ctx.permissions?.includes("catalog:update") ||
+        ctx.user.role === "device_admin" ||
+        ctx.user.role === "superadmin");
+
+    if (canPublishModel && device.modelId && (input.dataUrl?.trim() || input.externalRecordRef?.trim())) {
+      try {
+        await modelDocumentService.publish(ctx, {
+          deviceModelId: device.modelId,
+          kind: "ifu",
+          revisionLabel: `book-${new Date().toISOString().slice(0, 10)}`,
+          language: "de",
+          dataUrl: input.dataUrl,
+          externalUrl: input.externalRecordRef,
+        });
+      } catch {
+        // Instance evidence remains; model publish is best-effort when catalog grant missing.
+      }
+    }
 
     await recordAudit({
       actor: actorFromTenant(ctx),

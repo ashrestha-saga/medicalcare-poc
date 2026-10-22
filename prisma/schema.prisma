@@ -283,6 +283,15 @@ enum NotificationDocumentRole {
   attachment
 }
 
+/// Model-level document kinds (IFU lives on the Bauart, not the Exemplar).
+enum DocumentKind {
+  ifu
+  service_manual
+  safety_notice
+  work_instruction
+  other
+}
+
 enum DutyAddressee {
   operator
   employer
@@ -372,6 +381,7 @@ model Tenant {
   fieldSafetyActions  FieldSafetyAction[]
   fieldSafetyDeviceActions FieldSafetyDeviceAction[]
   fieldSafetyAffectedModels FieldSafetyAffectedModel[]
+  modelDocuments      ModelDocument[]
   reprocessingChecks  ReprocessingCheck[]
   reprocessingBatches ReprocessingBatch[]
   reprocessingBatchItems ReprocessingBatchItem[]
@@ -455,6 +465,9 @@ model User {
   findingsRecorded     AuthorityFinding[] @relation("FindingRecorder")
   notificationsSent    AuthorityNotification[] @relation("NotificationSender")
   notificationsRecorded AuthorityNotification[] @relation("NotificationRecorder")
+  dutyPerformances     DutyPerformance[] @relation("DutyPerformancePerformer")
+  evidenceRecorded     DeviceEvidence[] @relation("DeviceEvidenceRecorder")
+  modelDocumentsRecorded ModelDocument[] @relation("ModelDocumentRecorder")
 
   @@index([tenantId])
   @@index([accountKind])
@@ -630,9 +643,43 @@ model DeviceModel {
   trainingEvents         TrainingEvent[]
   incidents              DeviceIncident[]
   fieldSafetyAffectedModels FieldSafetyAffectedModel[]
+  documents              ModelDocument[]
 
   @@index([udiDi])
   @@index([manufacturer, modelName])
+}
+
+/// Document on the MODEL (Bauart), not the Exemplar. Current = latest validFrom without supersededAt.
+model ModelDocument {
+  id                  String         @id @default(cuid())
+  tenantId            String
+  tenant              Tenant         @relation(fields: [tenantId], references: [id])
+  deviceModelId       String
+  deviceModel         DeviceModel    @relation(fields: [deviceModelId], references: [id])
+  kind                DocumentKind
+  revisionLabel       String
+  language            String         @default("de")
+  validFrom           DateTime       @db.Date
+  supersededAt        DateTime?      @db.Date
+  supersededById      String?
+  supersededBy        ModelDocument? @relation("DocChain", fields: [supersededById], references: [id])
+  successors          ModelDocument[] @relation("DocChain")
+  fieldSafetyActionId String?
+  fieldSafetyAction   FieldSafetyAction? @relation(fields: [fieldSafetyActionId], references: [id])
+  blobId              String?
+  blob                AttachmentBlob? @relation(fields: [blobId], references: [id])
+  externalUrl         String?
+  recordedByName      String
+  recordedByUserId    String?
+  recordedByUser      User?          @relation("ModelDocumentRecorder", fields: [recordedByUserId], references: [id])
+  recordedAt          DateTime       @default(now())
+
+  @@unique([deviceModelId, kind, revisionLabel, language])
+  @@index([deviceModelId, kind, supersededAt])
+  @@index([tenantId])
+  @@index([blobId])
+  @@index([fieldSafetyActionId])
+  @@index([recordedByUserId])
 }
 
 model ExternalSourceRecord {
@@ -1056,7 +1103,11 @@ model DutyPerformance {
   performedAt      DateTime       @db.Date
   result           DutyPerformanceResult @default(passed)
   note             String?        @db.Text
+  /** Frozen display name (survives rename). */
   performedBy      String
+  /** Account that performed the duty when known; null for import/external actor strings. */
+  performedByUserId String?
+  performedByUser  User?          @relation("DutyPerformancePerformer", fields: [performedByUserId], references: [id])
   source           String         @default("assignment") // assignment | manual | import
   recordedAt       DateTime       @default(now())
   inspectionRun    InspectionRun?
@@ -1064,6 +1115,7 @@ model DutyPerformance {
   @@index([deviceDutyId, performedAt])
   @@index([tenantId])
   @@index([serviceRequestId])
+  @@index([performedByUserId])
 }
 
 /// Legal entity once. Capacity lives on OrganisationRole — not inferred from the table.
@@ -1246,11 +1298,32 @@ model ServiceContract {
   billingRef     String?
   /** Art. 28 AVV Nachweis reference (provider_operated). */
   avvRef         String?
-  /** JSON string[] — inventory | due-dates | inspection | reprocessing | training */
+  /**
+   * Legacy JSON string[] tokens — inventory | due-dates | inspection | reprocessing | training.
+   * Dual-read with ServiceContractScopeGrant (Phase 8); grants win when present.
+   */
   scope          String       @db.Text
+  scopeGrants    ServiceContractScopeGrant[]
 
   @@unique([tenantId, organisationId])
   @@index([organisationId])
+}
+
+/// Fine-grained contract scope (permission slug). denied=true means “nie” for that slug.
+model ServiceContractScopeGrant {
+  id           String          @id @default(cuid())
+  contractId   String
+  contract     ServiceContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  /** PermissionSlug (e.g. inventory:view) or legacy token kept for display only when source=token. */
+  permission   String
+  /** When true, this slug must never be granted even if role base includes it. */
+  denied       Boolean         @default(false)
+  /** token = expanded from ServiceContract.scope; manual = operator override / nie. */
+  source       String          @default("token")
+  createdAt    DateTime        @default(now())
+
+  @@unique([contractId, permission])
+  @@index([contractId, denied])
 }
 
 /// Schulungstermin — one event, many individual training_record proofs.
@@ -1449,7 +1522,10 @@ model AttachmentBlob {
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   kind        String
-  dataUrl     String   @db.LongText
+  /// Legacy inline payload; new large uploads prefer storageKey (dual-read).
+  dataUrl     String?  @db.LongText
+  /// Object-storage / filesystem key (Phase 6). Mutually preferred over dataUrl for new writes.
+  storageKey  String?  @db.VarChar(512)
   contentType String?
   byteSize    Int?
   /// SHA-256 of file bytes (hex). Client computes; server re-hashes on receive.
@@ -1460,9 +1536,11 @@ model AttachmentBlob {
   processRecordOf   ReprocessingBatch[] @relation("BatchProcessRecord")
   bookEntries       DeviceBookEntry[]
   notificationDocuments NotificationDocument[]
+  modelDocuments    ModelDocument[]
 
   @@index([tenantId])
   @@index([tenantId, sha256])
+  @@index([storageKey])
 }
 
 model DispatchTarget {
@@ -1696,12 +1774,16 @@ model DeviceEvidence {
   issuedBy          String?
   issuedAt          DateTime?
   validUntil        DateTime?
+  /** Frozen display name (survives rename). */
   recordedBy        String
+  recordedByUserId  String?
+  recordedByUser    User?          @relation("DeviceEvidenceRecorder", fields: [recordedByUserId], references: [id])
   recordedAt        DateTime       @default(now())
 
   @@unique([deviceInstanceId, prerequisiteCode])
   @@index([tenantId, validUntil])
   @@index([attachmentBlobId])
+  @@index([recordedByUserId])
 }
 
 model ReprocessingOnDevice {
@@ -2150,6 +2232,7 @@ model FieldSafetyAction {
   deviceActions    FieldSafetyDeviceAction[]
   /// Structured scope from the manufacturer letter — drives candidate suggestion.
   affectedModels   FieldSafetyAffectedModel[]
+  modelDocuments   ModelDocument[]
 
   @@unique([tenantId, reference])
   @@index([tenantId, dueAt])

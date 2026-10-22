@@ -9,8 +9,14 @@ export async function GET(req: Request) {
     const ctx = await requireTenantContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
-      const decisions = await dutyOverlapService.list(ctx);
-      return Response.json({ decisions }, { headers: { "x-correlation-id": ctx.correlationId } });
+      const [decisions, devices] = await Promise.all([
+        dutyOverlapService.list(ctx),
+        dutyOverlapService.listCandidateDevices(ctx),
+      ]);
+      return Response.json(
+        { decisions, devices },
+        { headers: { "x-correlation-id": ctx.correlationId } },
+      );
     });
   } catch (error) {
     return errorResponse(error, correlationId);

@@ -7,6 +7,9 @@ import { PrismaClient } from "@prisma/client";
 import { pathToFileURL } from "node:url";
 import { hashPassword } from "../src/lib/password";
 import { seedRoleGrantsIfEmpty } from "../src/services/roles/roleGrantsService";
+import { backfillDutyAndEvidenceAttribution } from "../src/services/attribution/runBackfillAttribution";
+import { backfillAllContractScopeGrants } from "../src/services/contracts/contractScopeService";
+import { backfillDutyProjections } from "../src/services/duties/dutyProjection";
 import { dutyService } from "../src/services/registration/dutyService";
 import { seedGoldenCatalog } from "./seeds/goldenCatalog";
 import { seedHandoverInventory } from "./seeds/handoverInventory";
@@ -500,6 +503,9 @@ export async function seed(prisma: PrismaClient) {
   const handover = await seedHandoverInventory(prisma, tenant.id);
 
   const dutiesBackfilled = await dutyService.backfillDueDates(prisma);
+  const attributionBackfilled = await backfillDutyAndEvidenceAttribution(prisma);
+  const contractScopeBackfilled = await backfillAllContractScopeGrants(prisma);
+  const dutyProjectionsBackfilled = await backfillDutyProjections(prisma);
 
   return {
     tenant: tenant.id,
@@ -516,6 +522,9 @@ export async function seed(prisma: PrismaClient) {
     golden,
     handover,
     dutiesBackfilled,
+    attributionBackfilled,
+    contractScopeBackfilled,
+    dutyProjectionsBackfilled,
   };
 }
 

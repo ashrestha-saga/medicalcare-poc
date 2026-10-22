@@ -9,8 +9,7 @@ import { actorAttribution } from "@/lib/auth/attribution";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
-import { konstanzDueAtFromCadence } from "@/services/k10/k10HardRules";
-import { computeDutyDueAt } from "@/services/registration/dueDate";
+import { recomputeDutyProjection } from "@/services/duties/dutyProjection";
 import type { CreateConstancyCadenceInput } from "@/schemas/k10";
 
 function isoDate(d: Date | null | undefined): string | null {
@@ -67,39 +66,6 @@ function mapCadence(row: {
 
 function openKey(deviceInstanceId: string, constancyObjectCode: string): string {
   return `${deviceInstanceId}:${constancyObjectCode}`;
-}
-
-async function applyDueAtFromCadence(
-  deviceInstanceId: string,
-  constancyObjectCode: string,
-  intervalValue: number,
-  intervalUnit: "months" | "years",
-  determinedAt: Date,
-) {
-  const duties = await prisma.deviceDuty.findMany({
-    where: {
-      deviceInstanceId,
-      dutyKey: "konstanz",
-      constancyObjectCode,
-      applicable: true,
-      suspendedAt: null,
-    },
-  });
-  for (const duty of duties) {
-    const dueAt = konstanzDueAtFromCadence(
-      { intervalValue, intervalUnit, determinedAt },
-      computeDutyDueAt,
-    );
-    await prisma.deviceDuty.update({
-      where: { id: duty.id },
-      data: {
-        intervalValue,
-        intervalUnit,
-        dueAt,
-        cadenceLabel: `${intervalValue} ${intervalUnit}`,
-      },
-    });
-  }
 }
 
 export const constancyCadenceService = {
@@ -191,13 +157,7 @@ export const constancyCadenceService = {
       },
     });
 
-    await applyDueAtFromCadence(
-      input.deviceInstanceId,
-      input.constancyObjectCode,
-      input.intervalValue,
-      input.intervalUnit,
-      determinedAt,
-    );
+    await recomputeDutyProjection(prisma, input.deviceInstanceId);
 
     await recordAudit({
       actor: actorFromTenant(ctx),

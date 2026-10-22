@@ -17,6 +17,7 @@ export default getRequestConfig(async () => {
   const locale: AppLocale = isAppLocale(raw) ? raw : LOCALE_DEFAULT;
   return {
     locale,
+    timeZone: "Europe/Berlin",
     messages: await loadMessages(locale),
   };
 });

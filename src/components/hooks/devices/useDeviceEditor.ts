@@ -160,6 +160,23 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
     }
   }, [detail, hydrate, onSaved]);
 
+  const [purging, setPurging] = useState(false);
+
+  const purge = useCallback(async () => {
+    if (!detail) return;
+    setPurging(true);
+    try {
+      await api(`/api/devices/${detail.id}`, { method: "DELETE" });
+      toast.success("Device and book purged after retention.");
+      close();
+      onSaved(detail);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Purge refused.");
+    } finally {
+      setPurging(false);
+    }
+  }, [detail, close, onSaved]);
+
   return {
     open,
     busy,
@@ -192,6 +209,8 @@ export function useDeviceEditor(onSaved: (device: DeviceInstanceDetailDTO) => vo
     setState,
     completingMaintenance,
     markMaintenanceDone,
+    purging,
+    purge,
     openEdit,
     close,
     submit,

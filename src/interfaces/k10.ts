@@ -92,6 +92,26 @@ export interface ComposedBookEvidenceDTO {
   externalRecordRef: string | null;
   recordedBy: string;
   recordedAt: string;
+  /** Prefer model document when set (Phase 6). */
+  source?: "model_document" | "device_evidence";
+  revisionLabel?: string | null;
+  openUrl?: string | null;
+}
+
+/** Model-level document (IFU on Bauart). */
+export interface ModelDocumentDTO {
+  id: string;
+  deviceModelId: string;
+  kind: string;
+  revisionLabel: string;
+  language: string;
+  validFrom: string;
+  supersededAt: string | null;
+  blobId: string | null;
+  externalUrl: string | null;
+  recordedByName: string;
+  recordedAt: string;
+  openUrl: string | null;
 }
 
 export interface ComposedBookDTO {
@@ -109,8 +129,11 @@ export interface ComposedBookDTO {
     areaName: string | null;
     siteName: string | null;
     room: string | null;
+    modelId?: string | null;
   };
   evidence: ComposedBookEvidenceDTO[];
+  /** Current model IFU when present (preferred over instance evidence for open). */
+  modelIfu: ModelDocumentDTO | null;
   duties: ComposedBookDutyDTO[];
   trainings: ComposedBookTrainingDTO[];
   entries: DeviceBookEntryDTO[];

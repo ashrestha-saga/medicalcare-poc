@@ -1,5 +1,6 @@
 import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
+import { recordAuthorityNotificationSchema } from "@/schemas/k10";
 import { authorityNotificationService } from "@/services/authority/authorityNotificationService";
 import type { NotificationKind, NotificationState } from "@prisma/client";
 
@@ -21,6 +22,24 @@ export async function GET(req: Request) {
       return Response.json(
         { notifications },
         { headers: { "x-correlation-id": ctx.correlationId } },
+      );
+    });
+  } catch (error) {
+    return errorResponse(error, correlationId);
+  }
+}
+
+export async function POST(req: Request) {
+  let correlationId: string | undefined;
+  try {
+    const ctx = await requireTenantContext(req);
+    return await withTenantStore(ctx, async () => {
+      correlationId = ctx.correlationId;
+      const input = recordAuthorityNotificationSchema.parse(await req.json().catch(() => ({})));
+      const notification = await authorityNotificationService.record(ctx, input);
+      return Response.json(
+        { notification },
+        { status: 201, headers: { "x-correlation-id": ctx.correlationId } },
       );
     });
   } catch (error) {

@@ -227,7 +227,7 @@ export const fieldSafetyService = {
     ctx: TenantContext,
     input: CreateFieldSafetyInput | CreateFieldSafetyWithDevicesInput,
   ): Promise<FieldSafetyActionDTO> {
-    requirePermission(ctx, "fieldsafety:view");
+    requirePermission(ctx, "fieldsafety:create");
     const deviceIds =
       "deviceInstanceIds" in input && Array.isArray(input.deviceInstanceIds)
         ? [...new Set(input.deviceInstanceIds)]
@@ -306,7 +306,7 @@ export const fieldSafetyService = {
     actionId: string,
     input: AddFieldSafetyAffectedModelsInput,
   ): Promise<FieldSafetyActionDTO> {
-    requirePermission(ctx, "fieldsafety:view");
+    requirePermission(ctx, "fieldsafety:create");
     const action = await prisma.fieldSafetyAction.findFirst({ where: { id: actionId } });
     if (!action) throw notFound("Field safety action not found");
     const models = normalizeAffectedModels(input.affectedModels);
@@ -344,7 +344,7 @@ export const fieldSafetyService = {
    * Does not mark devices as affected.
    */
   async suggestCandidates(ctx: TenantContext, actionId: string): Promise<FieldSafetyActionDTO> {
-    requirePermission(ctx, "fieldsafety:view");
+    requirePermission(ctx, "fieldsafety:create");
     const action = await prisma.fieldSafetyAction.findFirst({
       where: { id: actionId },
       include: includeActions,
@@ -393,7 +393,7 @@ export const fieldSafetyService = {
     actionId: string,
     input: MatchFieldSafetyDeviceInput,
   ): Promise<FieldSafetyActionDTO> {
-    requirePermission(ctx, "fieldsafety:view");
+    requirePermission(ctx, "fieldsafety:create");
     const action = await prisma.fieldSafetyAction.findFirst({ where: { id: actionId } });
     if (!action) throw notFound("Field safety action not found");
     const device = await prisma.deviceInstance.findFirst({ where: { id: input.deviceInstanceId } });
@@ -439,7 +439,7 @@ export const fieldSafetyService = {
   },
 
   async close(ctx: TenantContext, id: string): Promise<FieldSafetyActionDTO> {
-    requirePermission(ctx, "fieldsafety:view");
+    requirePermission(ctx, "fieldsafety:create");
     const existing = await prisma.fieldSafetyAction.findFirst({
       where: { id },
       include: includeActions,

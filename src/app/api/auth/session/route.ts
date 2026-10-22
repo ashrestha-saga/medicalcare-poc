@@ -1,3 +1,4 @@
+import { clinicHomePath } from "@/constants/authRoutes";
 import { readSession } from "@/lib/auth/session";
 import { isClinicSession, isPartnerSession } from "@/interfaces/session";
 
@@ -34,6 +35,6 @@ export async function GET() {
     user: toPublicUser(user),
     tenantName: user.companyName ?? null,
     oxidStatus: "disconnected",
-    homePath: "/",
+    homePath: clinicHomePath(user.role),
   });
 }

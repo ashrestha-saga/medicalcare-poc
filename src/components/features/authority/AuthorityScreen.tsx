@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
+import {
+  RecordNotificationModal,
+  type NotificationSubject,
+} from "@/components/features/authority/RecordNotificationModal";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import {
   useAuthorityList,
@@ -49,6 +54,7 @@ const MAPPE_LABELS: Record<string, string> = {
 
 export function AuthorityScreen() {
   const list = useAuthorityList();
+  const tn = useTranslations("pages.authorityNotification");
   const [remediateTarget, setRemediateTarget] = useState<AuthorityFindingDTO | null>(null);
   const [note, setNote] = useState("");
   const [notifyRecipient, setNotifyRecipient] = useState("");
@@ -57,6 +63,7 @@ export function AuthorityScreen() {
   const [purpose, setPurpose] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [busy, setBusy] = useState(false);
+  const [notifySubject, setNotifySubject] = useState<NotificationSubject | null>(null);
 
   if (!list.canView) {
     return (
@@ -344,18 +351,37 @@ export function AuthorityScreen() {
                               <p className="mt-1 text-xs">Remediation: {f.remediationNote}</p>
                             ) : null}
                           </div>
-                          {f.status === "open" && !readOnly ? (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                setRemediateTarget(f);
-                                setNote("");
-                                setNotifyRecipient("");
-                              }}
-                            >
-                              Remediate
-                            </Button>
+                          {!readOnly ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {f.status === "open" ? (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    setRemediateTarget(f);
+                                    setNote("");
+                                    setNotifyRecipient("");
+                                  }}
+                                >
+                                  Remediate
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                data-testid={`finding-notify-${f.id}`}
+                                onClick={() =>
+                                  setNotifySubject({
+                                    type: "finding",
+                                    id: f.id,
+                                    defaultSubject: `Abhilfenachweis ${f.itemNo ? `#${f.itemNo}` : f.id}`,
+                                    defaultBody: f.description,
+                                  })
+                                }
+                              >
+                                {tn("record")}
+                              </Button>
+                            </div>
                           ) : null}
                         </li>
                       ))}
@@ -539,6 +565,13 @@ export function AuthorityScreen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <RecordNotificationModal
+        open={!!notifySubject}
+        onOpenChange={(o) => !o && setNotifySubject(null)}
+        subject={notifySubject}
+        onRecorded={() => void list.refresh()}
+      />
     </div>
   );
 }

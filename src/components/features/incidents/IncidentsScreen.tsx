@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import {
+  RecordNotificationModal,
+  type NotificationSubject,
+} from "@/components/features/authority/RecordNotificationModal";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import {
   useIncidentsList,
@@ -62,6 +66,7 @@ function Chip({
 
 export function IncidentsScreen() {
   const t = useTranslations("pages.incidents");
+  const tn = useTranslations("pages.authorityNotification");
   const { permissionData } = usePermissions();
   const list = useIncidentsList();
   const maskRef = useRef<HTMLDivElement>(null);
@@ -71,6 +76,7 @@ export function IncidentsScreen() {
   const [assigneeId, setAssigneeId] = useState("");
   const [assignDue, setAssignDue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [notifySubject, setNotifySubject] = useState<NotificationSubject | null>(null);
 
   const [serious, setSerious] = useState<AssessChoice | undefined>(undefined);
   const [note, setNote] = useState("");
@@ -542,20 +548,42 @@ export function IncidentsScreen() {
                         </td>
                         <td className="px-3 py-3 text-xs">{reportCell(inc)}</td>
                         <td className="px-3 py-3 text-right whitespace-nowrap">
-                          {list.canManage && !inc.closedAt ? (
-                            <button
-                              type="button"
-                              className="text-[12.5px] font-semibold text-primary hover:underline"
-                              data-testid={`incident-assess-${inc.id}`}
-                              onClick={() => openMask(inc)}
-                            >
-                              {t("actions.assess")}
-                            </button>
-                          ) : inc.closedAt ? (
-                            <span className="text-xs text-muted-foreground">
-                              {t("closed", { date: formatDate(inc.closedAt) })}
-                            </span>
-                          ) : null}
+                          <div className="flex flex-col items-end gap-1">
+                            {list.canManage && !inc.closedAt ? (
+                              <button
+                                type="button"
+                                className="text-[12.5px] font-semibold text-primary hover:underline"
+                                data-testid={`incident-assess-${inc.id}`}
+                                onClick={() => openMask(inc)}
+                              >
+                                {t("actions.assess")}
+                              </button>
+                            ) : inc.closedAt ? (
+                              <span className="text-xs text-muted-foreground">
+                                {t("closed", { date: formatDate(inc.closedAt) })}
+                              </span>
+                            ) : null}
+                            {list.canManage &&
+                            inc.suspectedSerious === true &&
+                            !inc.reportedAt &&
+                            !inc.closedAt ? (
+                              <button
+                                type="button"
+                                className="text-[12.5px] font-semibold text-primary hover:underline"
+                                data-testid={`incident-notify-${inc.id}`}
+                                onClick={() =>
+                                  setNotifySubject({
+                                    type: "incident",
+                                    id: inc.id,
+                                    defaultSubject: `Vorkommnismeldung ${inc.id}`,
+                                    defaultBody: inc.description,
+                                  })
+                                }
+                              >
+                                {tn("record")}
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -566,6 +594,13 @@ export function IncidentsScreen() {
           )}
         </ListPageShell>
       </main>
+
+      <RecordNotificationModal
+        open={!!notifySubject}
+        onOpenChange={(o) => !o && setNotifySubject(null)}
+        subject={notifySubject}
+        onRecorded={() => void list.refresh()}
+      />
     </div>
   );
 }

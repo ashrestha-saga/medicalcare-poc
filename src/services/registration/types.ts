@@ -50,6 +50,16 @@ export interface RegistrationCharacteristics {
   istAufbGeraet?: boolean;
   eigenTyp?: string;
   /**
+   * § 3 Abs. 4 — electronic fever thermometer as Kompaktthermometer (book exception).
+   * Model-owned; MTK may still apply.
+   */
+  kompaktThermometer?: boolean;
+  /**
+   * § 3 Abs. 4 — BP manometer type. `quecksilber` | `aneroid` → book exception;
+   * `other` (e.g. oscillometric) stays book-obliged when otherwise required.
+   */
+  manometerTyp?: "quecksilber" | "aneroid" | "other";
+  /**
    * FA-208 per-field provenance. Keys are tracked field names
    * (`aktiv`, `wartungIntervall`, `anlage2Choice`, …).
    */

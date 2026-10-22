@@ -57,6 +57,9 @@ const INSPECTION_SCOPE: readonly PermissionSlug[] = [
   "inspections:view",
   "catalogues:view",
   "qualifications:view",
+  /** Acting technician may raise / process FSCA while on site (not incidents:manage). */
+  "fieldsafety:view",
+  "fieldsafety:create",
 ];
 
 /** Reprocessing scope: inventory + clarifications visibility (no clinic training). */
@@ -121,6 +124,8 @@ const ADMIN_BASE: readonly PermissionSlug[] = [
   "inspections:view",
   "catalogues:view",
   "qualifications:view",
+  "fieldsafety:view",
+  "fieldsafety:create",
   "audit:view",
   "audit:export",
 ];
@@ -135,6 +140,8 @@ const INSPECTOR_BASE: readonly PermissionSlug[] = [
   "inspections:view",
   "catalogues:view",
   "qualifications:view",
+  "fieldsafety:view",
+  "fieldsafety:create",
   "audit:view",
 ];
 
@@ -379,23 +386,37 @@ export function canAccessConsolePath(
   return slugSet.has("console:nav");
 }
 
-/** Effective partner grants on a tenant: role ∩ union(scope) minus reserved slugs. */
+/** Effective partner grants on a tenant: role ∩ resolved scope slugs minus reserved. */
+export function intersectPartnerGrantsWithResolvedSlugs(
+  roleGrants: readonly PermissionSlug[],
+  scopeSlugs: readonly PermissionSlug[],
+): PermissionSlug[] {
+  if (scopeSlugs.length === 0) return [];
+  const roleSet = new Set(stripForbidden(roleGrants));
+  const scopeSet = new Set(scopeSlugs);
+  return stripForbidden(
+    [...roleSet].filter(
+      (slug) =>
+        scopeSet.has(slug) || slug === "audit:view" || slug === "audit:export" || slug === "shell:nav",
+    ),
+  );
+}
+
+/**
+ * Effective partner grants on a tenant: role ∩ union(scope tokens) minus reserved slugs.
+ * Prefer resolveContractScopeSlugs + intersectPartnerGrantsWithResolvedSlugs when catalogue rows exist.
+ */
 export function intersectPartnerGrantsWithScope(
   roleGrants: readonly PermissionSlug[],
   scope: string[],
 ): PermissionSlug[] {
   const tokens = normalizeContractScope(scope);
   if (tokens.length === 0) return [];
-  const roleSet = new Set(stripForbidden(roleGrants));
   const scopeSet = new Set<PermissionSlug>();
   for (const token of tokens) {
     for (const slug of SCOPE_PERMISSIONS[token]) scopeSet.add(slug);
   }
-  return stripForbidden(
-    [...roleSet].filter(
-      (slug) => scopeSet.has(slug) || slug === "audit:view" || slug === "audit:export" || slug === "shell:nav",
-    ),
-  );
+  return intersectPartnerGrantsWithResolvedSlugs(roleGrants, [...scopeSet]);
 }
 
 /** Effective partner grants on a tenant: role ∩ union(scope) minus reserved slugs. */

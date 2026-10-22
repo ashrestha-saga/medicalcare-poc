@@ -80,6 +80,10 @@ export function ClarificationsScreen() {
                   inspectionTags: [],
                   isReprocessingEquipment: false,
                   catalogPending: false,
+                  retiredAt: null,
+                  decommissionedAt: null,
+                  retainUntil: null,
+                  retentionStatus: "none",
                 })
               }
             />

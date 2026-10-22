@@ -132,6 +132,7 @@ export async function syncWartungDutyOnComplete(
         result: "passed",
         note: args.note ?? null,
         performedBy: args.performedBy,
+        performedByUserId: args.actorUserId ?? null,
         source: "maintenance_complete",
       },
     });

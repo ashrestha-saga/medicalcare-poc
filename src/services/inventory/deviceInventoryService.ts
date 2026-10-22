@@ -25,10 +25,41 @@ import {
   getEffectiveAreaScope,
 } from "@/services/users/userAreaScope";
 import { userOptionsService } from "@/services/users/userOptionsService";
+import {
+  isPurgeAllowed,
+  retentionClockOnRetire,
+} from "@/services/inventory/retention";
 import { Prisma } from "@prisma/client";
 
 const INV_PREFIX = "INV-";
 const INV_PAD = 5;
+
+/** Backfill § 13 clock for legacy retired rows that only have retiredAt. */
+async function ensureRetentionClock(row: {
+  id: string;
+  state: string;
+  retiredAt: Date | null;
+  decommissionedAt: Date | null;
+  retainUntil: Date | null;
+}) {
+  if (row.state !== "retired" || row.decommissionedAt != null) return row;
+  const clock = retentionClockOnRetire({
+    now: new Date(),
+    retiredAt: row.retiredAt,
+  });
+  await prisma.deviceInstance.update({
+    where: { id: row.id },
+    data: {
+      decommissionedAt: clock.decommissionedAt,
+      retainUntil: clock.retainUntil,
+    },
+  });
+  return {
+    ...row,
+    decommissionedAt: clock.decommissionedAt,
+    retainUntil: clock.retainUntil,
+  };
+}
 
 /** Next tenant-scoped incremental inventarnummer: INV-00001, INV-00002, … */
 export async function allocateInventoryNumber(
@@ -215,6 +246,10 @@ export const deviceInventoryService: InventoryResolver & {
     id: string,
     input?: { performedAt?: string | null; note?: string | null },
   ): Promise<DeviceInstanceDetailDTO>;
+  /** Retired devices whose retainUntil has passed — eligible for audited purge. */
+  listRetentionEligible(ctx: TenantWorkContext): Promise<DeviceInstanceDTO[]>;
+  /** Hard-delete retired device + book evidence after retainUntil (audited). */
+  purge(ctx: TenantWorkContext, id: string): Promise<{ id: string; inventoryNumber: string }>;
 } = {
   async find(identifier, tenantId) {
     const candidates = new Set<string>();
@@ -335,9 +370,14 @@ export const deviceInventoryService: InventoryResolver & {
 
   async get(ctx, id) {
     requirePermission(ctx, "inventory:view");
-    const row = await loadInstance(id, ctx.tenantId);
+    let row = await loadInstance(id, ctx.tenantId);
     if (!row) throw notFound("Device not found.");
     await assertDeviceInWorkAreas(ctx, row.areaId);
+    if (row.state === "retired" && row.decommissionedAt == null) {
+      await ensureRetentionClock(row);
+      row = await loadInstance(id, ctx.tenantId);
+      if (!row) throw notFound("Device not found.");
+    }
     return toDetailDTO(row);
   },
 
@@ -598,12 +638,32 @@ export const deviceInventoryService: InventoryResolver & {
           data: {
             ...(input.state !== undefined ? { state: input.state } : {}),
             ...(input.state === "retired" && existing.state !== "retired"
-              ? { retiredAt: new Date() }
+              ? (() => {
+                  const now = new Date();
+                  const clock = retentionClockOnRetire({
+                    now,
+                    retiredAt: now,
+                  });
+                  // First decommission sets the § 13 clock; later re-retire keeps original.
+                  const firstClock = existing.decommissionedAt == null;
+                  return {
+                    retiredAt: now,
+                    ...(firstClock
+                      ? {
+                          decommissionedAt: clock.decommissionedAt,
+                          retainUntil: clock.retainUntil,
+                        }
+                      : {}),
+                  };
+                })()
               : {}),
             ...(input.state !== undefined &&
             input.state !== "retired" &&
             existing.retiredAt != null
-              ? { retiredAt: null }
+              ? {
+                  // Workflow may leave retirement; legal clock stays for the book.
+                  retiredAt: null,
+                }
               : {}),
             ...(identityMutable && input.inventoryNumber !== undefined
               ? { inventoryNumber: input.inventoryNumber }
@@ -779,6 +839,116 @@ export const deviceInventoryService: InventoryResolver & {
       after: { performedAt: performedAt.toISOString(), nextDueAt: nextDueAt?.toISOString() ?? null },
     });
     return toDetailDTO(refreshed);
+  },
+
+  async listRetentionEligible(ctx) {
+    requirePermission(ctx, "inventory:view");
+    const scope = await getEffectiveAreaScope(ctx);
+    if (scope.mode === "none") return [];
+
+    const today = new Date();
+    const retired = await prisma.deviceInstance.findMany({
+      where: {
+        state: "retired",
+        ...(scope.mode === "areas" ? { areaId: { in: scope.areaIds } } : {}),
+      },
+      include,
+      take: 500,
+    });
+
+    const eligible: DeviceInstanceDTO[] = [];
+    for (const row of retired) {
+      const withClock = await ensureRetentionClock(row);
+      if (isPurgeAllowed(withClock.retainUntil, today)) {
+        const full = await loadInstance(row.id, ctx.tenantId);
+        if (full) eligible.push(toDeviceInstanceDTO(full));
+      }
+    }
+    return eligible;
+  },
+
+  async purge(ctx, id) {
+    requirePermission(ctx, "inventory:update");
+    const existing = await loadInstance(id, ctx.tenantId);
+    if (!existing) throw notFound("Device not found.");
+    await assertDeviceInWorkAreas(ctx, existing.areaId);
+
+    if (existing.state !== "retired") {
+      throw unprocessable("Only retired devices can be purged.", { field: "state" });
+    }
+
+    const withClock = await ensureRetentionClock(existing);
+    if (!isPurgeAllowed(withClock.retainUntil)) {
+      throw unprocessable(
+        `Book must be retained until ${withClock.retainUntil?.toISOString().slice(0, 10) ?? "—"}. Purge refused.`,
+        {
+          field: "retainUntil",
+          retainUntil: withClock.retainUntil?.toISOString().slice(0, 10) ?? null,
+        },
+      );
+    }
+
+    const inventoryNumber = existing.inventoryNumber;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.deviceBookEntry.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.deviceEvidence.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.fieldSafetyDeviceAction.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.constancyCadence.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.dutyOverlapDecision.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.deviceIncident.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.reprocessingBatchItem.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.reprocessingCheck.deleteMany({ where: { equipmentDeviceId: id } });
+      await tx.reprocessingBatch.deleteMany({ where: { equipmentDeviceId: id } });
+      await tx.reprocessingOnDevice.deleteMany({
+        where: { OR: [{ profileDeviceId: id }, { equipmentDeviceId: id }] },
+      });
+      await tx.deviceReprocessingProfile.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.baselineMeasurement.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.inspectionStepResult.deleteMany({
+        where: { run: { deviceInstanceId: id } },
+      });
+      await tx.inspectionRun.deleteMany({ where: { deviceInstanceId: id } });
+      const dutyIds = (
+        await tx.deviceDuty.findMany({
+          where: { deviceInstanceId: id },
+          select: { id: true },
+        })
+      ).map((d) => d.id);
+      if (dutyIds.length > 0) {
+        await tx.dutyReminder.deleteMany({ where: { deviceDutyId: { in: dutyIds } } });
+        await tx.dutyPerformance.deleteMany({ where: { deviceDutyId: { in: dutyIds } } });
+      }
+      await tx.deviceDuty.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.deviceClarification.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.deviceUnitEvent.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.maintenanceEvent.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.deviceReleaseSnapshot.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.authorityNotification.deleteMany({ where: { deviceInstanceId: id } });
+      await tx.authorityFinding.updateMany({
+        where: { deviceInstanceId: id },
+        data: { deviceInstanceId: null },
+      });
+      await tx.deviceInstance.updateMany({
+        where: { parentInstanceId: id },
+        data: { parentInstanceId: null },
+      });
+      await tx.deviceInstance.delete({ where: { id } });
+    });
+
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "device",
+      resourceId: id,
+      action: "purge",
+      summary: `Purged retired inventory ${inventoryNumber} after retention`,
+      after: {
+        inventoryNumber,
+        retainUntil: withClock.retainUntil?.toISOString().slice(0, 10) ?? null,
+      },
+    });
+
+    return { id, inventoryNumber };
   },
 };
 

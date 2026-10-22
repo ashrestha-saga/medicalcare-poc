@@ -1,6 +1,12 @@
 "use client";
 
 import { Loader2, X } from "lucide-react";
+import { useState } from "react";
+import { useTranslations } from "next-intl";
+import {
+  RecordNotificationModal,
+  type NotificationSubject,
+} from "@/components/features/authority/RecordNotificationModal";
 import type { useLocationAdminForm } from "@/components/hooks/locations/useLocationAdminForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,13 +20,19 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { usePermissions } from "@/lib/providers/PermissionProvider";
 
 type FormApi = ReturnType<typeof useLocationAdminForm>;
 
 export function LocationFormModal({ form }: { form: FormApi }) {
   const isCreate = form.mode === "create";
+  const tn = useTranslations("pages.authorityNotification");
+  const { checkPermission } = usePermissions();
+  const canNotify = checkPermission("authority:view");
+  const [notifySubject, setNotifySubject] = useState<NotificationSubject | null>(null);
 
   return (
+    <>
     <Dialog
       open={form.open}
       onOpenChange={(open) => {
@@ -144,6 +156,24 @@ export function LocationFormModal({ form }: { form: FormApi }) {
           </div>
 
           <DialogFooter className="pt-2">
+            {!isCreate && canNotify && form.editing?.id ? (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={form.busy}
+                className="mr-auto"
+                data-testid="location-record-notification"
+                onClick={() =>
+                  setNotifySubject({
+                    type: "site",
+                    id: form.editing!.id,
+                    defaultSubject: `Notification · ${form.editing!.name}`,
+                  })
+                }
+              >
+                {tn("record")}
+              </Button>
+            ) : null}
             <Button type="button" variant="outline" disabled={form.busy} onClick={form.close}>
               Cancel
             </Button>
@@ -155,5 +185,12 @@ export function LocationFormModal({ form }: { form: FormApi }) {
         </form>
       </DialogContent>
     </Dialog>
+
+    <RecordNotificationModal
+      open={!!notifySubject}
+      onOpenChange={(o) => !o && setNotifySubject(null)}
+      subject={notifySubject}
+    />
+    </>
   );
 }

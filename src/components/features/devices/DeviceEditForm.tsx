@@ -2,8 +2,13 @@
 
 import Link from "next/link";
 import { ExternalLink, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import type { SiteDTO } from "@/interfaces";
+import {
+  RecordNotificationModal,
+  type NotificationSubject,
+} from "@/components/features/authority/RecordNotificationModal";
 import type { useDeviceEditor } from "@/components/hooks/devices/useDeviceEditor";
 import { UserSelect } from "@/components/features/shared/UserSelect";
 import { Badge } from "@/components/ui/badge";
@@ -58,9 +63,12 @@ function classificationSummary(form: EditorApi, t: IssuesT): string {
 
 export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
   const t = useTranslations("clarificationsIssues");
+  const tn = useTranslations("pages.authorityNotification");
   const locale = useLocale() as AppLocale;
   const { checkPermission } = usePermissions();
   const canViewCatalog = checkPermission("catalog:view");
+  const canNotify = checkPermission("authority:view");
+  const [notifySubject, setNotifySubject] = useState<NotificationSubject | null>(null);
   const modelHref =
     form.detail?.modelId && canViewCatalog ? `/catalog/${form.detail.modelId}` : null;
 
@@ -305,6 +313,56 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
               </div>
             </div>
 
+            {form.detail?.state === "retired" || form.state === "retired" ? (
+              <div
+                className="rounded-lg border border-amber-300/60 bg-amber-50/50 p-3 dark:border-amber-700/40 dark:bg-amber-950/20"
+                data-testid="device-retention"
+              >
+                <p className="text-sm font-medium">{t("retentionTitle")}</p>
+                <dl className="mt-2 grid gap-1 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{t("retentionDecommissioned")}</dt>
+                    <dd className="font-mono text-xs">
+                      {form.detail?.decommissionedAt
+                        ? formatDate(form.detail.decommissionedAt, locale)
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{t("retentionUntil")}</dt>
+                    <dd className="font-mono text-xs">
+                      {form.detail?.retainUntil
+                        ? formatDate(form.detail.retainUntil, locale)
+                        : "—"}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {form.detail?.retentionStatus === "purge_allowed"
+                    ? t("retentionPurgeAllowed")
+                    : t("retentionUnder")}
+                </p>
+                {form.detail?.retentionStatus === "purge_allowed" ? (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="mt-3"
+                    disabled={form.busy || form.purging}
+                    data-testid="device-purge"
+                    onClick={() => {
+                      if (window.confirm(t("retentionPurgeConfirm"))) {
+                        void form.purge();
+                      }
+                    }}
+                  >
+                    {form.purging ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {t("retentionPurge")}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+
             <div className="grid gap-2">
               <Label>{t("nextDue")}</Label>
               <Input
@@ -336,6 +394,23 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
                 {form.completingMaintenance && <Loader2 className="h-4 w-4 animate-spin" />}
                 {t("markMaintenanceDone")}
               </Button>
+              {canNotify && form.detail?.id ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={form.busy}
+                  data-testid="device-record-notification"
+                  onClick={() =>
+                    setNotifySubject({
+                      type: "device",
+                      id: form.detail!.id,
+                      defaultSubject: `Notification · ${form.detail!.inventoryNumber}`,
+                    })
+                  }
+                >
+                  {tn("record")}
+                </Button>
+              ) : null}
               <Button type="button" variant="outline" disabled={form.busy} onClick={form.close}>
                 {t("cancel")}
               </Button>
@@ -397,6 +472,12 @@ export function DeviceEditForm({ form, sites }: DeviceEditFormProps) {
           </aside>
         </form>
       )}
+
+      <RecordNotificationModal
+        open={!!notifySubject}
+        onOpenChange={(o) => !o && setNotifySubject(null)}
+        subject={notifySubject}
+      />
     </div>
   );
 }

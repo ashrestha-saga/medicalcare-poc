@@ -20,9 +20,12 @@ export async function GET(req: Request) {
         });
       }
       const access = await assertPartnerManagesTenant(partner.user.id, partner.organisationId, tenantId);
-      return Response.json(await resolvePartnerCapabilities(access.appRole, access.scope), {
-        headers: { "x-correlation-id": partner.correlationId },
-      });
+      return Response.json(
+        await resolvePartnerCapabilities(access.appRole, access.scope, access.permissionSlugs),
+        {
+          headers: { "x-correlation-id": partner.correlationId },
+        },
+      );
     }
 
     const ctx = await requireTenantContext(req);

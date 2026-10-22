@@ -25,6 +25,7 @@ import {
   dispositionDisplayState,
   nextDispositionDisplayState,
 } from "@/services/console/dispositionService";
+import { syncContractScopeGrantsFromTokens } from "@/services/contracts/contractScopeService";
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -465,6 +466,9 @@ export const clinicOnboardService = {
           ...(input.scope ? { scope: JSON.stringify(input.scope) } : {}),
         },
       });
+      if (input.scope) {
+        await syncContractScopeGrantsFromTokens(prisma, contractId, input.scope);
+      }
       if (input.operatingModel && input.operatingModel !== existing.tenant.operatingModel) {
         await prisma.tenant.update({
           where: { id: existing.tenantId },
@@ -596,6 +600,7 @@ export const clinicOnboardService = {
             scope,
           },
         });
+        await syncContractScopeGrantsFromTokens(tx, contract.id, input.scope);
         return { tenant, contract, institution };
       }),
     );

@@ -9,6 +9,7 @@ import { characteristicConflicts } from "./conflicts";
 import { computeReleaseLevel, deriveDuties, stkFlagFromDuties, type Annex2Lookup } from "./deriveDuties";
 import { annex2MetaById } from "./annex2Meta";
 import { writeDuty } from "./writeDuty";
+import { recomputeDutyProjection } from "@/services/duties/dutyProjection";
 import { draftService, type CreateDraftInput } from "./draftService";
 import {
   buildPrerequisites,
@@ -518,6 +519,8 @@ export const releaseService = {
           lastMaintainedAt: row.lastMaintainedAt,
         });
       }
+
+      await recomputeDutyProjection(tx, row.id);
 
       if (characteristics.aufbereitung && characteristics.aufbKlasse) {
         if (characteristics.aufbExtern) {

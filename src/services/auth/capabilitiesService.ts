@@ -2,8 +2,10 @@ import type { CapabilitiesResponse } from "@/interfaces/permissions";
 import type { PartnerAppRole } from "@/interfaces/management";
 import type { UserRole } from "@/interfaces/session";
 import { menuFromPermissions } from "@/constants/permissions";
+import type { PermissionSlug } from "@/interfaces/permissions";
 import {
   consoleMenuFromPermissions,
+  intersectPartnerGrantsWithResolvedSlugs,
   intersectPartnerGrantsWithScope,
 } from "@/constants/partnerPermissions";
 import {
@@ -39,13 +41,15 @@ export async function resolveCapabilities(
  * Partner capabilities (DB RoleGrant kind=partner_console | partner_acting):
  * - scope == null → Betreiberkonsole
  * - scope set → acting in a clinic (grants ∩ contract scope + clinic menu)
+ * Prefer `permissionSlugs` from catalogue dual-read when available.
  */
 export async function resolvePartnerCapabilities(
   appRole: PartnerAppRole | string,
   scope: string[] | null,
+  permissionSlugs?: readonly PermissionSlug[] | null,
 ): Promise<CapabilitiesResponse> {
   await ensurePartnerRoleGrantCache();
-  if (scope == null) {
+  if (scope == null && permissionSlugs == null) {
     const permissions = [...getCachedPartnerConsolePermissions(appRole)];
     return {
       role: appRole,
@@ -54,10 +58,11 @@ export async function resolvePartnerCapabilities(
       menu: consoleMenuFromPermissions(permissions),
     };
   }
-  const permissions = intersectPartnerGrantsWithScope(
-    getCachedPartnerActingPermissions(appRole),
-    scope,
-  );
+  const roleGrants = getCachedPartnerActingPermissions(appRole);
+  const permissions =
+    permissionSlugs != null
+      ? intersectPartnerGrantsWithResolvedSlugs(roleGrants, permissionSlugs)
+      : intersectPartnerGrantsWithScope(roleGrants, scope ?? []);
   return {
     role: appRole,
     accountKind: "partner",

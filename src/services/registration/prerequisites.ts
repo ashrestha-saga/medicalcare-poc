@@ -1,3 +1,4 @@
+import { isMpbetreibV34BookException } from "./bookException";
 import type { EvidenceKind, PrerequisiteItem, RegistrationCharacteristics } from "./types";
 
 export interface SiteSafetyStatus {
@@ -24,7 +25,8 @@ export interface RefPrerequisiteRow {
  * Supported forms:
  * - "true" / "" → always
  * - single key: "strahlung", "aufbereitung", "software_class", "aktiv_or_anlage2",
- *   "aufb_extern", "ist_aufb_geraet", "aufb_geraete"
+ *   "aufb_extern", "ist_aufb_geraet", "aufb_geraete", "buch_ausnahme"
+ * - "!key" negation for simple keys
  * - "key==value" for string fields (e.g. strahlenArt==roentgen)
  */
 export function evaluatesAppliesWhen(
@@ -40,6 +42,10 @@ export function evaluatesAppliesWhen(
   }
   if (raw.includes("||")) {
     return raw.split("||").some((part) => evaluatesAppliesWhen(part.trim(), m));
+  }
+
+  if (raw.startsWith("!") && !raw.includes("=")) {
+    return !evaluatesAppliesWhen(raw.slice(1).trim(), m);
   }
 
   if (raw.includes("!=")) {
@@ -62,6 +68,8 @@ export function evaluatesAppliesWhen(
       return Boolean(m.software && m.swKlasse && m.swKlasse !== "keine");
     case "aktiv_or_anlage2":
       return Boolean(m.aktiv || m.anlage2Ziffer || m.anlage2ItemId);
+    case "buch_ausnahme":
+      return isMpbetreibV34BookException(m);
     case "aufb_extern":
       return Boolean(m.aufbereitung && m.aufbExtern);
     case "ist_aufb_geraet":
@@ -284,7 +292,7 @@ export const FALLBACK_PREREQUISITES: RefPrerequisiteRow[] = [
     note: "For products under Anlage 1 and Anlage 2.",
     mandatory: true,
     evidenceKind: "confirmation",
-    appliesWhen: "aktiv_or_anlage2",
+    appliesWhen: "aktiv_or_anlage2&&!buch_ausnahme",
     releaseLevel: 1,
   },
   {

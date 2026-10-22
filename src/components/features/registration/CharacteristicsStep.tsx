@@ -384,6 +384,50 @@ export function CharacteristicsStep({
             {messgroesseByKey(merkmale.messgroesse || "")?.hinweis ? (
               <p className="p-reg__hint">{messgroesseByKey(merkmale.messgroesse || "")!.hinweis}</p>
             ) : null}
+            {merkmale.messgroesse === "temperatur" && merkmale.messvariante === "elektro" ? (
+              <div className="space-y-2" data-testid="book-exception-thermometer">
+                <YesNoAnswer
+                  label={fieldLabel("kompaktThermometer")}
+                  value={merkmale.kompaktThermometer}
+                  meta={fieldMeta(merkmale, "kompaktThermometer")}
+                  onAnswer={(v) => answer("kompaktThermometer", v)}
+                  onConfirm={() => confirmField("kompaktThermometer")}
+                />
+                <p className="p-reg__hint">{t("bookExceptionHint")}</p>
+              </div>
+            ) : null}
+            {merkmale.messgroesse === "blutdruck" ? (
+              <div className="space-y-2" data-testid="book-exception-manometer">
+                <SuggestableField
+                  label={fieldLabel("manometerTyp")}
+                  meta={fieldMeta(merkmale, "manometerTyp")}
+                >
+                  <div className="p-field">
+                    <select
+                      value={merkmale.manometerTyp ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (!v) return;
+                        answer("manometerTyp", v);
+                      }}
+                      data-testid="manometer-typ-select"
+                    >
+                      <option value="">{t("select")}</option>
+                      <option value="quecksilber">{t("manometerTypes.quecksilber")}</option>
+                      <option value="aneroid">{t("manometerTypes.aneroid")}</option>
+                      <option value="other">{t("manometerTypes.other")}</option>
+                    </select>
+                  </div>
+                </SuggestableField>
+                <FieldCheckRules
+                  field="manometerTyp"
+                  hits={checkHits}
+                  merkmale={merkmale}
+                  onAcknowledge={acknowledgeRule}
+                />
+                <p className="p-reg__hint">{t("bookExceptionHint")}</p>
+              </div>
+            ) : null}
             {(() => {
               const z = zifferAus({
                 messgroesse: merkmale.messgroesse,

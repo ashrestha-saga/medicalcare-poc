@@ -1,3 +1,4 @@
+import { clinicHomePath } from "@/constants/authRoutes";
 import { createSession } from "@/lib/auth/session";
 import { setTotpChallengeCookie } from "@/lib/auth/totpChallenge";
 import { errorResponse } from "@/lib/errors";
@@ -53,7 +54,11 @@ export async function POST(req: Request) {
     await createSession(user);
     logger.info("auth.login", { userId: user.id, tenantId: user.tenantId, role: user.role });
     const { tenantId: _tenantId, ...publicUser } = user;
-    return Response.json({ user: publicUser, tenantName, homePath: "/" });
+    return Response.json({
+      user: publicUser,
+      tenantName,
+      homePath: clinicHomePath(user.role),
+    });
   } catch (error) {
     return errorResponse(error);
   }

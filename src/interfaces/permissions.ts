@@ -62,6 +62,7 @@ export type PermissionSlug =
   | "incidents:view"
   | "incidents:manage"
   | "fieldsafety:view"
+  | "fieldsafety:create"
   | "devicebook:view"
   | "reprocessing:view"
   | "reprocessing:release"

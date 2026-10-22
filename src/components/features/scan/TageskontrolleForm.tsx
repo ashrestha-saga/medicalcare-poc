@@ -23,12 +23,17 @@ export function TageskontrolleForm({
   const [stepIndex, setStepIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [note, setNote] = useState("");
+  const [showNoteStep, setShowNoteStep] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
+    setShowNoteStep(false);
+    setStepIndex(0);
+    setNote("");
+    setError(null);
     void api<{ routine: ScanRoutineOpenDTO }>(`/api/scan/devices/${deviceId}/routine`)
       .then((res) => {
         if (!alive) return;
@@ -79,7 +84,6 @@ export function TageskontrolleForm({
 
   const answeredCount = steps.filter((s) => stepDone(s, answers[s.checkCode])).length;
   const onLast = stepIndex >= steps.length - 1;
-  const showingNote = steps.length > 0 && onLast && stepDone(steps[stepIndex]!, answers[steps[stepIndex]!.checkCode]);
 
   const setPass = (passed: boolean) => {
     if (!step) return;
@@ -108,7 +112,11 @@ export function TageskontrolleForm({
     if (stepIndex < steps.length - 1) {
       setStepIndex((i) => i + 1);
       setError(null);
+      return;
     }
+    // Last check: only leave the measure/pass UI after an explicit continue.
+    setShowNoteStep(true);
+    setError(null);
   };
 
   const submit = async () => {
@@ -203,7 +211,7 @@ export function TageskontrolleForm({
         </p>
       </header>
 
-      {step && !showingNote ? (
+      {step && !showNoteStep ? (
         <div className="p-routine__step" key={step.checkCode}>
           <p className="p-routine__question">{step.label}</p>
           {step.scope !== "equipment" ? (
@@ -252,7 +260,7 @@ export function TageskontrolleForm({
         </div>
       ) : null}
 
-      {showingNote ? (
+      {showNoteStep ? (
         <div className="p-routine__step">
           <p className="p-routine__question">
             {hasMangel ? t("noteRequired") : t("noteOptional")}
@@ -281,7 +289,7 @@ export function TageskontrolleForm({
           <button type="button" className="p-stoerung__cancel" onClick={onCancel} disabled={saving}>
             {t("later")}
           </button>
-          {showingNote ? (
+          {showNoteStep ? (
             <button
               type="button"
               className="p-routine__save"

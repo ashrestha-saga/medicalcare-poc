@@ -644,6 +644,73 @@
         "saveRef": "Save reference"
       }
     },
+    "dutyOverlap": {
+      "title": "Duty overlap decisions",
+      "description": "STK does not automatically satisfy DGUV. An explicit decision suspends the covered duty from due dates until the decision is revoked.",
+      "denied": "You do not have permission to view duty overlap.",
+      "loading": "Loading…",
+      "empty": "No open overlap decisions.",
+      "col": {
+        "device": "Device",
+        "coverage": "Coverage",
+        "reason": "Reason",
+        "decided": "Decided",
+        "actions": "Actions"
+      },
+      "form": {
+        "title": "Record overlap",
+        "hint": "The covered duty is suspended (not deleted). Revoking reactivates it if nothing else covers it.",
+        "device": "Device",
+        "devicePlaceholder": "Select a device with STK and DGUV…",
+        "deviceEmpty": "No released devices currently carry both STK and DGUV duties.",
+        "covered": "Covered duty (suspended)",
+        "satisfiedBy": "Satisfied by",
+        "reason": "Reason",
+        "reasonPlaceholder": "e.g. STK protocol covers DGUV electrical safety for this unit",
+        "decidedAt": "Decided on"
+      },
+      "actions": {
+        "save": "Save decision",
+        "revoke": "Revoke"
+      }
+    },
+    "authorityNotification": {
+      "title": "Record authority notification",
+      "hint": "The system does not transmit. You record that a named person sent the message, with recipient and channel.",
+      "kind": "Kind",
+      "recipient": "Recipient",
+      "recipientPlaceholder": "e.g. BfArM, Gesundheitsamt",
+      "channel": "Channel",
+      "subject": "Subject",
+      "body": "Body (optional)",
+      "sentAt": "Sent on",
+      "reference": "Recipient reference",
+      "ackRef": "Acknowledgement reference",
+      "ackRefPlaceholder": "Portal ticket / letter number",
+      "ackRefHint": "Optional — stores a NotificationDocument (acknowledgement).",
+      "choose": "— please choose —",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Notification recorded",
+      "errSave": "Could not record notification.",
+      "record": "Record notification",
+      "kinds": {
+        "incident": "Incident report",
+        "finding_remediation": "Finding remediation",
+        "radiation": "Radiation authorisation",
+        "accident": "Accident report",
+        "metrology": "Metrology notice",
+        "other": "Other"
+      },
+      "channels": {
+        "authority_portal": "Authority portal",
+        "manufacturer_portal": "Manufacturer portal",
+        "email": "Email",
+        "post": "Post",
+        "fax": "Fax",
+        "other": "Other"
+      }
+    },
     "constancyCadence": {
       "title": "Constancy test takt",
       "description": "§ 115 StrlSchV creates the duty per test object. The interval is an employer determination — without takt, dueAt stays null (takt to be set). QS-RL wording is a suggestion, never a frozen deadline.",
@@ -1850,8 +1917,16 @@
       "messvariante": "Measured quantity — variant",
       "anlage2Choice": "Measuring function per Anlage 2",
       "anlage2Verfahren": "Anlage 2 procedure (1.5.3)",
-      "zubehoer": "Accessories"
+      "zubehoer": "Accessories",
+      "kompaktThermometer": "Compact electronic fever thermometer (§ 3 Abs. 4 book exception)",
+      "manometerTyp": "Blood-pressure manometer type (§ 3 Abs. 4)"
     },
+    "manometerTypes": {
+      "quecksilber": "Mercury manometer (book exception)",
+      "aneroid": "Aneroid manometer (book exception)",
+      "other": "Other (e.g. oscillometric — book-obliged)"
+    },
+    "bookExceptionHint": "§ 3 Abs. 4 MPBetreibV — when yes / mercury / aneroid, the medical device book prerequisite does not apply (MTK may still apply).",
     "fieldShort": {
       "aktiv": "Active",
       "implantat": "Implant",
@@ -1874,7 +1949,9 @@
       "einmalprodukt": "Single-use",
       "istAufbGeraet": "Reprocessing machine",
       "zubehoer": "Accessories",
-      "aedAusnahme": "AED exception"
+      "aedAusnahme": "AED exception",
+      "kompaktThermometer": "Compact thermometer",
+      "manometerTyp": "Manometer type"
     },
     "messgroessen": {
       "keine": "No measuring function under Anlage 2",
@@ -2555,7 +2632,14 @@
     "notEditableHere": "Not editable here — edit classification in the catalog.",
     "openModelInCatalog": "Open model in catalog",
     "course": "Course",
-    "deviceFallback": "Device"
+    "deviceFallback": "Device",
+    "retentionTitle": "Book retention (§ 13 Abs. 3)",
+    "retentionDecommissioned": "Decommissioned",
+    "retentionUntil": "Retain until",
+    "retentionUnder": "Book under retention — purge refused until this date.",
+    "retentionPurgeAllowed": "Retention elapsed — purge of book and inventory is allowed.",
+    "retentionPurge": "Purge device and book",
+    "retentionPurgeConfirm": "Permanently delete this retired device and its book? This cannot be undone."
   },
   "inventoryDetail": {
     "backToList": "← Inventory list",

@@ -19,7 +19,7 @@ export interface RecordDutyCompletionArgs {
   };
   performedAt: Date;
   performedBy: string;
-  /** Actor user id when available (MaintenanceEvent.actorUserId). */
+  /** Actor user id when available (MaintenanceEvent.actorUserId + DutyPerformance.performedByUserId). */
   actorUserId?: string | null;
   note?: string | null;
   source: string;
@@ -56,6 +56,7 @@ export async function recordDutyCompletion(
       result: args.result ?? "passed",
       note: args.note ?? null,
       performedBy: args.performedBy,
+      performedByUserId: args.actorUserId ?? null,
       source: args.source,
     },
   });

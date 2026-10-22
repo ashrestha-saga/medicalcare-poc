@@ -166,6 +166,7 @@ async function writeDutyPerformanceOnComplete(args: {
   dutyId: string;
   serviceRequestId: string;
   performedBy: string;
+  actorUserId?: string | null;
   note: string | null;
   source: string;
 }) {
@@ -180,6 +181,7 @@ async function writeDutyPerformanceOnComplete(args: {
       duty,
       performedAt: new Date(),
       performedBy: args.performedBy,
+      actorUserId: args.actorUserId ?? null,
       note: args.note,
       source: args.source,
       serviceRequestId: args.serviceRequestId,
@@ -722,6 +724,7 @@ export const serviceRequestService = {
         dutyId: existing.dutyId,
         serviceRequestId: existing.id,
         performedBy: ctx.user.name,
+        actorUserId: ctx.user.id,
         note,
         source: "assignment",
       });

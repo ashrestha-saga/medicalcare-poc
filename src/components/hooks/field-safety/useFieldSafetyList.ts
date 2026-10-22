@@ -17,6 +17,7 @@ function parseView(raw: string | null): FieldSafetyView {
 export function useFieldSafetyList() {
   const { checkPermission } = usePermissions();
   const canView = checkPermission("fieldsafety:view");
+  const canCreate = checkPermission("fieldsafety:create");
   const viewParam = useQueryParam("view");
   const actionIdParam = useQueryParam("actionId");
   const { sync } = useSyncQueryParams();
@@ -153,6 +154,7 @@ export function useFieldSafetyList() {
 
   return {
     canView,
+    canCreate,
     actions,
     loading,
     refresh,

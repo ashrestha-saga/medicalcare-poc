@@ -644,6 +644,73 @@
         "saveRef": "Referenz speichern"
       }
     },
+    "dutyOverlap": {
+      "title": "Überlappungsentscheidungen",
+      "description": "STK erfüllt DGUV nicht automatisch. Eine ausdrückliche Entscheidung setzt die abgedeckte Pflicht aus den Fälligkeiten aus, bis die Entscheidung widerrufen wird.",
+      "denied": "Sie haben keine Berechtigung, Überlappungen anzusehen.",
+      "loading": "Laden…",
+      "empty": "Keine offenen Überlappungsentscheidungen.",
+      "col": {
+        "device": "Gerät",
+        "coverage": "Abdeckung",
+        "reason": "Grund",
+        "decided": "Festgelegt",
+        "actions": "Aktionen"
+      },
+      "form": {
+        "title": "Überlappung festlegen",
+        "hint": "Die abgedeckte Pflicht wird ausgesetzt (nicht gelöscht). Widerruf reaktiviert sie, wenn nichts anderes sie abdeckt.",
+        "device": "Gerät",
+        "devicePlaceholder": "Gerät mit STK und DGUV wählen…",
+        "deviceEmpty": "Kein freigegebenes Gerät trägt derzeit sowohl STK- als auch DGUV-Pflichten.",
+        "covered": "Abgedeckte Pflicht (ausgesetzt)",
+        "satisfiedBy": "Erfüllt durch",
+        "reason": "Grund",
+        "reasonPlaceholder": "z. B. STK-Protokoll deckt DGUV-Elektrosicherheit für dieses Exemplar ab",
+        "decidedAt": "Festgelegt am"
+      },
+      "actions": {
+        "save": "Entscheidung speichern",
+        "revoke": "Widerrufen"
+      }
+    },
+    "authorityNotification": {
+      "title": "Behördenmeldung erfassen",
+      "hint": "Das System sendet nicht. Sie halten fest, dass eine benannte Person die Meldung abgesendet hat — mit Empfänger und Weg.",
+      "kind": "Art",
+      "recipient": "Empfänger",
+      "recipientPlaceholder": "z. B. BfArM, Gesundheitsamt",
+      "channel": "Weg",
+      "subject": "Betreff",
+      "body": "Text (optional)",
+      "sentAt": "Abgesendet am",
+      "reference": "Referenz des Empfängers",
+      "ackRef": "Eingangsbestätigung",
+      "ackRefPlaceholder": "Portal-Ticket / Schreiben-Nr.",
+      "ackRefHint": "Optional — legt ein NotificationDocument (acknowledgement) an.",
+      "choose": "— bitte wählen —",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "saved": "Meldung erfasst",
+      "errSave": "Meldung konnte nicht erfasst werden.",
+      "record": "Meldung erfassen",
+      "kinds": {
+        "incident": "Vorkommnismeldung",
+        "finding_remediation": "Abhilfenachweis",
+        "radiation": "Strahlenschutz-Anzeige",
+        "accident": "Unfallanzeige",
+        "metrology": "Eichbehörde",
+        "other": "Sonstige"
+      },
+      "channels": {
+        "authority_portal": "Behördenportal",
+        "manufacturer_portal": "Herstellerportal",
+        "email": "E-Mail",
+        "post": "Post",
+        "fax": "Fax",
+        "other": "Sonstiges"
+      }
+    },
     "constancyCadence": {
       "title": "Takt der Konstanzprüfungen",
       "description": "§ 115 StrlSchV begründet die Pflicht je Prüfgegenstand. Der Abstand ist eine Festlegung des Betreibers — ohne Takt bleibt dueAt null (Takt festzulegen). QS-RL-Text ist Vorschlag, nie eingefrorene Frist.",
@@ -1850,8 +1917,16 @@
       "messvariante": "Messgröße — Variante",
       "anlage2Choice": "Messfunktion nach Anlage 2",
       "anlage2Verfahren": "Anlage-2-Verfahren (1.5.3)",
-      "zubehoer": "Zubehör"
+      "zubehoer": "Zubehör",
+      "kompaktThermometer": "Elektronisches Fieberthermometer als Kompaktthermometer (§ 3 Abs. 4 Buchausnahme)",
+      "manometerTyp": "Blutdruck-Manometertyp (§ 3 Abs. 4)"
     },
+    "manometerTypes": {
+      "quecksilber": "Quecksilbermanometer (Buchausnahme)",
+      "aneroid": "Aneroidmanometer (Buchausnahme)",
+      "other": "Sonstiges (z. B. oszillometrisch — buchpflichtig)"
+    },
+    "bookExceptionHint": "§ 3 Abs. 4 MPBetreibV — bei Ja / Quecksilber / Aneroid entfällt die Medizinproduktebuch-Voraussetzung (MTK kann weiterhin gelten).",
     "fieldShort": {
       "aktiv": "Aktiv",
       "implantat": "Implantat",
@@ -1874,7 +1949,9 @@
       "einmalprodukt": "Einmalprodukt",
       "istAufbGeraet": "Aufbereitungsgerät",
       "zubehoer": "Zubehör",
-      "aedAusnahme": "AED-Ausnahme"
+      "aedAusnahme": "AED-Ausnahme",
+      "kompaktThermometer": "Kompaktthermometer",
+      "manometerTyp": "Manometertyp"
     },
     "messgroessen": {
       "keine": "Keine Messfunktion nach Anlage 2",
@@ -2555,7 +2632,14 @@
     "notEditableHere": "Hier nicht bearbeitbar — Einstufung im Katalog ändern.",
     "openModelInCatalog": "Modell im Katalog öffnen",
     "course": "Verlauf",
-    "deviceFallback": "Gerät"
+    "deviceFallback": "Gerät",
+    "retentionTitle": "Aufbewahrung des Buches (§ 13 Abs. 3)",
+    "retentionDecommissioned": "Außerbetriebnahme",
+    "retentionUntil": "Aufbewahren bis",
+    "retentionUnder": "Buch in Aufbewahrung — Löschen bis zu diesem Datum abgelehnt.",
+    "retentionPurgeAllowed": "Aufbewahrungsfrist abgelaufen — Löschen von Buch und Bestand ist erlaubt.",
+    "retentionPurge": "Gerät und Buch löschen",
+    "retentionPurgeConfirm": "Dieses außer Betrieb genommene Gerät und sein Buch endgültig löschen? Das kann nicht rückgängig gemacht werden."
   },
   "inventoryDetail": {
     "backToList": "← Bestandsliste",

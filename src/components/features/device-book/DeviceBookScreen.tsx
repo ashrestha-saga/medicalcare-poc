@@ -268,10 +268,38 @@ export function DeviceBookScreen() {
                   </header>
 
                   <Section legal="§ 4 · § 13 Abs. 2" title={t("sections.documents")}>
-                    {book.evidence.length === 0 ? (
+                    {!book.modelIfu && book.evidence.length === 0 ? (
                       <Empty text={t("ifu.empty")} />
                     ) : (
                       <ul className="space-y-2">
+                        {book.modelIfu ? (
+                          <li
+                            key={book.modelIfu.id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+                            data-testid="device-book-model-ifu"
+                          >
+                            <div>
+                              <p className="font-medium">
+                                {t("ifu.label")} · {book.modelIfu.revisionLabel}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Model · {book.modelIfu.language} · {book.modelIfu.recordedByName},{" "}
+                                {formatDateTime(book.modelIfu.recordedAt)}
+                              </p>
+                            </div>
+                            {book.modelIfu.openUrl ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(book.modelIfu!.openUrl!, "_blank")}
+                                data-testid="device-book-open-model-ifu"
+                              >
+                                {t("actions.openIfu")}
+                              </Button>
+                            ) : null}
+                          </li>
+                        ) : null}
                         {book.evidence.map((ev) => (
                           <li
                             key={ev.id}

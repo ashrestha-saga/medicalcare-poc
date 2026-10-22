@@ -45,7 +45,7 @@ export async function loadMailAttachments(
         where: { id: pathMatch[1], tenantId },
         select: { dataUrl: true },
       });
-      if (!blob) continue;
+      if (!blob?.dataUrl) continue;
       const att = fromDataUrl(blob.dataUrl, row.kind, index);
       if (att) {
         out.push(att);

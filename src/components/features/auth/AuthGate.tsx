@@ -5,7 +5,8 @@ import { useSession } from "@/hooks/useSession";
 import { useSessionStore } from "@/store/sessionStore";
 import type { AuthGateProps } from "@/interfaces";
 import { Loading } from "@/components/ui/Loading";
-import { AUTH_HOME, isAuthRoute } from "@/constants/authRoutes";
+import { clinicHomePath, isAuthRoute, PARTNER_HOME } from "@/constants/authRoutes";
+import { isPartnerSession } from "@/interfaces/session";
 
 /**
  * Signed-out users are sent to loginPath (default /login).
@@ -16,12 +17,15 @@ export function AuthGate({ children, loginPath = "/login" }: AuthGateProps) {
   const user = useSessionStore((s) => s.user);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !user) return;
     const params = new URLSearchParams(window.location.search);
     if (params.has("auth")) {
-      window.history.replaceState(null, "", AUTH_HOME);
+      const home = isPartnerSession(user)
+        ? PARTNER_HOME
+        : clinicHomePath(user.role);
+      window.history.replaceState(null, "", home);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (status === "loading") return;

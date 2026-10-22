@@ -6,7 +6,7 @@ import { SignIn } from "@/components/features/auth/SignIn";
 import { Loading } from "@/components/ui/Loading";
 import { useSession } from "@/hooks/useSession";
 import { useSessionStore } from "@/store/sessionStore";
-import { AUTH_HOME, PARTNER_HOME } from "@/constants/authRoutes";
+import { clinicHomePath, PARTNER_HOME } from "@/constants/authRoutes";
 import { isPartnerSession } from "@/interfaces/session";
 
 function LoginContent() {
@@ -17,7 +17,9 @@ function LoginContent() {
 
   useEffect(() => {
     if (status === "signed-in" && user) {
-      window.location.replace(isPartnerSession(user) ? PARTNER_HOME : AUTH_HOME);
+      window.location.replace(
+        isPartnerSession(user) ? PARTNER_HOME : clinicHomePath(user.role),
+      );
     }
   }, [status, user]);
 

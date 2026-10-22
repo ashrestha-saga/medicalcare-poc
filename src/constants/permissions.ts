@@ -46,6 +46,7 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "incidents:view",
   "incidents:manage",
   "fieldsafety:view",
+  "fieldsafety:create",
   "devicebook:view",
   "reprocessing:view",
   "reprocessing:release",
@@ -90,6 +91,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
     "audit:view",
     "devicebook:view",
     "fieldsafety:view",
+    "fieldsafety:create",
     "incidents:view",
     "incidents:manage",
     "reprocessing:view",
@@ -102,11 +104,19 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
     "incidents:view",
     "incidents:manage",
     "fieldsafety:view",
+    "fieldsafety:create",
     "devicebook:view",
   ],
   // No shell:nav → Inventory-only chrome; /requests is blocked by RouteGuard.
-  // /security is allowed without shell:nav (see canAccessPath).
-  user: ["inventory:view", "requests:create", "parts:request", "requests:view-mine", "account:security"],
+  // /security and /device-book are allowed without shell:nav (see canAccessPath).
+  user: [
+    "inventory:view",
+    "requests:create",
+    "parts:request",
+    "requests:view-mine",
+    "account:security",
+    "devicebook:view",
+  ],
 };
 
 /** Permissions that cannot be removed from the superadmin role. */
@@ -143,6 +153,10 @@ export const PERMISSION_GROUPS: readonly {
       { slug: "incidents:view", description: "View device incidents" },
       { slug: "incidents:manage", description: "Assess, report and close incidents" },
       { slug: "fieldsafety:view", description: "View field safety actions and recalls" },
+      {
+        slug: "fieldsafety:create",
+        description: "Record recalls, match devices and close field safety actions",
+      },
       { slug: "reprocessing:view", description: "View reprocessing checks and batches" },
       { slug: "reprocessing:release", description: "Release or reject reprocessing batches" },
       { slug: "authority:view", description: "View authority inspections and findings" },
@@ -347,6 +361,7 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
  * - Always-allow paths (e.g. /login) pass.
  * - Home `/` needs only its resource slug (works without shell:nav).
  * - `/security` needs only account:security (works without shell:nav for capturers).
+ * - `/device-book` needs only devicebook:view (area-scoped capturers; no shell:nav).
  * - Any other app path needs `shell:nav` plus the path’s resource slug.
  */
 export function canAccessPath(
@@ -361,7 +376,13 @@ export function canAccessPath(
   if (!required) return false;
   if (!slugSet.has(required)) return false;
 
-  if (pathname === APP_HOME_PATH || pathname === "/security" || pathname.startsWith("/security")) {
+  if (
+    pathname === APP_HOME_PATH ||
+    pathname === "/security" ||
+    pathname.startsWith("/security") ||
+    pathname === "/device-book" ||
+    pathname.startsWith("/device-book")
+  ) {
     return true;
   }
   if (!slugSet.has("shell:nav")) return false;

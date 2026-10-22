@@ -31,10 +31,10 @@ Prefer existing `*:view` / `*:manage` (or `*:update` / `*:release`) pairs. Do **
 | Area | View | Mutate / admin |
 |------|------|----------------|
 | Incidents | `incidents:view` | `incidents:manage` |
-| Field safety | `fieldsafety:view` | (reuse view for match/close until a manage pair is needed) |
+| Field safety | `fieldsafety:view` | `fieldsafety:create` (record, match, suggest, close) |
 | Device book | `devicebook:view` | — |
 | Reprocessing | `reprocessing:view` | `reprocessing:release` |
-| Authority | `authority:view` | — |
+| Authority | `authority:view` | record notifications (finding/device/site); incident kind needs `incidents:manage` |
 | Duties / constancy / overlap | `duties:view` | — |
 | Dashboard | (tile assignment uses existing inventory/duties grants) | — |
 

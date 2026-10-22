@@ -25,6 +25,7 @@ import type { CapturedArticle } from "@prisma/client";
 import { inspectionTagsFromFlags } from "@/lib/inspectionTags";
 import { parseJson } from "@/lib/json";
 import { deriveMaintenanceStatus } from "@/lib/maintenance/schedule";
+import { retentionStatus } from "@/services/inventory/retention";
 import { isReprocessingEquipmentDevice } from "@/services/registration/reprocessingLinkService";
 
 export { inspectionTagsFromFlags };
@@ -157,6 +158,13 @@ export function toDeviceInstanceDTO(row: DeviceInstanceWithRelations): DeviceIns
       characteristicsJson: row.characteristicsJson,
     }),
     catalogPending: Boolean(modelState && modelState !== "released"),
+    retiredAt: row.retiredAt?.toISOString() ?? null,
+    decommissionedAt: row.decommissionedAt?.toISOString().slice(0, 10) ?? null,
+    retainUntil: row.retainUntil?.toISOString().slice(0, 10) ?? null,
+    retentionStatus: retentionStatus({
+      state: instanceState,
+      retainUntil: row.retainUntil,
+    }),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -37,3 +37,19 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     return errorResponse(error, correlationId);
   }
 }
+
+/** DELETE /api/devices/[id] — purge retired device after retainUntil (§ 13 Abs. 3). */
+export async function DELETE(req: Request, ctx: RouteContext) {
+  let correlationId: string | undefined;
+  try {
+    const auth = await requireTenantContext(req);
+    return await withTenantStore(auth, async () => {
+      correlationId = auth.correlationId;
+      const { id } = await ctx.params;
+      const result = await deviceInventoryService.purge(auth, id);
+      return Response.json({ purged: result }, { headers: { "x-correlation-id": auth.correlationId } });
+    });
+  } catch (error) {
+    return errorResponse(error, correlationId);
+  }
+}

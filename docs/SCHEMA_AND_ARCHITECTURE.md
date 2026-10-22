@@ -474,7 +474,7 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 | **Organisation** | Legal entity once (partners and institutions) | Partner seed, contracts |
 | **OrganisationRole** | Capacity: institution \| service_provider \| inspection_partner \| platform_operator | Manage-tenant gate |
 | **OrgMembership** | Partner user ↔ org; `appRole`: inspector \| admin \| order | Partner login door |
-| **ServiceContract** | Org may open one clinic; `scope` JSON; `terminatedAt` / `suspendedAt`; optional `billingRef` | Partner home / console / access control |
+| **ServiceContract** | Org may open one clinic; legacy `scope` JSON + `ServiceContractScopeGrant` catalogue (dual-read; grants win; `denied` = nie); `terminatedAt` / `suspendedAt`; optional `billingRef` | Partner home / console / access control |
 | **ExecutorOrg** | In-clinic executor catalog (O-MSR, O-RTS, O-INT) | Service request allocation (FA-713), dispatch targets per org |
 | **SmtpSettings** | Outbound SMTP for clinic tenant **or** partner org (exactly one owner) | Settings SMTP panels, invite/reset/dispatch mail |
 

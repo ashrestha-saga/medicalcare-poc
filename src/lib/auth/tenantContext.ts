@@ -1,7 +1,7 @@
 import type { ActingContext, ClinicSessionUser, PartnerContext, PartnerSessionUser, TenantContext } from "@/interfaces/session";
 import type { PermissionSlug } from "@/interfaces/permissions";
 import { ACTING_TENANT_HEADER, CORRELATION_HEADER } from "@/constants/session";
-import { intersectPartnerGrantsWithScope } from "@/constants/partnerPermissions";
+import { intersectPartnerGrantsWithResolvedSlugs } from "@/constants/partnerPermissions";
 import { forbidden, unauthorized } from "@/lib/errors";
 import { newCorrelationId } from "@/lib/crypto";
 import {
@@ -153,9 +153,9 @@ export async function requireActingContext(req: Request): Promise<ActingContext>
 
   const partner = await requirePartnerContext(req);
   const access = await assertPartnerManagesTenant(partner.user.id, partner.organisationId, tenantId);
-  const permissions = intersectPartnerGrantsWithScope(
+  const permissions = intersectPartnerGrantsWithResolvedSlugs(
     getCachedPartnerActingPermissions(access.appRole),
-    access.scope,
+    access.permissionSlugs,
   );
   // Partner door: caller must wrap with `withTenantStore(ctx, …)` (enterWith caveat).
   return {

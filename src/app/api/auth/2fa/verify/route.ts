@@ -1,3 +1,4 @@
+import { clinicHomePath } from "@/constants/authRoutes";
 import { createSession } from "@/lib/auth/session";
 import {
   clearTotpChallengeCookie,
@@ -23,7 +24,11 @@ export async function POST(req: Request) {
     await clearTotpChallengeCookie();
     await createSession(user);
     const { tenantId: _tenantId, ...publicUser } = user;
-    return Response.json({ user: publicUser, tenantName, homePath: "/" });
+    return Response.json({
+      user: publicUser,
+      tenantName,
+      homePath: clinicHomePath(user.role),
+    });
   } catch (error) {
     return errorResponse(error);
   }

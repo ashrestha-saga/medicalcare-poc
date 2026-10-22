@@ -1,12 +1,17 @@
+import type { PermissionSlug } from "@/interfaces/permissions";
 import type { PartnerContext } from "@/interfaces/session";
 import { forbidden } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { runWithoutTenantAsync } from "@/lib/auth/tenantStore";
-import { parseContractScope } from "@/constants/partnerPermissions";
+import { normalizeContractScope, parseContractScope } from "@/constants/partnerPermissions";
+import { resolveContractScopeSlugs } from "@/services/contracts/contractScopeService";
 
 export interface PartnerManageResult {
   contractId: string;
+  /** Coarse tokens for UI / legacy JSON (inventory, inspection, …). */
   scope: string[];
+  /** Resolved permission slugs for acting RBAC (catalogue dual-read). */
+  permissionSlugs: PermissionSlug[];
   organisationName: string;
   appRole: string;
 }
@@ -57,6 +62,7 @@ export async function assertPartnerManagesTenant(
       prisma.organisation.findFirst({ where: { id: organisationId }, select: { id: true, name: true } }),
       prisma.serviceContract.findFirst({
         where: { organisationId, tenantId },
+        include: { scopeGrants: { select: { permission: true, denied: true } } },
       }),
     ]);
 
@@ -75,9 +81,13 @@ export async function assertPartnerManagesTenant(
       if (!assignment) throw forbidden();
     }
 
+    const tokens = normalizeContractScope(parseContractScope(contract.scope));
+    const permissionSlugs = resolveContractScopeSlugs(contract.scope, contract.scopeGrants);
+
     return {
       contractId: contract.id,
-      scope: parseContractScope(contract.scope),
+      scope: tokens,
+      permissionSlugs,
       organisationName: organisation.name,
       appRole: membership.appRole,
     };

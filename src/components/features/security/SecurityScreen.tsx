@@ -4,12 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import type { TotpSetupConfirmDTO, TotpSetupStartDTO, TotpStatusDTO } from "@/interfaces";
-import { APP_HOME_PATH } from "@/constants/permissions";
+import { clinicHomePath } from "@/constants/authRoutes";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { formatDate } from "@/lib/format";
 import type { AppLocale } from "@/lib/locale";
 import { RequiredMark } from "@/components/ui/RequiredMark";
 import { Spinner } from "@/components/ui/Loading";
+import { useSessionStore } from "@/store/sessionStore";
 import { toast } from "@/store/toastStore";
 
 export function useTotpSecurity() {
@@ -116,6 +117,8 @@ export function SecurityScreen() {
   const t = useTranslations("security");
   const locale = useLocale() as AppLocale;
   const form = useTotpSecurity();
+  const role = useSessionStore((s) => s.user?.role);
+  const homePath = clinicHomePath(role);
 
   return (
     <div className="p-work" data-testid="security-page">
@@ -123,7 +126,7 @@ export function SecurityScreen() {
         <div className="p-settings" data-testid="security-screen">
           <section className="p-devhead p-settings__head">
             <Link
-              href={APP_HOME_PATH}
+              href={homePath}
               className="p-close"
               aria-label={t("backHomeAria")}
               data-testid="security-back-home"
@@ -283,7 +286,7 @@ export function SecurityScreen() {
 
             <div className="p-settings__actions">
               <Link
-                href={APP_HOME_PATH}
+                href={homePath}
                 className="p-cta ghost"
                 data-testid="security-back-home-cta"
               >
