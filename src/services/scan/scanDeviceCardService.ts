@@ -181,7 +181,7 @@ export const scanDeviceCardService = {
     const device = await prisma.deviceInstance.findFirst({
       where: { id: deviceId },
       include: {
-        model: { select: { tradeName: true, modelName: true, manufacturer: true } },
+        model: { select: { id: true, tradeName: true, modelName: true, manufacturer: true } },
         area: { select: { name: true, siteId: true, site: { select: { name: true } } } },
       },
     });
@@ -190,7 +190,7 @@ export const scanDeviceCardService = {
 
     const isEquipment = isReprocessingEquipmentDevice(device);
 
-    const [sperr, openBatchRows, openDailyChecks, openKonstanzChecks, konstanzDuty, openReq, ifuEv] =
+    const [sperr, openBatchRows, openDailyChecks, openKonstanzChecks, konstanzDuty, openReq, ifuEv, modelIfu] =
       await Promise.all([
         deriveSperrLage(deviceId),
         prisma.reprocessingBatch.findMany({
@@ -224,12 +224,36 @@ export const scanDeviceCardService = {
             deviceInstanceId: deviceId,
             prerequisiteCode: { in: ["ga", "ifu", "gebrauchsanweisung"] },
           },
-          select: { externalRecordRef: true, prerequisiteCode: true },
+          select: {
+            externalRecordRef: true,
+            prerequisiteCode: true,
+            attachmentBlobId: true,
+          },
         }),
+        device.modelId
+          ? prisma.modelDocument.findFirst({
+              where: { deviceModelId: device.modelId, kind: "ifu", supersededAt: null },
+              orderBy: { validFrom: "desc" },
+              select: {
+                revisionLabel: true,
+                blobId: true,
+                externalUrl: true,
+              },
+            })
+          : Promise.resolve(null),
       ]);
     const openBatches = openBatchRows.length;
     const latestOpenBatchId = openBatchRows[0]?.id;
-    const ifuLabel = ifuEv?.externalRecordRef?.trim() || (ifuEv ? "§ 4 MPBetreibV" : null);
+    const ifuOpenUrl =
+      (modelIfu?.blobId ? `/api/attachments/${modelIfu.blobId}` : null) ||
+      modelIfu?.externalUrl?.trim() ||
+      (ifuEv?.attachmentBlobId ? `/api/attachments/${ifuEv.attachmentBlobId}` : null) ||
+      ifuEv?.externalRecordRef?.trim() ||
+      null;
+    const ifuLabel =
+      modelIfu?.revisionLabel?.trim() ||
+      ifuEv?.externalRecordRef?.trim() ||
+      (modelIfu || ifuEv ? "§ 4 MPBetreibV" : null);
 
     const permissions = (ctx.permissions ?? []) as readonly PermissionSlug[];
     const role = (ctx.user.role ?? null) as UserRole | null;
@@ -241,6 +265,7 @@ export const scanDeviceCardService = {
       openKonstanzChecks,
       hasKonstanzDuties: Boolean(konstanzDuty),
       ifuLabel,
+      ifuOpenUrl,
       lage: sperr.lage,
       quelle: sperr.quelle,
       grund: sperr.grund,
@@ -280,6 +305,7 @@ export const scanDeviceCardService = {
       openKonstanzChecks,
       openRequestRef: openReq?.reference ?? null,
       ifuLabel,
+      ifuOpenUrl,
       primary: toPrimaryDto(primary),
       further: toFurtherDto(further),
     };

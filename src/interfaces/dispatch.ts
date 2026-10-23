@@ -15,6 +15,28 @@ export interface DispatchTargetDTO {
   retryPolicy: { maxAttempts?: number; backoffMs?: number } | null;
 }
 
+/** Settings → dispatch channel toggles (clinic admin). */
+export interface DispatchChannelSettingsDTO {
+  id: string;
+  type: string;
+  name: string;
+  endpoint: string | null;
+  enabled: boolean;
+}
+
+export interface DispatchExecutorChannelsDTO {
+  id: string;
+  code: string;
+  name: string;
+  kind: string;
+  channels: DispatchChannelSettingsDTO[];
+}
+
+export interface DispatchTargetsSettingsDTO {
+  canManage: boolean;
+  executors: DispatchExecutorChannelsDTO[];
+}
+
 /** Everything a downstream adapter is allowed to see about a request. */
 export interface DispatchableServiceRequest {
   request: ServiceRequestDTO;

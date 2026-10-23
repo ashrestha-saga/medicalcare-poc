@@ -11,6 +11,7 @@ import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { LanguagePanel } from "./LanguagePanel";
 import { ThemeAppearancePanel } from "./ThemeAppearancePanel";
 import { SmtpSettingsPanel } from "./SmtpSettingsPanel";
+import { DispatchChannelsPanel } from "./DispatchChannelsPanel";
 
 export function SettingsScreen() {
   const t = useTranslations("settings");
@@ -50,6 +51,7 @@ export function SettingsScreen() {
               </section>
             )}
             <SmtpSettingsPanel />
+            <DispatchChannelsPanel />
 
             <section className="p-settings__panel">
               <p className="p-sec-title">{t("oxidTitle")}</p>

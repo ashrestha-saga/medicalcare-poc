@@ -1,6 +1,7 @@
 import type { ManagementContractDTO, ManagementOverviewDTO, TenantContext } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { prisma } from "@/lib/prisma";
+import { isLiveContract } from "@/services/access/partnerAccessService";
 
 function parseScope(raw: string): string[] {
   try {
@@ -10,12 +11,6 @@ function parseScope(raw: string): string[] {
   } catch {
     return [];
   }
-}
-
-function isActiveContract(validFrom: Date, validTo: Date | null, now: Date): boolean {
-  if (validFrom.getTime() > now.getTime()) return false;
-  if (validTo != null && validTo.getTime() < now.getTime()) return false;
-  return true;
 }
 
 export const managementService = {
@@ -46,7 +41,7 @@ export const managementService = {
     });
 
     const active: ManagementContractDTO[] = contracts
-      .filter((c) => isActiveContract(c.validFrom, c.validTo, now))
+      .filter((c) => isLiveContract(c, now))
       .map((c) => ({
         id: c.id,
         organisationId: c.organisationId,

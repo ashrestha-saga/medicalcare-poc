@@ -57,6 +57,8 @@ afterAll(async () => {
     });
     await prisma.userInvitation.deleteMany({ where: { tenantId } });
     await prisma.auditEvent.deleteMany({ where: { tenantId } });
+    await prisma.dispatchTarget.deleteMany({ where: { tenantId } });
+    await prisma.executorOrg.deleteMany({ where: { tenantId } });
     await prisma.serviceContract.deleteMany({ where: { tenantId } });
     await prisma.site.deleteMany({ where: { tenantId } });
     await prisma.tenant.delete({ where: { id: tenantId } }).catch(() => undefined);
@@ -126,6 +128,16 @@ describe("clinicOnboardService", () => {
     });
     expect(audit?.actorKind).toBe("partner");
     expect(audit?.organisationId).toBe(MSR_ID);
+
+    const executors = await prisma.executorOrg.findMany({
+      where: { tenantId: tenant!.id },
+      orderBy: { code: "asc" },
+    });
+    expect(executors.map((e) => e.code).sort()).toEqual(["O-INT", "O-MSR"]);
+    const msr = executors.find((e) => e.code === "O-MSR");
+    expect(msr?.organisationId).toBe(MSR_ID);
+    expect(msr?.active).toBe(true);
+    expect(executors.find((e) => e.code === "O-INT")?.kind).toBe("internal");
   });
 
   it("refuses a partner who is not an organisation admin", async () => {

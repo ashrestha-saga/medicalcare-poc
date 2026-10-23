@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
 import { isLiveContract } from "@/services/access/partnerAccessService";
 import { requirePartnerPermission } from "@/lib/auth/tenantContext";
+import { ensureExecutorForContract } from "@/services/contracts/executorSyncService";
 import { parseAppointmentInput } from "@/lib/format";
 import { addMonthsUtc } from "@/lib/maintenance/schedule";
 import { computeDutyDueAt } from "@/services/registration/dueDate";
@@ -1073,7 +1074,7 @@ export const dispositionService = {
         });
       }
 
-      const mine = await prisma.executorOrg.findFirst({
+      let mine = await prisma.executorOrg.findFirst({
         where: {
           tenantId: row.tenantId,
           organisationId: ctx.organisationId,
@@ -1082,10 +1083,12 @@ export const dispositionService = {
         orderBy: { sortOrder: "asc" },
       });
       if (!mine) {
-        throw unprocessable(
-          "No executor organisation linked to your partner for this institution.",
-          { field: "executorOrgId" },
-        );
+        // Live manage-contract but missing allocate row — provision on the fly.
+        mine = await ensureExecutorForContract(prisma, {
+          tenantId: row.tenantId,
+          organisationId: ctx.organisationId,
+          active: true,
+        });
       }
       return mine.id;
     });

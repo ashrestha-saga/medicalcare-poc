@@ -48,6 +48,7 @@ export type DeviceActionInput = {
   hasKonstanzDuties: boolean;
   /** Gebrauchsanweisung label (§ 4), when evidence exists. */
   ifuLabel: string | null;
+  ifuOpenUrl?: string | null;
   /** Derived Sperrlage */
   lage: SperrLageCode;
   quelle: SperrQuelle;
@@ -225,7 +226,7 @@ export function resolveFurtherActions(
   out.push({
     ctx: "ifu",
     titleKey: "actions.ifu",
-    textKey: input.ifuLabel ? "actions.ifuHint" : "actions.ifuMissing",
+    textKey: input.ifuLabel || input.ifuOpenUrl ? "actions.ifuHint" : "actions.ifuMissing",
     ref: input.ifuLabel ?? undefined,
   });
   return out;

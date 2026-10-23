@@ -324,6 +324,10 @@ export function ScanApp() {
   const openInventoryIfu = async (deviceId: string) => {
     try {
       const res = await api<{ card: ScanDeviceCardDTO }>(`/api/scan/devices/${deviceId}`);
+      if (res.card.ifuOpenUrl) {
+        window.open(res.card.ifuOpenUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
       const ref = res.card.ifuLabel;
       if (ref) toast.info(tDevice("ifuOpen", { ref }));
       else toast.info(tDevice("ifuMissingToast"));

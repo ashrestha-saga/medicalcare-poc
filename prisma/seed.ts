@@ -9,6 +9,7 @@ import { hashPassword } from "../src/lib/password";
 import { seedRoleGrantsIfEmpty } from "../src/services/roles/roleGrantsService";
 import { backfillDutyAndEvidenceAttribution } from "../src/services/attribution/runBackfillAttribution";
 import { backfillAllContractScopeGrants } from "../src/services/contracts/contractScopeService";
+import { backfillExecutorsFromContracts } from "../src/services/contracts/executorSyncService";
 import { backfillDutyProjections } from "../src/services/duties/dutyProjection";
 import { dutyService } from "../src/services/registration/dutyService";
 import { seedGoldenCatalog } from "./seeds/goldenCatalog";
@@ -505,6 +506,7 @@ export async function seed(prisma: PrismaClient) {
   const dutiesBackfilled = await dutyService.backfillDueDates(prisma);
   const attributionBackfilled = await backfillDutyAndEvidenceAttribution(prisma);
   const contractScopeBackfilled = await backfillAllContractScopeGrants(prisma);
+  const executorsBackfilled = await backfillExecutorsFromContracts(prisma);
   const dutyProjectionsBackfilled = await backfillDutyProjections(prisma);
 
   return {
@@ -524,6 +526,7 @@ export async function seed(prisma: PrismaClient) {
     dutiesBackfilled,
     attributionBackfilled,
     contractScopeBackfilled,
+    executorsBackfilled,
     dutyProjectionsBackfilled,
   };
 }

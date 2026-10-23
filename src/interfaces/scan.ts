@@ -73,8 +73,10 @@ export interface ScanDeviceCardDTO {
   openDailyChecks: boolean;
   openKonstanzChecks: boolean;
   openRequestRef: string | null;
-  /** Gebrauchsanweisung label when § 4 evidence exists. */
+  /** Gebrauchsanweisung label when § 4 evidence / model IFU exists. */
   ifuLabel: string | null;
+  /** Open / download URL for the linked model (or instance) IFU. */
+  ifuOpenUrl: string | null;
   primary: ScanPrimaryActionDTO;
   further: ScanFurtherActionDTO[];
 }

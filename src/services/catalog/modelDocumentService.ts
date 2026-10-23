@@ -1,6 +1,6 @@
 import type { ModelDocumentDTO, TenantContext, TenantWorkContext } from "@/interfaces";
 import { actorAttribution } from "@/lib/auth/attribution";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext, actorFromTenant } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -175,5 +175,69 @@ export const modelDocumentService = {
       orderBy: { validFrom: "desc" },
     });
     return row ? mapDoc(row) : null;
+  },
+
+  /**
+   * During registration / release: publish IFU from instance evidence (shared blob or URL).
+   * Uses inventory:update so Erstanlage can write the Bauart document without catalog:update.
+   */
+  async publishFromEvidence(
+    ctx: TenantWorkContext,
+    input: {
+      deviceModelId: string;
+      attachmentBlobId?: string | null;
+      externalUrl?: string | null;
+      revisionLabel?: string;
+      language?: string;
+    },
+  ): Promise<ModelDocumentDTO | null> {
+    requirePermission(ctx, "inventory:update");
+    if (!input.attachmentBlobId?.trim() && !input.externalUrl?.trim()) return null;
+
+    const model = await prisma.deviceModel.findFirst({ where: { id: input.deviceModelId } });
+    if (!model) throw notFound("Model not found");
+
+    const kind: DocumentKind = "ifu";
+    const language = (input.language ?? "de").trim() || "de";
+    const revisionLabel =
+      input.revisionLabel?.trim() || `reg-${new Date().toISOString().slice(0, 10)}`;
+    const actor = actorAttribution(ctx);
+    const validFrom = new Date();
+
+    const row = await prisma.$transaction(async (tx) => {
+      const previous = await tx.modelDocument.findMany({
+        where: { deviceModelId: input.deviceModelId, kind, language, supersededAt: null },
+      });
+      const created = await tx.modelDocument.create({
+        data: {
+          tenantId: ctx.tenantId,
+          deviceModelId: input.deviceModelId,
+          kind,
+          revisionLabel,
+          language,
+          validFrom,
+          blobId: input.attachmentBlobId?.trim() || null,
+          externalUrl: input.externalUrl?.trim() || null,
+          recordedByName: actor.name,
+          recordedByUserId: actor.userId,
+        },
+      });
+      for (const prev of previous) {
+        await tx.modelDocument.update({
+          where: { id: prev.id },
+          data: { supersededAt: validFrom, supersededById: created.id },
+        });
+      }
+      return created;
+    });
+
+    await recordAudit({
+      actor: actorFromContext(ctx),
+      resource: "ModelDocument",
+      resourceId: row.id,
+      action: "publish",
+      summary: `Model ifu from registration ${revisionLabel}`,
+    });
+    return mapDoc(row);
   },
 };

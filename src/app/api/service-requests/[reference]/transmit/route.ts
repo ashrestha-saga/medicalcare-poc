@@ -12,9 +12,9 @@ export async function POST(req: Request, ctx: RouteContext) {
     return await withTenantStore(auth, async () => {
       correlationId = auth.correlationId;
       const { reference } = await ctx.params;
-      const request = await serviceRequestService.transmit(reference, auth);
+      const { request, warning } = await serviceRequestService.transmit(reference, auth);
       return Response.json(
-        { request },
+        { request, warning },
         { headers: { "x-correlation-id": auth.correlationId } },
       );
     });

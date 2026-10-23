@@ -188,9 +188,9 @@ describe("service requests — Phase 5 (AC #4, #7, #8, #11, #12)", () => {
     expect(allocated.allocationLocked).toBe(false);
 
     const transmitted = await serviceRequestService.transmit(request.reference, ctx);
-    expect(transmitted.state).toBe("transmitted");
-    expect(transmitted.allocationLocked).toBe(true);
-    expect(transmitted.transmittedAt).toBeTruthy();
+    expect(transmitted.request.state).toBe("transmitted");
+    expect(transmitted.request.allocationLocked).toBe(true);
+    expect(transmitted.request.transmittedAt).toBeTruthy();
 
     await expect(
       serviceRequestService.allocate(request.reference, { executorOrgId: internal!.id }, ctx),
@@ -205,7 +205,7 @@ describe("service requests — Phase 5 (AC #4, #7, #8, #11, #12)", () => {
     );
     await serviceRequestService.allocate(request.reference, { executorOrgId: msr.id }, ctx);
     const transmitted = await serviceRequestService.transmit(request.reference, ctx);
-    expect(transmitted.allocationLocked).toBe(true);
+    expect(transmitted.request.allocationLocked).toBe(true);
     const records = await prisma.dispatchRecord.findMany({ where: { serviceRequestId: request.id } });
     expect(records.length).toBeGreaterThanOrEqual(1);
     expect(records.every((r) => r.target.startsWith("mail:MSR") || r.target.startsWith("webhook:MSR"))).toBe(

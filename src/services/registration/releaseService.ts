@@ -28,6 +28,9 @@ import {
 import { toProductKindDTO } from "./productKinds";
 import { extractModelCharacteristics } from "./modelCharacteristics";
 import type { RegistrationCharacteristics } from "./types";
+import { modelDocumentService } from "@/services/catalog/modelDocumentService";
+
+const IFU_PREREQUISITE_CODES = new Set(["ga", "ifu", "gebrauchsanweisung"]);
 
 const APP_VERSION = "erstanlage-1.0";
 
@@ -601,6 +604,24 @@ export const releaseService = {
       before: { state: row.state },
       after: { state: "released", snapshotId: result.snapshotId, releaseLevel: result.releaseLevel },
     });
+
+    // Optional IFU file/URL from prerequisites → shared ModelDocument for this Bauart.
+    if (row.modelId) {
+      const ifuEv = evidenceRows.find((e) => IFU_PREREQUISITE_CODES.has(e.prerequisiteCode));
+      if (ifuEv && (ifuEv.attachmentBlobId || ifuEv.externalRecordRef?.trim())) {
+        try {
+          await modelDocumentService.publishFromEvidence(ctx, {
+            deviceModelId: row.modelId,
+            attachmentBlobId: ifuEv.attachmentBlobId,
+            externalUrl: ifuEv.externalRecordRef,
+            revisionLabel: `release-${row.inventoryNumber}`,
+          });
+        } catch {
+          // Release already succeeded; catalog IFU is best-effort.
+        }
+      }
+    }
+
     return {
       id: row.id,
       inventoryNumber: row.inventoryNumber,

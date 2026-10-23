@@ -260,7 +260,7 @@ export function ChargeFreigabeForm({
           <span>{uploading ? t("uploading") : t("belegPick")}</span>
           <input
             type="file"
-            accept="image/*,application/pdf"
+            accept=".pdf,.md,.txt,.doc,.docx,application/pdf,text/*,image/*"
             disabled={uploading}
             onChange={(e) => void onBeleg(e.target.files?.[0] ?? null)}
             data-testid="charge-beleg-input"

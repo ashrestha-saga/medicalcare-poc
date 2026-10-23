@@ -22,6 +22,7 @@ import {
 } from "@/components/hooks/catalog/catalogDisplay";
 import { catalogStateBadge } from "@/components/hooks/catalog/useCatalogColumns";
 import { intlLocale, type AppLocale } from "@/lib/locale";
+import { CatalogDocumentsPanel } from "./CatalogDocumentsPanel";
 
 function isDetail(model: CatalogModelDetailDTO | CatalogModelListItemDTO): model is CatalogModelDetailDTO {
   return "spread" in model && "createdAt" in model;
@@ -214,7 +215,7 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
               <CardDescription>{t("zeroCentral")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">{t("documentsEmpty")}</p>
+              <CatalogDocumentsPanel modelId={model.id} canEdit={canEdit} />
             </CardContent>
           </Card>
 

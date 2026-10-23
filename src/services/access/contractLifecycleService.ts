@@ -10,6 +10,7 @@ import {
   assertPartnerManagesTenant,
 } from "@/services/access/partnerAccessService";
 import { requirePartnerPermission } from "@/lib/auth/tenantContext";
+import { setContractExecutorActive } from "@/services/contracts/executorSyncService";
 
 type ContractAction = "suspend" | "resume" | "terminate";
 
@@ -167,6 +168,13 @@ async function mutate(
     const updated = await prisma.serviceContract.update({
       where: { id: row.id },
       data,
+    });
+
+    // Keep clinic allocate catalog in sync with commercial lifecycle.
+    await setContractExecutorActive(prisma, {
+      tenantId: row.tenantId,
+      organisationId: row.organisationId,
+      active: action === "resume",
     });
 
     await recordAudit({

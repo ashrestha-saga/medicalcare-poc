@@ -112,7 +112,7 @@ See also the simplified ERD in [SCHEMA_AND_ARCHITECTURE.md](./SCHEMA_AND_ARCHITE
 | `DeviceReprocessingProfile` / `ReprocessingOnDevice` / `ReprocessingBatch*` | Instance | AEMP / scan release demos weak (Sachkunde users exist) |
 | `ConstancyCadence` | Duties / constancy objects | Constancy cadence screen empty |
 | `CapturedArticle` | Resolve stage 4 | No pre-seeded unknown devices |
-| `ExecutorOrg` / `DispatchTarget` / `DispatchOutbox` | SR dispatch | Mail/OXID/webhook demos need config + rows |
+| `ExecutorOrg` / `DispatchTarget` / `DispatchOutbox` | SR dispatch | **ExecutorOrg** now upserted with each contract (import + onboard + lifecycle). DispatchTarget channels still seed/demo-tenant only |
 | `OrderRequest` / `OrderItem` | Parts path | Spare-parts queue empty |
 | `AuthorityInspection` / findings | Compliance | Authority screens empty |
 | `DutyOverlapDecision` / overlap refs | Duties | Overlap UI empty |

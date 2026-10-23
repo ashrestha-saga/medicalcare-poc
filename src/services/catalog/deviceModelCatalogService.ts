@@ -183,7 +183,6 @@ export const deviceModelCatalogService = {
       where,
       include: listIncludeForTenant(ctx.tenantId),
       orderBy: [{ tradeName: "asc" }, { modelName: "asc" }],
-      take: 500,
     });
     return rows.map((r) => toListItem(r as ModelWithAggregates));
   },

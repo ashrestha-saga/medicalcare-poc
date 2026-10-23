@@ -11,6 +11,10 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../../src/lib/password";
+import {
+  ensureExecutorForContract,
+  ensureInternalExecutor,
+} from "../../src/services/contracts/executorSyncService";
 
 const ORGANISATIONS = [
   {
@@ -262,17 +266,24 @@ export async function seedPartnerOrgs(
     }
   }
 
-  // Link clinic executor rows to partner organisations by code (O-MSR → MSR).
-  const orgsByCode = await prisma.organisation.findMany({
-    where: { code: { in: ["MSR", "RTS"] } },
-    select: { id: true, code: true },
+  // Wire allocate catalog: O-INT + contracting MSR (and keep seeded O-RTS linked).
+  await ensureInternalExecutor(prisma, tenantId);
+  await ensureExecutorForContract(prisma, {
+    tenantId,
+    organisationId: MSR_ID,
+    orgCode: "MSR",
+    orgName: "Medtech Service Rhein GmbH",
+    active: true,
+    sortOrder: 1,
   });
-  for (const org of orgsByCode) {
-    await prisma.executorOrg.updateMany({
-      where: { tenantId, code: `O-${org.code}` },
-      data: { organisationId: org.id },
-    });
-  }
+  await ensureExecutorForContract(prisma, {
+    tenantId,
+    organisationId: RTS_ID,
+    orgCode: "RTS",
+    orgName: "Radiotec Service GmbH",
+    active: true,
+    sortOrder: 2,
+  });
 
   return {
     organisations: ORGANISATIONS.length,

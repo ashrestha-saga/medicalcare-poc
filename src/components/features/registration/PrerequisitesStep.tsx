@@ -88,37 +88,47 @@ export function PrerequisitesStep({
           }
 
           if (kind === "document") {
+            const isIfu = p.k === "ga" || p.k === "ifu" || p.k === "gebrauchsanweisung";
             return (
               <div key={p.k} className={`space-y-1 ${satisfied ? "opacity-70" : ""}`}>
                 <span className="font-medium">
                   {p.t}
-                  {p.pflicht ? <span className="text-[var(--red)]"> *</span> : null}
+                  {p.pflicht && !isIfu ? <span className="text-[var(--red)]"> *</span> : null}
+                  {isIfu ? (
+                    <span className="ml-1 text-xs font-normal text-[var(--on-dark-soft)]">
+                      ({t("ifuUploadOptional")})
+                    </span>
+                  ) : null}
                 </span>
                 <span className="block text-xs text-[var(--on-dark-soft)]">
                   {p.g} — {p.n}
                 </span>
                 {p.evidenceId ? (
-                  <span className="block text-xs text-green-700">Document uploaded</span>
-                ) : onUploadEvidence ? (
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    className="mt-1 block text-sm"
-                    disabled={busy}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void onUploadEvidence(p.k, file);
-                    }}
-                  />
+                  <span className="block text-xs text-green-700">{t("ifuUploaded")}</span>
                 ) : (
-                  <label className="mt-1 flex items-start gap-2">
-                    <Checkbox
-                      checked={Boolean(checks[p.k])}
-                      disabled={busy}
-                      onCheckedChange={(v) => setChecks((c) => ({ ...c, [p.k]: Boolean(v) }))}
-                    />
-                    <span className="text-xs">Confirm without upload (level 1 only)</span>
-                  </label>
+                  <div className="mt-1 space-y-2">
+                    {onUploadEvidence ? (
+                      <input
+                        type="file"
+                        accept=".pdf,.md,.txt,.doc,.docx,application/pdf,text/*,image/*"
+                        className="block text-sm"
+                        disabled={busy}
+                        data-testid={isIfu ? "registration-ifu-upload" : undefined}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void onUploadEvidence(p.k, file);
+                        }}
+                      />
+                    ) : null}
+                    <label className="flex items-start gap-2">
+                      <Checkbox
+                        checked={Boolean(checks[p.k])}
+                        disabled={busy}
+                        onCheckedChange={(v) => setChecks((c) => ({ ...c, [p.k]: Boolean(v) }))}
+                      />
+                      <span className="text-xs">{t("confirmWithoutUpload")}</span>
+                    </label>
+                  </div>
                 )}
               </div>
             );

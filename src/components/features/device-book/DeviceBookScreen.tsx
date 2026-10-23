@@ -369,7 +369,7 @@ export function DeviceBookScreen() {
                           <input
                             ref={fileRef}
                             type="file"
-                            accept=".pdf,application/pdf,image/*"
+                            accept=".pdf,.md,.txt,.doc,.docx,application/pdf,text/*,image/*"
                             className="hidden"
                             data-testid="device-book-ifu-file"
                             onChange={(e) => void onPickFile(e.target.files?.[0] ?? null)}

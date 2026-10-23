@@ -22,6 +22,10 @@ import type {
   TransitionServiceRequestInput,
 } from "@/schemas/serviceRequest";
 import { dispatchService } from "@/services/dispatch/dispatchService";
+import {
+  isExecutorAllocatable,
+  loadTenantContractOrgSets,
+} from "@/services/contracts/executorSyncService";
 import { computeDutyDueAt } from "@/services/registration/dueDate";
 import { assertDeviceInWorkAreas } from "@/services/users/userAreaScope";
 import { recordDutyCompletion } from "@/services/registration/recordDutyCompletion";
@@ -432,17 +436,24 @@ export const serviceRequestService = {
 
   async listExecutors(ctx: TenantWorkContext): Promise<ExecutorOrgDTO[]> {
     requirePermission(ctx, "requests:view-mine");
-    const rows = await prisma.executorOrg.findMany({
-      where: { tenantId: ctx.tenantId, active: true },
-      orderBy: { sortOrder: "asc" },
-    });
-    return rows.map((r) => ({
-      id: r.id,
-      code: r.code,
-      name: r.name,
-      kind: r.kind,
-      active: r.active,
-    }));
+    const [rows, orgSets] = await Promise.all([
+      prisma.executorOrg.findMany({
+        where: { tenantId: ctx.tenantId, active: true },
+        orderBy: { sortOrder: "asc" },
+      }),
+      loadTenantContractOrgSets(prisma, ctx.tenantId),
+    ]);
+    return rows
+      .filter((r) =>
+        isExecutorAllocatable(r, orgSets.contractedOrgIds, orgSets.liveOrgIds),
+      )
+      .map((r) => ({
+        id: r.id,
+        code: r.code,
+        name: r.name,
+        kind: r.kind,
+        active: r.active,
+      }));
   },
 
   /** FA-713 — allocate executor; locked after transmit. */
@@ -465,6 +476,12 @@ export const serviceRequestService = {
       where: { id: input.executorOrgId, tenantId: ctx.tenantId, active: true },
     });
     if (!org) throw unprocessable("Unknown executor.", { field: "executorOrgId" });
+    const orgSets = await loadTenantContractOrgSets(prisma, ctx.tenantId);
+    if (!isExecutorAllocatable(org, orgSets.contractedOrgIds, orgSets.liveOrgIds)) {
+      throw unprocessable("Executor is not available under a live service contract.", {
+        field: "executorOrgId",
+      });
+    }
 
     const row = await prisma.$transaction(async (tx) => {
       await tx.statusEvent.create({
@@ -499,8 +516,15 @@ export const serviceRequestService = {
     return toDto(row);
   },
 
-  /** FA-714 — transmit to the allocated org's enabled channels and lock allocation. */
-  async transmit(reference: string, ctx: TenantWorkContext): Promise<ServiceRequestDTO> {
+  /**
+   * FA-714 — lock allocation and hand off to the executor.
+   * Dispatch channels are optional: when none are enabled, transmit still succeeds
+   * (in-app handover); callers may surface `warning` for the clinic UI.
+   */
+  async transmit(
+    reference: string,
+    ctx: TenantWorkContext,
+  ): Promise<{ request: ServiceRequestDTO; warning: string | null }> {
     requirePermission(ctx, "requests:transition");
     const existing = await prisma.serviceRequest.findFirst({
       where: { reference, tenantId: ctx.tenantId },
@@ -511,7 +535,7 @@ export const serviceRequestService = {
       throw unprocessable("Allocate an executor before transmitting.", { field: "executorOrgId" });
     }
     if (existing.transmittedAt) {
-      return toDto(existing);
+      return { request: await toDto(existing), warning: null };
     }
 
     const org = existing.executorOrg;
@@ -519,12 +543,16 @@ export const serviceRequestService = {
       where: { tenantId: ctx.tenantId, executorOrgId: org.id, enabled: true },
     });
 
-    // External partners must have at least one active channel; internal may hand off locally.
-    if (enabledCount === 0 && org.kind !== "internal") {
-      throw unprocessable(
-        `${org.name} has no enabled dispatch channels (mail/API). Configure DispatchTarget first.`,
-        { field: "transmit" },
-      );
+    let warning: string | null = null;
+    if (enabledCount === 0) {
+      warning = `No outbound channels enabled for ${org.name} — handed off in-app only.`;
+      logger.warn("service_request.transmit_no_channels", {
+        correlationId: ctx.correlationId,
+        reference,
+        executorOrgId: org.id,
+        executorName: org.name,
+        kind: org.kind,
+      });
     }
 
     let dto = await toDto(existing);
@@ -584,7 +612,7 @@ export const serviceRequestService = {
       before: { state: existing.state },
       after: { state: "transmitted" },
     });
-    return toDto(row);
+    return { request: await toDto(row), warning };
   },
 
   /**

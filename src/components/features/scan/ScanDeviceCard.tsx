@@ -122,6 +122,10 @@ export function ScanDeviceCard({
         onKonstanz(card);
         return;
       case "ifu":
+        if (card.ifuOpenUrl) {
+          window.open(card.ifuOpenUrl, "_blank", "noopener,noreferrer");
+          return;
+        }
         toast.info(ref ? t("ifuOpen", { ref }) : t("ifuMissingToast"));
         return;
       default:

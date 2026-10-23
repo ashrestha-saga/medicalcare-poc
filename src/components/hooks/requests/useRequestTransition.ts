@@ -62,12 +62,16 @@ export function useRequestTransition(
   const transmit = useCallback(async () => {
     setBusy(true);
     try {
-      const res = await api<{ request: ServiceRequestDTO }>(
+      const res = await api<{ request: ServiceRequestDTO; warning?: string | null }>(
         `/api/service-requests/${encodeURIComponent(request.reference)}/transmit`,
         { method: "POST", body: JSON.stringify({}) },
       );
       onUpdated(res.request);
-      toast.success(t("toastTransmitted"));
+      if (res.warning) {
+        toast.warning(t("toastTransmittedNoChannels"));
+      } else {
+        toast.success(t("toastTransmitted"));
+      }
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : t("toastTransmitFailed"));
     } finally {

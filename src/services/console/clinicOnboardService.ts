@@ -26,6 +26,10 @@ import {
   nextDispositionDisplayState,
 } from "@/services/console/dispositionService";
 import { syncContractScopeGrantsFromTokens } from "@/services/contracts/contractScopeService";
+import {
+  ensureExecutorForContract,
+  ensureInternalExecutor,
+} from "@/services/contracts/executorSyncService";
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -601,6 +605,12 @@ export const clinicOnboardService = {
           },
         });
         await syncContractScopeGrantsFromTokens(tx, contract.id, input.scope);
+        await ensureInternalExecutor(tx, tenant.id);
+        await ensureExecutorForContract(tx, {
+          tenantId: tenant.id,
+          organisationId: ctx.organisationId,
+          active: true,
+        });
         return { tenant, contract, institution };
       }),
     );
