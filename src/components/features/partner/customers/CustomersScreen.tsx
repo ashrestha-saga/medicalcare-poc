@@ -5,6 +5,10 @@ import { useTranslations } from "next-intl";
 import { useCustomerList } from "@/components/hooks/partner/customers/useCustomerList";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { OpenButton } from "@/components/features/shared/OpenButton";
+import {
+  AdminListCard,
+  ResponsiveTableSwitch,
+} from "@/components/features/shared/ResponsiveTableSwitch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/Loading";
@@ -85,61 +89,104 @@ export function CustomersScreen() {
             </p>
           ) : null}
           {!loading && data && data.clinics.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm" data-testid="console-customers-table">
-                <thead>
-                  <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="py-2 pr-3 font-medium">{t("colInstitution")}</th>
-                    <th className="py-2 pr-3 font-medium">{t("colSites")}</th>
-                    <th className="py-2 pr-3 font-medium">{t("colDevices")}</th>
-                    <th className="py-2 pr-3 font-medium">{t("colContract")}</th>
-                    <th className="py-2 pr-3 font-medium">{t("colScope")}</th>
-                    <th className="py-2 pr-3 font-medium">{t("colStatus")}</th>
-                    <th className="py-2 font-medium text-right">
-                      <span className="sr-only">{t("colOpen")}</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.clinics.map((clinic) => (
-                    <tr key={clinic.contractId} className="border-b border-border/70">
-                      <td className="py-2.5 pr-3">
-                        <div className="font-medium" data-testid={`clinic-name-${clinic.contractId}`}>
-                          {clinic.tenantName}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {[clinic.city, clinic.tenantCode].filter(Boolean).join(" · ")}
-                        </div>
-                      </td>
-                      <td className="py-2.5 pr-3">{clinic.siteCount}</td>
-                      <td className="py-2.5 pr-3">{clinic.deviceCount}</td>
-                      <td className="py-2.5 pr-3 text-xs">
-                        {clinic.validFrom}
-                        {clinic.validTo ? ` — ${clinic.validTo}` : ` — ${t("openEnded")}`}
-                      </td>
-                      <td className="py-2.5 pr-3">
-                        <div className="flex flex-wrap gap-1">
-                          {clinic.scope.map((s) => (
-                            <span key={s} className="rounded-md bg-muted px-2 py-0.5 text-xs">
-                              {t(SCOPE_KEYS[s] ?? "scopeInventory")}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="py-2.5 pr-3">
-                        <StatusChip live={clinic.live} suspended={Boolean(clinic.suspendedAt)} terminated={Boolean(clinic.terminatedAt)} />
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <OpenButton
-                          href={`/partner/customers/${clinic.contractId}`}
-                          data-testid={`clinic-link-${clinic.contractId}`}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ResponsiveTableSwitch
+              table={
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] text-left text-sm" data-testid="console-customers-table">
+                    <thead>
+                      <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                        <th className="py-2 pr-3 font-medium">{t("colInstitution")}</th>
+                        <th className="py-2 pr-3 font-medium">{t("colSites")}</th>
+                        <th className="py-2 pr-3 font-medium">{t("colDevices")}</th>
+                        <th className="py-2 pr-3 font-medium">{t("colContract")}</th>
+                        <th className="py-2 pr-3 font-medium">{t("colScope")}</th>
+                        <th className="py-2 pr-3 font-medium">{t("colStatus")}</th>
+                        <th className="py-2 font-medium text-right">
+                          <span className="sr-only">{t("colOpen")}</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.clinics.map((clinic) => (
+                        <tr key={clinic.contractId} className="border-b border-border/70">
+                          <td className="py-2.5 pr-3">
+                            <div className="font-medium" data-testid={`clinic-name-${clinic.contractId}`}>
+                              {clinic.tenantName}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {[clinic.city, clinic.tenantCode].filter(Boolean).join(" · ")}
+                            </div>
+                          </td>
+                          <td className="py-2.5 pr-3">{clinic.siteCount}</td>
+                          <td className="py-2.5 pr-3">{clinic.deviceCount}</td>
+                          <td className="py-2.5 pr-3 text-xs">
+                            {clinic.validFrom}
+                            {clinic.validTo ? ` — ${clinic.validTo}` : ` — ${t("openEnded")}`}
+                          </td>
+                          <td className="py-2.5 pr-3">
+                            <div className="flex flex-wrap gap-1">
+                              {clinic.scope.map((s) => (
+                                <span key={s} className="rounded-md bg-muted px-2 py-0.5 text-xs">
+                                  {t(SCOPE_KEYS[s] ?? "scopeInventory")}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-2.5 pr-3">
+                            <StatusChip
+                              live={clinic.live}
+                              suspended={Boolean(clinic.suspendedAt)}
+                              terminated={Boolean(clinic.terminatedAt)}
+                            />
+                          </td>
+                          <td className="py-2.5 text-right">
+                            <OpenButton
+                              href={`/partner/customers/${clinic.contractId}`}
+                              data-testid={`clinic-link-${clinic.contractId}`}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              }
+              cards={data.clinics.map((clinic) => (
+                <AdminListCard
+                  key={clinic.contractId}
+                  title={
+                    <span data-testid={`clinic-name-${clinic.contractId}`}>{clinic.tenantName}</span>
+                  }
+                  subtitle={[clinic.city, clinic.tenantCode].filter(Boolean).join(" · ")}
+                  actions={
+                    <OpenButton
+                      href={`/partner/customers/${clinic.contractId}`}
+                      data-testid={`clinic-link-${clinic.contractId}`}
+                    />
+                  }
+                >
+                  <p>
+                    {t("colSites")}: {clinic.siteCount} · {t("colDevices")}: {clinic.deviceCount}
+                  </p>
+                  <p className="text-xs">
+                    {clinic.validFrom}
+                    {clinic.validTo ? ` — ${clinic.validTo}` : ` — ${t("openEnded")}`}
+                  </p>
+                  <div className="flex flex-wrap gap-1">
+                    {clinic.scope.map((s) => (
+                      <span key={s} className="rounded-md bg-muted px-2 py-0.5 text-xs">
+                        {t(SCOPE_KEYS[s] ?? "scopeInventory")}
+                      </span>
+                    ))}
+                  </div>
+                  <StatusChip
+                    live={clinic.live}
+                    suspended={Boolean(clinic.suspendedAt)}
+                    terminated={Boolean(clinic.terminatedAt)}
+                  />
+                </AdminListCard>
+              ))}
+            />
           ) : null}
           <p className="mt-4 text-xs text-muted-foreground">{t("customersNote")}</p>
           {data && !canCreate ? (

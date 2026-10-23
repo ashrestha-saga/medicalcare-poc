@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { useSessionStore } from "@/store/sessionStore";
 import { Spinner } from "@/components/ui/Loading";
 import { oxidStatusLabel, useOxidSettings } from "@/components/hooks/settings/useOxidSettings";
 import { formatDateTime } from "@/lib/format";
 import type { AppLocale } from "@/lib/locale";
+import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { LanguagePanel } from "./LanguagePanel";
 import { ThemeAppearancePanel } from "./ThemeAppearancePanel";
 import { SmtpSettingsPanel } from "./SmtpSettingsPanel";
@@ -15,6 +17,8 @@ export function SettingsScreen() {
   const tRoles = useTranslations("roles");
   const locale = useLocale() as AppLocale;
   const user = useSessionStore((s) => s.user);
+  const { checkPermission } = usePermissions();
+  const canSecurity = checkPermission("account:security");
   const { status, busy, connect, disconnect } = useOxidSettings();
   const roleKey = user?.role;
   const roleText = roleKey ? tRoles(roleKey) : "—";
@@ -34,6 +38,17 @@ export function SettingsScreen() {
           <div className="p-settings__body">
             <LanguagePanel />
             <ThemeAppearancePanel />
+            {canSecurity && (
+              <section className="p-settings__panel" data-testid="settings-security-panel">
+                <p className="p-sec-title">{t("securityTitle")}</p>
+                <p className="p-settings__intro">{t("securityIntro")}</p>
+                <div className="p-settings__actions">
+                  <Link href="/security" className="p-cta" data-testid="settings-security-link">
+                    {t("securityOpen")}
+                  </Link>
+                </div>
+              </section>
+            )}
             <SmtpSettingsPanel />
 
             <section className="p-settings__panel">

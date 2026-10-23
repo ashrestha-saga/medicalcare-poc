@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, TriangleAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { useCatalogModels } from "@/components/hooks/catalog/useCatalogModels";
 import { useCatalogModelEditor } from "@/components/hooks/catalog/useCatalogModelEditor";
@@ -56,13 +57,12 @@ export function CatalogScreen({ modelId }: CatalogScreenProps) {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="catalog-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={tCommon("denied")}>
-            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={tCommon("denied")}
+        hint={tCommon("contactAdmin")}
+        testId="catalog-denied"
+      />
     );
   }
 

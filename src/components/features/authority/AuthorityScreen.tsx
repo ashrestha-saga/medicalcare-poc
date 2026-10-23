@@ -7,6 +7,7 @@ import {
   RecordNotificationModal,
   type NotificationSubject,
 } from "@/components/features/authority/RecordNotificationModal";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import {
   useAuthorityList,
@@ -67,16 +68,12 @@ export function AuthorityScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="authority-denied">
-        <main className="p-main">
-          <ListPageShell
-            title="Authority"
-            description="You do not have permission to view authority inspections."
-          >
-            <p className="text-sm text-muted-foreground">Access denied.</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title="Authority"
+        description="You do not have permission to view authority inspections."
+        hint="Access denied."
+        testId="authority-denied"
+      />
     );
   }
 

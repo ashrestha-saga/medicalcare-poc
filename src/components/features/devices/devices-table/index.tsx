@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { RowSelectionState } from "@tanstack/react-table";
-import { Printer, Plus, ScanLine, Search } from "lucide-react";
+import { Download, Printer, Plus, ScanLine, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { DeviceInstanceDTO } from "@/interfaces";
 import { CameraScanner } from "@/components/features/scan/CameraScanner";
@@ -22,10 +22,13 @@ import { toInventoryLabels } from "@/lib/inventory/label";
 import { identifierLookupText, matchesDevice } from "@/lib/barcode/matchDevice";
 import type { BarcodeCaptureResult } from "@/lib/barcode/types";
 import { parseIdentifier } from "@/lib/gs1";
-import { api, ApiError } from "@/lib/http/apiClient";
+import { api, ApiError, newClientId } from "@/lib/http/apiClient";
+import { ACTING_TENANT_HEADER, CORRELATION_HEADER } from "@/constants/session";
+import { useActingTenantStore } from "@/store/actingTenantStore";
 import { useDevicesColumns } from "@/components/hooks/devices/useDevicesColumns";
 import { useDevicesList } from "@/components/hooks/devices/useDevicesList";
 import { useSites } from "@/components/hooks/location/useSites";
+import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { toast } from "@/store/toastStore";
 import { DevicesFilterToolbar } from "../filter-toolbar";
 
@@ -48,12 +51,15 @@ interface DevicesTableProps {
 export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
   const tFilters = useTranslations("filters");
   const t = useTranslations("pages.inventory");
+  const { checkPermission } = usePermissions();
+  const canExport = checkPermission("inventory:export");
   const sites = useSites();
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keywordInput, setKeywordInput] = useState(list.q);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [scanOpen, setScanOpen] = useState(false);
   const [scanBusy, setScanBusy] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
 
   useEffect(() => {
     setKeywordInput(list.q);
@@ -107,6 +113,49 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
     if (selectedDevices.length === 0) return;
     printInventoryLabels(toInventoryLabels(selectedDevices));
   }, [selectedDevices]);
+
+  const export14 = useCallback(async () => {
+    if (exportBusy) return;
+    setExportBusy(true);
+    try {
+      const actingTenantId = useActingTenantStore.getState().tenantId;
+      const qs = new URLSearchParams({ format: "csv" });
+      if (list.siteFilter) qs.set("siteId", list.siteFilter);
+      const res = await fetch(`/api/inventory/export?${qs}`, {
+        headers: {
+          [CORRELATION_HEADER]: newClientId(),
+          ...(actingTenantId ? { [ACTING_TENANT_HEADER]: actingTenantId } : {}),
+        },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => undefined);
+        const msg =
+          (body as { error?: { message?: string } } | undefined)?.error?.message ??
+          t("export14Failed");
+        throw new ApiError(res.status, "export_failed", msg);
+      }
+      const blob = await res.blob();
+      const rowCount = Number(res.headers.get("X-Export-Row-Count") ?? "0");
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const match = /filename="([^"]+)"/.exec(cd);
+      const filename = match?.[1] ?? "Bestandsverzeichnis.csv";
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(t("export14Done", { count: rowCount }));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        toast.error(t("export14Denied"));
+      } else {
+        toast.error(e instanceof ApiError ? e.message : t("export14Failed"));
+      }
+    } finally {
+      setExportBusy(false);
+    }
+  }, [exportBusy, list.siteFilter, t]);
 
   const onBarcodeSearch = useCallback(
     async (result: BarcodeCaptureResult) => {
@@ -200,6 +249,20 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
               >
                 <Printer className="h-4 w-4" />
                 Print labels ({selectedDevices.length})
+              </Button>
+            )}
+            {canExport && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8"
+                disabled={exportBusy}
+                onClick={() => void export14()}
+                data-testid="devices-export-14"
+              >
+                <Download className="h-4 w-4" />
+                {exportBusy ? t("export14Busy") : t("export14")}
               </Button>
             )}
             {list.canUpdate && (

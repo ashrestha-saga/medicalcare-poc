@@ -336,6 +336,11 @@ model Tenant {
   /** Legal-entity Organisation with role=institution. Not used by the access gate. */
   institutionOrgId    String?
   institutionOrg      Organisation?            @relation("TenantInstitution", fields: [institutionOrgId], references: [id])
+  /**
+   * Inbetriebnahme dismissed (v26). Chip stays hidden while set; cleared automatically
+   * when a computed criterion reopens.
+   */
+  setupDismissedAt    DateTime?
   createdAt           DateTime                 @default(now())
   users               User[]
   sites               Site[]
@@ -364,6 +369,7 @@ model Tenant {
   trainingEvents      TrainingEvent[]
   trainingRecords     TrainingRecord[]
   auditEvents         AuditEvent[]
+  exportLogs          ExportLog[]
   attachmentBlobs     AttachmentBlob[]
   reprocessingProfiles DeviceReprocessingProfile[]
   dutyReminders       DutyReminder[]
@@ -468,6 +474,7 @@ model User {
   dutyPerformances     DutyPerformance[] @relation("DutyPerformancePerformer")
   evidenceRecorded     DeviceEvidence[] @relation("DeviceEvidenceRecorder")
   modelDocumentsRecorded ModelDocument[] @relation("ModelDocumentRecorder")
+  exportLogs             ExportLog[]
 
   @@index([tenantId])
   @@index([accountKind])
@@ -1687,6 +1694,25 @@ model AuditEvent {
   @@index([actorUserId, occurredAt])
   @@index([organisationId, occurredAt])
   @@index([correlationId])
+}
+
+/** §14 Bestandsverzeichnis export audit — one row per generated file. */
+model ExportLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  /** csv | pdf */
+  format    String
+  /** JSON filters (siteId, areaId, …). */
+  filters   String   @db.Text
+  rowCount  Int
+  sha256    String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
 }
 
 /** OPS-01 — one row per duty × reminder stage; delivery status for the deadline run. */

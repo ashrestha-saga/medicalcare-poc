@@ -4,13 +4,13 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useCreateClinic } from "@/components/hooks/partner/customers/useCreateClinic";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
-import { cn } from "@/lib/utils";
 
 const SCOPES = [
   { id: "inventory", key: "scopeInventory" as const },
@@ -28,15 +28,19 @@ export function CreateClinicScreen() {
 
   if (!permissionsLoading && !checkPermission("console:customers:create")) {
     return (
-      <div className="p-work" data-testid="console-create-denied">
-        <main className="p-main">
-          <ListPageShell title={t("createTitle")} description={tCommon("denied")}>
-            <Link href="/partner/customers" className="text-sm text-primary underline-offset-4 hover:underline">
-              ← {t("backToCustomers")}
-            </Link>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("createTitle")}
+        description={tCommon("denied")}
+        hint={
+          <Link
+            href="/partner/customers"
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
+            ← {t("backToCustomers")}
+          </Link>
+        }
+        testId="console-create-denied"
+      />
     );
   }
 
@@ -288,39 +292,10 @@ export function CreateClinicScreen() {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="rounded-lg border border-border bg-card p-4 sm:p-5">
-      <h2 className="mb-4 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h2>
       {children}
     </section>
-  );
-}
-
-function Field({
-  label,
-  error,
-  required,
-  hint,
-  className,
-  fieldKey,
-  children,
-}: {
-  label: string;
-  error?: string;
-  required?: boolean;
-  hint?: string;
-  className?: string;
-  fieldKey?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={cn("grid gap-1.5", className)} data-field={fieldKey}>
-      <Label required={required} className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </Label>
-      {children}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      {!error && hint ? <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p> : null}
-    </div>
   );
 }

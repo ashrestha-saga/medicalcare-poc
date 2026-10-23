@@ -20,25 +20,22 @@ describe("RBAC defaults & path guards", () => {
     expect(permissionsForRole("superadmin")).toEqual(ROLE_PERMISSIONS.superadmin);
     expect(menuForRole("superadmin").map((m) => m.id)).toEqual([
       "dashboard",
-      "registration",
-      "clarifications",
       "inventory",
       "due-dates",
       "requests",
-      "training",
-      "duty-overlap",
       "device-book",
-      "incidents",
-      "field-safety",
       "reprocessing",
       "constancy-cadence",
+      "training",
+      "incidents",
+      "field-safety",
       "authority",
-      "management",
+      "duty-overlap",
+      "locations",
       "users",
       "catalog",
-      "locations",
+      "management",
       "roles",
-      "security",
       "activity",
       "settings",
     ]);
@@ -48,6 +45,7 @@ describe("RBAC defaults & path guards", () => {
     expect(hasPermission("device_admin", "shell:nav")).toBe(true);
     expect(hasPermission("device_admin", "requests:transition")).toBe(true);
     expect(hasPermission("device_admin", "inventory:update")).toBe(true);
+    expect(hasPermission("device_admin", "inventory:export")).toBe(true);
     expect(hasPermission("device_admin", "catalog:view")).toBe(true);
     expect(hasPermission("device_admin", "catalog:update")).toBe(true);
     expect(hasPermission("device_admin", "clarifications:view")).toBe(true);
@@ -65,22 +63,19 @@ describe("RBAC defaults & path guards", () => {
     expect(hasPermission("device_admin", "authority:view")).toBe(true);
     expect(menuForRole("device_admin").map((m) => m.id)).toEqual([
       "dashboard",
-      "registration",
-      "clarifications",
       "inventory",
       "due-dates",
       "requests",
-      "training",
-      "duty-overlap",
       "device-book",
-      "incidents",
-      "field-safety",
       "reprocessing",
       "constancy-cadence",
+      "training",
+      "incidents",
+      "field-safety",
       "authority",
-      "management",
+      "duty-overlap",
       "catalog",
-      "security",
+      "management",
       "activity",
     ]);
   });

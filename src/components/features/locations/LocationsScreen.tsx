@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useLocationsList } from "@/components/hooks/locations/useLocationsList";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { LocationsTable } from "./locations-table";
 
@@ -13,13 +14,12 @@ export function LocationsScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="locations-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={tCommon("denied")}>
-            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={tCommon("denied")}
+        hint={tCommon("contactAdmin")}
+        testId="locations-denied"
+      />
     );
   }
 

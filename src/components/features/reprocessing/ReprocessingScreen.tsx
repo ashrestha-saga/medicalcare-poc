@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import {
   useReprocessingList,
@@ -156,13 +157,12 @@ export function ReprocessingScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="reprocessing-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={t("denied")}>
-            <p className="text-sm text-muted-foreground">{t("denied")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={t("denied")}
+        hint={t("denied")}
+        testId="reprocessing-denied"
+      />
     );
   }
 

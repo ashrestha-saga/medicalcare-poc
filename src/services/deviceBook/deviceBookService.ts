@@ -418,6 +418,7 @@ export const deviceBookService = {
       evidence: evidenceRows.map(mapEvidence),
       modelIfu,
       duties: duties.map((d) => ({
+        id: d.id,
         dutyKey: d.dutyKey,
         title: d.title ?? d.dutyKey,
         basisText: d.basisText,

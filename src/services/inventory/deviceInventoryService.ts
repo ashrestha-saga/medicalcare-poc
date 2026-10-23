@@ -346,7 +346,9 @@ export const deviceInventoryService: InventoryResolver & {
             OR: [
               { inventoryNumber: { contains: q } },
               { serialNumber: { contains: q } },
+              { udiDi: { contains: q } },
               { responsiblePerson: { contains: q } },
+              { responsibleUser: { name: { contains: q } } },
               { room: { contains: q } },
               { model: { tradeName: { contains: q } } },
               { model: { modelName: { contains: q } } },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { SmtpSettingsPanel } from "@/components/features/settings/SmtpSettingsPanel";
 import { TestEquipmentPanel } from "@/components/features/partner/settings/TestEquipmentPanel";
@@ -15,13 +16,12 @@ export function SettingsScreen() {
 
   if (!permissionsLoading && !canView) {
     return (
-      <div className="p-work" data-testid="console-settings-denied">
-        <main className="p-main">
-          <ListPageShell title={t("settingsTitle")} description={tCommon("denied")}>
-            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("settingsTitle")}
+        description={tCommon("denied")}
+        hint={tCommon("contactAdmin")}
+        testId="console-settings-denied"
+      />
     );
   }
 

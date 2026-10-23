@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { SUPERADMIN_LOCKED_PERMISSIONS } from "@/constants/permissions";
 import { useRolesCatalog } from "@/components/hooks/users/useRolesCatalog";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -160,13 +161,12 @@ export function RolesScreen() {
 
   if (!canView) {
     return (
-      <div className="p-work" data-testid="roles-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={tCommon("denied")}>
-            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={tCommon("denied")}
+        hint={tCommon("contactAdmin")}
+        testId="roles-denied"
+      />
     );
   }
 

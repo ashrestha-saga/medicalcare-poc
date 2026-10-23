@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useDueDatesList } from "@/components/hooks/due-dates/useDueDatesList";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Button } from "@/components/ui/button";
 import { DueDatesFilterToolbar } from "./DueDatesFilterToolbar";
@@ -16,13 +17,12 @@ export function DueDatesScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="due-dates-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={t("denied")}>
-            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={t("denied")}
+        hint={tCommon("contactAdmin")}
+        testId="due-dates-denied"
+      />
     );
   }
 

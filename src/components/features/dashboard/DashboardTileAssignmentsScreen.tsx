@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useDashboardTileAssignments } from "@/components/hooks/dashboard/useDashboardTileAssignments";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,13 +29,12 @@ export function DashboardTileAssignmentsScreen() {
 
   if (!a.canView) {
     return (
-      <div className="p-work" data-testid="tile-assignments-denied">
-        <main className="p-main">
-          <ListPageShell title={t("assignments.title")} description={t("assignments.requiresRolesView")}>
-            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("assignments.title")}
+        description={t("assignments.requiresRolesView")}
+        hint={tCommon("contactAdmin")}
+        testId="tile-assignments-denied"
+      />
     );
   }
 

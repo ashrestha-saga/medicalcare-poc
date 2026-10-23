@@ -39,6 +39,7 @@
     "subtitleRoles": "Role catalog",
     "subtitleSettings": "Settings",
     "subtitleManagement": "Management",
+    "subtitleCommissioning": "Commissioning",
     "subtitleActivity": "Activity",
     "subtitleDueDates": "Due dates",
     "subtitleTraining": "Training",
@@ -47,13 +48,48 @@
     "subtitleSecurity": "Security",
     "home": "Home",
     "groupOverview": "Overview",
+    "groupDevices": "Devices",
+    "groupRecords": "Evidence",
+    "groupReports": "Reports",
+    "groupAdmin": "Administration",
     "groupWork": "Work",
     "groupSafety": "Safety",
     "groupAufbereitung": "Reprocessing",
     "groupRadiation": "Radiation protection",
     "groupAuthority": "Authority",
     "groupMaster": "Master data",
-    "groupOutput": "Output"
+    "groupOutput": "Output",
+    "badgeCount": "{label}: {count}",
+    "badgeWarn": "{label}: attention required",
+    "searchPlaceholder": "Search / scan …",
+    "searchShortcut": "⌘K",
+    "searchBestand": "Search device: inventory number, serial, room, person",
+    "setupTitle": "Commissioning · {done} of {total} steps",
+    "setupLoading": "Commissioning …",
+    "setupNext": "Next step: {step}"
+  },
+  "commissioning": {
+    "title": "Commissioning · {done} of {total} steps",
+    "goThere": "Go there",
+    "allDone": "All ten steps complete.",
+    "allDoneHint": "The navigation card is hidden while every criterion stays met. Acknowledge to record completion; if a criterion slips later, the card returns.",
+    "dismiss": "Complete commissioning",
+    "dismissed": "Commissioning acknowledged.",
+    "dismissedHint": "Acknowledged. Open this page any time from the address bar or bookmarks.",
+    "dismissFailed": "Could not acknowledge commissioning.",
+    "openManagement": "Open providers & contracts",
+    "steps": {
+      "sites": "Sites and areas",
+      "personen": "People, roles, MPSB appointment",
+      "traegerschaft": "Responsibilities per role",
+      "betreuung": "Providers and contracts",
+      "bestand": "Inventory recorded",
+      "einstufung": "Classifications confirmed",
+      "klaerliste": "Issue list empty",
+      "takte": "Intervals set",
+      "aufbereitung": "Reprocessing set up",
+      "export": "Register checked"
+    }
   },
   "common": {
     "loading": "Loading…",
@@ -560,7 +596,10 @@
     "smtpSaveFailed": "Could not save SMTP settings.",
     "smtpTestSent": "Test email sent to {to}.",
     "smtpTestSimulated": "Test email simulated (no send). Source: {source}.",
-    "smtpTestFailed": "Test email failed."
+    "smtpTestFailed": "Test email failed.",
+    "securityTitle": "Account security",
+    "securityIntro": "Two-factor authentication (TOTP) and backup codes for your sign-in.",
+    "securityOpen": "Open security settings"
   },
   "pages": {
     "inventory": {
@@ -576,7 +615,18 @@
       "scanFound": "Opened {inventory}",
       "scanNotFound": "No device matches this code.",
       "scanFailed": "Could not search inventory.",
-      "searchScanWrongKind": "Scan an inventory number or serial number."
+      "searchScanWrongKind": "Scan an inventory number or serial number.",
+      "tabAll": "All",
+      "tabKlarliste": "Open issues",
+      "tabReleased": "Released",
+      "tabRetired": "Retired",
+      "export14": "Export §14",
+      "export14Busy": "Exporting…",
+      "export14Done": "Exported {count} released devices.",
+      "export14Failed": "Export failed.",
+      "export14Denied": "You don't have permission to export the inventory directory.",
+      "lastExports": "Recent exports",
+      "lastExportsEmpty": "No exports yet."
     },
     "requests": {
       "title": "Requests",
@@ -1062,6 +1112,7 @@
     "management": {
       "title": "Management",
       "description": "Partner organisations and service contracts",
+      "commissioningLink": "Commissioning status",
       "loadFailed": "Failed to load management",
       "managingOrg": "Managing organisation",
       "noContract": "No active service contract for this clinic. Partner organisations cannot open this tenant until a contract is recorded.",
@@ -1441,6 +1492,7 @@
     "button": "Inventory",
     "buttonTitle": "Inventory register",
     "security": "Security",
+    "deviceBook": "Device book",
     "tagReprocessing": "Reprocessing"
   },
   "inventarize": {

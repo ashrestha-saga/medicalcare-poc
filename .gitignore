@@ -33,6 +33,9 @@ npm-debug.log*
 # local object-storage dual-read (Phase 6)
 .data/
 
+# local demo seed (generators + fixtures — do not commit)
+seed/
+
 # local implementation / UX / architecture notes (not part of the app)
 DeviceCare_Implementation_Guide_Continued.md
 DeviceCare_Mobile_Tablet_UX_Exact_Cursor_Spec.md

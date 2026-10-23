@@ -6,6 +6,7 @@ import {
   useConstancyCadence,
   type MissingCadenceRow,
 } from "@/components/hooks/constancy/useConstancyCadence";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,13 +88,12 @@ export function ConstancyCadenceScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="constancy-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={t("denied")}>
-            <p className="text-sm text-muted-foreground">{t("denied")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={t("denied")}
+        hint={t("denied")}
+        testId="constancy-denied"
+      />
     );
   }
 

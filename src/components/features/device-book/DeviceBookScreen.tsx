@@ -2,7 +2,12 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
+import {
+  AdminListCard,
+  ResponsiveTableSwitch,
+} from "@/components/features/shared/ResponsiveTableSwitch";
 import { useDeviceBookComposed } from "@/components/hooks/device-book/useDeviceBookComposed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,13 +86,12 @@ export function DeviceBookScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="device-book-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={t("denied")}>
-            <p className="text-sm text-muted-foreground">{t("denied")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={t("denied")}
+        hint={t("denied")}
+        testId="device-book-denied"
+      />
     );
   }
 
@@ -165,68 +169,92 @@ export function DeviceBookScreen() {
                 </p>
               </div>
 
-              <div className="overflow-x-auto rounded-lg border">
-                <table className="w-full min-w-[800px] text-left text-sm">
-                  <thead className="bg-muted/50 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2.5 font-medium">{t("col.inventory")}</th>
-                      <th className="px-3 py-2.5 font-medium">{t("col.name")}</th>
-                      <th className="px-3 py-2.5 font-medium">{t("col.serial")}</th>
-                      <th className="px-3 py-2.5 font-medium">{t("col.place")}</th>
-                      <th className="px-3 py-2.5 font-medium">{t("col.ifu")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {list.listLoading ? (
-                      <tr>
-                        <td colSpan={5} className="px-3 py-6 text-muted-foreground">
-                          {t("loading")}
-                        </td>
-                      </tr>
-                    ) : list.filteredDevices.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-3 py-6 text-muted-foreground">
-                          {list.devices.length === 0 ? t("empty") : t("search.noMatch")}
-                        </td>
-                      </tr>
-                    ) : (
-                      list.filteredDevices.map((d) => (
-                        <tr
-                          key={d.id}
-                          className="cursor-pointer border-t hover:bg-muted/40"
-                          data-testid={`device-book-row-${d.inventoryNumber}`}
-                          onClick={() => list.setDevice(d.id)}
-                        >
-                          <td className="px-3 py-3 align-top font-mono text-xs font-medium">
-                            {d.inventoryNumber}
-                          </td>
-                          <td className="px-3 py-3 align-top">
-                            <p className="font-medium">{d.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {[d.manufacturer, d.basicUdiDi || d.udiDi]
-                                .filter(Boolean)
-                                .join(" · ") || "—"}
-                            </p>
-                          </td>
-                          <td className="px-3 py-3 align-top font-mono text-xs">
-                            {d.serialNumber ?? "—"}
-                          </td>
-                          <td className="px-3 py-3 align-top text-muted-foreground">
-                            {placeLine(d)}
-                          </td>
-                          <td className="px-3 py-3 align-top">
-                            <IfuChip
-                              hasIfu={d.hasIfu}
-                              present={t("ifu.present")}
-                              missing={t("ifu.missing")}
-                            />
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              {list.listLoading ? (
+                <p className="text-sm text-muted-foreground">{t("loading")}</p>
+              ) : list.filteredDevices.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {list.devices.length === 0 ? t("empty") : t("search.noMatch")}
+                </p>
+              ) : (
+                <ResponsiveTableSwitch
+                  table={
+                    <div className="overflow-x-auto rounded-lg border">
+                      <table className="w-full min-w-[800px] text-left text-sm">
+                        <thead className="bg-muted/50 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          <tr>
+                            <th className="px-3 py-2.5 font-medium">{t("col.inventory")}</th>
+                            <th className="px-3 py-2.5 font-medium">{t("col.name")}</th>
+                            <th className="px-3 py-2.5 font-medium">{t("col.serial")}</th>
+                            <th className="px-3 py-2.5 font-medium">{t("col.place")}</th>
+                            <th className="px-3 py-2.5 font-medium">{t("col.ifu")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {list.filteredDevices.map((d) => (
+                            <tr
+                              key={d.id}
+                              className="cursor-pointer border-t hover:bg-muted/40"
+                              data-testid={`device-book-row-${d.inventoryNumber}`}
+                              onClick={() => list.setDevice(d.id)}
+                            >
+                              <td className="px-3 py-3 align-top font-mono text-xs font-medium">
+                                {d.inventoryNumber}
+                              </td>
+                              <td className="px-3 py-3 align-top">
+                                <p className="font-medium">{d.name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {[d.manufacturer, d.basicUdiDi || d.udiDi]
+                                    .filter(Boolean)
+                                    .join(" · ") || "—"}
+                                </p>
+                              </td>
+                              <td className="px-3 py-3 align-top font-mono text-xs">
+                                {d.serialNumber ?? "—"}
+                              </td>
+                              <td className="px-3 py-3 align-top text-muted-foreground">
+                                {placeLine(d)}
+                              </td>
+                              <td className="px-3 py-3 align-top">
+                                <IfuChip
+                                  hasIfu={d.hasIfu}
+                                  present={t("ifu.present")}
+                                  missing={t("ifu.missing")}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                  cards={list.filteredDevices.map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      className="w-full text-left"
+                      data-testid={`device-book-row-${d.inventoryNumber}`}
+                      onClick={() => list.setDevice(d.id)}
+                    >
+                      <AdminListCard
+                        title={
+                          <span className="font-mono text-xs">{d.inventoryNumber}</span>
+                        }
+                        subtitle={d.name}
+                      >
+                        <p className="text-xs">
+                          {[d.manufacturer, d.serialNumber].filter(Boolean).join(" · ") || "—"}
+                        </p>
+                        <p className="text-xs">{placeLine(d)}</p>
+                        <IfuChip
+                          hasIfu={d.hasIfu}
+                          present={t("ifu.present")}
+                          missing={t("ifu.missing")}
+                        />
+                      </AdminListCard>
+                    </button>
+                  ))}
+                />
+              )}
             </>
           ) : (
             <>
@@ -427,7 +455,7 @@ export function DeviceBookScreen() {
                           </thead>
                           <tbody>
                             {book.duties.map((d) => (
-                              <tr key={`${d.dutyKey}-${d.dueAt}`} className="border-b border-border/50">
+                              <tr key={d.id} className="border-b border-border/50">
                                 <td className="py-2 pr-3 font-medium">{d.title}</td>
                                 <td className="py-2 pr-3 text-xs text-muted-foreground">
                                   {d.basisText}

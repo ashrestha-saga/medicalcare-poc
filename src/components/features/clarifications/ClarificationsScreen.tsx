@@ -5,6 +5,7 @@ import { useClarificationsList } from "@/components/hooks/clarifications/useClar
 import { useDeviceEditor } from "@/components/hooks/devices/useDeviceEditor";
 import { useSites } from "@/components/hooks/location/useSites";
 import { DeviceEditForm } from "@/components/features/devices/DeviceEditForm";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { ClarificationsList } from "./ClarificationsList";
 
@@ -20,13 +21,12 @@ export function ClarificationsScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="clarifications-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={tCommon("denied")}>
-            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={tCommon("denied")}
+        hint={tCommon("contactAdmin")}
+        testId="clarifications-denied"
+      />
     );
   }
 

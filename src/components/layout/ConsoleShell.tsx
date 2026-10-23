@@ -13,11 +13,14 @@ import { cn } from "@/lib/utils";
 import { Loading } from "@/components/ui/Loading";
 import {
   ActivityIcon,
+  AssignmentsIcon,
+  CustomersIcon,
+  DispositionIcon,
   DueDatesIcon,
-  LocationsIcon,
+  ExternalInspectorsIcon,
   LogoutIcon,
   ManagementIcon,
-  RequestsIcon,
+  MySitesIcon,
   SettingsIcon,
   UsersIcon,
 } from "@/components/layout/navIcons";
@@ -50,16 +53,17 @@ const MENU_I18N: Partial<
 };
 
 function ConsoleNavIcon({ id }: { id: MenuModuleId }) {
+  if (id === "console-customers") return <CustomersIcon />;
   if (id === "console-due-dates") return <DueDatesIcon />;
-  if (id === "console-disposition" || id === "console-assignments") {
-    return <RequestsIcon />;
-  }
-  if (id === "console-my-sites") return <LocationsIcon />;
-  if (id === "console-staff" || id === "console-external") return <UsersIcon />;
+  if (id === "console-disposition") return <DispositionIcon />;
+  if (id === "console-assignments") return <AssignmentsIcon />;
+  if (id === "console-my-sites") return <MySitesIcon />;
+  if (id === "console-staff") return <UsersIcon />;
+  if (id === "console-external") return <ExternalInspectorsIcon />;
   if (id === "console-organisation") return <ManagementIcon />;
   if (id === "console-activity") return <ActivityIcon />;
   if (id === "console-settings") return <SettingsIcon />;
-  return <LocationsIcon />;
+  return <CustomersIcon />;
 }
 
 /** Operator-console chrome: nav from console:* capabilities. */
@@ -85,20 +89,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             {user?.appRole ? ` · ${user.appRole}` : ""}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <LocaleToggle />
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-            data-testid="partner-sign-out"
-            onClick={() => void signOut({ redirectTo: "/login/partner" })}
-          >
-            <span className="inline-flex size-[18px] shrink-0 [&_svg]:size-full [&_svg]:stroke-current [&_svg]:fill-none [&_svg]:stroke-[1.75] [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]">
-              <LogoutIcon />
-            </span>
-            {t("signOut")}
-          </button>
-        </div>
+        <LocaleToggle />
       </header>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {permissionsLoading ? (
@@ -107,45 +98,80 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           </div>
         ) : showNav ? (
           <nav
-            className="shrink-0 overflow-y-auto border-b border-border p-3 md:w-56 md:border-b-0 md:border-r"
+            className="flex shrink-0 flex-col overflow-y-auto border-b border-border p-3 md:w-56 md:border-b-0 md:border-r"
             aria-label={t("navLabel")}
           >
-            {ops.length > 0 ? (
-              <>
-                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t("navOps")}
-                </p>
-                {ops.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    href={item.href}
-                    active={pathname.startsWith(item.href)}
-                    icon={<ConsoleNavIcon id={item.id} />}
-                  >
-                    {t(MENU_I18N[item.id] ?? "customers")}
-                  </NavLink>
-                ))}
-              </>
-            ) : null}
-            {org.length > 0 ? (
-              <>
-                <p className="mb-1 mt-4 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {t("navOrg")}
-                </p>
-                {org.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    href={item.href}
-                    active={pathname.startsWith(item.href)}
-                    icon={<ConsoleNavIcon id={item.id} />}
-                  >
-                    {t(MENU_I18N[item.id] ?? "organisation")}
-                  </NavLink>
-                ))}
-              </>
-            ) : null}
+            <div className="min-h-0 flex-1">
+              {ops.length > 0 ? (
+                <>
+                  <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("navOps")}
+                  </p>
+                  {ops.map((item) => (
+                    <NavLink
+                      key={item.href}
+                      href={item.href}
+                      active={pathname.startsWith(item.href)}
+                      icon={<ConsoleNavIcon id={item.id} />}
+                    >
+                      {t(MENU_I18N[item.id] ?? "customers")}
+                    </NavLink>
+                  ))}
+                </>
+              ) : null}
+              {org.length > 0 ? (
+                <>
+                  <p className="mb-1 mt-4 px-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("navOrg")}
+                  </p>
+                  {org.map((item) => (
+                    <NavLink
+                      key={item.href}
+                      href={item.href}
+                      active={pathname.startsWith(item.href)}
+                      icon={<ConsoleNavIcon id={item.id} />}
+                    >
+                      {t(MENU_I18N[item.id] ?? "organisation")}
+                    </NavLink>
+                  ))}
+                </>
+              ) : null}
+            </div>
+            <div className="mt-4 border-t border-border pt-3">
+              <button
+                type="button"
+                className={cn(
+                  "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
+                  "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                )}
+                data-testid="partner-sign-out"
+                onClick={() => void signOut({ redirectTo: "/login/partner" })}
+              >
+                <span className="inline-flex size-[20px] shrink-0 [&_svg]:size-full [&_svg]:stroke-current [&_svg]:fill-none [&_svg]:stroke-[1.75] [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]">
+                  <LogoutIcon />
+                </span>
+                <span>{t("signOut")}</span>
+              </button>
+            </div>
           </nav>
-        ) : null}
+        ) : (
+          <div className="shrink-0 border-b border-border p-3 md:w-56 md:border-b-0 md:border-r">
+            <button
+              type="button"
+              className={cn(
+                "flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm",
+                "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+              )}
+              data-testid="partner-sign-out"
+              onClick={() => void signOut({ redirectTo: "/login/partner" })}
+            >
+              <span className="inline-flex size-[20px] shrink-0 [&_svg]:size-full [&_svg]:stroke-current [&_svg]:fill-none [&_svg]:stroke-[1.75] [&_svg]:[stroke-linecap:round] [&_svg]:[stroke-linejoin:round]">
+                <LogoutIcon />
+              </span>
+              <span>{t("signOut")}</span>
+            </button>
+          </div>
+        )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
       </div>
     </div>

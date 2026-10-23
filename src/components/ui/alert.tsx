@@ -8,11 +8,10 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "bg-card text-foreground border-border",
-        warning:
-          "border-[rgba(245,165,36,0.35)] bg-[rgba(245,165,36,0.12)] text-foreground [&>svg]:text-[var(--warn)]",
-        info: "border-[rgba(30,127,224,0.3)] bg-[rgba(30,127,224,0.1)] text-foreground [&>svg]:text-[var(--accent)]",
+        warning: "border-border bg-[var(--warn-soft)] text-foreground [&>svg]:text-[var(--warn)]",
+        info: "border-border bg-[var(--accent-soft)] text-foreground [&>svg]:text-[var(--accent)]",
         destructive:
-          "border-[rgba(255,51,102,0.35)] bg-[rgba(255,51,102,0.1)] text-foreground [&>svg]:text-[var(--red)]",
+          "border-border bg-[var(--danger-soft)] text-foreground [&>svg]:text-[var(--red)]",
       },
     },
     defaultVariants: {
@@ -36,11 +35,16 @@ const AlertTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<H
 );
 AlertTitle.displayName = "AlertTitle";
 
-const AlertDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <div ref={ref} className={cn("text-sm text-muted-foreground [&_p]:leading-relaxed", className)} {...props} />
-  ),
-);
+const AlertDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("text-sm text-muted-foreground [&_p]:leading-relaxed", className)}
+    {...props}
+  />
+));
 AlertDescription.displayName = "AlertDescription";
 
 export { Alert, AlertTitle, AlertDescription };

@@ -67,6 +67,7 @@ export interface ComposedBookDeviceOptionDTO {
 }
 
 export interface ComposedBookDutyDTO {
+  id: string;
   dutyKey: string;
   title: string;
   basisText: string;

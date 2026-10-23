@@ -6,14 +6,17 @@ import { useTranslations } from "next-intl";
 import { LocaleToggle } from "@/components/features/shared/LocaleToggle";
 import { MenuIcon } from "@/components/layout/navIcons";
 
-/** Status-bar corner menu: 2FA · language · logout. */
+/** Status-bar corner menu: device book · 2FA · language · logout. */
 export function AccountCornerMenu({
   showSecurity,
+  showDeviceBook,
   showLogout,
   onSignOut,
   roleText,
 }: {
   showSecurity?: boolean;
+  /** When capturer has devicebook:view — open § 13 book without shell:nav. */
+  showDeviceBook?: boolean;
   showLogout?: boolean;
   onSignOut?: () => void;
   roleText?: string | null;
@@ -62,6 +65,19 @@ export function AccountCornerMenu({
           ) : null}
 
           <div className="p-acct-corner__stack">
+            {showDeviceBook ? (
+              <Link
+                href="/device-book"
+                className="p-acct-corner__btn"
+                role="menuitem"
+                data-testid="capturer-device-book-link"
+                onClick={() => setOpen(false)}
+              >
+                <span className="p-acct-corner__btn-k">{tCap("deviceBook")}</span>
+                <span className="p-acct-corner__btn-v">{t("device-book")}</span>
+              </Link>
+            ) : null}
+
             {showSecurity ? (
               <Link
                 href="/security"

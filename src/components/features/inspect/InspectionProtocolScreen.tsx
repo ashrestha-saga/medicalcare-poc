@@ -187,11 +187,13 @@ export function InspectionProtocolScreen({ reference }: { reference: string }) {
             <section className="pp-card">
               <h4>{catalogue.label}</h4>
               <div className="pp-card__body">
-                <p className="pp-kv__k">
+                <p className="pp-kv__k" id="pp-equipment-label">
                   {t("equipmentRequired")} — {catalogue.testEquipmentClassLabel}
                 </p>
                 <select
+                  id="pp-equipment"
                   className="pp-select"
+                  aria-labelledby="pp-equipment-label"
                   value={p.testEquipmentId}
                   onChange={(e) => p.setTestEquipmentId(e.target.value)}
                 >
@@ -283,10 +285,16 @@ export function InspectionProtocolScreen({ reference }: { reference: string }) {
               <div className="pp-card__body">
                 {catalogue?.testEquipmentClass ? (
                   <>
-                    <p className="pp-kv__k">
+                    <p className="pp-kv__k" id="pp-equipment-preview-label">
                       {t("fieldEquipmentClass")} — {catalogue.testEquipmentClassLabel}
                     </p>
-                    <select className="pp-select" value={p.testEquipmentId} disabled>
+                    <select
+                      id="pp-equipment-preview"
+                      className="pp-select"
+                      aria-labelledby="pp-equipment-preview-label"
+                      value={p.testEquipmentId}
+                      disabled
+                    >
                       {preview.eligibleEquipment
                         .filter((e) => e.id === (run.testEquipmentId ?? p.testEquipmentId))
                         .map((eq) => (

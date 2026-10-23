@@ -3,7 +3,14 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useDutyOverlap } from "@/components/hooks/duties/useDutyOverlap";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
+import { EmptyState } from "@/components/features/shared/EmptyState";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
+import { PageLoading } from "@/components/features/shared/PageLoading";
+import {
+  AdminListCard,
+  ResponsiveTableSwitch,
+} from "@/components/features/shared/ResponsiveTableSwitch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,13 +40,12 @@ export function DutyOverlapScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="duty-overlap-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={t("denied")}>
-            <p className="text-sm text-muted-foreground">{t("denied")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={t("denied")}
+        hint={t("denied")}
+        testId="duty-overlap-denied"
+      />
     );
   }
 
@@ -76,9 +82,9 @@ export function DutyOverlapScreen() {
   return (
     <div className="p-work" data-testid="duty-overlap-page">
       <main className="p-main">
-        <ListPageShell title={t("title")} description={t("description")}>
+        <ListPageShell variant="compose" title={t("title")} description={t("description")}>
           <section
-            className="mb-6 rounded-lg border border-l-4 border-l-blue-600 bg-background p-4"
+            className="mb-6 rounded-lg border border-l-4 border-l-primary bg-background p-4"
             data-testid="duty-overlap-form"
           >
             <h2 className="text-sm font-semibold">{t("form.title")}</h2>
@@ -86,7 +92,7 @@ export function DutyOverlapScreen() {
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="ov-device" className="text-[11px] uppercase tracking-wide">
+                <Label htmlFor="ov-device" className="text-xs uppercase tracking-wide">
                   {t("form.device")}
                 </Label>
                 <select
@@ -110,7 +116,7 @@ export function DutyOverlapScreen() {
                 </select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="ov-covered" className="text-[11px] uppercase tracking-wide">
+                <Label htmlFor="ov-covered" className="text-xs uppercase tracking-wide">
                   {t("form.covered")}
                 </Label>
                 <select
@@ -125,7 +131,7 @@ export function DutyOverlapScreen() {
                 </select>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="ov-satisfied" className="text-[11px] uppercase tracking-wide">
+                <Label htmlFor="ov-satisfied" className="text-xs uppercase tracking-wide">
                   {t("form.satisfiedBy")}
                 </Label>
                 <select
@@ -140,8 +146,8 @@ export function DutyOverlapScreen() {
                 </select>
               </div>
               <div className="space-y-1 sm:col-span-2">
-                <Label htmlFor="ov-reason" className="text-[11px] uppercase tracking-wide">
-                  {t("form.reason")} <span className="text-red-600">*</span>
+                <Label htmlFor="ov-reason" className="text-xs uppercase tracking-wide" required>
+                  {t("form.reason")}
                 </Label>
                 <Textarea
                   id="ov-reason"
@@ -153,7 +159,7 @@ export function DutyOverlapScreen() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="ov-at" className="text-[11px] uppercase tracking-wide">
+                <Label htmlFor="ov-at" className="text-xs uppercase tracking-wide">
                   {t("form.decidedAt")}
                 </Label>
                 <Input
@@ -184,53 +190,79 @@ export function DutyOverlapScreen() {
           </section>
 
           {list.loading ? (
-            <p className="text-sm text-muted-foreground">{t("loading")}</p>
+            <PageLoading label={t("loading")} />
           ) : list.decisions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t("empty")}</p>
+            <EmptyState>{t("empty")}</EmptyState>
           ) : (
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="bg-muted/50 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2.5 font-medium">{t("col.device")}</th>
-                    <th className="px-3 py-2.5 font-medium">{t("col.coverage")}</th>
-                    <th className="px-3 py-2.5 font-medium">{t("col.reason")}</th>
-                    <th className="px-3 py-2.5 font-medium">{t("col.decided")}</th>
-                    <th className="px-3 py-2.5 font-medium">{t("col.actions")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.decisions.map((d) => (
-                    <tr key={d.id} className="border-t" data-testid={`overlap-${d.id}`}>
-                      <td className="px-3 py-3 align-top font-mono text-xs">
-                        {d.inventoryNumber ?? "—"}
-                      </td>
-                      <td className="px-3 py-3 align-top font-medium">
-                        {d.coveredDutyKey} ← {d.satisfiedByDutyKey}
-                      </td>
-                      <td className="max-w-[240px] px-3 py-3 align-top text-muted-foreground">
-                        {d.reasonText}
-                      </td>
-                      <td className="px-3 py-3 align-top text-muted-foreground">
-                        {formatDate(d.decidedAt)}
-                      </td>
-                      <td className="px-3 py-3 align-top">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          disabled={revokingId === d.id}
-                          onClick={() => void onRevoke(d.id)}
-                          data-testid={`overlap-revoke-${d.id}`}
-                        >
-                          {t("actions.revoke")}
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ResponsiveTableSwitch
+              table={
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full min-w-[640px] text-left text-sm">
+                    <thead className="bg-muted/50 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2.5 font-medium">{t("col.device")}</th>
+                        <th className="px-3 py-2.5 font-medium">{t("col.coverage")}</th>
+                        <th className="px-3 py-2.5 font-medium">{t("col.reason")}</th>
+                        <th className="px-3 py-2.5 font-medium">{t("col.decided")}</th>
+                        <th className="px-3 py-2.5 font-medium">{t("col.actions")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.decisions.map((d) => (
+                        <tr key={d.id} className="border-t" data-testid={`overlap-${d.id}`}>
+                          <td className="px-3 py-3 align-top font-mono text-xs">
+                            {d.inventoryNumber ?? "—"}
+                          </td>
+                          <td className="px-3 py-3 align-top font-medium">
+                            {d.coveredDutyKey} ← {d.satisfiedByDutyKey}
+                          </td>
+                          <td className="max-w-[240px] px-3 py-3 align-top text-muted-foreground">
+                            {d.reasonText}
+                          </td>
+                          <td className="px-3 py-3 align-top text-muted-foreground">
+                            {formatDate(d.decidedAt)}
+                          </td>
+                          <td className="px-3 py-3 align-top">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={revokingId === d.id}
+                              onClick={() => void onRevoke(d.id)}
+                              data-testid={`overlap-revoke-${d.id}`}
+                            >
+                              {t("actions.revoke")}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              }
+              cards={list.decisions.map((d) => (
+                <AdminListCard
+                  key={d.id}
+                  testId={`overlap-${d.id}`}
+                  title={d.inventoryNumber ?? "—"}
+                  subtitle={`${d.coveredDutyKey} ← ${d.satisfiedByDutyKey} · ${formatDate(d.decidedAt)}`}
+                  actions={
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={revokingId === d.id}
+                      onClick={() => void onRevoke(d.id)}
+                      data-testid={`overlap-revoke-${d.id}`}
+                    >
+                      {t("actions.revoke")}
+                    </Button>
+                  }
+                >
+                  <p>{d.reasonText}</p>
+                </AdminListCard>
+              ))}
+            />
           )}
         </ListPageShell>
       </main>

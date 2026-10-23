@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -12,22 +12,33 @@ import { OfflineBar } from "@/components/ui/OfflineBar";
 import { LocaleToggle } from "@/components/features/shared/LocaleToggle";
 import { AccountCornerMenu } from "@/components/layout/AccountCornerMenu";
 import { PartnerActingBar } from "@/components/layout/PartnerActingBar";
+import { NavBestandSearch } from "@/components/layout/NavBestandSearch";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { api } from "@/lib/http/apiClient";
 import { ScanTabBar } from "@/components/features/scan/ScanTabBar";
 import { useCapturerInventoryUi } from "@/store/capturerInventoryStore";
 import { useCapturerScanNav } from "@/store/capturerScanNavStore";
+import { useSetupProgress } from "@/components/hooks/nav/useSetupProgress";
 import {
+  ActivityIcon,
+  AuthorityIcon,
   CatalogIcon,
   ClarificationsIcon,
+  ConstancyIcon,
+  DashboardIcon,
+  DeviceBookIcon,
   DueDatesIcon,
+  DutyOverlapIcon,
+  FieldSafetyIcon,
+  IncidentsIcon,
   InventoryIcon,
   LocationsIcon,
   LogoutIcon,
-  ActivityIcon,
   ManagementIcon,
-  MenuIcon,
+  NavCollapseIcon,
+  NavExpandIcon,
   RegistrationIcon,
+  ReprocessingIcon,
   RequestsIcon,
   RolesIcon,
   SecurityIcon,
@@ -38,18 +49,37 @@ import {
 
 import type { FormFactor, MenuModule, MenuModuleId } from "@/interfaces";
 import { APP_HOME_PATH } from "@/constants/permissions";
+import { MENU_ID_TO_NAV_COUNT, type NavCountEntry, type NavCountsResponse } from "@/constants/navCounts";
+import { useNavCounts } from "@/components/hooks/nav/useNavCounts";
 
-/** Group order and labels match mockup v22 (`Überblick` … `Ausgabe`). */
+/** Group order and labels match mockup v26 (`Überblick` … `Verwaltung`). */
 const CLINIC_NAV_GROUPS = [
-  { id: "overview" as const, labelKey: "groupOverview" as const },
-  { id: "work" as const, labelKey: "groupWork" as const },
-  { id: "safety" as const, labelKey: "groupSafety" as const },
-  { id: "aufbereitung" as const, labelKey: "groupAufbereitung" as const },
-  { id: "radiation" as const, labelKey: "groupRadiation" as const },
-  { id: "authority" as const, labelKey: "groupAuthority" as const },
-  { id: "master" as const, labelKey: "groupMaster" as const },
-  { id: "output" as const, labelKey: "groupOutput" as const },
-];
+  { id: "overview" as const, labelKey: "groupOverview" as const, collapsible: false },
+  { id: "devices" as const, labelKey: "groupDevices" as const, collapsible: false },
+  { id: "records" as const, labelKey: "groupRecords" as const, collapsible: false },
+  { id: "reports" as const, labelKey: "groupReports" as const, collapsible: false },
+  { id: "admin" as const, labelKey: "groupAdmin" as const, collapsible: true },
+] as const;
+
+const ADMIN_COLLAPSE_KEY = "dc.nav.adminCollapsed";
+
+function GroupChevron({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg
+      className="p-nav__group-chevron"
+      viewBox="0 0 16 16"
+      aria-hidden
+      data-collapsed={collapsed ? "true" : "false"}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 6l4 4 4-4" />
+    </svg>
+  );
+}
 
 function navItemClass(active: boolean): string {
   return ["p-nav__item", active ? "is-active" : ""].filter(Boolean).join(" ");
@@ -63,6 +93,7 @@ function AccountBar({
   inventoryCount,
   onOpenInventory,
   showSecurity,
+  showDeviceBook,
   showHome,
   showScanTabs,
   useCornerMenu,
@@ -74,6 +105,7 @@ function AccountBar({
   inventoryCount?: number | null;
   onOpenInventory?: () => void;
   showSecurity?: boolean;
+  showDeviceBook?: boolean;
   showHome?: boolean;
   /** Desktop capturer: Scan · Today · Inventory · Batches pills in the status bar. */
   showScanTabs?: boolean;
@@ -132,12 +164,23 @@ function AccountBar({
         {useCornerMenu ? (
           <AccountCornerMenu
             showSecurity={showSecurity}
+            showDeviceBook={showDeviceBook}
             showLogout={showLogout}
             onSignOut={onSignOut}
             roleText={roleText}
           />
         ) : (
           <>
+            {showDeviceBook && (
+              <Link
+                href="/device-book"
+                className="k"
+                data-testid="capturer-device-book-link"
+                title={tCap("deviceBook")}
+              >
+                {t("device-book")}
+              </Link>
+            )}
             {showSecurity && (
               <Link href="/security" className="k" data-testid="capturer-security-link" title={tCap("security")}>
                 2FA
@@ -160,12 +203,21 @@ function AccountBar({
 }
 
 function NavIcon({ id }: { id: MenuModuleId }) {
+  if (id === "dashboard") return <DashboardIcon />;
+  if (id === "inventory") return <InventoryIcon />;
   if (id === "registration") return <RegistrationIcon />;
   if (id === "due-dates") return <DueDatesIcon />;
+  if (id === "duty-overlap") return <DutyOverlapIcon />;
   if (id === "training") return <TrainingIcon />;
   if (id === "catalog") return <CatalogIcon />;
   if (id === "clarifications") return <ClarificationsIcon />;
   if (id === "requests") return <RequestsIcon />;
+  if (id === "device-book") return <DeviceBookIcon />;
+  if (id === "incidents") return <IncidentsIcon />;
+  if (id === "field-safety") return <FieldSafetyIcon />;
+  if (id === "reprocessing") return <ReprocessingIcon />;
+  if (id === "constancy-cadence") return <ConstancyIcon />;
+  if (id === "authority") return <AuthorityIcon />;
   if (id === "users") return <UsersIcon />;
   if (id === "locations") return <LocationsIcon />;
   if (id === "roles") return <RolesIcon />;
@@ -177,33 +229,78 @@ function NavIcon({ id }: { id: MenuModuleId }) {
 }
 
 function isNavActive(id: MenuModuleId, pathname: string): boolean {
+  if (id === "dashboard") {
+    return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  }
   if (id === "inventory") return pathname.startsWith("/devices");
   if (id === "registration") return pathname.startsWith("/registration");
   if (id === "due-dates") return pathname.startsWith("/due-dates");
+  if (id === "duty-overlap") return pathname.startsWith("/duty-overlap");
   if (id === "training") return pathname.startsWith("/training");
   if (id === "catalog") return pathname.startsWith("/catalog");
   if (id === "clarifications") return pathname.startsWith("/clarifications");
   if (id === "requests") return pathname.startsWith("/requests");
+  if (id === "device-book") return pathname.startsWith("/device-book");
+  if (id === "incidents") return pathname.startsWith("/incidents");
+  if (id === "field-safety") return pathname.startsWith("/field-safety");
+  if (id === "reprocessing") return pathname.startsWith("/reprocessing");
+  if (id === "constancy-cadence") return pathname.startsWith("/constancy-cadence");
+  if (id === "authority") return pathname.startsWith("/authority");
   if (id === "users") return pathname.startsWith("/users");
   if (id === "locations") return pathname.startsWith("/locations");
   if (id === "roles") return pathname.startsWith("/roles");
   if (id === "management") return pathname.startsWith("/management");
   if (id === "activity") return pathname.startsWith("/activity");
   if (id === "security") return pathname.startsWith("/security");
-  if (id === "settings") return pathname.startsWith("/settings");
+  // Security lives under Settings (v26) — keep secondary rail highlighted.
+  if (id === "settings") return pathname.startsWith("/settings") || pathname.startsWith("/security");
   return false;
+}
+
+function NavBadge({ entry, label }: { entry: NavCountEntry | undefined; label: string }) {
+  if (!entry) return null;
+  if (entry.mark) {
+    return (
+      <span
+        className={["p-nav__badge", entry.warn ? "is-warn" : ""].filter(Boolean).join(" ")}
+        aria-label={label}
+        data-testid="nav-badge-mark"
+      >
+        {entry.mark}
+      </span>
+    );
+  }
+  if (entry.count == null) return null;
+  return (
+    <span
+      className={["p-nav__badge", entry.warn ? "is-warn" : ""].filter(Boolean).join(" ")}
+      aria-label={label}
+      data-testid="nav-badge-count"
+    >
+      {entry.count > 99 ? "99+" : entry.count}
+    </span>
+  );
 }
 
 function NavLink({
   item,
   pathname,
   label,
+  countEntry,
 }: {
   item: MenuModule;
   pathname: string;
   label: string;
+  countEntry?: NavCountEntry;
 }) {
   const active = isNavActive(item.id, pathname);
+  const t = useTranslations("nav");
+  const badgeAria =
+    countEntry?.mark && countEntry.warn
+      ? t("badgeWarn", { label })
+      : countEntry?.count != null
+        ? t("badgeCount", { label, count: countEntry.count })
+        : undefined;
   return (
     <Link
       href={item.href}
@@ -214,6 +311,7 @@ function NavLink({
     >
       <NavIcon id={item.id} />
       <span className="p-nav__label">{label}</span>
+      <NavBadge entry={countEntry} label={badgeAria ?? label} />
     </Link>
   );
 }
@@ -234,17 +332,21 @@ export function AppShell({
   testId?: string;
 }) {
   const t = useTranslations("nav");
-  const [open, setOpen] = useState(false);
+  const tCommissioning = useTranslations("commissioning");
+  const [open, setOpen] = useState(true);
+  const [adminCollapsed, setAdminCollapsed] = useState(false);
   const pathname = usePathname();
   const { signOut } = useSession();
   const { permissionData, checkPermission } = usePermissions();
   useOnlineStatus();
 
   const showNav = checkPermission("shell:nav");
+  const canSearchBestand = checkPermission("inventory:view");
   const isCapturerChrome = !showNav;
   const onHome = pathname === APP_HOME_PATH;
   const showCapturerInventory = !showNav && onHome && checkPermission("inventory:view");
   const showCapturerSecurity = !showNav && checkPermission("account:security");
+  const showCapturerDeviceBook = !showNav && checkPermission("devicebook:view");
   const showCapturerHome = !showNav && !onHome;
   /** Desktop status-bar Scan tabs; phone/tablet use bottom bar — Inventory lives in those tabs. */
   const showDesktopScanTabs = showCapturerInventory && form === "full";
@@ -256,6 +358,11 @@ export function AppShell({
   const primary = menu.filter((m) => m.id !== "settings");
   const settingsItem = menu.find((m) => m.id === "settings");
   const settingsActive = Boolean(settingsItem && isNavActive("settings", pathname));
+  const { counts } = useNavCounts(showNav);
+  const { progress, loading: setupLoading } = useSetupProgress(showNav);
+  /** Mockup: chip above nav while open criteria remain (`showChip` from API). */
+  const showSetupChip =
+    showNav && (setupLoading || !progress || progress.showChip);
   const grouped = CLINIC_NAV_GROUPS.map((g) => ({
     ...g,
     items: primary.filter((m) => m.group === g.id),
@@ -263,6 +370,20 @@ export function AppShell({
   const ungrouped = primary.filter(
     (m) => !m.group || !CLINIC_NAV_GROUPS.some((g) => g.id === m.group),
   );
+
+  function countFor(id: MenuModuleId): NavCountEntry | undefined {
+    const key = MENU_ID_TO_NAV_COUNT[id];
+    if (!key || !counts) return undefined;
+    return (counts as NavCountsResponse)[key];
+  }
+
+  useEffect(() => {
+    try {
+      setAdminCollapsed(window.localStorage.getItem(ADMIN_COLLAPSE_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (!showCapturerInventory) return;
@@ -279,6 +400,23 @@ export function AppShell({
     };
   }, [showCapturerInventory, setInventoryCount]);
 
+  const toggleAdmin = () => {
+    setAdminCollapsed((v) => {
+      const next = !v;
+      try {
+        window.localStorage.setItem(ADMIN_COLLAPSE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const nextStepLabel =
+    progress?.nextStepTitleKey != null
+      ? tCommissioning(`steps.${progress.nextStepTitleKey}` as "steps.sites")
+      : null;
+
   return (
     <div
       className={["p-screen", showNav ? "p-screen--nav" : ""].filter(Boolean).join(" ")}
@@ -287,69 +425,135 @@ export function AppShell({
       data-testid={testId}
     >
       {showNav && (
-        <>
-          <button
-            type="button"
-            className="p-nav-toggle"
-            aria-label={open ? t("collapse") : t("expand")}
-            aria-expanded={open}
-            data-testid="nav-toggle"
-            onClick={() => setOpen((v) => !v)}
-          >
-            <MenuIcon />
-          </button>
-
-          <aside className="p-nav" aria-label={t("main")} data-testid="app-nav">
-            <nav className="p-nav__primary">
-              {grouped.map((g) => (
-                <div key={g.id} className="p-nav__group" data-testid={`nav-group-${g.id}`}>
-                  <p className="p-nav__group-label">{t(g.labelKey)}</p>
-                  {g.items.map((item) => (
-                    <NavLink
-                      key={item.id}
-                      item={item}
-                      pathname={pathname}
-                      label={t(item.id as "inventory")}
-                    />
-                  ))}
-                </div>
-              ))}
-              {ungrouped.map((item) => (
-                <NavLink
-                  key={item.id}
-                  item={item}
-                  pathname={pathname}
-                  label={t(item.id as "inventory")}
-                />
-              ))}
-            </nav>
-
-            <div className="p-nav__secondary">
-              {settingsItem && (
-                <Link
-                  href={settingsItem.href}
-                  className={navItemClass(settingsActive)}
-                  title={t("settings")}
-                  data-testid="settings-button"
-                  aria-current={settingsActive ? "page" : undefined}
-                >
-                  <SettingsIcon />
-                  <span className="p-nav__label">{t("settings")}</span>
-                </Link>
-              )}
-              <button
-                type="button"
-                className={navItemClass(false)}
-                title={t("logout")}
-                data-testid="sign-out"
-                onClick={() => void signOut()}
+        <aside className="p-nav" aria-label={t("main")} data-testid="app-nav">
+          <div className="p-nav__tools">
+            {canSearchBestand && (
+              <Suspense fallback={<div className="p-nav__search" aria-hidden />}>
+                <NavBestandSearch navOpen={open} onEnsureNavOpen={() => setOpen(true)} />
+              </Suspense>
+            )}
+            {showSetupChip && (
+              <Link
+                href="/commissioning"
+                className="p-nav__setup"
+                data-testid="nav-setup-chip"
+                title={
+                  progress
+                    ? t("setupTitle", { done: progress.done, total: progress.total })
+                    : t("setupTitle", { done: 0, total: 10 })
+                }
               >
-                <LogoutIcon />
-                <span className="p-nav__label">{t("logout")}</span>
-              </button>
-            </div>
-          </aside>
-        </>
+                <span className="p-nav__setup-label">
+                  {progress
+                    ? t("setupTitle", { done: progress.done, total: progress.total })
+                    : t("setupLoading")}
+                </span>
+                <span className="p-nav__setup-track" aria-hidden>
+                  <span
+                    className="p-nav__setup-fill"
+                    style={{
+                      width: progress
+                        ? `${Math.round((progress.done / Math.max(progress.total, 1)) * 100)}%`
+                        : "0%",
+                    }}
+                  />
+                </span>
+                {nextStepLabel ? (
+                  <span className="p-nav__setup-next">
+                    {t("setupNext", { step: nextStepLabel })}
+                  </span>
+                ) : null}
+              </Link>
+            )}
+          </div>
+
+          <nav className="p-nav__primary">
+            {grouped.map((g) => {
+              const collapsed = g.collapsible && adminCollapsed;
+              return (
+                <div
+                  key={g.id}
+                  className="p-nav__group"
+                  data-testid={`nav-group-${g.id}`}
+                  data-collapsed={collapsed ? "true" : "false"}
+                >
+                  {g.collapsible ? (
+                    <button
+                      type="button"
+                      className="p-nav__group-head"
+                      aria-expanded={!collapsed}
+                      data-testid={`nav-group-toggle-${g.id}`}
+                      onClick={toggleAdmin}
+                    >
+                      <span className="p-nav__group-head-label">{t(g.labelKey)}</span>
+                      <GroupChevron collapsed={collapsed} />
+                    </button>
+                  ) : (
+                    <p className="p-nav__group-label">{t(g.labelKey)}</p>
+                  )}
+                  <div className="p-nav__group-items">
+                    {g.items.map((item) => (
+                      <NavLink
+                        key={item.id}
+                        item={item}
+                        pathname={pathname}
+                        label={t(item.id as "inventory")}
+                        countEntry={countFor(item.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            {ungrouped.map((item) => (
+              <NavLink
+                key={item.id}
+                item={item}
+                pathname={pathname}
+                label={t(item.id as "inventory")}
+                countEntry={countFor(item.id)}
+              />
+            ))}
+          </nav>
+
+          <div className="p-nav__chrome">
+            <button
+              type="button"
+              className="p-nav-toggle"
+              aria-label={open ? t("collapse") : t("expand")}
+              aria-expanded={open}
+              data-testid="nav-toggle"
+              onClick={() => setOpen((v) => !v)}
+            >
+              {open ? <NavCollapseIcon /> : <NavExpandIcon />}
+            </button>
+          </div>
+
+          <div className="p-nav__secondary">
+            {settingsItem && (
+              <Link
+                href={settingsItem.href}
+                className={navItemClass(settingsActive)}
+                title={t("settings")}
+                data-testid="settings-button"
+                aria-current={settingsActive ? "page" : undefined}
+              >
+                <SettingsIcon />
+                <span className="p-nav__label">{t("settings")}</span>
+              </Link>
+            )}
+            <button
+              type="button"
+              className={navItemClass(false)}
+              title={t("logout")}
+              data-testid="sign-out"
+              onClick={() => void signOut()}
+            >
+              <LogoutIcon />
+              <span className="p-nav__label">{t("logout")}</span>
+            </button>
+          </div>
+        </aside>
       )}
 
       <div className="p-screen-body">
@@ -362,6 +566,7 @@ export function AppShell({
           inventoryCount={inventoryCount}
           onOpenInventory={openInventory}
           showSecurity={showCapturerSecurity}
+          showDeviceBook={showCapturerDeviceBook}
           showHome={showCapturerHome}
           showScanTabs={showDesktopScanTabs && scanNavEnabled}
           useCornerMenu={isCapturerChrome}

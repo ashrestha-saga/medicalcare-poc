@@ -83,6 +83,7 @@ function useAccountSubtitle(pathname: string): string | undefined {
   if (pathname.startsWith("/roles")) return t("subtitleRoles");
   if (pathname.startsWith("/settings")) return t("subtitleSettings");
   if (pathname.startsWith("/management")) return t("subtitleManagement");
+  if (pathname.startsWith("/commissioning")) return t("subtitleCommissioning");
   if (pathname.startsWith("/activity")) return t("subtitleActivity");
   if (pathname.startsWith("/due-dates")) return t("subtitleDueDates");
   if (pathname.startsWith("/training")) return t("subtitleTraining");

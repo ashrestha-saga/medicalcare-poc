@@ -71,6 +71,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "AuthorityNotification",
   "NotificationDocument",
   "ModelDocument",
+  "ExportLog",
 ]);
 
 /** Required-tenantId models that stay off the guard (must filter manually or use bypass). */

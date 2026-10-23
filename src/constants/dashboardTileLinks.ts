@@ -25,14 +25,14 @@ export const DASHBOARD_TILE_LINKS: Record<string, DashboardTileLink> = {
 
   "freigabe-blockiert": { path: "/devices", query: { state: "draft" } },
   "bestand-zustand": { path: "/devices" },
-  bestandsverzeichnis: { path: "/devices", query: { state: "released" } },
+  bestandsverzeichnis: { path: "/devices", query: { tab: "released" } },
   "meine-geraete": { path: "/devices", query: { mineArea: "1" } },
   "gesperrte-geraete": { path: "/devices", query: { state: "not_released", mineArea: "1" } },
   "kopplung-historie": { path: "/devices" },
   auditfaehigkeit: { path: "/devices", query: { state: "released" } },
 
-  klaerliste: { path: "/clarifications" },
-  "offene-punkte-standort": { path: "/clarifications" },
+  klaerliste: { path: "/devices", query: { tab: "klaerliste" } },
+  "offene-punkte-standort": { path: "/devices", query: { tab: "klaerliste" } },
 
   "vorkommnis-unbewertet": { path: "/incidents", query: { view: "unassessed" } },
   "vorkommnis-ungemeldet": { path: "/incidents", query: { view: "unreported" } },

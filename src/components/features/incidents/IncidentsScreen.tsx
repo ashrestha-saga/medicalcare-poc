@@ -6,7 +6,12 @@ import {
   RecordNotificationModal,
   type NotificationSubject,
 } from "@/components/features/authority/RecordNotificationModal";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
+import {
+  AdminListCard,
+  ResponsiveTableSwitch,
+} from "@/components/features/shared/ResponsiveTableSwitch";
 import {
   useIncidentsList,
   type IncidentView,
@@ -100,13 +105,12 @@ export function IncidentsScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="incidents-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={t("denied")}>
-            <p className="text-sm text-muted-foreground">{t("denied")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={t("denied")}
+        hint={t("denied")}
+        testId="incidents-denied"
+      />
     );
   }
 
@@ -493,85 +497,68 @@ export function IncidentsScreen() {
           ) : list.incidents.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("empty")}</p>
           ) : (
-            <div className="overflow-x-auto rounded-md border border-border bg-card">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="border-b border-border text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2.5">{t("col.date")}</th>
-                    <th className="px-3 py-2.5">{t("col.device")}</th>
-                    <th className="px-3 py-2.5">{t("col.incident")}</th>
-                    <th className="px-3 py-2.5">{t("col.severity")}</th>
-                    <th className="px-3 py-2.5">{t("col.report")}</th>
-                    <th className="px-3 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.incidents.map((inc) => {
-                    const selected = maskTarget?.id === inc.id;
-                    return (
-                      <tr
-                        key={inc.id}
-                        className={cn(
-                          "border-b border-border last:border-0",
-                          selected && "bg-muted/40",
-                        )}
-                        data-testid={`incident-${inc.id}`}
-                      >
-                        <td className="px-3 py-3 font-mono text-xs whitespace-nowrap">
-                          {formatDate(inc.occurredAt)}
-                        </td>
-                        <td className="px-3 py-3">
-                          <b className="font-mono text-xs">
-                            {inc.inventoryNumber ?? t("modelLevel")}
-                          </b>
-                          {inc.deviceLabel ? (
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              {inc.deviceLabel}
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-3">
-                          <span>{inc.description}</span>
-                          {inc.harmDescription ? (
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              {inc.harmDescription}
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-3">
-                          {severityChip(inc)}
-                          {inc.assessedBy && inc.assessedAt ? (
-                            <span className="mt-1 block text-xs text-muted-foreground">
-                              {inc.assessedBy}, {formatDate(inc.assessedAt)}
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="px-3 py-3 text-xs">{reportCell(inc)}</td>
-                        <td className="px-3 py-3 text-right whitespace-nowrap">
-                          <div className="flex flex-col items-end gap-1">
-                            {list.canManage && !inc.closedAt ? (
-                              <button
-                                type="button"
-                                className="text-[12.5px] font-semibold text-primary hover:underline"
-                                data-testid={`incident-assess-${inc.id}`}
-                                onClick={() => openMask(inc)}
-                              >
-                                {t("actions.assess")}
-                              </button>
-                            ) : inc.closedAt ? (
-                              <span className="text-xs text-muted-foreground">
-                                {t("closed", { date: formatDate(inc.closedAt) })}
-                              </span>
-                            ) : null}
-                            {list.canManage &&
-                            inc.suspectedSerious === true &&
-                            !inc.reportedAt &&
-                            !inc.closedAt ? (
-                              <button
-                                type="button"
-                                className="text-[12.5px] font-semibold text-primary hover:underline"
-                                data-testid={`incident-notify-${inc.id}`}
-                                onClick={() =>
+            <ResponsiveTableSwitch
+              table={
+                <div className="overflow-x-auto rounded-md border border-border bg-card">
+                  <table className="w-full min-w-[720px] text-left text-sm">
+                    <thead className="border-b border-border text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2.5">{t("col.date")}</th>
+                        <th className="px-3 py-2.5">{t("col.device")}</th>
+                        <th className="px-3 py-2.5">{t("col.incident")}</th>
+                        <th className="px-3 py-2.5">{t("col.severity")}</th>
+                        <th className="px-3 py-2.5">{t("col.report")}</th>
+                        <th className="px-3 py-2.5" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.incidents.map((inc) => {
+                        const selected = maskTarget?.id === inc.id;
+                        return (
+                          <tr
+                            key={inc.id}
+                            className={cn(
+                              "border-b border-border last:border-0",
+                              selected && "bg-muted/40",
+                            )}
+                            data-testid={`incident-${inc.id}`}
+                          >
+                            <td className="px-3 py-3 font-mono text-xs whitespace-nowrap">
+                              {formatDate(inc.occurredAt)}
+                            </td>
+                            <td className="px-3 py-3">
+                              <b className="font-mono text-xs">
+                                {inc.inventoryNumber ?? t("modelLevel")}
+                              </b>
+                              {inc.deviceLabel ? (
+                                <span className="mt-0.5 block text-xs text-muted-foreground">
+                                  {inc.deviceLabel}
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span>{inc.description}</span>
+                              {inc.harmDescription ? (
+                                <span className="mt-0.5 block text-xs text-muted-foreground">
+                                  {inc.harmDescription}
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-3">
+                              {severityChip(inc)}
+                              {inc.assessedBy && inc.assessedAt ? (
+                                <span className="mt-1 block text-xs text-muted-foreground">
+                                  {inc.assessedBy}, {formatDate(inc.assessedAt)}
+                                </span>
+                              ) : null}
+                            </td>
+                            <td className="px-3 py-3 text-xs">{reportCell(inc)}</td>
+                            <td className="px-3 py-3 text-right whitespace-nowrap">
+                              <IncidentRowActions
+                                inc={inc}
+                                canManage={list.canManage}
+                                onAssess={() => openMask(inc)}
+                                onNotify={() =>
                                   setNotifySubject({
                                     type: "incident",
                                     id: inc.id,
@@ -579,18 +566,55 @@ export function IncidentsScreen() {
                                     defaultBody: inc.description,
                                   })
                                 }
-                              >
-                                {tn("record")}
-                              </button>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                                assessLabel={t("actions.assess")}
+                                closedLabel={
+                                  inc.closedAt
+                                    ? t("closed", { date: formatDate(inc.closedAt) })
+                                    : null
+                                }
+                                notifyLabel={tn("record")}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              }
+              cards={list.incidents.map((inc) => (
+                <AdminListCard
+                  key={inc.id}
+                  testId={`incident-${inc.id}`}
+                  title={inc.inventoryNumber ?? t("modelLevel")}
+                  subtitle={`${formatDate(inc.occurredAt)}${inc.deviceLabel ? ` · ${inc.deviceLabel}` : ""}`}
+                  actions={
+                    <IncidentRowActions
+                      inc={inc}
+                      canManage={list.canManage}
+                      onAssess={() => openMask(inc)}
+                      onNotify={() =>
+                        setNotifySubject({
+                          type: "incident",
+                          id: inc.id,
+                          defaultSubject: `Vorkommnismeldung ${inc.id}`,
+                          defaultBody: inc.description,
+                        })
+                      }
+                      assessLabel={t("actions.assess")}
+                      closedLabel={
+                        inc.closedAt ? t("closed", { date: formatDate(inc.closedAt) }) : null
+                      }
+                      notifyLabel={tn("record")}
+                    />
+                  }
+                >
+                  <p className="text-foreground">{inc.description}</p>
+                  <div>{severityChip(inc)}</div>
+                  <p className="text-xs">{reportCell(inc)}</p>
+                </AdminListCard>
+              ))}
+            />
           )}
         </ListPageShell>
       </main>
@@ -601,6 +625,51 @@ export function IncidentsScreen() {
         subject={notifySubject}
         onRecorded={() => void list.refresh()}
       />
+    </div>
+  );
+}
+
+function IncidentRowActions({
+  inc,
+  canManage,
+  onAssess,
+  onNotify,
+  assessLabel,
+  closedLabel,
+  notifyLabel,
+}: {
+  inc: DeviceIncidentDTO;
+  canManage: boolean;
+  onAssess: () => void;
+  onNotify: () => void;
+  assessLabel: string;
+  closedLabel: string | null;
+  notifyLabel: string;
+}) {
+  return (
+    <div className="flex flex-col items-end gap-1">
+      {canManage && !inc.closedAt ? (
+        <button
+          type="button"
+          className="text-xs font-semibold text-primary hover:underline"
+          data-testid={`incident-assess-${inc.id}`}
+          onClick={onAssess}
+        >
+          {assessLabel}
+        </button>
+      ) : closedLabel ? (
+        <span className="text-xs text-muted-foreground">{closedLabel}</span>
+      ) : null}
+      {canManage && inc.suspectedSerious === true && !inc.reportedAt && !inc.closedAt ? (
+        <button
+          type="button"
+          className="text-xs font-semibold text-primary hover:underline"
+          data-testid={`incident-notify-${inc.id}`}
+          onClick={onNotify}
+        >
+          {notifyLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

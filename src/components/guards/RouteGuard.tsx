@@ -2,7 +2,9 @@
 
 import type { ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Loading } from "@/components/ui/Loading";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 
 /**
@@ -11,6 +13,7 @@ import { usePermissions } from "@/lib/providers/PermissionProvider";
  */
 export function RouteGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const t = useTranslations("common");
   const { permissionsLoading, checkRouteAccess } = usePermissions();
 
   if (permissionsLoading) {
@@ -19,14 +22,11 @@ export function RouteGuard({ children }: { children: ReactNode }) {
 
   if (!checkRouteAccess(pathname, "get")) {
     return (
-      <div className="p-work" data-testid="forbidden">
-        <main className="p-main">
-          <section className="p-devhead">
-            <h2>Access denied</h2>
-            <p className="p-requests__sub">You do not have permission to open this page.</p>
-          </section>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("denied")}
+        description={t("contactAdmin")}
+        testId="forbidden"
+      />
     );
   }
 

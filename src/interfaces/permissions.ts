@@ -5,6 +5,7 @@ export type PermissionSlug =
   | "shell:nav"
   | "inventory:view"
   | "inventory:update"
+  | "inventory:export"
   | "catalog:view"
   | "catalog:update"
   | "clarifications:view"
@@ -102,9 +103,14 @@ export type MenuModuleId =
   | "console-activity"
   | "console-settings";
 
-/** Clinic groups mirror mockup v22; console keeps ops | org. */
+/** Clinic groups mirror mockup v26; console keeps ops | org. */
 export type MenuGroupId =
   | "overview"
+  | "devices"
+  | "records"
+  | "reports"
+  | "admin"
+  /** @deprecated v22 — kept for partner console / legacy refs */
   | "work"
   | "safety"
   | "aufbereitung"

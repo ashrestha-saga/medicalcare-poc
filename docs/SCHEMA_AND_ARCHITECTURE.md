@@ -1,6 +1,6 @@
 # DeviceCare — Schema & Architecture
 
-Detailed reference for the Prisma/MySQL data model and how the application layers use it. For product behaviour, screens, and env setup see also [`PROJECT.md`](./PROJECT.md).
+Detailed reference for the Prisma/MySQL data model and how the application layers use it. For product behaviour, screens, and env setup see also [`PROJECT.md`](./PROJECT.md). For large multi-tenant demo seed coverage and gaps see [`demo-seed-coverage.md`](./demo-seed-coverage.md).
 
 ---
 
@@ -15,7 +15,7 @@ Detailed reference for the Prisma/MySQL data model and how the application layer
 7. [Security (schema-related)](#7-security-schema-related)
 8. [Entity relationship (simplified)](#8-entity-relationship-simplified)
 9. [Adapter boundary](#9-adapter-boundary)
-10. [Seeded clinic users](#10-seeded-clinic-users)
+10. [Seed data](#10-seed-data) (app seed users + large demo pack)
 
 Schema domains in §4 include tenancy, devices, Ref*, classification/duties, partners, training, requests/dispatch, **Prüfpartner (§4.8)**, and ops (§4.9).
 
@@ -240,7 +240,7 @@ Each domain starts with a **quick-reference table**, then a longer write-up per 
 
 | Model | Purpose | Where it works |
 |---|---|---|
-| **DeviceModel** | Article master (UDI-DI/GTIN, manufacturer, risk class, EMDN…). `source`: manual \| catalog \| beudamed \| wizard. `state`: draft \| review \| released | Catalog UI, resolve stages 2–3, Erstanlage classification, training subject |
+| **DeviceModel** | Article master (UDI-DI/GTIN, manufacturer, risk class, EMDN…). **Global** (no `tenantId`). `source`: manual \| catalog \| beudamed \| wizard. `state`: draft \| review \| released | Catalog UI, resolve stages 2–3, Erstanlage classification, training subject |
 | **DeviceInstance** | One physical unit. Unique `(tenantId, inventoryNumber)`. States: draft \| review \| released \| retired | Resolve stage 1, `/devices`, inventarize, Erstanlage release, duties, due-dates |
 | **ExternalSourceRecord** | Cached BEUDAMED/OXID payloads | Resolve stage 3 cache (~90 days), external call path |
 | **CapturedArticle** | Stage-4 unknown device; `serviceOnly=true` forced | `POST /api/captures`; blocks spare-parts path |
@@ -260,14 +260,18 @@ Each domain starts with a **quick-reference table**, then a longer write-up per 
 
 **Purpose:** Article / type master — “what kind of device is this?” Shared across tenants for the product identity (GTIN, UDI-DI, manufacturer, trade/model name, risk class, EMDN/GMDN). Not a stock unit.
 
+**Tenancy:** **Global** — no `tenantId`. Omitted from `TENANT_SCOPED_MODELS`. One row is visible to every clinic. Tenant-scoped artefacts hang off it: `DeviceInstance`, `ModelDocument`, and (after release) per-instance duties/snapshots.
+
 **Key fields:** `basicUdiDi` (unique when set), `udiDi`, `gtins` (JSON array as text), `source` (`manual` \| `catalog` \| `beudamed` \| `wizard`), `state` (`draft` \| `review` \| `released`), optional `maintenanceCycleMonths` as model-level default.
+
+**Who writes:** Clinic users with `catalog:update` (default: `superadmin`, `device_admin`) via catalog UI / XLSX import; resolve may create/update from OXID (`source=catalog`) or BEUDAMED (`source=beudamed`); Erstanlage inventarize may create `source=wizard`. Partner acting sessions strip `catalog:update`. There is **no** platform approval gate yet — `state` exists but clinic writers can publish shared masters today.
 
 **In the app:**
 
 - Catalog browse / edit / XLSX import (`/catalog`, `deviceModelCatalogService`)
 - Resolve stages 2–3 (local match, then OXID; BEUDAMED may create/update in `review`)
 - Anchor for `DeviceModelClassification` and model-scoped training events
-- Reclassify wizard (`/registration/reclassify/[modelId]`) updates classification for all tenant copies of the model
+- Reclassify wizard (`/registration/reclassify/[modelId]`) updates the **shared** open classification, then re-freezes **this tenant’s** instance copies (see classification tenancy note below)
 
 #### DeviceInstance
 
@@ -398,7 +402,7 @@ These tables are **not** tenant-scoped. They are seeded once (`prisma/seeds/`, `
 
 | Model | Purpose | Where it works |
 |---|---|---|
-| **DeviceModelClassification** | Historised model Einstufung (`validTo` null = open). STK/MTK/radiation/software; optional `mtkItemId`, **`appliedPartCode`**, **`deviceFamilyCode`**. C4: productKindCode, characteristics, fieldStates, decisions, deferredFields | Erstanlage, reclassify, catalogue resolution (STK family steps / patient leakage) |
+| **DeviceModelClassification** | Historised model Einstufung (`validTo` null = open). **Global today** (no `tenantId`; one open per `deviceModelId`). STK/MTK/radiation/software; optional `mtkItemId`, **`appliedPartCode`**, **`deviceFamilyCode`**. C4: productKindCode, characteristics, fieldStates, decisions, deferredFields | Erstanlage, reclassify, catalogue resolution (STK family steps / patient leakage) |
 | **DeviceReleaseSnapshot** | Immutable freeze at release (characteristics, derivedDuties, prerequisites JSON + evidence ids) | `POST /api/registration/release` |
 | **DeviceDuty** | Frozen per-instance obligations + `dueAt`; category (inspection\|operating), setsBaseline / requiresBaseline, referenceDeviceId | `/due-dates`, device duties APIs, assignment → service request |
 | **DeviceEvidence** | Commissioning evidence (blob or external ref) keyed by prerequisiteCode | Erstanlage prerequisites / release gate |
@@ -411,6 +415,12 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 #### DeviceModelClassification
 
 **Purpose:** Historised **Einstufung** at model level (STK yes/no, MTK annex item, radiation, software class, confidence, evidence). Open row = `validTo` null; reclassify closes the old row and inserts a new one.
+
+**Tenancy (current):** **Global** — no `tenantId`. Uniqueness while open: `openClassificationKey = deviceModelId` (SCH-02). Not in `TENANT_SCOPED_MODELS`. Erstanlage prefill, catalog edit, and reclassify therefore share one open Einstufung across all clinics that use the model.
+
+**Multi-tenant implication:** Reclassify / catalog classification update closes the single global open row and creates a new one, but only re-releases **the acting tenant’s** instances. Other tenants keep old living `DeviceDuty` rows while catalogue/prefill flip to the new Einstufung. Living schedules (`DeviceDuty`, instance maintenance fields) are already tenant-scoped; the leak is the shared open classification.
+
+**Recommended direction (not implemented):** keep `DeviceModel` global; add `tenantId` on classification with `openClassificationKey = tenantId:deviceModelId` (same pattern as `ReprocessingOnDevice.openLinkKey`). Lazy: one open row per tenant that classifies that model — not N×full catalogue. See also [`demo-seed-coverage.md`](./demo-seed-coverage.md).
 
 **Key Prüfpartner fields (on the open row):**
 
@@ -838,7 +848,7 @@ Offline replay rules: 2xx remove · 409 mark synced · 400/404/422 keep with err
 - **SEC-03 session revoke:** `User.sessionsValidFrom` — on deactivate, role change, or password reset the timestamp is bumped; `readSession` rejects cookies whose `iat` is older.
 - **SEC-04 lockout:** `failedLoginAttempts` / `lockedUntil` on `User` (threshold via `AUTH_MAX_FAILED_LOGINS`, duration via `AUTH_LOCKOUT_MINUTES`).
 - Passwords: hashed (`src/lib/password`); TOTP, OXID tokens, and SMTP `passEnc` AES-GCM via `src/lib/crypto/secretBox.ts`.
-- **SEC-01 tenant guard:** `AsyncLocalStorage` bound in `requireTenantContext` / `requireActingContext`; Prisma `$extends` injects `tenantId` on tenant-scoped models and throws if no context. Seed/tests/jobs use `runWithoutTenant` / `bindTenantBypass`. Unguarded client: `prismaSystem`. `UserInvitation` is allowlisted when clinic-scoped; org-scoped invites and redeem use `runWithoutTenantAsync`. `PasswordResetToken` is tenant-scoped; redeem runs without tenant.
+- **SEC-01 tenant guard:** `AsyncLocalStorage` bound in `requireTenantContext` / `requireActingContext`; Prisma `$extends` injects `tenantId` on tenant-scoped models and throws if no context. Seed/tests/jobs use `runWithoutTenant` / `bindTenantBypass`. Unguarded client: `prismaSystem`. `UserInvitation` is allowlisted when clinic-scoped; org-scoped invites and redeem use `runWithoutTenantAsync`. `PasswordResetToken` is tenant-scoped; redeem runs without tenant. **Global by design (not guarded):** `DeviceModel`, `DeviceModelClassification`, `ExternalSourceRecord`, all `Ref*`, `Organisation` / partner membership graphs, `RoleGrant`.
 - **SEC-02:** child tables (`Attachment`, `StatusEvent`, `DispatchRecord`, `OrderItem`, `Area`, `SiteHeadcount`, `SafetyOfficerAppointment`) carry `tenantId` with FK.
 - **SEC-06:** MySQL triggers reject `UPDATE`/`DELETE` on `AuditEvent` (append-only). App DB user should also lack those privileges (ops).
 - **SEC-07 invites & resets:** `UserInvitation` + hashed token (optional clinic `permissions` snapshot → `UserPermission`); `PasswordResetToken` + hashed token. Redeem sets password (no session cookie from the link).
@@ -902,7 +912,7 @@ Schedule both URLs from external cron (e.g. every 15 minutes). Failed dispatch t
 ### SCH uniqueness
 
 - `DeviceInstance` unique `(tenantId, modelId, serialNumber)` (NULLs allowed).
-- `DeviceModelClassification.openClassificationKey` unique while open (`= deviceModelId`, cleared when `validTo` set).
+- `DeviceModelClassification.openClassificationKey` unique while open (`= deviceModelId` today — **one open Einstufung per model globally**; cleared when `validTo` set). Future tenant-scoped design would use `` `${tenantId}:${deviceModelId}` ``.
 
 ---
 
@@ -959,7 +969,11 @@ Schema and BFF stay the same; only adapter implementations under `src/services/a
 
 ---
 
-## 10. Seeded clinic users
+## 10. Seed data
+
+### 10.1 App seed (`prisma/seed.ts`)
+
+Small clinic + partner + Ref* bootstrap for local development.
 
 | Email | Name | Role |
 |---|---|---|
@@ -968,12 +982,23 @@ Schema and BFF stay the same; only adapter implementations under `src/services/a
 | `clara@demo.local` | Clara Sicherheit | `security_officer` |
 | `ben@demo.local` | Ben Pflege | `user` |
 
-Password for all demo clinic accounts: **`demo`**. Use the clinic login door. Partner demo users are seeded separately (`prisma/seeds/partnerOrgs.ts`).
+Password for all demo clinic accounts: **`demo`**. Use the clinic login door. Partner demo users, contracts, and Prüfpartner catalogues/equipment are seeded separately (`prisma/seeds/partnerOrgs.ts`, `refPruefpartner.ts`, …).
+
+### 10.2 Large multi-tenant demo pack (`seed/`)
+
+In-repo pack: **4 tenants** (T-KLN, T-MVZ, T-HZF, T-RSG), **5 000** shared `DeviceModel` + open classification, **528** instances, **101** clinic users, plus a **process layer** (~115 release snapshots, ~155 duties, 12 service requests, MSR/RTS contracts, clarifications, training, incidents).
+
+**Still not seeded:** inspection runs / baselines, FSCA, reprocessing batches, constancy cadence, authority visits, OXID/SMTP. Classification remains **globally** open per model.
+
+Details: **[`demo-seed-coverage.md`](./demo-seed-coverage.md)** · **[`seed/README.md`](../seed/README.md)**.
+
+**Import order:** app `prisma/seed` (Refs + Prüfpartner) → `npx tsx seed/import_seed.ts`.
 
 ---
 
 ## Related docs
 
 - [`PROJECT.md`](./PROJECT.md) — product overview, screens, API surface, offline, testing
+- [`demo-seed-coverage.md`](./demo-seed-coverage.md) — large demo seed coverage, schema gaps, example effects
 - [`../README.md`](../README.md) — quick start and adapter notes
 - `prisma/schema.prisma` — canonical table definitions

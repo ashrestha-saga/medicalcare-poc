@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
+import { PageLoading } from "@/components/features/shared/PageLoading";
 import { useDashboardBoard } from "@/components/hooks/dashboard/useDashboardBoard";
 import { Button } from "@/components/ui/button";
 import type { DashboardTileDTO } from "@/interfaces";
@@ -31,30 +33,32 @@ export function DashboardScreen() {
 
   if (!canView) {
     return (
-      <div className="p-work" data-testid="dashboard-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={t("denied")}>
-            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={t("denied")}
+        hint={tCommon("contactAdmin")}
+        testId="dashboard-denied"
+      />
     );
   }
 
   return (
     <div className="p-work" data-testid="dashboard-page">
       <main className="p-main">
-        <ListPageShell title={t("title")} description={t("description")}>
-          {canManageTiles ? (
-            <div className="mb-4">
+        <ListPageShell
+          variant="board"
+          title={t("title")}
+          description={t("description")}
+          headerExtra={
+            canManageTiles ? (
               <Button asChild variant="outline" size="sm">
                 <Link href="/dashboard/assignments">{t("tileAssignments")}</Link>
               </Button>
-            </div>
-          ) : null}
-
+            ) : null
+          }
+        >
           {loading || !board ? (
-            <p className="text-sm text-muted-foreground">{tCommon("loading")}</p>
+            <PageLoading label={tCommon("loading")} />
           ) : (
             <div className="space-y-6">
               <InventoryOverview tiles={board.overview} />

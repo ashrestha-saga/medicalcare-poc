@@ -1,4 +1,6 @@
-import { RequiredMark } from "@/components/ui/RequiredMark";
+import type { ReactNode } from "react";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 interface FieldProps {
   label: string;
@@ -6,31 +8,59 @@ interface FieldProps {
   hint?: string;
   error?: string | null;
   required?: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
+  className?: string;
+  /** Optional data-field key for tests / scroll-to-error. */
+  fieldKey?: string;
 }
 
-export function Field({ label, htmlFor, hint, error, required, children }: FieldProps) {
+/**
+ * Admin/console form field: muted eyebrow label + control + hint/error.
+ * Use on clinic admin + partner screens; field BEM flows keep `.p-field`.
+ */
+export function Field({
+  label,
+  htmlFor,
+  hint,
+  error,
+  required,
+  children,
+  className,
+  fieldKey,
+}: FieldProps) {
   return (
-    <div className="space-y-1.5">
-      <label htmlFor={htmlFor} className="block text-sm font-medium text-ink">
+    <div className={cn("grid gap-1.5", className)} data-field={fieldKey}>
+      <Label
+        htmlFor={htmlFor}
+        required={required}
+        className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+      >
         {label}
-        {required ? (
-          <>
-            {" "}
-            <RequiredMark />
-          </>
-        ) : null}
-      </label>
+      </Label>
       {children}
-      {error ? <p className="text-xs text-danger">{error}</p> : hint ? <p className="text-xs text-ink-faint">{hint}</p> : null}
+      {error ? (
+        <p className="text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      ) : hint ? (
+        <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }
 
-export function SectionTitle({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) {
+export function SectionTitle({
+  children,
+  aside,
+}: {
+  children: ReactNode;
+  aside?: ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between">
-      <h3 className="t-label">{children}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {children}
+      </h3>
       {aside}
     </div>
   );

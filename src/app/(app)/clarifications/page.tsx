@@ -1,11 +1,6 @@
-import { Suspense } from "react";
-import { ClarificationsScreen } from "@/components/features/clarifications/ClarificationsScreen";
+import { redirect } from "next/navigation";
 
-/** /clarifications — inventory data-quality list (clarifications:view). */
+/** Legacy /clarifications → Bestand Klärliste tab (v26). */
 export default function ClarificationsPage() {
-  return (
-    <Suspense fallback={null}>
-      <ClarificationsScreen />
-    </Suspense>
-  );
+  redirect("/devices?tab=klaerliste");
 }

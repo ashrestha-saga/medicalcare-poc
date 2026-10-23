@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { ActivityTable } from "@/components/features/audit/activity-table";
 import { useAuditList } from "@/components/hooks/audit/useAuditList";
@@ -12,13 +13,12 @@ export function ActivityScreen() {
 
   if (!list.canView) {
     return (
-      <div className="p-work" data-testid="activity-denied">
-        <main className="p-main">
-          <ListPageShell title={t("title")} description={tCommon("denied")}>
-            <p className="text-sm text-muted-foreground">{tCommon("contactAdmin")}</p>
-          </ListPageShell>
-        </main>
-      </div>
+      <AccessDenied
+        title={t("title")}
+        description={tCommon("denied")}
+        hint={tCommon("contactAdmin")}
+        testId="activity-denied"
+      />
     );
   }
 
