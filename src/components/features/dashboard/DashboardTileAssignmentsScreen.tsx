@@ -49,7 +49,7 @@ export function DashboardTileAssignmentsScreen() {
       <main className="p-main">
         <ListPageShell title={t("assignments.title")} description={t("assignments.description")}>
           <p className="mb-4 text-sm">
-            <Link href="/dashboard" className="underline">
+            <Link href="/today" className="underline">
               {t("assignments.backDashboard")}
             </Link>
             {" · "}

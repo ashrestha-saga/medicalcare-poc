@@ -52,7 +52,7 @@ export function DashboardScreen() {
           headerExtra={
             canManageTiles ? (
               <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard/assignments">{t("tileAssignments")}</Link>
+                <Link href="/today/assignments">{t("tileAssignments")}</Link>
               </Button>
             ) : null
           }

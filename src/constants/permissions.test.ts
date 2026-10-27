@@ -19,7 +19,7 @@ describe("RBAC defaults & path guards", () => {
     expect(hasPermission("superadmin", "duties:view")).toBe(true);
     expect(permissionsForRole("superadmin")).toEqual(ROLE_PERMISSIONS.superadmin);
     expect(menuForRole("superadmin").map((m) => m.id)).toEqual([
-      "dashboard",
+      "today",
       "inventory",
       "due-dates",
       "requests",
@@ -62,7 +62,7 @@ describe("RBAC defaults & path guards", () => {
     expect(hasPermission("device_admin", "reprocessing:release")).toBe(true);
     expect(hasPermission("device_admin", "authority:view")).toBe(true);
     expect(menuForRole("device_admin").map((m) => m.id)).toEqual([
-      "dashboard",
+      "today",
       "inventory",
       "due-dates",
       "requests",

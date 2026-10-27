@@ -4,7 +4,7 @@ Mobile-first web application for clinical technicians and nursing staff: scan or
 
 This document describes how the system works, the domain model, and the technical features available in the codebase.
 
-For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) (incl. **§4.8 Prüfpartner**, transmit/withdraw handoff, SWOT finishing 30.09.: enums, reprocessing link history, deriveDuties P1–P3 / AED, RoleGrant / UserPermission / SMTP / password reset).
+For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) (incl. **§4.8 Prüfpartner**, ModelDocument IFU, ExecutorOrg↔contract sync, soft transmit / dispatch channel settings, transmit/withdraw handoff, SWOT finishing 30.09.: enums, reprocessing link history, deriveDuties P1–P3 / AED, RoleGrant / UserPermission / SMTP / password reset).
 
 ---
 
@@ -121,9 +121,11 @@ Primary entities (see `prisma/schema.prisma`):
 
 ### Requests & dispatch
 
-- **ServiceRequest** — idempotent create (`idempotencyKey` + `fingerprint`); subject is `instance` \| `model` \| `captured`; status events + attachments + dispatch records. Clinic **allocate → transmit** sets `transmittedAt` (partner visibility gate). Clinic may **withdraw** only before transmit.
+- **ServiceRequest** — idempotent create (`idempotencyKey` + `fingerprint`); subject is `instance` \| `model` \| `captured`; status events + attachments + dispatch records. Clinic **allocate → transmit** sets `transmittedAt` (partner visibility gate). Transmit is **soft** on outbound channels: if the allocated executor has no **enabled** `DispatchTarget`s, handoff still succeeds in-app and the API may return a `warning`. Clinic may **withdraw** only before transmit.
+- **ExecutorOrg** — clinic-local allocate list (`O-INT`, `O-MSR`, …). Synced from live `ServiceContract`s via `executorSyncService` (onboard / lifecycle / disposition); each executor gets a default mail `DispatchTarget` when missing.
 - **OrderRequest** — spare-parts order (separate lifecycle; approval defaults to `pending_approval`).
-- **DispatchTarget** / **DispatchRecord** — per-tenant targets (`mail`, `oxid`, `webhook`) and per-send outcomes.
+- **DispatchTarget** / **DispatchRecord** — per-tenant (and per-executor) targets (`mail`, `oxid`, `webhook`) with `enabled` flag; per-send outcomes. Clinics toggle channels under Settings.
+- **ModelDocument** — tenant-scoped IFU (and related kinds) on a **shared** `DeviceModel`. Same current IFU is used by catalog detail, Erstanlage prerequisites, device book, and scan “open IFU”.
 - **DeviceModelClassification** — historised model-level Einstufung (open row = `validTo` null). Anlage 2 via wizard; `appliedPartCode` / `deviceFamilyCode` exist on the schema for Prüfpartner but are not set by the registration UI yet.
 - **Erstanlage** — wizard holds identity/characteristics in the client; release (`POST /api/registration/release`) creates the instance and freezes duties (`DeviceReleaseSnapshot` / `DeviceDuty`). Inventarize still creates a draft and deep-links to `/registration/[id]`. Scan uses **manual** service-type select (no proposal engine).
 - **Prüfpartner** — `RefInspectionCatalogue` + steps; `InspectionRun` / `InspectionStepResult`; `BaselineMeasurement`; partner `TestEquipment`. See [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) §4.8 / §5.4.
@@ -151,7 +153,7 @@ Primary entities (see `prisma/schema.prisma`):
 | `/locations` | Sites and areas |
 | `/roles` | Role catalog (DB grants; editable with `roles:update`) |
 | `/security` | Enroll / disable TOTP (QR + backup codes) |
-| `/settings` | Tenant settings (appearance theme + OXID shop link) |
+| `/settings` | Tenant settings (appearance, **dispatch channels** per executor, OXID shop link, SMTP) |
 | `/auth/callback` | OXID OAuth2 callback (route handler) |
 
 Layouts: root, `(app)` (clinic shell), `(partner)`, `(inspect)`, `(auth)`.
@@ -196,8 +198,9 @@ Route handlers under `src/app/api/`:
 | `POST` | `/api/duties/[id]/complete` |
 | `GET` | `/api/due-dates` |
 | `POST` | `/api/due-dates/[dutyId]/assign` |
-| `GET`/`POST` | `/api/catalog/models` |
+| `GET`/`POST` | `/api/catalog/models` | List has **no row cap** (returns all matching models) |
 | `GET`/`PATCH` | `/api/catalog/models/[id]` |
+| `GET`/`POST` | `/api/catalog/models/[id]/documents` | Model IFU / docs (`ModelDocument`) |
 | `POST` | `/api/catalog/models/import` |
 
 ### Requests
@@ -232,6 +235,7 @@ Route handlers under `src/app/api/`:
 | `PATCH` | `/api/roles/[role]` | Replace grants (`roles:update`) |
 | `GET`/`POST`/`PATCH`/`DELETE` | `/api/sites` |
 | `GET`/`POST`/`DELETE` | `/api/settings/oxid` |
+| `GET`/`PATCH` | `/api/settings/dispatch-targets` | List executor channels (`settings:view`); enable/disable (`settings:smtp`) |
 | `GET`/`POST` | `/api/oxid/token`, `GET` `/api/oxid/categories` |
 | `GET` | `/api/health` |
 
@@ -312,7 +316,7 @@ Released instances reject identity/classification-changing PATCHes (`state === '
 2. **Idempotency:** same `(idempotencyKey, fingerprint)` → 200 with same reference; same key + different payload → 409; unique-constraint races handled.
 3. One transaction: create request + `captured` status event + attachments; due-date flow navigates to `/requests/[reference]`.
 4. Clinic **allocate** executor → **transmit** sets `transmittedAt` (partner portals only list transmitted assignments).
-5. Optional outbound dispatch to configured targets (isolated per target).
+5. Outbound dispatch runs only the allocated executor’s **enabled** targets (isolated per target). If none are enabled, transmit still locks handoff and may return `warning` (in-app only).
 6. **Withdraw** (pre-transmit only) deletes a wrong assignment so the duty is free again.
 7. Partner disposition → `/inspect/[reference]` for the Prüfpartner protocol (catalogue, equipment, seal / baselines).
 
@@ -334,7 +338,7 @@ Downstream systems can push status via `POST .../status`. Staff can transition o
 
 ## 10. Dispatch (mail / OXID / webhook)
 
-`dispatchService` loads tenant `DispatchTarget`s and runs adapters by type:
+`dispatchService` loads **enabled** `DispatchTarget`s for the **allocated `ExecutorOrg`** and runs adapters by type:
 
 | Type | Role |
 |---|---|
@@ -343,6 +347,10 @@ Downstream systems can push status via `POST .../status`. Staff can transition o
 | `webhook` | HTTP callback |
 
 Failures on one target do not roll back others. Export content for mail is built in `serviceDispatchExport.ts`.
+
+**Settings → Dispatch channels:** `GET`/`PATCH` `/api/settings/dispatch-targets` (`DispatchChannelsPanel`). Ensures `O-INT` and a default mail target per active executor; clinic admins with `settings:smtp` can toggle `enabled` without editing endpoints.
+
+**Soft transmit:** Missing or disabled channels do **not** block `POST …/transmit` — the assignment is still handed off (`transmittedAt` set). The response may include `warning` for the UI toast. Hard failure only when an enabled channel is attempted and fails.
 
 **SMTP resolution (owner-generic):** `SmtpSettings` stores outbound credentials per clinic `tenantId` or partner `organisationId` (password encrypted). Clinics configure under Settings → SMTP (`settings:smtp`). For mail dispatch: optional `DispatchTarget.auth` override → owner `SmtpSettings` → platform `SMTP_*` env → simulate. Invite mail uses owner settings (no target auth). `DispatchTarget.endpoint` remains the **recipient** address, not the SMTP identity.
 
@@ -386,7 +394,10 @@ Inventarnummer is **not** entered by the user and must not be confused with UDI-
 ### Catalog (`/catalog`, `/api/catalog/models`)
 
 - Browse / edit `DeviceModel` rows (permission `catalog:update` for writes — typically `superadmin` / `device_admin`).
+- List API returns **all** matching models (no hard `take` limit); large demo packs (~5 000) load in one response — use search (`q`) when possible.
 - Import via XLSX (`POST .../import`).
+- **Model documents / IFU:** catalog detail lists and publishes `ModelDocument` (`GET`/`POST …/models/[id]/documents`). Upload accept includes PDF, Markdown, plain text, Office docs, and images (service-request **photos** remain `image/*` only).
+- Same current IFU is opened from scan, optional on Erstanlage release (`publishFromEvidence`), and editable in the device book.
 - Stage 2 resolve also consults the OXID catalog adapter when local miss.
 
 ---

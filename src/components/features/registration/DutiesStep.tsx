@@ -26,7 +26,7 @@ const ORIGIN_KEYS: Record<DecisionProtocolEntry["origin"], "originConfirmed" | "
 
 function einheitLabel(
   einheit: string | undefined,
-  t: (key: "months" | "years") => string,
+  t: (key: "months" | "years" | "working_days") => string,
 ): string {
   if (!einheit) return "";
   const lower = einheit.toLowerCase();
@@ -35,6 +35,16 @@ function einheitLabel(
   }
   if (lower === "jahre" || lower === "years" || lower === "year" || lower === "jahr") {
     return t("years");
+  }
+  if (
+    lower === "working_days" ||
+    lower === "arbeitstage" ||
+    lower.includes("arbeitst") ||
+    lower.includes("taeglich") ||
+    lower.includes("täglich") ||
+    lower === "daily"
+  ) {
+    return t("working_days");
   }
   return einheit;
 }

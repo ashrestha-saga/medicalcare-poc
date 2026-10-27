@@ -36,7 +36,7 @@ export function ConstancyCadenceScreen() {
 
   const [target, setTarget] = useState<MissingCadenceRow | null>(null);
   const [intervalValue, setIntervalValue] = useState("");
-  const [intervalUnit, setIntervalUnit] = useState<"months" | "years">("months");
+  const [intervalUnit, setIntervalUnit] = useState<"months" | "years" | "working_days">("months");
   const [basisText, setBasisText] = useState("");
   const [determinedAt, setDeterminedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [hintCadence, setHintCadence] = useState<string | null>(null);
@@ -62,6 +62,7 @@ export function ConstancyCadenceScreen() {
   const unitLabel = (unit: string) => {
     if (unit === "years") return t("unit.years");
     if (unit === "months") return t("unit.months");
+    if (unit === "working_days") return t("unit.working_days");
     return unit;
   };
 
@@ -221,9 +222,12 @@ export function ConstancyCadenceScreen() {
                     id="kt-unit"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={intervalUnit}
-                    onChange={(e) => setIntervalUnit(e.target.value as "months" | "years")}
+                    onChange={(e) =>
+                      setIntervalUnit(e.target.value as "months" | "years" | "working_days")
+                    }
                     data-testid="constancy-unit"
                   >
+                    <option value="working_days">{t("unit.working_days")}</option>
                     <option value="months">{t("unit.months")}</option>
                     <option value="years">{t("unit.years")}</option>
                   </select>

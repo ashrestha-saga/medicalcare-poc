@@ -210,7 +210,7 @@ export const setupProgressService = {
       why: tl
         ? "Pflichten sieht niemand im Dashboard — Kacheln zuweisen"
         : "Jede Pflichtart hat einen Träger",
-      href: "/dashboard/assignments",
+      href: "/today/assignments",
     });
 
     // 4 Betreuung

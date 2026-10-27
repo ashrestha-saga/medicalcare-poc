@@ -46,7 +46,7 @@ export function useConstancyCadence() {
     deviceInstanceId: string;
     constancyObjectCode: string;
     intervalValue: number;
-    intervalUnit: "months" | "years";
+    intervalUnit: "months" | "years" | "working_days";
     basisText: string;
     determinedAt: string;
   }) {

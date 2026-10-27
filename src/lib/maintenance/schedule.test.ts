@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   addMonthsUtc,
+  addWorkingDaysUtc,
   computeNextMaintenanceDueAt,
   deriveMaintenanceStatus,
+  onOrAfterWorkingDayUtc,
   resolveMaintenanceCycleMonths,
 } from "./schedule";
 
@@ -10,6 +12,27 @@ describe("addMonthsUtc", () => {
   it("adds months without local timezone drift", () => {
     const base = new Date("2024-01-15T12:00:00.000Z");
     expect(addMonthsUtc(base, 12).toISOString()).toBe("2025-01-15T12:00:00.000Z");
+  });
+});
+
+describe("working days", () => {
+  it("rolls weekend to Monday", () => {
+    expect(onOrAfterWorkingDayUtc(new Date("2026-10-24T15:00:00.000Z")).toISOString()).toBe(
+      "2026-10-26T00:00:00.000Z",
+    );
+  });
+
+  it("adds one working day across a weekend", () => {
+    // Friday → next working day Monday
+    expect(addWorkingDaysUtc(new Date("2026-10-23T00:00:00.000Z"), 1).toISOString()).toBe(
+      "2026-10-26T00:00:00.000Z",
+    );
+  });
+
+  it("keeps weekday for interval 0", () => {
+    expect(addWorkingDaysUtc(new Date("2026-10-27T12:00:00.000Z"), 0).toISOString()).toBe(
+      "2026-10-27T00:00:00.000Z",
+    );
   });
 });
 

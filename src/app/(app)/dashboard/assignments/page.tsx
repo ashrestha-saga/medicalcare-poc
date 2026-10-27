@@ -1,6 +1,6 @@
-import { DashboardTileAssignmentsScreen } from "@/components/features/dashboard/DashboardTileAssignmentsScreen";
+import { redirect } from "next/navigation";
 
-/** /dashboard/assignments — per-user tile overrides (roles:view / roles:update). */
-export default function DashboardAssignmentsPage() {
-  return <DashboardTileAssignmentsScreen />;
+/** Legacy path — tile assignments live at /today/assignments. */
+export default function DashboardAssignmentsRedirectPage() {
+  redirect("/today/assignments");
 }

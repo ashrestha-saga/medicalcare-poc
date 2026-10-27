@@ -1,10 +1,14 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { CONTRACT_SCOPE_TOKENS } from "@/constants/partnerPermissions";
 import { useCustomerDetail } from "@/components/hooks/partner/customers/useCustomerDetail";
+import {
+  ContractLifecycleConfirmDialog,
+  type ContractLifecycleConfirmAction,
+} from "@/components/features/partner/customers/ContractLifecycleConfirmDialog";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -46,6 +50,7 @@ export function CustomerDetailScreen({ contractId }: { contractId: string }) {
   const canLifecycle = checkPermission("console:contracts:lifecycle");
   const canAssignStaff = checkPermission("console:staff:assign");
   const detail = useCustomerDetail(contractId);
+  const [confirmAction, setConfirmAction] = useState<ContractLifecycleConfirmAction | null>(null);
   const {
     clinic,
     error,
@@ -68,6 +73,12 @@ export function CustomerDetailScreen({ contractId }: { contractId: string }) {
     setStaffAssigned,
     openBackoffice,
   } = detail;
+
+  async function confirmLifecycle() {
+    if (!confirmAction) return;
+    const ok = await lifecycle(confirmAction);
+    if (ok) setConfirmAction(null);
+  }
 
   const stateLabel = clinic
     ? clinic.terminatedAt
@@ -254,7 +265,8 @@ export function CustomerDetailScreen({ contractId }: { contractId: string }) {
                       type="button"
                       variant="outline"
                       disabled={busy}
-                      onClick={() => void lifecycle("suspend")}
+                      onClick={() => setConfirmAction("suspend")}
+                      data-testid="contract-suspend"
                     >
                       {t("contractSuspend")}
                     </Button>
@@ -274,7 +286,8 @@ export function CustomerDetailScreen({ contractId }: { contractId: string }) {
                       type="button"
                       variant="destructive"
                       disabled={busy}
-                      onClick={() => void lifecycle("terminate")}
+                      onClick={() => setConfirmAction("terminate")}
+                      data-testid="contract-terminate"
                     >
                       {t("contractTerminate")}
                     </Button>
@@ -438,6 +451,13 @@ export function CustomerDetailScreen({ contractId }: { contractId: string }) {
             </div>
           </ListPageShell>
         ) : null}
+        <ContractLifecycleConfirmDialog
+          action={confirmAction}
+          tenantName={clinic?.tenantName ?? ""}
+          busy={busy}
+          onClose={() => setConfirmAction(null)}
+          onConfirm={() => void confirmLifecycle()}
+        />
       </main>
     </div>
   );

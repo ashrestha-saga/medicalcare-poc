@@ -19,15 +19,6 @@ import {
 } from "@/services/users/userAreaScope";
 import { dashboardTileService } from "./dashboardTileService";
 
-/** Band groups appear only when a tile targets that view (mockup zieleVon). */
-const BAND_FROM_HREF: Record<string, "pruefung" | "behoerde" | "rueckruf"> = {
-  "/due-dates": "pruefung",
-  "/constancy-cadence": "pruefung",
-  "/duty-overlap": "pruefung",
-  "/authority": "behoerde",
-  "/field-safety": "rueckruf",
-};
-
 type TileValue = {
   count: number | null;
   label: string;
@@ -531,12 +522,14 @@ async function valueForTile(ctx: TenantContext, key: string): Promise<TileValue>
     }
     case "befund-frist": {
       const [count, total] = await Promise.all([
-        prisma.authorityFinding.count({ where: { status: "open", dueAt: { not: null } } }),
-        prisma.authorityFinding.count(),
+        prisma.authorityFinding.count({
+          where: { status: "open", dueAt: { not: null, lt: today } },
+        }),
+        prisma.authorityFinding.count({ where: { status: "open" } }),
       ]);
       return W(
         count,
-        count ? "mit Frist" : "keine offenen",
+        count ? "Frist überfällig" : "keine überfälligen",
         count > 0 ? "overdue" : "ok",
         total || null,
         "Befund|Befunden",
@@ -555,18 +548,25 @@ async function valueForTile(ctx: TenantContext, key: string): Promise<TileValue>
         "Befund|Befunden",
       );
     }
-    case "begehung-vorbereitung": {
-      const [gaps, total] = await Promise.all([
-        prisma.refAuthorityChecklistItem.count({ where: { covered: false } }),
-        prisma.refAuthorityChecklistItem.count(),
-      ]);
-      return W(
-        gaps,
-        gaps ? "Checklist-Punkte ohne Daten" : "Checklisten vollständig abgedeckt",
-        gaps > 0 ? "info" : "ok",
-        total || null,
-        "Checklist-Punkt|Checklist-Punkten",
+    case "begehung-vorbereitung":
+    case "begehung-luecke": {
+      const { authorityPreparationService } = await import(
+        "@/services/authority/authorityPreparationService"
       );
+      try {
+        const prep = await authorityPreparationService.preparation(ctx, "CL-MP-DE");
+        const gaps = prep.progress.gap;
+        return W(
+          gaps,
+          gaps ? "Prüfpunkte mit Lücke" : "keine Lücken",
+          gaps > 0 ? "info" : "ok",
+          prep.progress.total || null,
+          "Prüfpunkt|Prüfpunkten",
+        );
+      } catch {
+        const gaps = await prisma.refAuthorityChecklistItem.count({ where: { covered: false } });
+        return W(gaps, gaps ? "ohne Abdeckung" : "abgedeckt", gaps > 0 ? "info" : "ok");
+      }
     }
     case "auditfaehigkeit": {
       const released = await prisma.deviceInstance.count({ where: { state: "released" } });
@@ -674,16 +674,10 @@ async function valueForTile(ctx: TenantContext, key: string): Promise<TileValue>
   }
 }
 
-async function buildBand(
-  today: Date,
-  allowed: Set<"pruefung" | "behoerde" | "rueckruf">,
-): Promise<DashboardBandGroupDTO[]> {
-  if (allowed.size === 0) return [];
-
-  const groups: DashboardBandGroupDTO[] = [];
-
-  if (allowed.has("pruefung")) {
-    const duties = await prisma.deviceDuty.findMany({
+/** Always all three groups — horizon filter is applied client-side in DeadlineBand. */
+async function buildBand(today: Date): Promise<DashboardBandGroupDTO[]> {
+  const [duties, findings, actions] = await Promise.all([
+    prisma.deviceDuty.findMany({
       where: { applicable: true, suspendedAt: null, dueAt: { not: null } },
       select: {
         id: true,
@@ -693,8 +687,23 @@ async function buildBand(
       },
       take: 200,
       orderBy: { dueAt: "asc" },
-    });
-    groups.push({
+    }),
+    prisma.authorityFinding.findMany({
+      where: { status: { in: ["open", "remediated"] }, dueAt: { not: null } },
+      select: { id: true, dueAt: true, itemNo: true, description: true },
+      take: 100,
+      orderBy: { dueAt: "asc" },
+    }),
+    prisma.fieldSafetyAction.findMany({
+      where: { closedAt: null, dueAt: { not: null } },
+      select: { id: true, dueAt: true, reference: true },
+      take: 100,
+      orderBy: { dueAt: "asc" },
+    }),
+  ]);
+
+  return [
+    {
       key: "pruefung",
       title: "Prüfungen und Fristen",
       points: duties
@@ -710,17 +719,8 @@ async function buildBand(
             href: `/due-dates?dutyId=${encodeURIComponent(d.id)}`,
           };
         }),
-    });
-  }
-
-  if (allowed.has("behoerde")) {
-    const findings = await prisma.authorityFinding.findMany({
-      where: { status: { in: ["open", "remediated"] }, dueAt: { not: null } },
-      select: { id: true, dueAt: true, itemNo: true, description: true },
-      take: 100,
-      orderBy: { dueAt: "asc" },
-    });
-    groups.push({
+    },
+    {
       key: "behoerde",
       title: "Behördliche Befunde",
       points: findings
@@ -732,19 +732,10 @@ async function buildBand(
           label: f.itemNo ? `Befund ${f.itemNo}` : f.description.slice(0, 60),
           href: `/authority?section=findings&findingId=${encodeURIComponent(f.id)}`,
         })),
-    });
-  }
-
-  if (allowed.has("rueckruf")) {
-    const actions = await prisma.fieldSafetyAction.findMany({
-      where: { closedAt: null, dueAt: { not: null } },
-      select: { id: true, dueAt: true, reference: true },
-      take: 100,
-      orderBy: { dueAt: "asc" },
-    });
-    groups.push({
+    },
+    {
       key: "rueckruf",
-      title: "Rückrufe",
+      title: "Field-Safety-Maßnahmen",
       points: actions
         .filter((a) => a.dueAt)
         .map((a) => ({
@@ -754,10 +745,8 @@ async function buildBand(
           label: a.reference || "Rückruf",
           href: `/field-safety?actionId=${encodeURIComponent(a.id)}`,
         })),
-    });
-  }
-
-  return groups.filter((g) => g.points.length > 0);
+    },
+  ];
 }
 
 function toDto(
@@ -829,14 +818,7 @@ export const dashboardBoardService = {
     );
     const watch = work.filter((t) => t.zone === "watch").sort((a, b) => a.sortOrder - b.sortOrder);
 
-    const allowedBand = new Set<"pruefung" | "behoerde" | "rueckruf">();
-    for (const t of work) {
-      if (!t.href) continue;
-      const path = t.href.split("?")[0] ?? t.href;
-      const g = BAND_FROM_HREF[path];
-      if (g) allowedBand.add(g);
-    }
-    const band = await buildBand(startOfTodayUtc(), allowedBand);
+    const band = await buildBand(startOfTodayUtc());
 
     return {
       meta: {

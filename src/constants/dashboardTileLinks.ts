@@ -69,15 +69,19 @@ export const DASHBOARD_TILE_LINKS: Record<string, DashboardTileLink> = {
 
   "befund-frist": {
     path: "/authority",
-    query: { section: "findings", status: "open", hasDue: "1" },
+    query: { tab: "begehungen", filter: "ueberfaellig" },
   },
   "befund-nachweis": {
     path: "/authority",
-    query: { section: "findings", status: "remediated" },
+    query: { tab: "begehungen", filter: "behoben" },
   },
   "begehung-vorbereitung": {
     path: "/authority",
-    query: { mode: "vorbereitung", tab: "luecken" },
+    query: { tab: "vorbereitung", filter: "luecke" },
+  },
+  "begehung-luecke": {
+    path: "/authority",
+    query: { tab: "vorbereitung", filter: "luecke" },
   },
 
   "modelle-ohne-einstufung": { path: "/catalog" },
@@ -87,7 +91,7 @@ export const DASHBOARD_TILE_LINKS: Record<string, DashboardTileLink> = {
   "befaehigung-auslaufend": { path: "/training", query: { expiring: "365" } },
   "sachkunde-aufb": { path: "/users" },
   "betreuung-zugriffe": { path: "/activity", query: { actorKind: "partner" } },
-  "traegerschaft-luecke": { path: "/dashboard/assignments" },
+  "traegerschaft-luecke": { path: "/today/assignments" },
 };
 
 export function hrefForDashboardTile(key: string): string | null {

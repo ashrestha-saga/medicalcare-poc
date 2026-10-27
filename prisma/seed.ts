@@ -12,6 +12,7 @@ import { backfillAllContractScopeGrants } from "../src/services/contracts/contra
 import { backfillExecutorsFromContracts } from "../src/services/contracts/executorSyncService";
 import { backfillDutyProjections } from "../src/services/duties/dutyProjection";
 import { dutyService } from "../src/services/registration/dutyService";
+import { seedBandDemoDates } from "./seeds/bandDemoDates";
 import { seedGoldenCatalog } from "./seeds/goldenCatalog";
 import { seedHandoverInventory } from "./seeds/handoverInventory";
 import { seedPartnerOrgs } from "./seeds/partnerOrgs";
@@ -503,6 +504,9 @@ export async function seed(prisma: PrismaClient) {
   // Handover testdaten → existing Prisma models only; all under demo-tenant.
   const handover = await seedHandoverInventory(prisma, tenant.id);
 
+  // Today band: authority findings + field-safety actions with dueAt.
+  const bandDemo = await seedBandDemoDates(prisma, tenant.id);
+
   const dutiesBackfilled = await dutyService.backfillDueDates(prisma);
   const attributionBackfilled = await backfillDutyAndEvidenceAttribution(prisma);
   const contractScopeBackfilled = await backfillAllContractScopeGrants(prisma);
@@ -523,6 +527,7 @@ export async function seed(prisma: PrismaClient) {
     partners,
     golden,
     handover,
+    bandDemo,
     dutiesBackfilled,
     attributionBackfilled,
     contractScopeBackfilled,

@@ -21,11 +21,9 @@ function startOfTodayUtc(): Date {
 /**
  * Area-scoped “Heute” worklist for Scan v3.
  *
- * With `reprocessing:view`: only Aufbereitungsgeräte that still need today's
- * work — open daily catalogue steps (RefReprocessingCheck vs today's evidence)
- * and/or unreleased batches / Sperrlage.
- *
- * Without reprocessing: devices with open Konstanz or Sperrlage (blocked).
+ * Always includes devices with open Konstanz (dueAt ≤ today) or Sperrlage.
+ * With `reprocessing:view`, also lists Aufbereitungsgeräte (daily checks /
+ * open batches / done-today) — mixed users see both workstreams.
  */
 export const scanHeuteService = {
   async list(ctx: TenantContext): Promise<ScanHeuteDTO> {
@@ -99,7 +97,7 @@ export const scanHeuteService = {
             });
           })()
         : Promise.resolve([]),
-      !canReproc && deviceIds.length > 0
+      deviceIds.length > 0
         ? prisma.deviceDuty.findMany({
             where: {
               deviceInstanceId: { in: deviceIds },
@@ -139,34 +137,35 @@ export const scanHeuteService = {
     for (const d of devices) {
       const isEquipment = isReprocessingEquipmentDevice(d);
       const openBatchCount = openBatchByDevice.get(d.id) ?? 0;
-      const openDailyCodes = canReproc
-        ? openDailyRefCodesForDevice(
-            {
-              id: d.id,
-              productKindCode: d.productKindCode,
-              characteristicsJson: d.characteristicsJson,
-              siteId: d.area?.siteId ?? null,
-            },
-            dailyRefs,
-            doneToday,
-          )
-        : [];
+      const openDailyCodes =
+        canReproc && isEquipment
+          ? openDailyRefCodesForDevice(
+              {
+                id: d.id,
+                productKindCode: d.productKindCode,
+                characteristicsJson: d.characteristicsJson,
+                siteId: d.area?.siteId ?? null,
+              },
+              dailyRefs,
+              doneToday,
+            )
+          : [];
       const openDailyChecks = openDailyCodes.length > 0;
       const openKonstanzChecks = openKonstanzSet.has(d.id);
       const bookBlocked = blockedByBook.has(d.id);
       const hasOpenReprocWork = openDailyChecks || openBatchCount > 0 || bookBlocked;
+      const hasKonstanzOrBlock = openKonstanzChecks || bookBlocked;
 
-      // Reprocessing persona: equipment in scope — open work first, cleared stays as done.
+      // Union: due Konstanz / Sperre for everyone; equipment list when reprocessing.
       if (canReproc) {
-        if (!isEquipment) continue;
-      } else {
-        // Other capturers: Konstanz due or Außer Betrieb.
-        if (!openKonstanzChecks && !bookBlocked) continue;
+        if (!isEquipment && !hasKonstanzOrBlock) continue;
+      } else if (!hasKonstanzOrBlock) {
+        continue;
       }
 
       let band: ScanHeuteBand = "open";
       if (bookBlocked || d.state !== "released") band = "blocked";
-      else if (canReproc && !hasOpenReprocWork) band = "done";
+      else if (canReproc && isEquipment && !hasOpenReprocWork && !openKonstanzChecks) band = "done";
       else if (openKonstanzChecks && !openDailyChecks && openBatchCount === 0) band = "notice";
 
       const label =

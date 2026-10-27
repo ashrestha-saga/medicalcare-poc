@@ -2,7 +2,7 @@
  * Due-date arithmetic per deadline anchor (NFA-704 / FA-452).
  * Pure — calculates, decides nothing.
  */
-import { addMonthsUtc } from "@/lib/maintenance/schedule";
+import { addMonthsUtc, addWorkingDaysUtc, onOrAfterWorkingDayUtc } from "@/lib/maintenance/schedule";
 import { toIntervalUnit } from "./dutyKeys";
 
 export type DeadlineAnchor =
@@ -16,7 +16,9 @@ export type DeadlineAnchor =
   | "reference"
   | "none";
 
-export function intervalUnitFromEinheits(einheit: string | null | undefined): "months" | "years" | null {
+export function intervalUnitFromEinheits(
+  einheit: string | null | undefined,
+): "months" | "years" | "working_days" | null {
   return toIntervalUnit(einheit);
 }
 
@@ -33,6 +35,14 @@ export function dueDate(
   }
 
   const base = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth(), baseDate.getUTCDate()));
+
+  if (intervalUnit === "working_days") {
+    if (anchor !== "exact_day" && anchor !== "month_end") return null;
+    // 0 = due on/after base working day (initial takt); n>0 = n working days after base.
+    if (intervalValue <= 0) return onOrAfterWorkingDayUtc(base);
+    return addWorkingDaysUtc(base, intervalValue);
+  }
+
   const months = intervalUnit === "years" ? intervalValue * 12 : intervalUnit === "months" ? intervalValue : null;
   if (months == null) return null;
 
@@ -62,5 +72,10 @@ export function computeDutyDueAt(input: {
   intervalUnit: string | null | undefined;
 }): Date | null {
   const base = input.lastCompletedAt ?? input.referenceDate;
-  return dueDate(input.deadlineAnchor, base, input.intervalValue, input.intervalUnit);
+  // After a completion, always advance by the full interval (even for working_days).
+  const intervalValue =
+    input.lastCompletedAt && input.intervalUnit === "working_days" && (input.intervalValue ?? 0) <= 0
+      ? 1
+      : input.intervalValue;
+  return dueDate(input.deadlineAnchor, base, intervalValue, input.intervalUnit);
 }

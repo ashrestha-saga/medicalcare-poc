@@ -147,9 +147,23 @@ export const navCountsService = {
     if (can(ctx, "authority:view")) {
       tasks.push(
         (async () => {
-          const n = await prisma.authorityFinding.count({
-            where: { status: { in: ["open", "remediated"] } },
+          const findingsOpen = await prisma.authorityFinding.count({
+            where: { status: "open" },
           });
+          let gapItems = 0;
+          try {
+            const { authorityPreparationService } = await import(
+              "@/services/authority/authorityPreparationService"
+            );
+            const prep = await authorityPreparationService.preparation(
+              ctx as TenantContext,
+              "CL-MP-DE",
+            );
+            gapItems = prep.progress.gap;
+          } catch {
+            gapItems = 0;
+          }
+          const n = findingsOpen + gapItems;
           out.begehung = entry(n, n > 0);
         })(),
       );

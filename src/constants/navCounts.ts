@@ -29,7 +29,7 @@ export type NavCountsResponse = Partial<Record<NavCountKey, NavCountEntry>>;
 
 /** Menu module id → count key (sidebar badge binding). */
 export const MENU_ID_TO_NAV_COUNT: Partial<Record<MenuModuleId, NavCountKey>> = {
-  dashboard: "dash",
+  today: "dash",
   inventory: "list",
   "due-dates": "faelligkeiten",
   requests: "auftraege",

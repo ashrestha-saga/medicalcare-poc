@@ -308,6 +308,8 @@ export interface AuthorityFindingDTO {
   remediationNote: string | null;
   remediatedAt: string | null;
   provenAt: string | null;
+  disputedAt?: string | null;
+  disputedReason?: string | null;
 }
 
 export interface DisclosureSessionDTO {
@@ -319,6 +321,78 @@ export interface DisclosureSessionDTO {
   purpose: string | null;
   scope: string[];
   active: boolean;
+  siteId?: string | null;
+  siteName?: string | null;
+  checklistCode?: string | null;
+  participants?: string | null;
+  autoClosed?: boolean;
+  disclosedCount?: number;
+  gapsAtOpening?: number | null;
+}
+
+export interface DisclosedEventDTO {
+  id: string;
+  occurredAt: string;
+  resource: string;
+  resourceId: string;
+  label: string;
+}
+
+export interface DisclosureGapSnapshotDTO {
+  code: string;
+  label: string;
+  count: number;
+}
+
+export interface DisclosureCloseSummaryDTO {
+  session: DisclosureSessionDTO;
+  disclosed: DisclosedEventDTO[];
+  gaps: DisclosureGapSnapshotDTO[];
+  durationMinutes: number;
+  disclosedCount: number;
+}
+
+export type PrepItemState = "ready" | "gap" | "external";
+
+export interface PreparationItemDTO {
+  itemId: string;
+  position: number;
+  label: string;
+  legalBasis: string | null;
+  mapsToSection: string | null;
+  covered: boolean;
+  state: PrepItemState;
+  gapCount: number;
+  gapTarget: string | null;
+  readiness: {
+    externalReady: boolean;
+    documentRef: string | null;
+    checkedBy: string | null;
+    checkedAt: string | null;
+  } | null;
+}
+
+export interface PreparationListDTO {
+  checklistCode: string;
+  checklistLabel: string;
+  items: PreparationItemDTO[];
+  unmapped: {
+    code: string;
+    count: number;
+    target: string;
+    label: string;
+  }[];
+  progress: { ready: number; gap: number; external: number; total: number };
+}
+
+export interface AuthorityOverviewDTO {
+  items: number;
+  ready: number;
+  gap: number;
+  external: number;
+  findingsOpen: number;
+  findingsRemediated: number;
+  otherLists: { checklistCode: string; authorityName: string; open: number }[];
 }
 
 export type NotificationKindDto =

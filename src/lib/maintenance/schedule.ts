@@ -14,6 +14,38 @@ export function addMonthsUtc(date: Date, months: number): Date {
   return d;
 }
 
+function isUtcWeekend(d: Date): boolean {
+  const day = d.getUTCDay();
+  return day === 0 || day === 6;
+}
+
+/** Next Mon–Fri on or after `date` (UTC calendar day). */
+export function onOrAfterWorkingDayUtc(date: Date): Date {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  while (isUtcWeekend(d)) {
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return d;
+}
+
+/**
+ * Add `n` Mon–Fri days in UTC.
+ * `n <= 0` → on-or-after working day of `date` (no advance).
+ */
+export function addWorkingDaysUtc(date: Date, n: number): Date {
+  if (n <= 0) return onOrAfterWorkingDayUtc(date);
+  let d = onOrAfterWorkingDayUtc(date);
+  // Start counting from the next day after a working-day base when advancing.
+  d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1));
+  let left = n;
+  while (left > 0) {
+    if (!isUtcWeekend(d)) left -= 1;
+    if (left === 0) break;
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
 /**
  * nextDue = (lastMaintainedAt ?? maintenanceAnchorAt) + cycleMonths.
  * Returns null when cycle or base date is missing / invalid.

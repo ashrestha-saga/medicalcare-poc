@@ -70,6 +70,21 @@ describe("konstanzDueAtFromCadence", () => {
     );
     expect(result).toEqual(due);
   });
+
+  it("uses exact_day and interval 0 for working_days initial due", () => {
+    const determinedAt = new Date("2026-10-27T00:00:00.000Z");
+    const due = new Date("2026-10-27T00:00:00.000Z");
+    const result = konstanzDueAtFromCadence(
+      { intervalValue: 1, intervalUnit: "working_days", determinedAt },
+      (args) => {
+        expect(args.deadlineAnchor).toBe("exact_day");
+        expect(args.intervalValue).toBe(0);
+        expect(args.intervalUnit).toBe("working_days");
+        return due;
+      },
+    );
+    expect(result).toEqual(due);
+  });
 });
 
 describe("k10 schemas (write boundary)", () => {

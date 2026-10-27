@@ -17,7 +17,7 @@ Detailed reference for the Prisma/MySQL data model and how the application layer
 9. [Adapter boundary](#9-adapter-boundary)
 10. [Seed data](#10-seed-data) (app seed users + large demo pack)
 
-Schema domains in §4 include tenancy, devices, Ref*, classification/duties, partners, training, requests/dispatch, **Prüfpartner (§4.8)**, and ops (§4.9).
+Schema domains in §4 include tenancy, devices (incl. **ModelDocument** IFU), Ref*, classification/duties, partners (**ExecutorOrg** sync), training, requests/dispatch (soft transmit + channel toggles), **Prüfpartner (§4.8)**, and ops (§4.9).
 
 ---
 
@@ -241,6 +241,7 @@ Each domain starts with a **quick-reference table**, then a longer write-up per 
 | Model | Purpose | Where it works |
 |---|---|---|
 | **DeviceModel** | Article master (UDI-DI/GTIN, manufacturer, risk class, EMDN…). **Global** (no `tenantId`). `source`: manual \| catalog \| beudamed \| wizard. `state`: draft \| review \| released | Catalog UI, resolve stages 2–3, Erstanlage classification, training subject |
+| **ModelDocument** | Tenant-scoped IFU / manuals on a shared model (`kind`, revision, blob or URL; supersession chain) | Catalog documents panel, Erstanlage IFU, device book, scan open-IFU |
 | **DeviceInstance** | One physical unit. Unique `(tenantId, inventoryNumber)`. States: draft \| review \| released \| retired | Resolve stage 1, `/devices`, inventarize, Erstanlage release, duties, due-dates |
 | **ExternalSourceRecord** | Cached BEUDAMED/OXID payloads | Resolve stage 3 cache (~90 days), external call path |
 | **CapturedArticle** | Stage-4 unknown device; `serviceOnly=true` forced | `POST /api/captures`; blocks spare-parts path |
@@ -268,10 +269,20 @@ Each domain starts with a **quick-reference table**, then a longer write-up per 
 
 **In the app:**
 
-- Catalog browse / edit / XLSX import (`/catalog`, `deviceModelCatalogService`)
+- Catalog browse / edit / XLSX import (`/catalog`, `deviceModelCatalogService`) — list returns **all** matching rows (no hard limit)
 - Resolve stages 2–3 (local match, then OXID; BEUDAMED may create/update in `review`)
-- Anchor for `DeviceModelClassification` and model-scoped training events
+- Anchor for `DeviceModelClassification`, `ModelDocument`, and model-scoped training events
 - Reclassify wizard (`/registration/reclassify/[modelId]`) updates the **shared** open classification, then re-freezes **this tenant’s** instance copies (see classification tenancy note below)
+
+#### ModelDocument
+
+**Purpose:** Document attached to the **Bauart** (`DeviceModel`), not the Exemplar — typically IFU (`kind=ifu`), also service manuals / safety notices / work instructions / other. Current = latest of kind+language with `supersededAt` null; publishing supersedes prior current rows.
+
+**Tenancy:** **Tenant-scoped** (`tenantId`) even though the parent model is global — each clinic keeps its own IFU copies / revisions for that shared model.
+
+**Key fields:** `deviceModelId`, `kind` (`DocumentKind`), `revisionLabel`, `language`, `validFrom` / `supersededAt` / `supersededById`, optional `blobId` (`AttachmentBlob`) or `externalUrl`, recorder attribution.
+
+**In the app:** `modelDocumentService` + `GET`/`POST /api/catalog/models/[id]/documents`. Uploads accept PDF, Markdown, text, Office docs, and images. Catalog detail (`CatalogDocumentsPanel`), optional Erstanlage prerequisite publish (`publishFromEvidence`), device-book IFU upload, and scan card “open IFU” all share the current model document.
 
 #### DeviceInstance
 
@@ -518,7 +529,9 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 **Purpose:** Clinic-local catalog of who executes work (internal team or named external codes like O-MSR / O-RTS). Distinct from global `Organisation` — FA-713 allocation lives here so each clinic can configure its executors.
 
-**In the app:** Service request allocation (`executorOrgId`); optional owner of `DispatchTarget`s so each executor has its own mail/API endpoints.
+**Sync:** `executorSyncService` upserts executors from partner `ServiceContract`s (`ensureExecutorForContract`, `O-{orgCode}`), keeps `O-INT` (`ensureInternalExecutor`), and ensures a default **mail** `DispatchTarget` per executor. Contract suspend/terminate/resume flips `active` (`setContractExecutorActive`). Allocate list filters external contracted orgs to **live** contracts (`isExecutorAllocatable`).
+
+**In the app:** Service request allocation (`executorOrgId`); owner of `DispatchTarget`s so each executor has its own mail/API endpoints; Settings → Dispatch channels.
 
 #### SmtpSettings
 
@@ -558,8 +571,8 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 | **ServiceRequest** | Idempotent create (`idempotencyKey` + `fingerprint`); subject instance \| model \| captured; optional `dutyId`, `executorOrgId` | Scan workflow, `/requests`, due-date assignment |
 | **StatusEvent** | State history | Transitions + downstream status feedback |
 | **Attachment** / **AttachmentBlob** | Photos / files | Capture + request submit; offline queue stores downscaled images |
-| **DispatchTarget** | Per-tenant (and optional executor) endpoints: mail \| oxid \| webhook | Seed + dispatch |
-| **DispatchRecord** | Per-send outcome | After create; request → `transmitted` if ≥1 success |
+| **DispatchTarget** | Per-tenant + optional `executorOrgId`; mail \| oxid \| webhook; `enabled` | Seed, Settings toggles, transmit dispatch |
+| **DispatchRecord** | Per-send outcome | On transmit when channels run; request may still be `transmitted` with no sends |
 | **OrderRequest** / **OrderItem** | Spare-parts cart | Parts flow; blocked for `serviceOnly` captures |
 
 #### ServiceRequest
@@ -568,7 +581,7 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 **Key fields:** `reference` (human id), `subjectType` / `subjectId` (`instance` \| `model` \| `captured`), `serviceType`, location/delivery/contact, `state` (starts `captured`), `source` (`app` \| `due_date`), optional `dutyId`, allocation fields (`executorOrgId`, `allocatedAt`, `transmittedAt`), optional `assigneeUserId` / `scheduledAt` (partner disposition).
 
-**In the app:** Home scan workflow; `/requests`; due-date assign → navigate to assignment; clinic **allocate → transmit** (locks allocation); partner lists only rows with `transmittedAt` set; clinic may **withdraw** (hard-delete) only **before** transmit; inspect portal loads assignment for protocol work.
+**In the app:** Home scan workflow; `/requests`; due-date assign → navigate to assignment; clinic **allocate → transmit** (locks allocation). Transmit always sets `transmittedAt` when allocation is valid; if the executor has no enabled outbound channels, response may include `warning` (in-app handoff only). Partner lists only rows with `transmittedAt` set; clinic may **withdraw** (hard-delete) only **before** transmit; inspect portal loads assignment for protocol work.
 
 #### StatusEvent
 
@@ -590,15 +603,15 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 #### DispatchTarget
 
-**Purpose:** Configured outbound channel for a tenant (and optionally an `ExecutorOrg`): type `mail` \| `oxid` \| `webhook`, endpoint, auth/mapping JSON, retry policy, enabled flag.
+**Purpose:** Configured outbound channel for a tenant and (normally) an `ExecutorOrg`: type `mail` \| `oxid` \| `webhook`, endpoint, auth/mapping JSON, retry policy, **`enabled`**.
 
-**In the app:** Seeded defaults; `dispatchService` loads enabled targets after request create. Failures are isolated per target.
+**In the app:** Created by seed / `ensureDefaultMailTarget`; clinics toggle `enabled` via Settings (`dispatchTargetsSettingsService`, `GET`/`PATCH /api/settings/dispatch-targets`). On transmit, `dispatchService` loads only **enabled** targets for the allocated executor. Failures are isolated per target; zero enabled targets → soft success + warning (no `DispatchRecord`s).
 
 #### DispatchRecord
 
 **Purpose:** Outcome of one send attempt (success, HTTP status, response/error snippet, attempt count, correlation id).
 
-**In the app:** Written per target; request becomes `transmitted` once at least one target succeeds. Visible on request detail / ops debugging.
+**In the app:** Written per attempted target on transmit. Request state / `transmittedAt` are set by `serviceRequestService.transmit` even when no channels run. Visible on request detail / ops debugging.
 
 #### OrderRequest
 
@@ -776,8 +789,10 @@ Erstanlage release defaults classification `confidence=responsible`; reclassify 
 ```
 Due date / scan
   → create ServiceRequest (source=due_date | app)  [clinic]
-  → POST …/allocate  (executorOrgId)
+  → POST …/allocate  (executorOrgId)   # list from ExecutorOrg (contract-synced)
   → POST …/transmit  → StatusEvent(transmitted) + transmittedAt
+       → optional: dispatch enabled channels for that executor
+       → if none enabled: warning, in-app handoff only
        → partner portal/disposition/my-sites lists only if transmittedAt set
   → partner disposition (assignee, schedule) → inspect protocol
 ```
@@ -786,7 +801,7 @@ Due date / scan
 
 Optional link: `DeviceDuty` → request (`dutyId`); completion → `DutyPerformance` + roll `dueAt`.
 
-**Services:** `src/services/requests/serviceRequestService.ts`, `src/services/dispatch/*`, `src/services/console/dispositionService.ts`.
+**Services:** `src/services/requests/serviceRequestService.ts`, `src/services/contracts/executorSyncService.ts`, `src/services/settings/dispatchTargetsSettingsService.ts`, `src/services/dispatch/*`, `src/services/console/dispositionService.ts`.
 
 ### 5.4 Prüfpartner inspection protocol
 
@@ -943,6 +958,7 @@ Tenant ─┬─ User (clinic) ── UserPermission?
 
 DeviceModel ─┬─ DeviceInstance*
              ├─ DeviceModelClassification → RefAnnex2Item / RefAppliedPartType / RefDeviceFamily / RefRuleSet
+             ├─ ModelDocument* (tenant-scoped IFU / manuals → AttachmentBlob?)
              ├─ ExternalSourceRecord
              └─ TrainingEvent (subject)
 

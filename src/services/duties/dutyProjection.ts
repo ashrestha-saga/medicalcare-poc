@@ -94,7 +94,12 @@ export async function recomputeDutyProjection(
 
   let cadenceUpdated = 0;
   for (const c of cadences) {
-    const unit = c.intervalUnit === "years" ? "years" : "months";
+    const unit =
+      c.intervalUnit === "years"
+        ? "years"
+        : c.intervalUnit === "working_days"
+          ? "working_days"
+          : "months";
     const duties = await tx.deviceDuty.findMany({
       where: {
         deviceInstanceId,
@@ -119,8 +124,12 @@ export async function recomputeDutyProjection(
         data: {
           intervalValue: c.intervalValue,
           intervalUnit: unit,
+          ...(unit === "working_days" ? { deadlineAnchor: "exact_day" as const } : {}),
           dueAt,
-          cadenceLabel: `${c.intervalValue} ${unit}`,
+          cadenceLabel:
+            unit === "working_days"
+              ? `${c.intervalValue} working day${c.intervalValue === 1 ? "" : "s"}`
+              : `${c.intervalValue} ${unit}`,
         },
       });
       cadenceUpdated += 1;

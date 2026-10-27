@@ -175,7 +175,7 @@ export function RolesScreen() {
       <main className="p-main">
         <ListPageShell title={t("title")} description={t("description")}>
           <p className="mb-4 text-sm">
-            <Link href="/dashboard/assignments" className="underline" data-testid="roles-tile-assignments-link">
+            <Link href="/today/assignments" className="underline" data-testid="roles-tile-assignments-link">
               {tDash("tileAssignments")}
             </Link>
           </p>

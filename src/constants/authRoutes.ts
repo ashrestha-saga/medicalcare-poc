@@ -10,12 +10,12 @@ export const AUTH_ROUTES = ["/login"] as const;
 /** Capturer / scan home — role `user` without shell:nav. */
 export const AUTH_HOME = "/";
 
-/** Persona dashboard — default for clinic managers after sign-in. */
-export const DASHBOARD_HOME = "/dashboard";
+/** Persona Today board — default for clinic managers after sign-in. */
+export const DASHBOARD_HOME = "/today";
 
 export const PARTNER_HOME = "/partner";
 
-/** Roles that land on the dashboard instead of the scan home. */
+/** Roles that land on Today instead of the scan home. */
 const DASHBOARD_HOME_ROLES: readonly UserRole[] = [
   "superadmin",
   "device_admin",

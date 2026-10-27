@@ -54,6 +54,8 @@ enum TermMatchConfidence {
 enum IntervalUnit {
   months
   years
+  /** Calendar working days (Mon–Fri) — e.g. QS-RL arbeitstäglich for monitors. */
+  working_days
 }
 
 /**
@@ -396,6 +398,7 @@ model Tenant {
   authorityInspections AuthorityInspection[]
   authorityFindings   AuthorityFinding[]
   disclosureSessions  DisclosureSession[]
+  checklistItemReadiness ChecklistItemReadiness[]
   dutyOverlapDecisions DutyOverlapDecision[]
   userAreaAssignments UserAreaAssignment[]
   authorityNotifications AuthorityNotification[]
@@ -475,6 +478,7 @@ model User {
   evidenceRecorded     DeviceEvidence[] @relation("DeviceEvidenceRecorder")
   modelDocumentsRecorded ModelDocument[] @relation("ModelDocumentRecorder")
   exportLogs             ExportLog[]
+  checklistReadinessChecked ChecklistItemReadiness[] @relation("ReadinessChecker")
 
   @@index([tenantId])
   @@index([accountKind])
@@ -567,6 +571,7 @@ model Site {
   reprocessingChecks        ReprocessingCheck[]
   authorityInspections      AuthorityInspection[]
   authorityNotifications    AuthorityNotification[]
+  disclosureSessions       DisclosureSession[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2657,6 +2662,9 @@ model AuthorityFinding {
   evidenceBlobId      String?
   evidenceBlob        AttachmentBlob?     @relation(fields: [evidenceBlobId], references: [id])
   provenAt            DateTime?           @db.Date
+  /// D15 (E69) — dispute branch.
+  disputedAt          DateTime?           @db.Date
+  disputedReason      String?             @db.Text
   recordedBy          String
   recordedByUserId    String?
   recordedByUser      User?               @relation("FindingRecorder", fields: [recordedByUserId], references: [id])
@@ -2692,12 +2700,43 @@ model DisclosureSession {
   /// Welche Teile der Mappe freigegeben sind. JSON string[] der
   /// Abschnittsschlüssel, damit der Umfang nachweisbar bleibt.
   scope         String   @db.Text
+  /// D16 (E66) — site, checklist, participants, auto-close.
+  siteId        String?
+  site          Site?    @relation(fields: [siteId], references: [id])
+  checklistCode String?
+  checklist     RefAuthorityChecklist? @relation(fields: [checklistCode], references: [code])
+  /// Free text: attendees for the authority and for us.
+  participants  String?  @db.Text
+  autoClosed    Boolean  @default(false)
   /// Verknüpfung in das Prüfprotokoll: jeder Aufruf während der Sitzung
   /// trägt diese Kennung als correlationId im AuditEvent.
   inspection    AuthorityInspection?
 
   @@index([tenantId, openedAt])
   @@index([tenantId, expiresAt])
+  @@index([siteId])
+  @@index([checklistCode])
+}
+
+/// D14 (E67) · Operator tick "bereitgelegt" for checklist items DeviceCare
+/// does not cover. Per tenant, with who/when.
+model ChecklistItemReadiness {
+  id              String   @id @default(cuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  itemId          String
+  item            RefAuthorityChecklistItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  externalReady   Boolean  @default(false)
+  /// Shelf, folder, DMS link — free text.
+  documentRef     String?  @db.Text
+  checkedBy       String
+  checkedByUserId String?
+  checkedByUser   User?    @relation("ReadinessChecker", fields: [checkedByUserId], references: [id])
+  checkedAt       DateTime @default(now())
+
+  @@unique([tenantId, itemId])
+  @@index([tenantId])
+  @@index([checkedByUserId])
 }
 
 // ===========================================================================
@@ -2791,6 +2830,7 @@ model RefAuthorityChecklist {
   sourceDate    DateTime?     @db.Date
   items         RefAuthorityChecklistItem[]
   inspections   AuthorityInspection[]
+  disclosureSessions DisclosureSession[]
 
   @@unique([authorityKind, stateCode])
   @@index([stateCode])
@@ -2811,6 +2851,7 @@ model RefAuthorityChecklistItem {
   /// statt weggelassen. Die Lücke ist dann im Vorbereitungsmodus sichtbar.
   covered       Boolean               @default(true)
   note          String?               @db.Text
+  readiness     ChecklistItemReadiness[]
 
   @@unique([checklistCode, position])
   @@index([checklistCode])

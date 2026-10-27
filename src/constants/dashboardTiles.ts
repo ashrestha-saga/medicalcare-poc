@@ -13,6 +13,7 @@ export const DASHBOARD_TILE_KIND: Record<string, DashboardTileKind> = {
   "befund-frist": "arbeit",
   "befund-nachweis": "arbeit",
   "begehung-vorbereitung": "arbeit",
+  "begehung-luecke": "arbeit",
   "bestand-zustand": "uebersicht",
   bestandsverzeichnis: "arbeit",
   "betreuung-zugriffe": "uebersicht",

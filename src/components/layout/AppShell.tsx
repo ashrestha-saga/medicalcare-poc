@@ -203,7 +203,7 @@ function AccountBar({
 }
 
 function NavIcon({ id }: { id: MenuModuleId }) {
-  if (id === "dashboard") return <DashboardIcon />;
+  if (id === "today") return <DashboardIcon />;
   if (id === "inventory") return <InventoryIcon />;
   if (id === "registration") return <RegistrationIcon />;
   if (id === "due-dates") return <DueDatesIcon />;
@@ -229,8 +229,8 @@ function NavIcon({ id }: { id: MenuModuleId }) {
 }
 
 function isNavActive(id: MenuModuleId, pathname: string): boolean {
-  if (id === "dashboard") {
-    return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  if (id === "today") {
+    return pathname === "/today" || pathname.startsWith("/today/");
   }
   if (id === "inventory") return pathname.startsWith("/devices");
   if (id === "registration") return pathname.startsWith("/registration");

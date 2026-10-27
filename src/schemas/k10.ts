@@ -238,7 +238,7 @@ export const createConstancyCadenceSchema = z.object({
   deviceInstanceId: z.string().min(1),
   constancyObjectCode: z.string().min(1),
   intervalValue: z.number().int().positive(),
-  intervalUnit: z.enum(["months", "years"]),
+  intervalUnit: z.enum(["months", "years", "working_days"]),
   basisText: z.string().min(1),
   determinedAt: dateOnly,
 });
@@ -280,6 +280,7 @@ export const createAuthorityInspectionSchema = z.object({
   protocolRef: z.string().optional().nullable(),
   feeEur: z.number().optional().nullable(),
   checklistCode: z.string().optional().nullable(),
+  disclosureSessionId: z.string().optional().nullable(),
   note: z.string().optional().nullable(),
 });
 export type CreateAuthorityInspectionInput = z.infer<typeof createAuthorityInspectionSchema>;
@@ -370,12 +371,40 @@ export const recordAuthorityNotificationSchema = z
 export type RecordAuthorityNotificationInput = z.infer<typeof recordAuthorityNotificationSchema>;
 
 export const openDisclosureSchema = z.object({
-  expiresAt: z.string().min(1),
+  /** Absolute expiry ISO — or use durationMinutes (preferred for v26.1). */
+  expiresAt: z.string().min(1).optional(),
+  durationMinutes: z.number().int().min(15).max(720).optional().default(240),
   audience: z.string().min(1),
   purpose: z.string().optional().nullable(),
   scope: z.array(z.string()).min(1),
+  siteId: z.string().optional().nullable(),
+  checklistCode: z.string().optional().nullable(),
+  participants: z.string().optional().nullable(),
 });
 export type OpenDisclosureInput = z.infer<typeof openDisclosureSchema>;
+
+export const discloseResourceSchema = z.object({
+  resource: z.string().min(1),
+  resourceId: z.string().optional().nullable(),
+  label: z.string().min(1),
+});
+export type DiscloseResourceInput = z.infer<typeof discloseResourceSchema>;
+
+export const setReadinessSchema = z.object({
+  externalReady: z.boolean(),
+  documentRef: z.string().optional().nullable(),
+});
+export type SetReadinessInput = z.infer<typeof setReadinessSchema>;
+
+export const proveFindingSchema = z.object({
+  provenAt: dateOnly,
+});
+export type ProveFindingInput = z.infer<typeof proveFindingSchema>;
+
+export const disputeFindingSchema = z.object({
+  disputedReason: z.string().min(1),
+});
+export type DisputeFindingInput = z.infer<typeof disputeFindingSchema>;
 
 export const setRoleDashboardTilesSchema = z.object({
   role: z.enum(["superadmin", "device_admin", "security_officer", "user"]),

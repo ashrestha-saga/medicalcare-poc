@@ -77,7 +77,12 @@ export function DeviceDutiesPanel({
 
   const intervalLabel = (duty: DeviceDutyDTO): string => {
     if (duty.intervalValue != null && duty.intervalUnit) {
-      const unit = duty.intervalUnit === "years" ? t("years") : t("monthsUnit");
+      const unit =
+        duty.intervalUnit === "years"
+          ? t("years")
+          : duty.intervalUnit === "working_days"
+            ? t("workingDaysUnit")
+            : t("monthsUnit");
       return `${duty.intervalValue} ${unit}`;
     }
     return duty.cadenceLabel ?? translateAnchor(duty.deadlineAnchor);

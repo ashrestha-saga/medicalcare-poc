@@ -11,8 +11,8 @@ export async function POST(req: Request, { params }: Ctx) {
     const ctx = await requireTenantContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
-      const session = await authorityService.closeDisclosure(ctx, id);
-      return Response.json({ session }, { headers: { "x-correlation-id": ctx.correlationId } });
+      const summary = await authorityService.closeDisclosure(ctx, id);
+      return Response.json(summary, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {
     return errorResponse(error, correlationId);

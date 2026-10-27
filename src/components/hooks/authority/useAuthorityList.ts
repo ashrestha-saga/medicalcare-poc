@@ -1,85 +1,132 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import type {
   AuthorityFindingDTO,
   AuthorityInspectionDTO,
   AuthorityNotificationDTO,
-  BegehGapDTO,
+  AuthorityOverviewDTO,
   ChecklistPrepDTO,
+  DisclosedEventDTO,
+  DisclosureCloseSummaryDTO,
   DisclosureSessionDTO,
+  PreparationListDTO,
 } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { toast } from "@/store/toastStore";
 
-export type BegehMode = "vorbereitung" | "begehung";
-export type BegehTab = "luecken" | "mappe" | "befunde" | "notifications" | "disclosure";
+export type BegehTab = "vorbereitung" | "begehungen" | "sitzungen" | "notifications";
+export type PrepFilter = "all" | "bereit" | "luecke" | "aussen";
+export type FindingFilter =
+  | "all"
+  | "offen"
+  | "ueberfaellig"
+  | "behoben"
+  | "nachgewiesen"
+  | "bestritten";
 
-function parseMode(raw: string | null): BegehMode {
-  return raw === "begehung" ? "begehung" : "vorbereitung";
-}
+/** Legacy aliases kept for deep links from older tiles. */
+export type BegehMode = "vorbereitung" | "begehung";
 
 function parseTab(raw: string | null): BegehTab {
+  if (raw === "begehungen" || raw === "befunde") return "begehungen";
+  if (raw === "sitzungen" || raw === "disclosure") return "sitzungen";
+  if (raw === "notifications") return "notifications";
+  if (raw === "luecken" || raw === "mappe" || raw === "vorbereitung") return "vorbereitung";
+  return "vorbereitung";
+}
+
+function parsePrepFilter(raw: string | null): PrepFilter {
+  if (raw === "bereit" || raw === "luecke" || raw === "aussen") return raw;
+  return "all";
+}
+
+function parseFindingFilter(raw: string | null): FindingFilter {
   if (
-    raw === "mappe" ||
-    raw === "befunde" ||
-    raw === "notifications" ||
-    raw === "disclosure" ||
-    raw === "luecken"
+    raw === "offen" ||
+    raw === "ueberfaellig" ||
+    raw === "behoben" ||
+    raw === "nachgewiesen" ||
+    raw === "bestritten"
   ) {
     return raw;
   }
-  return "luecken";
+  if (raw === "open") return "offen";
+  if (raw === "remediated") return "behoben";
+  return "all";
 }
 
 export function useAuthorityList() {
+  const t = useTranslations("pages.authority");
   const { checkPermission } = usePermissions();
   const canView = checkPermission("authority:view");
+  const canManage = checkPermission("authority:manage");
   const { sync } = useSyncQueryParams();
 
-  const modeParam = useQueryParam("mode");
   const tabParam = useQueryParam("tab");
+  const listParam = useQueryParam("list");
   const checklistParam = useQueryParam("checklist");
+  const filterParam = useQueryParam("filter");
+  const siteParam = useQueryParam("site");
   const findingIdParam = useQueryParam("findingId");
+  const resolvedListParam = listParam ?? checklistParam;
 
-  const mode = parseMode(modeParam);
   const tab = parseTab(tabParam);
+  const prepFilter = parsePrepFilter(filterParam);
+  const findingFilter = parseFindingFilter(filterParam);
 
   const [inspections, setInspections] = useState<AuthorityInspectionDTO[]>([]);
   const [findings, setFindings] = useState<AuthorityFindingDTO[]>([]);
   const [notifications, setNotifications] = useState<AuthorityNotificationDTO[]>([]);
   const [checklists, setChecklists] = useState<ChecklistPrepDTO[]>([]);
   const [sessions, setSessions] = useState<DisclosureSessionDTO[]>([]);
-  const [gaps, setGaps] = useState<BegehGapDTO[]>([]);
-  const [prepMeta, setPrepMeta] = useState({
-    openFindings: 0,
-    overdueFindings: 0,
-    remediatedUnproven: 0,
-  });
+  const [preparation, setPreparation] = useState<PreparationListDTO | null>(null);
+  const [overview, setOverview] = useState<AuthorityOverviewDTO | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const setMode = useCallback(
-    (next: BegehMode) => {
-      sync({ mode: next === "vorbereitung" ? null : next });
-    },
-    [sync],
-  );
 
   const setTab = useCallback(
     (next: BegehTab) => {
-      sync({ tab: next === "luecken" ? null : next });
+      sync({ tab: next === "vorbereitung" ? null : next, filter: null });
     },
     [sync],
   );
 
-  const setChecklist = useCallback(
-    (code: string | null) => {
-      sync({ checklist: code });
+  /** One URL write for KPI tiles — setTab+setFilter race and drop either tab or filter. */
+  const goTo = useCallback(
+    (nextTab: BegehTab, nextFilter: string | null) => {
+      sync({
+        tab: nextTab === "vorbereitung" ? null : nextTab,
+        filter: nextFilter === "all" || !nextFilter ? null : nextFilter,
+      });
     },
     [sync],
   );
+
+  const setList = useCallback(
+    (code: string | null) => {
+      sync({ list: code, checklist: null });
+    },
+    [sync],
+  );
+
+  const setFilter = useCallback(
+    (next: string | null) => {
+      sync({ filter: next === "all" || !next ? null : next });
+    },
+    [sync],
+  );
+
+  const setSite = useCallback(
+    (id: string | null) => {
+      sync({ site: id });
+    },
+    [sync],
+  );
+
+  const activeListCode = resolvedListParam ?? checklists[0]?.code ?? "CL-MP-DE";
 
   const refresh = useCallback(async () => {
     if (!canView) {
@@ -91,42 +138,39 @@ export function useAuthorityList() {
       const findingsQs = findingIdParam
         ? `?findingId=${encodeURIComponent(findingIdParam)}`
         : "";
-      const [i, f, n, s, prep] = await Promise.all([
+      const listQs = encodeURIComponent(activeListCode);
+      const siteQs = siteParam ? `&site=${encodeURIComponent(siteParam)}` : "";
+      const [i, f, n, s, prepLegacy, overviewRes, preparationRes] = await Promise.all([
         api<{ inspections: AuthorityInspectionDTO[] }>("/api/authority/inspections"),
         api<{ findings: AuthorityFindingDTO[] }>(`/api/authority/findings${findingsQs}`),
         api<{ notifications: AuthorityNotificationDTO[] }>("/api/authority/notifications"),
         api<{ sessions: DisclosureSessionDTO[] }>("/api/authority/disclosure"),
-        api<{
-          prep: {
-            gaps: BegehGapDTO[];
-            openFindings: number;
-            overdueFindings: number;
-            remediatedUnproven: number;
-          };
-          checklists: ChecklistPrepDTO[];
-        }>("/api/authority/prep"),
+        api<{ checklists: ChecklistPrepDTO[] }>("/api/authority/prep"),
+        api<AuthorityOverviewDTO>(`/api/authority/overview?list=${listQs}${siteQs}`),
+        api<PreparationListDTO>(`/api/authority/preparation?list=${listQs}`),
       ]);
       setInspections(i.inspections);
       setFindings(f.findings);
       setNotifications(n.notifications);
       setSessions(s.sessions);
-      setGaps(prep.prep.gaps);
-      setPrepMeta({
-        openFindings: prep.prep.openFindings,
-        overdueFindings: prep.prep.overdueFindings,
-        remediatedUnproven: prep.prep.remediatedUnproven,
-      });
-      setChecklists(prep.checklists);
+      setChecklists(prepLegacy.checklists);
+      setOverview(overviewRes);
+      setPreparation(preparationRes);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Could not load authority data.");
+      toast.error(err instanceof ApiError ? err.message : t("toast.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [canView, findingIdParam]);
+  }, [canView, findingIdParam, activeListCode, siteParam, t]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const activeSession = useMemo(
+    () => sessions.find((s) => s.active) ?? null,
+    [sessions],
+  );
 
   const remediate = useCallback(
     async (id: string, remediationNote: string, opts?: { notifyRecipient?: string | null }) => {
@@ -138,60 +182,228 @@ export function useAuthorityList() {
           notifyRecipient: opts?.notifyRecipient ?? null,
         }),
       });
-      toast.success("Finding marked remediated");
+      toast.success(t("toast.remediated"));
       await refresh();
     },
-    [refresh],
+    [refresh, t],
+  );
+
+  const prove = useCallback(
+    async (id: string, provenAt: string) => {
+      await api(`/api/authority/findings/${id}/prove`, {
+        method: "POST",
+        body: JSON.stringify({ provenAt }),
+      });
+      toast.success(t("toast.proven"));
+      await refresh();
+    },
+    [refresh, t],
+  );
+
+  const dispute = useCallback(
+    async (id: string, disputedReason: string) => {
+      await api(`/api/authority/findings/${id}/dispute`, {
+        method: "POST",
+        body: JSON.stringify({ disputedReason }),
+      });
+      toast.success(t("toast.disputed"));
+      await refresh();
+    },
+    [refresh, t],
   );
 
   const openDisclosure = useCallback(
     async (input: {
-      expiresAt: string;
+      durationMinutes?: number;
+      expiresAt?: string;
       audience: string;
       purpose?: string | null;
       scope: string[];
+      siteId?: string | null;
+      checklistCode?: string | null;
+      participants?: string | null;
     }) => {
       await api("/api/authority/disclosure", {
         method: "POST",
         body: JSON.stringify(input),
       });
-      toast.success("Disclosure session opened");
+      toast.success(t("toast.sessionOpened"));
       await refresh();
     },
-    [refresh],
+    [refresh, t],
   );
 
   const closeDisclosure = useCallback(
-    async (id: string) => {
-      await api(`/api/authority/disclosure/${id}/close`, { method: "POST", body: "{}" });
-      toast.success("Disclosure session closed");
+    async (id: string): Promise<DisclosureCloseSummaryDTO> => {
+      const summary = await api<DisclosureCloseSummaryDTO>(
+        `/api/authority/disclosure/${id}/close`,
+        { method: "POST", body: "{}" },
+      );
+      toast.success(t("toast.sessionClosed"));
       await refresh();
+      return summary;
     },
-    [refresh],
+    [refresh, t],
   );
 
+  const listDisclosed = useCallback(async (sessionId: string): Promise<DisclosedEventDTO[]> => {
+    const res = await api<{ disclosed: DisclosedEventDTO[] }>(
+      `/api/authority/sessions/${sessionId}/disclosed`,
+    );
+    return res.disclosed;
+  }, []);
+
+  const recordShown = useCallback(
+    async (sessionId: string, input: { resource: string; resourceId?: string | null; label: string }) => {
+      try {
+        await api(`/api/authority/sessions/${sessionId}/disclosed`, {
+          method: "POST",
+          body: JSON.stringify(input),
+        });
+      } catch {
+        /* non-blocking protocol */
+      }
+    },
+    [],
+  );
+
+  const setReadiness = useCallback(
+    async (itemId: string, externalReady: boolean, documentRef?: string | null) => {
+      await api(`/api/authority/readiness/${itemId}`, {
+        method: "PUT",
+        body: JSON.stringify({ externalReady, documentRef: documentRef ?? null }),
+      });
+      toast.success(externalReady ? t("toast.readinessSet") : t("toast.readinessCleared"));
+      await refresh();
+    },
+    [refresh, t],
+  );
+
+  const createInspection = useCallback(
+    async (input: {
+      authorityName: string;
+      authorityKind:
+        | "health_office"
+        | "device_authority"
+        | "occupational_safety"
+        | "metrology"
+        | "medical_board"
+        | "other";
+      visitedAt: string;
+      siteId?: string | null;
+      checklistCode?: string | null;
+      announcedAt?: string | null;
+      protocolReceivedAt?: string | null;
+      protocolRef?: string | null;
+      feeEur?: number | null;
+      legalBasis?: string | null;
+      disclosureSessionId?: string | null;
+      note?: string | null;
+    }) => {
+      const res = await api<{ inspection: { id: string } }>("/api/authority/inspections", {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+      toast.success(t("toast.inspectionRecorded"));
+      await refresh();
+      return res.inspection.id;
+    },
+    [refresh, t],
+  );
+
+  const addFinding = useCallback(
+    async (
+      inspectionId: string,
+      input: {
+        itemNo?: string | null;
+        description: string;
+        legalBasis?: string | null;
+        dueAt?: string | null;
+        deviceInstanceId?: string | null;
+      },
+    ) => {
+      await api(`/api/authority/inspections/${inspectionId}/findings`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      });
+      toast.success(t("toast.findingAdded"));
+      await refresh();
+    },
+    [refresh, t],
+  );
+
+  const filteredFindings = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const listAuthorityKind = checklists.find((c) => c.code === activeListCode)?.authorityKind;
+    return findings.filter((f) => {
+      const insp = inspections.find((i) => i.id === f.inspectionId);
+      const matchesList =
+        insp?.checklistCode === activeListCode ||
+        (!insp?.checklistCode &&
+          Boolean(listAuthorityKind) &&
+          insp?.authorityKind === listAuthorityKind);
+      if (!matchesList) return false;
+      if (findingFilter === "offen") return f.status === "open";
+      if (findingFilter === "ueberfaellig")
+        return f.status === "open" && Boolean(f.dueAt && f.dueAt < today);
+      if (findingFilter === "behoben") return f.status === "remediated";
+      if (findingFilter === "nachgewiesen") return f.status === "proven";
+      if (findingFilter === "bestritten") return f.status === "disputed";
+      return true;
+    });
+  }, [findings, findingFilter, inspections, activeListCode, checklists]);
+
   const activeChecklist =
-    checklists.find((c) => c.code === checklistParam) ?? checklists[0] ?? null;
+    checklists.find((c) => c.code === activeListCode) ?? checklists[0] ?? null;
 
   return {
     canView,
-    mode,
-    setMode,
+    canManage,
     tab,
     setTab,
+    goTo,
+    /** @deprecated mode removed in v26.1 — kept for compile compatibility */
+    mode: "vorbereitung" as BegehMode,
+    setMode: (_: BegehMode) => undefined,
+    prepFilter,
+    findingFilter,
+    setFilter,
     inspections,
-    findings,
+    findings: filteredFindings,
+    allFindings: findings,
     notifications,
     checklists,
     activeChecklist,
-    setChecklist,
+    activeListCode,
+    setChecklist: setList,
+    setList,
+    siteId: siteParam,
+    setSite,
     sessions,
-    gaps,
-    prepMeta,
+    activeSession,
+    preparation,
+    overview,
+    gaps: preparation?.unmapped.map((u) => ({
+      count: u.count,
+      label: u.label,
+      href: u.target,
+    })) ?? [],
+    prepMeta: {
+      openFindings: overview?.findingsOpen ?? 0,
+      overdueFindings: filteredFindings.filter((f) => f.status === "open" && f.dueAt).length,
+      remediatedUnproven: overview?.findingsRemediated ?? 0,
+    },
     loading,
     refresh,
     remediate,
+    prove,
+    dispute,
     openDisclosure,
     closeDisclosure,
+    listDisclosed,
+    recordShown,
+    setReadiness,
+    createInspection,
+    addFinding,
   };
 }

@@ -25,12 +25,17 @@ export const managementService = {
           include: {
             memberships: {
               where: {
+                isExternal: false,
                 OR: [{ validTo: null }, { validTo: { gte: now } }],
                 validFrom: { lte: now },
                 user: { active: true, accountKind: "partner" },
               },
               include: {
                 user: { select: { id: true, name: true, email: true, jobTitle: true } },
+                staffAssignments: {
+                  where: { tenantId: ctx.tenantId },
+                  select: { tenantId: true },
+                },
               },
               orderBy: { appRole: "asc" },
             },
@@ -51,13 +56,16 @@ export const managementService = {
         validFrom: c.validFrom.toISOString().slice(0, 10),
         validTo: c.validTo ? c.validTo.toISOString().slice(0, 10) : null,
         scope: parseScope(c.scope),
-        people: c.organisation.memberships.map((m) => ({
-          id: m.user.id,
-          name: m.user.name,
-          jobTitle: m.user.jobTitle,
-          appRole: m.appRole,
-          email: m.user.email,
-        })),
+        // Same rule as partner customer detail: org admins always; others only if assigned.
+        people: c.organisation.memberships
+          .filter((m) => m.appRole === "admin" || m.staffAssignments.length > 0)
+          .map((m) => ({
+            id: m.user.id,
+            name: m.user.name,
+            jobTitle: m.user.jobTitle,
+            appRole: m.appRole,
+            email: m.user.email,
+          })),
       }));
 
     return { tenantId: ctx.tenantId, contracts: active };

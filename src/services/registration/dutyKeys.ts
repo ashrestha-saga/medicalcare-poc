@@ -50,6 +50,16 @@ export function toIntervalUnit(einheit: string | null | undefined): IntervalUnit
   if (lower === "jahre" || lower === "years" || lower === "year" || lower === "jahr") {
     return "years";
   }
+  if (
+    lower === "working_days" ||
+    lower === "arbeitstage" ||
+    lower.includes("arbeitst") ||
+    lower.includes("taeglich") ||
+    lower.includes("täglich") ||
+    lower === "daily"
+  ) {
+    return "working_days";
+  }
   return null;
 }
 

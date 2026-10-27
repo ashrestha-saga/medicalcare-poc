@@ -1,6 +1,6 @@
-import { DashboardScreen } from "@/components/features/dashboard/DashboardScreen";
+import { redirect } from "next/navigation";
 
-/** /dashboard — persona tile board for roles with shell:nav. */
-export default function DashboardPage() {
-  return <DashboardScreen />;
+/** Legacy path — Today board lives at /today. */
+export default function DashboardRedirectPage() {
+  redirect("/today");
 }

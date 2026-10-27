@@ -77,14 +77,16 @@ export function useCustomerDetail(contractId: string) {
     }
   }
 
-  async function lifecycle(action: "suspend" | "resume" | "terminate") {
+  async function lifecycle(action: "suspend" | "resume" | "terminate"): Promise<boolean> {
     setBusy(true);
     try {
       await api(`/api/partner/contracts/${contractId}/${action}`, { method: "POST" });
       toast.success(t(`lifecycle_${action}` as "lifecycle_suspend"));
       await load();
+      return true;
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : t("lifecycleFailed"));
+      return false;
     } finally {
       setBusy(false);
     }

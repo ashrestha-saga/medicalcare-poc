@@ -1,18 +1,18 @@
 /** Map RefConstancyObject.defaultCadence text → suggested interval (employer may override). */
 export function suggestFromDefaultCadence(defaultCadence: string | null | undefined): {
   intervalValue: number;
-  intervalUnit: "months" | "years";
+  intervalUnit: "months" | "years" | "working_days";
   hint: string | null;
 } {
   const raw = (defaultCadence ?? "").toLowerCase().trim();
   if (!raw) {
     return { intervalValue: 12, intervalUnit: "months", hint: null };
   }
-  if (raw.includes("arbeitst") || raw.includes("taeglich") || raw.includes("täglich")) {
+  if (raw.includes("arbeitst") || raw.includes("taeglich") || raw.includes("täglich") || raw === "daily") {
     return {
       intervalValue: 1,
-      intervalUnit: "months",
-      hint: `QS-RL names “${defaultCadence}” — that is a suggestion, not a due date. Confirm or choose another interval.`,
+      intervalUnit: "working_days",
+      hint: `QS-RL names “${defaultCadence}” — working days (Mon–Fri). Confirm or choose another interval.`,
     };
   }
   if (raw.includes("monat")) {
@@ -46,6 +46,6 @@ export function suggestFromDefaultCadence(defaultCadence: string | null | undefi
   return {
     intervalValue: 12,
     intervalUnit: "months",
-    hint: `QS-RL names “${defaultCadence}” — parse as months/years yourself; suggestion only.`,
+    hint: `QS-RL names “${defaultCadence}” — parse the interval yourself; suggestion only.`,
   };
 }

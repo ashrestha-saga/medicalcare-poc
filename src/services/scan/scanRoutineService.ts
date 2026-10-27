@@ -69,8 +69,10 @@ export function openDailyRefCodesForDevice(
       // Equipment without eigenTyp: only untyped equipment catalogue rows.
       return r.equipmentTypeCode == null;
     }
+    // Site-scoped daily checks (water / chemistry / sterile storage) belong on
+    // Aufbereitungsgeräte at that site — not on imaging / other products.
     if (r.scope === "water" || r.scope === "chemistry" || r.scope === "sterile_storage") {
-      return Boolean(siteId);
+      return isEquipment && Boolean(siteId);
     }
     return false;
   });

@@ -25,6 +25,9 @@ export const forbidden = (message = "Not allowed.") => new AppError(403, "forbid
 export const notFound = (message = "Not found.") => new AppError(404, "not_found", message);
 export const conflict = (message: string, details?: unknown) =>
   new AppError(409, "conflict", message, details);
+/** Disclosure session active — clinic writes blocked (v26.1 R2). */
+export const locked = (message: string, details?: unknown) =>
+  new AppError(423, "DISCLOSURE_SESSION_ACTIVE", message, details);
 export const unprocessable = (message: string, details?: unknown) =>
   new AppError(422, "unprocessable", message, details);
 export const rateLimited = (message = "Too many requests.") =>

@@ -67,7 +67,8 @@ export type PermissionSlug =
   | "devicebook:view"
   | "reprocessing:view"
   | "reprocessing:release"
-  | "authority:view";
+  | "authority:view"
+  | "authority:manage";
 
 export type MenuModuleId =
   | "inventory"
@@ -84,7 +85,7 @@ export type MenuModuleId =
   | "security"
   | "management"
   | "activity"
-  | "dashboard"
+  | "today"
   | "constancy-cadence"
   | "duty-overlap"
   | "incidents"

@@ -52,6 +52,7 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "reprocessing:view",
   "reprocessing:release",
   "authority:view",
+  "authority:manage",
 ] as const;
 
 /** Staff who manage the service queue — includes the nav rail. */
@@ -99,6 +100,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
     "reprocessing:view",
     "reprocessing:release",
     "authority:view",
+    "authority:manage",
   ],
   security_officer: [
     ...SERVICE_STAFF,
@@ -164,6 +166,10 @@ export const PERMISSION_GROUPS: readonly {
       { slug: "reprocessing:view", description: "View reprocessing checks and batches" },
       { slug: "reprocessing:release", description: "Release or reject reprocessing batches" },
       { slug: "authority:view", description: "View authority inspections and findings" },
+      {
+        slug: "authority:manage",
+        description: "Open disclosure sessions, record inspections, and update findings",
+      },
     ],
   },
   {
@@ -242,8 +248,8 @@ export const CRITICAL_PERMISSIONS: ReadonlySet<PermissionSlug> = new Set(
  * Erstanlage / Klärliste / Security are not primary nav (chip, Bestand tab, Settings).
  */
 export const MENU_MODULES: readonly MenuModule[] = [
-  // Überblick — Dashboard unchanged (mockup “Heute”)
-  { id: "dashboard", label: "Dashboard", href: "/dashboard", slug: "duties:view", group: "overview" },
+  // Überblick — mockup “Heute” / Today
+  { id: "today", label: "Today", href: "/today", slug: "duties:view", group: "overview" },
   // Geräte
   { id: "inventory", label: "Inventory", href: "/devices", slug: "inventory:view", group: "devices" },
   { id: "due-dates", label: "Due dates", href: "/due-dates", slug: "duties:view", group: "devices" },
@@ -272,6 +278,9 @@ export const MENU_MODULES: readonly MenuModule[] = [
 /** Exact path → required resource slug (in addition to shell:nav for non-home). */
 export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/": "inventory:view",
+  "/today": "duties:view",
+  "/today/assignments": "roles:view",
+  // Legacy bookmarks → redirect pages under (app)/dashboard
   "/dashboard": "duties:view",
   "/dashboard/assignments": "roles:view",
   "/devices": "inventory:view",
@@ -349,7 +358,7 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   if (pathname.startsWith("/activity")) return "audit:view";
   if (pathname.startsWith("/security")) return "account:security";
   if (pathname.startsWith("/settings")) return "settings:view";
-  if (pathname.startsWith("/dashboard")) return "duties:view";
+  if (pathname.startsWith("/today")) return "duties:view";
   if (pathname.startsWith("/incidents")) return "incidents:view";
   if (pathname.startsWith("/field-safety")) return "fieldsafety:view";
   if (pathname.startsWith("/device-book")) return "devicebook:view";

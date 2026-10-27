@@ -66,6 +66,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "AuthorityInspection",
   "AuthorityFinding",
   "DisclosureSession",
+  "ChecklistItemReadiness",
   "DutyOverlapDecision",
   "UserAreaAssignment",
   "AuthorityNotification",
@@ -157,6 +158,20 @@ export function withTenantGuard(client: PrismaClient) {
           }
 
           const tenantId = requireTenantId();
+
+          // v26.1 R2 — block clinic writes while a disclosure session is open.
+          // Whitelist: session row itself + readiness ticks (André: legitimate during visit).
+          if (
+            WRITE_OPS.has(operation) &&
+            model !== "DisclosureSession" &&
+            model !== "ChecklistItemReadiness"
+          ) {
+            const { assertClinicWritable } = await import(
+              "@/services/authority/disclosureLockService"
+            );
+            await assertClinicWritable(tenantId);
+          }
+
           const nextArgs = { ...(args as Record<string, unknown>) } as Record<string, unknown>;
 
           if (READ_OPS.has(operation) || operation === "update" || operation === "updateMany" || operation === "delete" || operation === "deleteMany") {

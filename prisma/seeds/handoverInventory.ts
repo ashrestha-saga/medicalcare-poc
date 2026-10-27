@@ -247,7 +247,7 @@ function dutyKey(inspectionType: string, constancyObject: string | null): DutyKe
 }
 
 function asIntervalUnit(raw: string | null | undefined): IntervalUnit | null {
-  if (raw === "months" || raw === "years") return raw;
+  if (raw === "months" || raw === "years" || raw === "working_days") return raw;
   return null;
 }
 

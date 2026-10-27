@@ -17,7 +17,7 @@ import { isLiveContract } from "@/services/access/partnerAccessService";
 import { requirePartnerPermission } from "@/lib/auth/tenantContext";
 import { ensureExecutorForContract } from "@/services/contracts/executorSyncService";
 import { parseAppointmentInput } from "@/lib/format";
-import { addMonthsUtc } from "@/lib/maintenance/schedule";
+import { addMonthsUtc, addWorkingDaysUtc } from "@/lib/maintenance/schedule";
 import { computeDutyDueAt } from "@/services/registration/dueDate";
 import type { ServiceRequestState } from "@prisma/client";
 
@@ -76,6 +76,9 @@ function resolveInventoryDutyDue(
   if (computed) return computed;
   // Interval/recurring duties often store dueAt=null; still show next occurrence.
   if (duty.intervalValue != null && duty.intervalUnit) {
+    if (duty.intervalUnit === "working_days") {
+      return addWorkingDaysUtc(duty.lastCompletedAt ?? duty.referenceDate, duty.intervalValue);
+    }
     const months =
       duty.intervalUnit === "years"
         ? duty.intervalValue * 12

@@ -363,8 +363,8 @@
   },
   {
    "key": "befund-frist",
-   "title": "Begehungsbefunde mit Frist",
-   "question": "Was hat die Behörde gesetzt?",
+   "title": "Begehung: Fristen überfällig",
+   "question": "Welche Befristungen sind überschritten?",
    "zone": "decides",
    "sortOrder": 17,
    "dutyKey": null,
@@ -374,7 +374,7 @@
   {
    "key": "befund-nachweis",
    "title": "Behoben, Nachweis fehlt",
-   "question": "Was ist zu belegen?",
+   "question": "Was ist behoben und noch zu bestätigen?",
    "zone": "worklist",
    "sortOrder": 15,
    "dutyKey": null,
@@ -382,9 +382,9 @@
    "partnerOnly": false
   },
   {
-   "key": "begehung-vorbereitung",
-   "title": "Vorbereitungsmodus",
-   "question": "Was würde die Behörde vermissen?",
+   "key": "begehung-luecke",
+   "title": "Vorbereitung: Prüfpunkte mit Lücke",
+   "question": "Welche Prüfpunkte haben noch eine Lücke?",
    "zone": "worklist",
    "sortOrder": 16,
    "dutyKey": null,
@@ -713,11 +713,11 @@
   },
   {
    "role": "device_admin",
-   "tileKey": "begehung-vorbereitung"
+   "tileKey": "begehung-luecke"
   },
   {
    "role": "superadmin",
-   "tileKey": "begehung-vorbereitung"
+   "tileKey": "begehung-luecke"
   },
   {
    "role": "superadmin",
@@ -944,7 +944,7 @@
    "position": 21,
    "label": "Keine abgelaufenen Produkte im Einsatz",
    "legalBasis": "MPDG",
-   "mapsToSection": "offene-punkte",
+   "mapsToSection": "nachweise",
    "covered": false
   },
   {
@@ -952,7 +952,7 @@
    "position": 22,
    "label": "Meldung mutmaßlicher Vorkommnisse",
    "legalBasis": "MPAMIV",
-   "mapsToSection": "medizinproduktebuch",
+   "mapsToSection": "meldewesen",
    "covered": true
   },
   {
@@ -960,7 +960,7 @@
    "position": 1,
    "label": "Hygieneplan vorhanden und aktuell",
    "legalBasis": "§ 23 IfSG · KRINKO",
-   "mapsToSection": "offene-punkte",
+   "mapsToSection": "hygiene",
    "covered": false
   },
   {
@@ -968,7 +968,7 @@
    "position": 2,
    "label": "Händehygiene und Flächendesinfektion",
    "legalBasis": "KRINKO",
-   "mapsToSection": "offene-punkte",
+   "mapsToSection": "hygiene",
    "covered": false
   },
   {
@@ -976,7 +976,7 @@
    "position": 3,
    "label": "Abfallentsorgung",
    "legalBasis": "KRINKO · AbfallR",
-   "mapsToSection": "offene-punkte",
+   "mapsToSection": "hygiene",
    "covered": false
   },
   {
@@ -984,7 +984,7 @@
    "position": 4,
    "label": "Trinkwasser und Spülpläne",
    "legalBasis": "§ 15a, § 37 IfSG",
-   "mapsToSection": "offene-punkte",
+   "mapsToSection": "hygiene",
    "covered": false
   },
   {
@@ -1000,7 +1000,7 @@
    "position": 1,
    "label": "Gefährdungsbeurteilung",
    "legalBasis": "§ 5 ArbSchG",
-   "mapsToSection": "offene-punkte",
+   "mapsToSection": "arbeitsschutz",
    "covered": false
   },
   {
@@ -1008,7 +1008,7 @@
    "position": 2,
    "label": "Betriebsanweisungen",
    "legalBasis": "GefStoffV · BioStoffV",
-   "mapsToSection": "offene-punkte",
+   "mapsToSection": "arbeitsschutz",
    "covered": false
   },
   {
@@ -1024,7 +1024,7 @@
    "position": 4,
    "label": "Biostoff- und Gefahrstoffverzeichnis",
    "legalBasis": "BioStoffV · GefStoffV",
-   "mapsToSection": "offene-punkte",
+   "mapsToSection": "arbeitsschutz",
    "covered": false
   },
   {
@@ -1032,7 +1032,7 @@
    "position": 5,
    "label": "Vorsorge und Impfungen",
    "legalBasis": "ArbMedVV",
-   "mapsToSection": "offene-punkte",
+   "mapsToSection": "arbeitsschutz",
    "covered": false
   }
  ]

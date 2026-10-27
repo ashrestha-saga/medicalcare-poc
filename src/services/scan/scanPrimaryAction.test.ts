@@ -210,7 +210,7 @@ describe("openDailyRefCodesForDevice", () => {
     expect(open).toEqual(["RC-water-1"]);
   });
 
-  it("returns no equipment rows for ordinary products", () => {
+  it("returns no daily rows for ordinary products (incl. site-scoped)", () => {
     const open = openDailyRefCodesForDevice(
       {
         id: "d2",
@@ -221,6 +221,20 @@ describe("openDailyRefCodesForDevice", () => {
       refs,
       [],
     );
-    expect(open).toEqual(["RC-water-1"]);
+    expect(open).toEqual([]);
+  });
+
+  it("returns no daily rows for imaging devices with a site", () => {
+    const open = openDailyRefCodesForDevice(
+      {
+        id: "d-ct",
+        productKindCode: "bildgebung",
+        characteristicsJson: null,
+        siteId: "s1",
+      },
+      refs,
+      [],
+    );
+    expect(open).toEqual([]);
   });
 });

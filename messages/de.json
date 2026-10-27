@@ -3,7 +3,7 @@
     "inventory": "Bestand",
     "registration": "Erstanlage",
     "due-dates": "Fälligkeiten",
-    "dashboard": "Dashboard",
+    "today": "Heute",
     "constancy-cadence": "Strahlenschutz",
     "duty-overlap": "Pflichtüberlappung",
     "incidents": "Vorkommnisse",
@@ -241,6 +241,10 @@
     "lifecycle_resume": "Vertrag fortgesetzt.",
     "lifecycle_terminate": "Vertrag beendet.",
     "lifecycleFailed": "Vertragsaktion fehlgeschlagen.",
+    "lifecycleConfirmSuspendTitle": "Vertrag pausieren?",
+    "lifecycleConfirmSuspendBody": "Betreuungsvertrag für {tenant} pausieren? Partnerzugriff bleibt ausgesetzt, bis der Vertrag fortgesetzt wird.",
+    "lifecycleConfirmTerminateTitle": "Vertrag beenden?",
+    "lifecycleConfirmTerminateBody": "Betreuungsvertrag für {tenant} endgültig beenden? Das lässt sich in der Konsole nicht rückgängig machen.",
     "openBackoffice": "Im Backoffice öffnen",
     "contractEndNote": "Beendete Verträge verschwinden aus der aktiven Liste; der Mandant bleibt bestehen.",
     "actingBar": "{org} betreut Mandant {tenant}",
@@ -739,6 +743,182 @@
         "revoke": "Widerrufen"
       }
     },
+    "authority": {
+      "title": "Behördenbegehung",
+      "description": "Prüfpunkte vorbereiten, eine Nur-Zeigen-Sitzung eröffnen, dann Begehungen und Befunde erfassen.",
+      "deniedTitle": "Behördenbegehung",
+      "deniedDescription": "Sie haben keine Berechtigung, Behördenbegehungen einzusehen.",
+      "deniedHint": "Zugriff verweigert.",
+      "loading": "Laden…",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "open": "Öffnen",
+      "close": "Schließen",
+      "emDash": "—",
+      "noSession": "Keine Sitzung",
+      "noSessionHint": "Die Behörde sieht nur, was in einer offenen Sitzung gezeigt wird.",
+      "openSession": "Sitzung eröffnen",
+      "closeSession": "Sitzung schließen",
+      "sessionExpired": "abgelaufen",
+      "sessionRemaining": "noch {hours}h {minutes}m",
+      "sessionRunning": "Sitzung läuft seit {since} · noch {remaining}",
+      "sessionScope": "Umfang: {scope}",
+      "sessionShown": "Gezeigt {count}",
+      "sessionMeta": "{audience}{site}",
+      "sessionSiteSuffix": " · {site}",
+      "otherAuthorities": "Andere Behörden:",
+      "otherAuthorityOpen": "{name} ({count} offen)",
+      "tabs": {
+        "vorbereitung": "Vorbereitung",
+        "begehungen": "Begehungen",
+        "sitzungen": "Sitzungen",
+        "notifications": "Meldungen"
+      },
+      "prepFilter": {
+        "all": "Alle",
+        "bereit": "Bereit",
+        "luecke": "Lücke",
+        "aussen": "Außerhalb"
+      },
+      "findingFilter": {
+        "all": "Alle",
+        "offen": "Offen",
+        "ueberfaellig": "Überfällig",
+        "behoben": "Nachweis offen",
+        "nachgewiesen": "Nachgewiesen",
+        "bestritten": "Bestritten"
+      },
+      "kpi": {
+        "items": "Prüfpunkte",
+        "ready": "Bereit",
+        "gap": "Lücke",
+        "outside": "Außerhalb",
+        "openFindings": "Befunde offen",
+        "evidencePending": "Nachweis offen"
+      },
+      "kpiHint": {
+        "ready": "in der Mappe, keine Lücke",
+        "gap": "mit Lücke im Backoffice",
+        "outside": "noch auszulegen",
+        "openFindings": "im Fristenlauf",
+        "openFindingsOverdue": "{count} davon überfällig",
+        "evidencePending": "behoben, nicht bestätigt"
+      },
+      "prep": {
+        "progress": "{ready} von {total} bereit",
+        "colPosition": "#",
+        "colItem": "Prüfpunkt",
+        "colSection": "Abschnitt",
+        "colStatus": "Stand",
+        "colAction": "Aktion",
+        "stateReady": "bereit",
+        "stateGap": "Lücke · {count}",
+        "stateExternal": "außerhalb",
+        "laidOut": "Bereitgelegt",
+        "documentRef": "Ablage / Dokumentreferenz",
+        "otherOpenStates": "Weitere offene Zustände"
+      },
+      "inspections": {
+        "record": "Begehung erfassen",
+        "recordHint": "Zuerst der Besuch — Protokoll, Gebühr und Befunde folgen.",
+        "empty": "Noch keine Begehungen für diese Behörde.",
+        "emptyHint": " Erfassen Sie eine, um Befunde hinzuzufügen.",
+        "authorityName": "Behörde",
+        "authorityNamePlaceholder": "z. B. Bezirksregierung Köln",
+        "visited": "Besucht",
+        "announced": "Angekündigt",
+        "site": "Standort",
+        "checklist": "Prüfliste",
+        "protocolReceived": "Protokolleingang",
+        "protocolRef": "Protokollreferenz",
+        "fee": "Gebühr (€)",
+        "legalBasis": "Rechtsgrundlage",
+        "session": "Sitzung",
+        "metaSite": "Standort {name}",
+        "metaAnnounced": "angekündigt {date}",
+        "metaVisited": "besucht {date}",
+        "metaProtocol": "Protokoll {date}",
+        "noFindings": "Noch keine Befunde.",
+        "addFinding": "Befund hinzufügen",
+        "findingNo": "Nr.",
+        "finding": "Befund",
+        "due": "Frist",
+        "status": "Status",
+        "action": "Aktion",
+        "remediate": "Beheben",
+        "dispute": "Bestreiten",
+        "confirm": "Bestätigen"
+      },
+      "status": {
+        "open": "offen",
+        "overdue": "überfällig",
+        "remediated": "Nachweis offen",
+        "proven": "nachgewiesen",
+        "disputed": "bestritten"
+      },
+      "sessions": {
+        "empty": "Noch keine Sitzungen.",
+        "open": "läuft",
+        "closed": "geschlossen",
+        "autoClosed": "automatisch geschlossen",
+        "closedManually": "manuell geschlossen",
+        "colTime": "Zeit",
+        "colView": "Ansicht",
+        "colReference": "Referenz",
+        "noProtocol": "Noch nichts gezeigt.",
+        "openedAt": "eröffnet {at}",
+        "closedAt": "geschlossen {at}",
+        "durationHours": "Dauer {hours} Stunden",
+        "durationMinutes": "Dauer {minutes} Minuten",
+        "gapsAtOpening": "Lücken bei Eröffnung: {count}",
+        "remaining": "noch {remaining}",
+        "recordInspection": "Begehung erfassen"
+      },
+      "summary": {
+        "title": "Sitzungszusammenfassung {id}",
+        "meta": "{audience}{site} · {from} bis {to} · Dauer {duration} · {closedHow}",
+        "participants": "Teilnehmer",
+        "scope": "Umfang",
+        "shown": "Gezeigt ({count})",
+        "gaps": "Lücken bei Eröffnung",
+        "noGaps": "Keine Lücken erfasst.",
+        "dismiss": "Verwerfen",
+        "recordInspection": "Begehung erfassen"
+      },
+      "notifications": {
+        "empty": "Keine Meldungen erfasst."
+      },
+      "dialog": {
+        "remediateTitle": "Befund beheben",
+        "remediateHint": "Notiz erforderlich. Optional Empfänger benachrichtigen.",
+        "notifyRecipient": "Empfänger benachrichtigen (optional)",
+        "disputeTitle": "Befund bestreiten",
+        "disputeHint": "Begründung ist erforderlich.",
+        "disputeAction": "Bestreiten",
+        "discloseTitle": "Sitzung eröffnen",
+        "discloseHint": "Ab Eröffnung gilt die Schreibsperre in jeder Ansicht; jeder Aufruf wird protokolliert. Die Sitzung endet mit Schließen oder Ablauf der Dauer.",
+        "audience": "Behörde (Name)",
+        "site": "Standort",
+        "purpose": "Zweck",
+        "scope": "Umfang (Mappenabschnitte)",
+        "participants": "Teilnehmer (Behörde und Standort)",
+        "durationHours": "Dauer (Stunden)",
+        "selectAllScope": "Alle",
+        "clearScope": "Keine"
+      },
+      "toast": {
+        "loadFailed": "Behördendaten konnten nicht geladen werden.",
+        "remediated": "Befund als behoben markiert",
+        "proven": "Befund als nachgewiesen markiert",
+        "disputed": "Befund bestritten",
+        "sessionOpened": "Sitzung eröffnet",
+        "sessionClosed": "Sitzung geschlossen",
+        "readinessSet": "Als bereitgelegt markiert",
+        "readinessCleared": "Bereitgelegt-Markierung entfernt",
+        "inspectionRecorded": "Begehung erfasst",
+        "findingAdded": "Befund hinzugefügt"
+      }
+    },
     "authorityNotification": {
       "title": "Behördenmeldung erfassen",
       "hint": "Das System sendet nicht. Sie halten fest, dass eine benannte Person die Meldung abgesendet hat — mit Empfänger und Weg.",
@@ -804,6 +984,7 @@
         "determined": "Festgelegt"
       },
       "unit": {
+        "working_days": "Arbeitstage",
         "months": "Monate",
         "years": "Jahre"
       },
@@ -1183,9 +1364,9 @@
       "description": "Neues Gerät anlegen (Produktart, Merkmale, Pflichten)"
     },
     "dashboard": {
-      "title": "Dashboard",
+      "title": "Heute",
       "description": "Kachelkatalog nach Anwendungsrolle. Zone 1 zeigt höchstens drei dringende Kacheln; der Rest bleibt im Arbeitsvorrat erreichbar.",
-      "denied": "Das Dashboard erfordert Navigationszugriff.",
+      "denied": "Heute erfordert Navigationszugriff.",
       "tileAssignments": "Kacheln je Rolle",
       "zones": {
         "decides": "Entscheidet den Tag",
@@ -1240,7 +1421,7 @@
         "groups": {
           "pruefung": "Prüfungen und Fristen",
           "behoerde": "Behördliche Befunde",
-          "rueckruf": "Rückrufe"
+          "rueckruf": "Field-Safety-Maßnahmen"
         }
       },
       "tile": {
@@ -1258,7 +1439,7 @@
         "title": "Kacheln je Rolle",
         "description": "Vorbelegung aus dem Kachelkatalog je Anwendungsrolle. Jede Person mit dieser Rolle sieht dieselben Kacheln (gefiltert nach Rechten).",
         "requiresRolesView": "Erfordert roles:view.",
-        "backDashboard": "← Dashboard",
+        "backDashboard": "← Heute",
         "rolesLink": "Rollen",
         "roleLabel": "Anwendungsrolle",
         "rolePlaceholder": "Rolle wählen",
@@ -1898,6 +2079,7 @@
     "bezugDauerhaft": "dauerhaft",
     "months": "Monate",
     "years": "Jahre",
+    "working_days": "Arbeitstage",
     "checkRulesTitle": "Prüfung der Antworten",
     "contradiction": "Widerspruch",
     "note": "Hinweis",
@@ -2767,6 +2949,7 @@
     "markDone": "Erledigt",
     "years": "Jahre",
     "monthsUnit": "Monate",
+    "workingDaysUnit": "Arbeitstage",
     "anchorExactDay": "genauer Tag",
     "anchorMonthEnd": "Monatsende",
     "anchorYearEnd": "Jahresende",

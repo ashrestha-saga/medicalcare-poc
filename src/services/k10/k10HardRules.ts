@@ -43,7 +43,11 @@ export function trimDecidesZone<T extends { urgency: TileUrgency; sortOrder: num
  * RefConstancyObject.defaultCadence. No open cadence ⇒ null (“Takt festzulegen”).
  */
 export function konstanzDueAtFromCadence(
-  openCadence: { intervalValue: number; intervalUnit: "months" | "years"; determinedAt: Date } | null,
+  openCadence: {
+    intervalValue: number;
+    intervalUnit: "months" | "years" | "working_days";
+    determinedAt: Date;
+  } | null,
   computeDueAt: (args: {
     deadlineAnchor: string;
     referenceDate: Date;
@@ -52,6 +56,16 @@ export function konstanzDueAtFromCadence(
   }) => Date | null,
 ): Date | null {
   if (!openCadence) return null;
+  if (openCadence.intervalUnit === "working_days") {
+    // Initial takt: due on/after the determination day (interval 0), so daily
+    // work appears on Today immediately. Completions advance via computeDutyDueAt.
+    return computeDueAt({
+      deadlineAnchor: "exact_day",
+      referenceDate: openCadence.determinedAt,
+      intervalValue: 0,
+      intervalUnit: "working_days",
+    });
+  }
   return computeDueAt({
     deadlineAnchor: "month_end",
     referenceDate: openCadence.determinedAt,

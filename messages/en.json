@@ -3,7 +3,7 @@
     "inventory": "Inventory",
     "registration": "Registration",
     "due-dates": "Due dates",
-    "dashboard": "Dashboard",
+    "today": "Today",
     "constancy-cadence": "Constancy takt",
     "duty-overlap": "Duty overlap",
     "incidents": "Incidents",
@@ -241,6 +241,10 @@
     "lifecycle_resume": "Contract resumed.",
     "lifecycle_terminate": "Contract terminated.",
     "lifecycleFailed": "Contract action failed.",
+    "lifecycleConfirmSuspendTitle": "Suspend contract?",
+    "lifecycleConfirmSuspendBody": "Suspend the management contract for {tenant}? Partner acting access pauses until the contract is resumed.",
+    "lifecycleConfirmTerminateTitle": "Terminate contract?",
+    "lifecycleConfirmTerminateBody": "Permanently terminate the management contract for {tenant}? This cannot be undone from the console.",
     "openBackoffice": "Open in back office",
     "contractEndNote": "Ended or terminated contracts leave the live list; the tenant remains.",
     "actingBar": "{org} acting in tenant {tenant}",
@@ -739,6 +743,182 @@
         "revoke": "Revoke"
       }
     },
+    "authority": {
+      "title": "Authority inspection",
+      "description": "Prepare checklist items, open a show-only session, then record inspections and findings.",
+      "deniedTitle": "Authority",
+      "deniedDescription": "You do not have permission to view authority inspections.",
+      "deniedHint": "Access denied.",
+      "loading": "Loading…",
+      "save": "Save",
+      "cancel": "Cancel",
+      "open": "Open",
+      "close": "Close",
+      "emDash": "—",
+      "noSession": "No session",
+      "noSessionHint": "The authority sees only what is shown in an open session.",
+      "openSession": "Open session",
+      "closeSession": "Close session",
+      "sessionExpired": "expired",
+      "sessionRemaining": "{hours}h {minutes}m left",
+      "sessionRunning": "Session running since {since} · remaining {remaining}",
+      "sessionScope": "Scope: {scope}",
+      "sessionShown": "Shown {count}",
+      "sessionMeta": "{audience}{site}",
+      "sessionSiteSuffix": " · {site}",
+      "otherAuthorities": "Other authorities:",
+      "otherAuthorityOpen": "{name} ({count} open)",
+      "tabs": {
+        "vorbereitung": "Preparation",
+        "begehungen": "Inspections",
+        "sitzungen": "Sessions",
+        "notifications": "Notifications"
+      },
+      "prepFilter": {
+        "all": "All",
+        "bereit": "Ready",
+        "luecke": "Gap",
+        "aussen": "External"
+      },
+      "findingFilter": {
+        "all": "All",
+        "offen": "Open",
+        "ueberfaellig": "Overdue",
+        "behoben": "Evidence pending",
+        "nachgewiesen": "Proven",
+        "bestritten": "Disputed"
+      },
+      "kpi": {
+        "items": "Checklist items",
+        "ready": "Ready",
+        "gap": "Gap",
+        "outside": "Outside",
+        "openFindings": "Open findings",
+        "evidencePending": "Evidence pending"
+      },
+      "kpiHint": {
+        "ready": "in the folder, no gap",
+        "gap": "with a gap in the back office",
+        "outside": "still to be laid out",
+        "openFindings": "in the due-dates run",
+        "openFindingsOverdue": "{count} thereof overdue",
+        "evidencePending": "remediated, not confirmed"
+      },
+      "prep": {
+        "progress": "{ready} of {total} ready",
+        "colPosition": "#",
+        "colItem": "Item",
+        "colSection": "Section",
+        "colStatus": "Status",
+        "colAction": "Action",
+        "stateReady": "ready",
+        "stateGap": "gap · {count}",
+        "stateExternal": "external",
+        "laidOut": "Laid out",
+        "documentRef": "Document ref",
+        "otherOpenStates": "Other open states"
+      },
+      "inspections": {
+        "record": "Record inspection",
+        "recordHint": "Visit first — protocol, fee and findings follow.",
+        "empty": "No inspections for this authority yet.",
+        "emptyHint": " Record one to add findings.",
+        "authorityName": "Authority name",
+        "authorityNamePlaceholder": "e.g. Bezirksregierung Köln",
+        "visited": "Visited",
+        "announced": "Announced",
+        "site": "Site",
+        "checklist": "Checklist",
+        "protocolReceived": "Protocol received",
+        "protocolRef": "Protocol reference",
+        "fee": "Fee (€)",
+        "legalBasis": "Legal basis",
+        "session": "Session",
+        "metaSite": "Site {name}",
+        "metaAnnounced": "announced {date}",
+        "metaVisited": "visited {date}",
+        "metaProtocol": "protocol {date}",
+        "noFindings": "No findings yet.",
+        "addFinding": "Add finding",
+        "findingNo": "No.",
+        "finding": "Finding",
+        "due": "Due",
+        "status": "Status",
+        "action": "Action",
+        "remediate": "Remediate",
+        "dispute": "Dispute",
+        "confirm": "Confirm"
+      },
+      "status": {
+        "open": "open",
+        "overdue": "overdue",
+        "remediated": "evidence pending",
+        "proven": "proven",
+        "disputed": "disputed"
+      },
+      "sessions": {
+        "empty": "No sessions yet.",
+        "open": "running",
+        "closed": "closed",
+        "autoClosed": "auto-closed",
+        "closedManually": "closed manually",
+        "colTime": "Time",
+        "colView": "View",
+        "colReference": "Reference",
+        "noProtocol": "Nothing shown yet.",
+        "openedAt": "opened {at}",
+        "closedAt": "closed {at}",
+        "durationHours": "Duration {hours} hours",
+        "durationMinutes": "Duration {minutes} minutes",
+        "gapsAtOpening": "gaps at opening: {count}",
+        "remaining": "remaining {remaining}",
+        "recordInspection": "Record inspection"
+      },
+      "summary": {
+        "title": "Session summary {id}",
+        "meta": "{audience}{site} · {from} to {to} · Duration {duration} · {closedHow}",
+        "participants": "Participants",
+        "scope": "Scope",
+        "shown": "Shown ({count})",
+        "gaps": "Gaps at the time of opening",
+        "noGaps": "No gaps recorded.",
+        "dismiss": "Dismiss",
+        "recordInspection": "Record inspection"
+      },
+      "notifications": {
+        "empty": "No notifications recorded."
+      },
+      "dialog": {
+        "remediateTitle": "Remediate finding",
+        "remediateHint": "Note required. Optional notify recipient.",
+        "notifyRecipient": "Notify recipient (optional)",
+        "disputeTitle": "Dispute finding",
+        "disputeHint": "Reason is required.",
+        "disputeAction": "Dispute",
+        "discloseTitle": "Open session",
+        "discloseHint": "From opening, the write lock applies in every view; every call is logged. The session ends when closed or when the duration elapses.",
+        "audience": "Authority (name)",
+        "site": "Site",
+        "purpose": "Purpose",
+        "scope": "Scope (folder sections)",
+        "participants": "Participants (authority and site)",
+        "durationHours": "Duration (hours)",
+        "selectAllScope": "Select all",
+        "clearScope": "Clear"
+      },
+      "toast": {
+        "loadFailed": "Could not load authority data.",
+        "remediated": "Finding marked remediated",
+        "proven": "Finding marked proven",
+        "disputed": "Finding disputed",
+        "sessionOpened": "Disclosure session opened",
+        "sessionClosed": "Disclosure session closed",
+        "readinessSet": "Marked ready (external)",
+        "readinessCleared": "Cleared ready mark",
+        "inspectionRecorded": "Inspection recorded",
+        "findingAdded": "Finding added"
+      }
+    },
     "authorityNotification": {
       "title": "Record authority notification",
       "hint": "The system does not transmit. You record that a named person sent the message, with recipient and channel.",
@@ -804,6 +984,7 @@
         "determined": "Set"
       },
       "unit": {
+        "working_days": "Working days",
         "months": "Months",
         "years": "Years"
       },
@@ -1183,9 +1364,9 @@
       "description": "Register a new device (product kind, characteristics, duties)"
     },
     "dashboard": {
-      "title": "Dashboard",
+      "title": "Today",
       "description": "Tile catalogue by application role. Zone 1 shows at most three urgent tiles; the rest stay reachable in the worklist.",
-      "denied": "Dashboard requires navigation access.",
+      "denied": "Today requires navigation access.",
       "tileAssignments": "Tiles by role",
       "zones": {
         "decides": "Decides the day",
@@ -1240,7 +1421,7 @@
         "groups": {
           "pruefung": "Inspections and deadlines",
           "behoerde": "Authority findings",
-          "rueckruf": "Recalls"
+          "rueckruf": "Field safety Action"
         }
       },
       "tile": {
@@ -1258,7 +1439,7 @@
         "title": "Tiles by role",
         "description": "Default assignment from the tile catalogue per application role. Everyone with this role sees the same tiles (filtered by permissions).",
         "requiresRolesView": "Requires roles:view.",
-        "backDashboard": "← Dashboard",
+        "backDashboard": "← Today",
         "rolesLink": "Roles",
         "roleLabel": "Application role",
         "rolePlaceholder": "Select role",
@@ -1898,6 +2079,7 @@
     "bezugDauerhaft": "ongoing",
     "months": "months",
     "years": "years",
+    "working_days": "working days",
     "checkRulesTitle": "Review of answers",
     "contradiction": "Contradiction",
     "note": "Note",
@@ -2767,6 +2949,7 @@
     "markDone": "Mark done",
     "years": "years",
     "monthsUnit": "months",
+    "workingDaysUnit": "working days",
     "anchorExactDay": "exact day",
     "anchorMonthEnd": "end of month",
     "anchorYearEnd": "end of year",

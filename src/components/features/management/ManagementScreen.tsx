@@ -172,7 +172,6 @@ export function ManagementScreen() {
                         })}
                       </ul>
                     )}
-                    <p className="mt-3 text-sm text-muted-foreground">{t("peopleFootnote")}</p>
                   </CardContent>
                 </Card>
               </div>

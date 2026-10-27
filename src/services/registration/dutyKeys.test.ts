@@ -15,6 +15,8 @@ describe("dutyKeys", () => {
 
   it("normalizes interval units and legacy guess confidence", () => {
     expect(toIntervalUnit("Monate")).toBe("months");
+    expect(toIntervalUnit("arbeitstaeglich")).toBe("working_days");
+    expect(toIntervalUnit("working_days")).toBe("working_days");
     expect(toIntervalUnit("Jahre")).toBe("years");
     expect(normalizeConfidence("guess")).toBe("derived");
     expect(normalizeConfidence("verified")).toBe("verified");
