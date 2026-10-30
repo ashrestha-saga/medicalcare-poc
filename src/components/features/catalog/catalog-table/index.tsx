@@ -55,6 +55,17 @@ export function CatalogTable({ list, onSelect, onEdit }: CatalogTableProps) {
           <Button
             type="button"
             size="sm"
+            variant={list.showAll ? "outline" : "default"}
+            className={cn("h-8")}
+            onClick={() => list.setShowAll(!list.showAll)}
+            data-testid="catalog-filter-owned"
+            aria-pressed={!list.showAll}
+          >
+            {list.showAll ? tFilters("catalogOwnedOff") : tFilters("catalogOwned")}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
             variant={list.missingClassification ? "default" : "outline"}
             className={cn("h-8")}
             onClick={() => list.setMissingClassification(!list.missingClassification)}

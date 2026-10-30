@@ -118,11 +118,24 @@ function AccountBar({
   const user = useSessionStore((s) => s.user);
   const tenantName = useSessionStore((s) => s.tenantName);
   const sites = useSites();
-  const site = sites[0];
-  const area = site?.areas[0];
-  const siteDelivery = site ? (area ? `${site.name} · ${area.name}` : site.name) : null;
+  const homeAreaId = user?.homeAreaId ?? null;
+  const homeSite =
+    (homeAreaId
+      ? sites.find((s) => s.areas.some((a) => a.id === homeAreaId))
+      : null) ?? null;
+  const homeArea = homeSite?.areas.find((a) => a.id === homeAreaId) ?? null;
+  const homeLine =
+    user?.workLocationLine ||
+    (homeSite ? (homeArea ? `${homeSite.name} · ${homeArea.name}` : homeSite.name) : null);
+  const fallbackSite = sites[0];
+  const fallbackArea = fallbackSite?.areas[0];
+  const siteDelivery = fallbackSite
+    ? fallbackArea
+      ? `${fallbackSite.name} · ${fallbackArea.name}`
+      : fallbackSite.name
+    : null;
   const org = user?.companyName?.trim() || tenantName || null;
-  const deliveryLine = user?.deliveryLine || siteDelivery || "—";
+  const deliveryLine = user?.deliveryLine || homeLine || siteDelivery || "—";
   const countLabel = inventoryCount == null ? "…" : String(inventoryCount);
   const roleKey = user?.role;
   const roleText = roleKey ? tRoles(roleKey) : "—";
@@ -295,8 +308,9 @@ function NavLink({
 }) {
   const active = isNavActive(item.id, pathname);
   const t = useTranslations("nav");
-  const badgeAria =
-    countEntry?.mark && countEntry.warn
+  const badgeAria = countEntry?.hintKey
+    ? t(countEntry.hintKey)
+    : countEntry?.mark || countEntry?.warn
       ? t("badgeWarn", { label })
       : countEntry?.count != null
         ? t("badgeCount", { label, count: countEntry.count })
@@ -306,7 +320,7 @@ function NavLink({
       href={item.href}
       className={navItemClass(active)}
       aria-current={active ? "page" : undefined}
-      title={label}
+      title={badgeAria ?? label}
       data-testid={`nav-${item.id}`}
     >
       <NavIcon id={item.id} />
@@ -342,8 +356,10 @@ export function AppShell({
 
   const showNav = checkPermission("shell:nav");
   const canSearchBestand = checkPermission("inventory:view");
-  const isCapturerChrome = !showNav;
   const onHome = pathname === APP_HOME_PATH;
+  /** Scan home keeps the account bar but hides the admin ERP rail. */
+  const showNavRail = showNav && !onHome;
+  const isCapturerChrome = !showNav;
   const showCapturerInventory = !showNav && onHome && checkPermission("inventory:view");
   const showCapturerSecurity = !showNav && checkPermission("account:security");
   const showCapturerDeviceBook = !showNav && checkPermission("devicebook:view");
@@ -424,7 +440,7 @@ export function AppShell({
       data-nav={showNav ? (open ? "open" : "collapsed") : undefined}
       data-testid={testId}
     >
-      {showNav && (
+      {showNavRail && (
         <aside className="p-nav" aria-label={t("main")} data-testid="app-nav">
           <div className="p-nav__tools">
             {canSearchBestand && (
@@ -560,16 +576,16 @@ export function AppShell({
         <PartnerActingBar />
         <AccountBar
           subtitle={accountSubtitle}
-          showLogout={!showNav}
+          showLogout={!showNavRail}
           onSignOut={() => void signOut()}
           showInventory={false}
           inventoryCount={inventoryCount}
           onOpenInventory={openInventory}
-          showSecurity={showCapturerSecurity}
+          showSecurity={showCapturerSecurity || (showNav && onHome && checkPermission("account:security"))}
           showDeviceBook={showCapturerDeviceBook}
-          showHome={showCapturerHome}
+          showHome={showNav && onHome ? true : showCapturerHome}
           showScanTabs={showDesktopScanTabs && scanNavEnabled}
-          useCornerMenu={isCapturerChrome}
+          useCornerMenu={isCapturerChrome || (showNav && onHome)}
         />
         <OfflineBar />
         {children}

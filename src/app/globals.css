@@ -824,6 +824,18 @@ body {
   }
 }
 
+/* Today, scan, inspect: body text at least 16px (P2 ward readability). */
+.p-work--readable,
+[data-page="today"],
+[data-page="scan"],
+[data-page="inspect"] {
+  --fs-body: 16px;
+  --fs-label: 12px;
+  --fs-btn: 15px;
+  --fs-meta: 12px;
+  font-size: var(--fs-body);
+}
+
 .p-work {
   flex: 1 1 0;
   min-height: 0;

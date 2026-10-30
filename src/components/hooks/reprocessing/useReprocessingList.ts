@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  DeviceInstanceDTO,
   ReprocessingBatchDTO,
   ReprocessingCheckDTO,
   RefReprocessingCheckDTO,
+  SiteDTO,
 } from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
@@ -21,6 +23,23 @@ const TAB_SCOPES: Record<Exclude<ReprocessingTab, "batches">, string> = {
   equipment: "equipment",
   water: "water,chemistry",
   sterile: "sterile_storage",
+};
+
+export type ReprocessingEquipmentOption = {
+  id: string;
+  inventoryNumber: string;
+  label: string;
+};
+
+export type RecordCheckInput = {
+  checkCode: string;
+  equipmentDeviceId?: string | null;
+  siteId?: string | null;
+  batchId?: string | null;
+  performedAt: string;
+  passed?: boolean | null;
+  measuredValue?: string | null;
+  note?: string | null;
 };
 
 function parseTab(section: string | null, scope: string | null): ReprocessingTab {
@@ -49,6 +68,8 @@ export function useReprocessingList() {
   const [openTodayRefs, setOpenTodayRefs] = useState<RefReprocessingCheckDTO[]>([]);
   const [batches, setBatches] = useState<ReprocessingBatchDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [equipment, setEquipment] = useState<ReprocessingEquipmentOption[]>([]);
+  const [sites, setSites] = useState<Array<{ id: string; name: string }>>([]);
 
   const setTab = useCallback(
     (next: ReprocessingTab) => {
@@ -62,6 +83,13 @@ export function useReprocessingList() {
         openToday: null,
         cadence: null,
       });
+    },
+    [sync],
+  );
+
+  const setOpenToday = useCallback(
+    (next: boolean) => {
+      sync({ openToday: next ? "1" : null });
     },
     [sync],
   );
@@ -145,6 +173,63 @@ export function useReprocessingList() {
     return map;
   }, [checks]);
 
+  const openTodayCodes = useMemo(() => new Set(openTodayRefs.map((r) => r.code)), [openTodayRefs]);
+
+  const displayRefs = useMemo(
+    () => (highlightOpenToday ? refs.filter((r) => openTodayCodes.has(r.code)) : refs),
+    [highlightOpenToday, refs, openTodayCodes],
+  );
+
+  // Deep-link `?openToday=1` without a tab: land on the first tab that has open daily checks.
+  const openTodayTabRef = useRef(false);
+  useEffect(() => {
+    if (!highlightOpenToday || loading || openTodayTabRef.current) return;
+    openTodayTabRef.current = true;
+    if (sectionParam || scopeParam || openTodayRefs.length === 0) return;
+    const hasScope = (scopes: string[]) => openTodayRefs.some((r) => scopes.includes(r.scope));
+    const next = hasScope(["equipment"])
+      ? null
+      : hasScope(["water", "chemistry"])
+        ? "water"
+        : hasScope(["sterile_storage"])
+          ? "sterile"
+          : null;
+    if (next) sync({ section: "checks", scope: TAB_SCOPES[next] });
+  }, [highlightOpenToday, loading, sectionParam, scopeParam, openTodayRefs, sync]);
+
+  /** Lazy-load pickers for the record dialog (equipment devices, sites). */
+  const loadRecordOptions = useCallback(async () => {
+    const [devRes, siteRes] = await Promise.all([
+      api<{ devices: DeviceInstanceDTO[] }>("/api/devices").catch(() => null),
+      api<{ sites: SiteDTO[] }>("/api/sites").catch(() => null),
+    ]);
+    setEquipment(
+      (devRes?.devices ?? [])
+        .filter((d) => d.isReprocessingEquipment && d.state !== "retired")
+        .map((d) => ({
+          id: d.id,
+          inventoryNumber: d.inventoryNumber,
+          label: d.tradeName || d.modelName || d.inventoryNumber,
+        })),
+    );
+    setSites((siteRes?.sites ?? []).map((site) => ({ id: site.id, name: site.name })));
+  }, []);
+
+  const recordCheck = useCallback(
+    async (input: RecordCheckInput) => {
+      try {
+        await api("/api/reprocessing/checks", { method: "POST", body: JSON.stringify(input) });
+        toast.success("Check recorded");
+        await refresh();
+        return true;
+      } catch (err) {
+        toast.error(err instanceof ApiError ? err.message : "Could not record check.");
+        return false;
+      }
+    },
+    [refresh],
+  );
+
   const unevaluatedCount = useMemo(
     () =>
       checks.filter(
@@ -159,7 +244,7 @@ export function useReprocessingList() {
     tab,
     setTab,
     checks,
-    refs,
+    refs: displayRefs,
     allRefs,
     openTodayRefs,
     batches,
@@ -176,7 +261,11 @@ export function useReprocessingList() {
     scope: tab === "batches" ? null : TAB_SCOPES[tab],
     setScope: (_next: string | null) => undefined,
     openToday: highlightOpenToday,
-    setOpenToday: (_next: boolean) => undefined,
+    setOpenToday,
+    equipment,
+    sites,
+    loadRecordOptions,
+    recordCheck,
     clearCheckFilters: () => undefined,
   };
 }

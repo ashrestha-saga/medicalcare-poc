@@ -28,6 +28,10 @@ import {
   getEffectiveAreaScope,
 } from "@/services/users/userAreaScope";
 import { recordedByAttribution } from "@/lib/auth/attribution";
+import {
+  shouldHideFromRegisterDevice,
+  shouldHideFromRegisterIncident,
+} from "@/lib/registerQuality";
 
 /** Prerequisite codes that mean Gebrauchsanweisung / IFU (§ 4). */
 export const IFU_PREREQUISITE_CODES = ["ga", "ifu", "gebrauchsanweisung"] as const;
@@ -312,6 +316,17 @@ export const deviceBookService = {
 
     return rows
       .filter((r) => !isMpbetreibV34BookException(parseCharacteristicsJson(r.characteristicsJson)))
+      .filter(
+        (r) =>
+          !shouldHideFromRegisterDevice({
+            inventoryNumber: r.inventoryNumber,
+            name: r.model?.tradeName || r.model?.modelName,
+            modelName: r.model?.modelName,
+            manufacturer: r.model?.manufacturer,
+            serialNumber: r.serialNumber,
+            room: r.room,
+          }),
+      )
       .map((r) => ({
         id: r.id,
         inventoryNumber: r.inventoryNumber,
@@ -433,7 +448,9 @@ export const deviceBookService = {
         participants: t.records.map((r) => r.person.name),
       })),
       entries,
-      incidents: incidents.map((row) => ({
+      incidents: incidents
+        .filter((row) => !shouldHideFromRegisterIncident(row))
+        .map((row) => ({
         id: row.id,
         deviceInstanceId: row.deviceInstanceId,
         inventoryNumber: row.deviceInstance?.inventoryNumber ?? null,

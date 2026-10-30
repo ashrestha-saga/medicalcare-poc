@@ -4,6 +4,9 @@ export type ConsoleActingScope = "managing_org" | "tenant" | "platform" | "other
 
 export type DispositionDisplayState =
   | "erfasst"
+  | "warteschlange"
+  | "uebermittelt"
+  | "uebergeben"
   | "zugewiesen"
   | "terminiert"
   | "in_arbeit"

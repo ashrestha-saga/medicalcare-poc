@@ -13,9 +13,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ConstancyCadenceDTO } from "@/interfaces";
-import { suggestFromDefaultCadence } from "@/lib/constancy/suggestCadence";
+import {
+  guidelineCadenceMismatch,
+  suggestFromDefaultCadence,
+} from "@/lib/constancy/suggestCadence";
 import { useSessionStore } from "@/store/sessionStore";
 import { cn } from "@/lib/utils";
+
+function displayDeterminedBy(name: string | null | undefined): string {
+  const raw = name?.trim() ?? "";
+  if (!raw) return "—";
+  // Never show a raw user id (cuid / seeded user-tech-1).
+  if (/^user[-_]/i.test(raw) || /^c[a-z0-9]{20,}$/i.test(raw)) return "—";
+  return raw;
+}
 
 type TableRow =
   | { kind: "open"; key: string; row: ConstancyCadenceDTO }
@@ -40,6 +51,7 @@ export function ConstancyCadenceScreen() {
   const [basisText, setBasisText] = useState("");
   const [determinedAt, setDeterminedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [hintCadence, setHintCadence] = useState<string | null>(null);
+  const [intervalError, setIntervalError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const total = list.missing.length + list.open.length;
@@ -121,6 +133,17 @@ export function ConstancyCadenceScreen() {
     if (!target || !basisText.trim()) return;
     const value = Number(intervalValue);
     if (!Number.isFinite(value) || value < 1) return;
+    const mismatch = guidelineCadenceMismatch(target.defaultCadence, intervalUnit);
+    if (mismatch.mismatch && mismatch.guideline && mismatch.suggestedUnit) {
+      setIntervalError(
+        t("form.unitMismatch", {
+          guideline: mismatch.guideline,
+          unit: unitLabel(mismatch.suggestedUnit),
+        }),
+      );
+      return;
+    }
+    setIntervalError(null);
     setBusy(true);
     try {
       const ok = await list.determine({
@@ -222,15 +245,21 @@ export function ConstancyCadenceScreen() {
                     id="kt-unit"
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                     value={intervalUnit}
-                    onChange={(e) =>
-                      setIntervalUnit(e.target.value as "months" | "years" | "working_days")
-                    }
+                    onChange={(e) => {
+                      setIntervalUnit(e.target.value as "months" | "years" | "working_days");
+                      setIntervalError(null);
+                    }}
                     data-testid="constancy-unit"
                   >
                     <option value="working_days">{t("unit.working_days")}</option>
                     <option value="months">{t("unit.months")}</option>
                     <option value="years">{t("unit.years")}</option>
                   </select>
+                  {intervalError ? (
+                    <p className="text-xs text-destructive" data-testid="constancy-unit-error">
+                      {intervalError}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-1 sm:col-span-2">
                   <Label htmlFor="kt-basis" className="text-[11px] uppercase tracking-wide">
@@ -337,7 +366,7 @@ export function ConstancyCadenceScreen() {
                             {c.basisText}
                           </td>
                           <td className="px-3 py-3 align-top text-muted-foreground">
-                            {c.determinedBy}, {formatDate(c.determinedAt)}
+                            {displayDeterminedBy(c.determinedBy)}, {formatDate(c.determinedAt)}
                           </td>
                         </tr>
                       );

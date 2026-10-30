@@ -160,7 +160,7 @@ function normalizeGtins(gtins: string[] | null | undefined): string | null {
 export const deviceModelCatalogService = {
   async list(
     ctx: TenantWorkContext,
-    opts: { q?: string; missingClassification?: boolean } = {},
+    opts: { q?: string; missingClassification?: boolean; ownedOnly?: boolean } = {},
   ): Promise<CatalogModelListItemDTO[]> {
     requirePermission(ctx, "catalog:view");
     const q = opts.q?.trim();
@@ -178,6 +178,10 @@ export const deviceModelCatalogService = {
         : {}),
       // Match dashboard tile modelle-ohne-einstufung: no open (validTo=null) classification.
       ...(opts.missingClassification ? { classifications: { none: { validTo: null } } } : {}),
+      // Default catalog: models this clinic already has copies of.
+      ...(opts.ownedOnly !== false
+        ? { instances: { some: { tenantId: ctx.tenantId } } }
+        : {}),
     };
     const rows = await prisma.deviceModel.findMany({
       where,

@@ -116,6 +116,44 @@ export const dutyOverlapService = {
       .sort((a, b) => a.inventoryNumber.localeCompare(b.inventoryNumber));
   },
 
+  /**
+   * Devices with an applicable, unsuspended DGUV duty and no open overlap
+   * decision covering DGUV (mirrors dashboard tile `dguv-ohne-festlegung`).
+   */
+  async listPendingDguvCoverage(ctx: TenantContext): Promise<OverlapCandidateDevice[]> {
+    requirePermission(ctx, "duties:view");
+    const withDecision = await prisma.dutyOverlapDecision.findMany({
+      where: { validTo: null, coveredDutyKey: "dguv" },
+      select: { deviceInstanceId: true },
+    });
+    const decided = new Set(withDecision.map((d) => d.deviceInstanceId));
+    const duties = await prisma.deviceDuty.findMany({
+      where: { dutyKey: "dguv", applicable: true, suspendedAt: null },
+      select: {
+        deviceInstanceId: true,
+        deviceInstance: {
+          select: {
+            id: true,
+            inventoryNumber: true,
+            model: { select: { tradeName: true, modelName: true } },
+          },
+        },
+      },
+    });
+
+    const byDevice = new Map<string, OverlapCandidateDevice>();
+    for (const d of duties) {
+      if (decided.has(d.deviceInstanceId) || byDevice.has(d.deviceInstanceId)) continue;
+      byDevice.set(d.deviceInstanceId, {
+        id: d.deviceInstance.id,
+        inventoryNumber: d.deviceInstance.inventoryNumber,
+        tradeName: d.deviceInstance.model?.tradeName ?? null,
+        modelName: d.deviceInstance.model?.modelName ?? null,
+      });
+    }
+    return [...byDevice.values()].sort((a, b) => a.inventoryNumber.localeCompare(b.inventoryNumber));
+  },
+
   async decide(ctx: TenantContext, input: CreateDutyOverlapInput): Promise<DutyOverlapDecisionDTO> {
     requirePermission(ctx, "duties:view");
     if (input.coveredDutyKey === input.satisfiedByDutyKey) {

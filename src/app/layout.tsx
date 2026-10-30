@@ -37,7 +37,7 @@ export const viewport: Viewport = {
 };
 
 /** Theme + locale before paint (localStorage theme, cookie locale). */
-const bootScript = `(function(){try{var k="devicecare.theme";var p=localStorage.getItem(k);if(p!=="light"&&p!=="dark"&&p!=="system")p="dark";var r=p==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):p;var d=document.documentElement;d.dataset.theme=r;d.classList.toggle("dark",r==="dark");d.style.colorScheme=r;var m=document.cookie.match(/(?:^|; )devicecare\\.locale=([^;]*)/);var l=m?decodeURIComponent(m[1]):"en";if(l!=="de"&&l!=="en")l="en";d.lang=l;}catch(e){document.documentElement.dataset.theme="dark";document.documentElement.lang="en";}})();`;
+const bootScript = `(function(){try{var k="devicecare.theme";var p=localStorage.getItem(k);if(p!=="light"&&p!=="dark"&&p!=="system")p="light";var r=p==="system"?(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):p;var d=document.documentElement;d.dataset.theme=r;d.classList.toggle("dark",r==="dark");d.style.colorScheme=r;var m=document.cookie.match(/(?:^|; )devicecare\\.locale=([^;]*)/);var l=m?decodeURIComponent(m[1]):"en";if(l!=="de"&&l!=="en")l="en";d.lang=l;}catch(e){document.documentElement.dataset.theme="light";document.documentElement.lang="en";}})();`;
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = (await getLocale()) as AppLocale;

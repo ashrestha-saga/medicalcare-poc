@@ -1,5 +1,6 @@
 import { clinicHomePath } from "@/constants/authRoutes";
 import { readSession } from "@/lib/auth/session";
+import { prisma } from "@/lib/prisma";
 import { isClinicSession, isPartnerSession } from "@/interfaces/session";
 
 /** Client-facing session user — omits clinic tenantId; partners keep organisationId for shell routing. */
@@ -31,8 +32,29 @@ export async function GET() {
     return Response.json({ user: null }, { status: 200 });
   }
 
+  const home = await prisma.user.findFirst({
+    where: { id: user.id },
+    select: {
+      homeAreaId: true,
+      homeArea: {
+        select: {
+          name: true,
+          site: { select: { name: true } },
+        },
+      },
+    },
+  });
+  const workLocationLine =
+    home?.homeArea?.site?.name && home.homeArea.name
+      ? `${home.homeArea.site.name} · ${home.homeArea.name}`
+      : home?.homeArea?.site?.name ?? home?.homeArea?.name ?? null;
+
   return Response.json({
-    user: toPublicUser(user),
+    user: {
+      ...toPublicUser(user),
+      homeAreaId: home?.homeAreaId ?? null,
+      workLocationLine,
+    },
     tenantName: user.companyName ?? null,
     oxidStatus: "disconnected",
     homePath: clinicHomePath(user.role),

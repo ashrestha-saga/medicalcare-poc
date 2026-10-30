@@ -39,8 +39,8 @@ export function deviceMatchesScope(device: CandidateDevice, scope: AffectedModel
       device.modelBasicUdiDi === scope.basicUdiDi.trim());
 
   if (!scope.deviceModelId && !scope.basicUdiDi?.trim()) {
-    // Serial-only row: match by serial range against any device.
-    return serialInRange(device.serialNumber, scope.serialFrom, scope.serialTo);
+    // A serial range never selects devices of an unnamed model.
+    return false;
   }
   if (!modelOk) return false;
   return serialInRange(device.serialNumber, scope.serialFrom, scope.serialTo);

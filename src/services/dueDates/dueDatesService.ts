@@ -11,10 +11,22 @@ import { deriveMaintenanceStatus } from "@/lib/maintenance/schedule";
 import { prisma } from "@/lib/prisma";
 import type { CreateDutyAssignmentInput } from "@/schemas/dueDates";
 import { serviceRequestService } from "@/services/requests/serviceRequestService";
-import type { DutyKey, Prisma } from "@prisma/client";
+import type { DutyKey, Prisma, ServiceRequestState } from "@prisma/client";
 import { confidenceLabel, deadlineAnchorLabel, serviceTypeForDuty } from "./dutyDisplay";
 
-const OPEN_SET = new Set<string>(OPEN_REQUEST_STATES);
+/** Open assignments on the due-dates board (includes scheduled appointments). */
+const BOARD_OPEN_STATES = [
+  ...OPEN_REQUEST_STATES,
+  "scheduled",
+] as const satisfies readonly ServiceRequestState[];
+
+const OPEN_ASSIGNMENT_SOME: Prisma.ServiceRequestListRelationFilter = {
+  some: { state: { in: [...BOARD_OPEN_STATES] } },
+};
+
+const OPEN_ASSIGNMENT_NONE: Prisma.ServiceRequestListRelationFilter = {
+  none: { state: { in: [...BOARD_OPEN_STATES] } },
+};
 
 function startOfTodayUtc(): Date {
   const n = new Date();
@@ -36,7 +48,14 @@ function deviceTitle(
   return model?.tradeName?.trim() || model?.modelName?.trim() || inventoryNumber;
 }
 
-function buildDutyWhere(tenantId: string, query: DueDatesListQuery = {}): Prisma.DeviceDutyWhereInput {
+/**
+ * Shared scopes (duty key, horizon, confidence, …) — used for KPI cards so
+ * counts stay stable while a status chip is active.
+ */
+function buildBaseDutyWhere(
+  tenantId: string,
+  query: DueDatesListQuery = {},
+): Prisma.DeviceDutyWhereInput {
   const today = startOfTodayUtc();
   const where: Prisma.DeviceDutyWhereInput = {
     tenantId,
@@ -70,6 +89,42 @@ function buildDutyWhere(tenantId: string, query: DueDatesListQuery = {}): Prisma
   return where;
 }
 
+/**
+ * Apply status chip in SQL so pagination does not walk overdue rows first and
+ * then discard them in memory (empty `?filter=due` pages).
+ */
+function applyStatusFilterToWhere(
+  base: Prisma.DeviceDutyWhereInput,
+  filter: DueDatesListQuery["filter"] | undefined,
+  today: Date,
+): Prisma.DeviceDutyWhereInput {
+  if (!filter || filter === "all") return base;
+
+  if (filter === "due") {
+    // Align with card: today or later (status due|ok). Respect an existing horizon window.
+    const existing = base.dueAt;
+    if (existing && typeof existing === "object" && "lte" in existing) {
+      return { ...base, dueAt: { gte: today, lte: (existing as { lte: Date }).lte } };
+    }
+    return { ...base, dueAt: { gte: today } };
+  }
+
+  if (filter === "overdue") {
+    return { ...base, dueAt: { lt: today } };
+  }
+
+  if (filter === "unassigned") {
+    return { ...base, serviceRequests: OPEN_ASSIGNMENT_NONE };
+  }
+
+  if (filter === "open") {
+    return { ...base, serviceRequests: OPEN_ASSIGNMENT_SOME };
+  }
+
+  return base;
+}
+
+/** Post-filter safety net (soft-joined assignments / search path). */
 function matchesStatusFilter(
   row: DueDateRowDTO,
   filter: DueDatesListQuery["filter"] | undefined,
@@ -107,28 +162,37 @@ export const dueDatesService = {
 
     const limit = Math.min(Math.max(query.limit ?? DEFAULT_PAGE_LIMIT, 1), MAX_PAGE_LIMIT);
     const offset = Math.max(query.offset ?? 0, 0);
-    const where = buildDutyWhere(ctx.tenantId, query);
     const today = startOfTodayUtc();
+    const baseWhere = buildBaseDutyWhere(ctx.tenantId, query);
+    const where = applyStatusFilterToWhere(baseWhere, query.filter, today);
 
-    const [rows, totalMatching, overdueCount, dueOrOkCount] = await Promise.all([
-      prisma.deviceDuty.findMany({
-        where,
-        include: {
-          deviceInstance: {
-            include: {
-              model: { select: { tradeName: true, modelName: true } },
-              area: { include: { site: true } },
+    const [rows, totalMatching, overdueCount, dueOrOkCount, unassignedCount, openAssignmentCount] =
+      await Promise.all([
+        prisma.deviceDuty.findMany({
+          where,
+          include: {
+            deviceInstance: {
+              include: {
+                model: { select: { tradeName: true, modelName: true } },
+                area: { include: { site: true } },
+              },
             },
           },
-        },
-        orderBy: [{ dueAt: "asc" }, { dutyKey: "asc" }],
-        take: limit,
-        skip: offset,
-      }),
-      prisma.deviceDuty.count({ where }),
-      prisma.deviceDuty.count({ where: { ...where, dueAt: { lt: today } } }),
-      prisma.deviceDuty.count({ where: { ...where, dueAt: { gte: today } } }),
-    ]);
+          orderBy: [{ dueAt: "asc" }, { dutyKey: "asc" }],
+          take: limit,
+          skip: offset,
+        }),
+        prisma.deviceDuty.count({ where }),
+        // KPIs from base scope (ignore active status chip) so cards stay stable.
+        prisma.deviceDuty.count({ where: { ...baseWhere, dueAt: { lt: today } } }),
+        prisma.deviceDuty.count({ where: { ...baseWhere, dueAt: { gte: today } } }),
+        prisma.deviceDuty.count({
+          where: { ...baseWhere, serviceRequests: OPEN_ASSIGNMENT_NONE },
+        }),
+        prisma.deviceDuty.count({
+          where: { ...baseWhere, serviceRequests: OPEN_ASSIGNMENT_SOME },
+        }),
+      ]);
 
     const dutyIds = rows.map((r) => r.id);
     const instanceIds = [...new Set(rows.map((r) => r.deviceInstanceId))];
@@ -140,7 +204,7 @@ export const dueDatesService = {
             where: {
               tenantId: ctx.tenantId,
               dutyId: { in: dutyIds },
-              state: { in: [...OPEN_REQUEST_STATES] },
+              state: { in: [...BOARD_OPEN_STATES] },
             },
             orderBy: { createdAt: "desc" },
             select: {
@@ -168,7 +232,7 @@ export const dueDatesService = {
               dutyId: null,
               subjectType: "instance",
               subjectId: { in: instanceIds },
-              state: { in: [...OPEN_REQUEST_STATES] },
+              state: { in: [...BOARD_OPEN_STATES] },
             },
             orderBy: { createdAt: "desc" },
             select: {
@@ -216,16 +280,16 @@ export const dueDatesService = {
       };
     });
 
-    const searched = mapped.filter((row) => matchesSearch(row, query.q));
-    const filtered = searched.filter((row) => matchesStatusFilter(row, query.filter));
+    // Search remains in-memory; status chip is already in SQL (keep as safety net for soft joins).
+    const filtered = mapped
+      .filter((row) => matchesSearch(row, query.q))
+      .filter((row) => matchesStatusFilter(row, query.filter));
 
-    // Page-local assignment stats; due/overdue from full DB filter (stable under pagination).
     const summary = {
       due: dueOrOkCount,
       overdue: overdueCount,
-      unassigned: searched.filter((r) => !r.assignment).length,
-      openAssignments: searched.filter((r) => r.assignment && OPEN_SET.has(r.assignment.state))
-        .length,
+      unassigned: unassignedCount,
+      openAssignments: openAssignmentCount,
     };
 
     return {

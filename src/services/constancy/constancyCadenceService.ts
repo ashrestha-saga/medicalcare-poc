@@ -10,6 +10,7 @@ import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
 import { recomputeDutyProjection } from "@/services/duties/dutyProjection";
+import { guidelineCadenceMismatch } from "@/lib/constancy/suggestCadence";
 import type { CreateConstancyCadenceInput } from "@/schemas/k10";
 
 function isoDate(d: Date | null | undefined): string | null {
@@ -125,6 +126,13 @@ export const constancyCadenceService = {
     if (!device) throw notFound("Device not found");
     const obj = await prisma.refConstancyObject.findUnique({ where: { code: input.constancyObjectCode } });
     if (!obj) throw badRequest("Unknown constancy object");
+    const mismatch = guidelineCadenceMismatch(obj.defaultCadence, input.intervalUnit);
+    if (mismatch.mismatch && mismatch.guideline && mismatch.suggestedUnit) {
+      throw badRequest(
+        `Interval unit does not match QS-RL “${mismatch.guideline}” (use ${mismatch.suggestedUnit}).`,
+        { field: "intervalUnit", suggestedUnit: mismatch.suggestedUnit },
+      );
+    }
 
     const key = openKey(input.deviceInstanceId, input.constancyObjectCode);
     await prisma.constancyCadence.updateMany({

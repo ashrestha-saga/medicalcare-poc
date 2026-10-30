@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   RecordNotificationModal,
   type NotificationSubject,
@@ -21,7 +21,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { DeviceIncidentDTO } from "@/interfaces";
+import { formatDate as formatDateIntl } from "@/lib/format";
 import { api } from "@/lib/http/apiClient";
+import type { AppLocale } from "@/lib/locale";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { cn } from "@/lib/utils";
 
@@ -35,13 +37,6 @@ function daysSince(isoDate: string): number {
   const today = new Date();
   const utcToday = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   return Math.max(0, Math.floor((utcToday - d.getTime()) / 86_400_000));
-}
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const [y, m, d] = iso.split("-");
-  if (!y || !m || !d) return iso;
-  return `${d}.${m}.${y}`;
 }
 
 function todayIso(): string {
@@ -72,6 +67,8 @@ function Chip({
 export function IncidentsScreen() {
   const t = useTranslations("pages.incidents");
   const tn = useTranslations("pages.authorityNotification");
+  const locale = useLocale() as AppLocale;
+  const formatDate = (iso: string | null | undefined) => formatDateIntl(iso, locale);
   const { permissionData } = usePermissions();
   const list = useIncidentsList();
   const maskRef = useRef<HTMLDivElement>(null);

@@ -2,7 +2,7 @@ export type ThemePreference = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
 export const THEME_STORAGE_KEY = "devicecare.theme";
-export const THEME_DEFAULT: ThemePreference = "dark";
+export const THEME_DEFAULT: ThemePreference = "light";
 
 export const THEME_OPTIONS: {
   value: ThemePreference;
@@ -30,7 +30,7 @@ export function readStoredThemePreference(): ThemePreference {
 
 export function resolveTheme(preference: ThemePreference): ResolvedTheme {
   if (preference !== "system") return preference;
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 

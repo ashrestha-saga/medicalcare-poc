@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import {
@@ -13,22 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ComposedBookEvidenceDTO } from "@/interfaces";
+import { formatDate as formatDateIntl, formatDateTime as formatDateTimeIntl } from "@/lib/format";
+import type { AppLocale } from "@/lib/locale";
 import { cn } from "@/lib/utils";
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const day = iso.slice(0, 10);
-  const [y, m, d] = day.split("-");
-  if (!y || !m || !d) return day;
-  return `${d}.${m}.${y}`;
-}
-
-function formatDateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const date = formatDate(iso);
-  if (iso.length < 16) return date;
-  return `${date} ${iso.slice(11, 16)}`;
-}
 
 function placeLine(parts: {
   siteName?: string | null;
@@ -79,6 +66,9 @@ function IfuChip({ hasIfu, present, missing }: { hasIfu: boolean; present: strin
 
 export function DeviceBookScreen() {
   const t = useTranslations("pages.deviceBook");
+  const locale = useLocale() as AppLocale;
+  const formatDate = (iso: string | null | undefined) => formatDateIntl(iso, locale);
+  const formatDateTime = (iso: string | null | undefined) => formatDateTimeIntl(iso, locale);
   const list = useDeviceBookComposed();
   const fileRef = useRef<HTMLInputElement>(null);
   const [externalRef, setExternalRef] = useState("");

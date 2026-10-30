@@ -7,11 +7,17 @@ import type {
   TenantContext,
 } from "@/interfaces";
 import { hrefForDashboardTile } from "@/constants/dashboardTileLinks";
-import { DASHBOARD_ROLE_LABELS, isOverviewTile, tileKind } from "@/constants/dashboardTiles";
+import {
+  DASHBOARD_ROLE_LABELS,
+  TODAY_PRIMARY_TILE_KEYS,
+  isOverviewTile,
+  tileKind,
+} from "@/constants/dashboardTiles";
 import type { UserRole } from "@/interfaces/session";
 import { prisma } from "@/lib/prisma";
 import { clarificationService } from "@/services/clarifications/clarificationService";
-import { trimDecidesZone } from "@/services/k10/k10HardRules";
+import { countMissingConstancyCadences } from "@/services/constancy/missingCadenceMetrics";
+import { overdueDutyWhere } from "@/services/dueDates/dutyDueMetrics";
 import { reprocessingEvidenceService } from "@/services/reprocessingEvidence/reprocessingEvidenceService";
 import {
   getAssignedAreaIds,
@@ -93,14 +99,13 @@ async function deviceStateSegments(): Promise<{
 async function valueForTile(ctx: TenantContext, key: string): Promise<TileValue> {
   const today = startOfTodayUtc();
   const in30 = addDays(today, 30);
+  const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0, 23, 59, 59, 999));
   const in90 = addDays(today, 90);
 
   switch (key) {
     case "ueberfaellig": {
       const [count, total] = await Promise.all([
-        prisma.deviceDuty.count({
-          where: { applicable: true, suspendedAt: null, dueAt: { lt: today } },
-        }),
+        prisma.deviceDuty.count({ where: overdueDutyWhere(today) }),
         prisma.deviceDuty.count({
           where: { applicable: true, suspendedAt: null, dueAt: { not: null } },
         }),
@@ -116,7 +121,7 @@ async function valueForTile(ctx: TenantContext, key: string): Promise<TileValue>
     case "faellig-30": {
       const [count, total] = await Promise.all([
         prisma.deviceDuty.count({
-          where: { applicable: true, suspendedAt: null, dueAt: { gte: today, lte: in30 } },
+          where: { applicable: true, suspendedAt: null, dueAt: { gte: today, lte: monthEnd } },
         }),
         prisma.deviceDuty.count({
           where: { applicable: true, suspendedAt: null, dueAt: { not: null } },
@@ -124,7 +129,7 @@ async function valueForTile(ctx: TenantContext, key: string): Promise<TileValue>
       ]);
       return W(
         count,
-        count ? "in den nächsten 30 Tagen" : "nichts in 30 Tagen",
+        count ? "fällig diesen Monat" : "nichts diesen Monat",
         count > 0 ? "due" : "ok",
         total,
         "Pflicht mit Termin|Pflichten mit Termin",
@@ -445,11 +450,15 @@ async function valueForTile(ctx: TenantContext, key: string): Promise<TileValue>
     }
     case "konstanz-takt-offen": {
       const [open, total] = await Promise.all([
+        countMissingConstancyCadences(),
         prisma.deviceDuty.count({
-          where: { dutyKey: "konstanz", applicable: true, suspendedAt: null, dueAt: null },
-        }),
-        prisma.deviceDuty.count({
-          where: { dutyKey: "konstanz", applicable: true, suspendedAt: null },
+          where: {
+            dutyKey: "konstanz",
+            applicable: true,
+            suspendedAt: null,
+            constancyObjectCode: { not: null },
+            deviceInstance: { state: { not: "retired" } },
+          },
         }),
       ]);
       const set = Math.max(0, total - open);
@@ -807,16 +816,15 @@ export const dashboardBoardService = {
 
     const overview = enriched.filter((t) => isOverviewTile(t.key));
     const work = enriched.filter((t) => !isOverviewTile(t.key));
-
-    const decidesAll = work.filter((t) => t.zone === "decides");
-    const { decides, overflow } = trimDecidesZone(decidesAll, 3);
-    const overflowWorklist = overflow.map((t) => ({ ...t, zone: "worklist" as const }));
-
-    const worklistBase = work.filter((t) => t.zone === "worklist");
-    const worklist = [...worklistBase, ...overflowWorklist].sort(
-      (a, b) => a.sortOrder - b.sortOrder,
+    const primaryKeySet = new Set<string>(TODAY_PRIMARY_TILE_KEYS);
+    const decides = TODAY_PRIMARY_TILE_KEYS.map((key) => work.find((t) => t.key === key)).filter(
+      (t): t is (typeof work)[number] => Boolean(t),
     );
-    const watch = work.filter((t) => t.zone === "watch").sort((a, b) => a.sortOrder - b.sortOrder);
+    const more = work
+      .filter((t) => !primaryKeySet.has(t.key))
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.key.localeCompare(b.key));
+    const worklist = more.filter((t) => t.zone === "worklist" || t.zone === "decides");
+    const watch = more.filter((t) => t.zone === "watch");
 
     const band = await buildBand(startOfTodayUtc());
 
@@ -826,9 +834,9 @@ export const dashboardBoardService = {
         roleLabel: DASHBOARD_ROLE_LABELS[role] ?? role,
         workTileCount: work.length,
         overviewCount: overview.length,
-        decidesPoolCount: decidesAll.length,
-        overflowCount: overflow.length,
-        worklistBaseCount: worklistBase.length,
+        decidesPoolCount: decides.length,
+        overflowCount: more.length,
+        worklistBaseCount: worklist.length,
         watchCount: watch.length,
       },
       overview,

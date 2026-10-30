@@ -17,38 +17,43 @@ export function useDutyOverlap() {
   const canView = checkPermission("duties:view");
   const [decisions, setDecisions] = useState<DutyOverlapDecisionDTO[]>([]);
   const [devices, setDevices] = useState<OverlapDeviceOption[]>([]);
+  const [pending, setPending] = useState<OverlapDeviceOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!canView) {
       setDecisions([]);
       setDevices([]);
+      setPending([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
+      type DeviceRow = {
+        id: string;
+        inventoryNumber: string;
+        tradeName: string | null;
+        modelName: string | null;
+      };
+      const toOption = (d: DeviceRow): OverlapDeviceOption => ({
+        id: d.id,
+        inventoryNumber: d.inventoryNumber,
+        label: d.tradeName || d.modelName || d.inventoryNumber,
+      });
       const res = await api<{
         decisions: DutyOverlapDecisionDTO[];
-        devices: Array<{
-          id: string;
-          inventoryNumber: string;
-          tradeName: string | null;
-          modelName: string | null;
-        }>;
+        devices: DeviceRow[];
+        pending?: DeviceRow[];
       }>("/api/duty-overlap");
       setDecisions(res.decisions);
-      setDevices(
-        (res.devices ?? []).map((d) => ({
-          id: d.id,
-          inventoryNumber: d.inventoryNumber,
-          label: d.tradeName || d.modelName || d.inventoryNumber,
-        })),
-      );
+      setDevices((res.devices ?? []).map(toOption));
+      setPending((res.pending ?? []).map(toOption));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Could not load overlap decisions.");
       setDecisions([]);
       setDevices([]);
+      setPending([]);
     } finally {
       setLoading(false);
     }
@@ -91,5 +96,5 @@ export function useDutyOverlap() {
     }
   }
 
-  return { canView, decisions, devices, loading, refresh, decide, revoke };
+  return { canView, decisions, devices, pending, loading, refresh, decide, revoke };
 }

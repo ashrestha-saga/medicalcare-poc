@@ -3,7 +3,7 @@ import { errorResponse } from "@/lib/errors";
 import { createCatalogModelSchema } from "@/schemas/catalogModel";
 import { deviceModelCatalogService } from "@/services/catalog/deviceModelCatalogService";
 
-/** GET /api/catalog/models?q=&missingClassification=1 — central DeviceModel list (catalog:view). */
+/** GET /api/catalog/models?q=&missingClassification=1&all=1 — clinic copies by default. */
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
@@ -14,7 +14,12 @@ export async function GET(req: Request) {
       const q = params.get("q") ?? undefined;
       const missingClassification =
         params.get("missingClassification") === "1" || params.get("missingClassification") === "true";
-      const models = await deviceModelCatalogService.list(ctx, { q, missingClassification });
+      const ownedOnly = !(params.get("all") === "1" || params.get("all") === "true");
+      const models = await deviceModelCatalogService.list(ctx, {
+        q,
+        missingClassification,
+        ownedOnly,
+      });
       return Response.json({ models }, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {

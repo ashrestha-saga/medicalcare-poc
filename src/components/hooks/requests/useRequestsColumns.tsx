@@ -94,6 +94,7 @@ export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void)
             state === "captured" ||
             state === "queued" ||
             state === "transmitted" ||
+            state === "handed_off" ||
             state === "acknowledged" ||
             state === "in_progress" ||
             state === "completed" ||

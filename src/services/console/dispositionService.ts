@@ -110,9 +110,16 @@ const PRE_SCHEDULE: ServiceRequestState[] = [
   "captured",
   "queued",
   "transmitted",
+  "handed_off",
   "acknowledged",
 ];
 
+/**
+ * Same stored step on both desks, different words.
+ * Clinic `transmitted` is Sent; the partner sees Received.
+ * Clinic `handed_off` is Handed off; the partner sees Received, in app only.
+ * Neither is folded into Captured.
+ */
 export function dispositionDisplayState(
   state: ServiceRequestState,
   assigneeUserId: string | null,
@@ -121,25 +128,31 @@ export function dispositionDisplayState(
   if (state === "completed") return "abgeschlossen";
   if (state === "rejected") return "abgelehnt";
   if (state === "in_progress") return "in_arbeit";
-  if (state === "scheduled" || scheduledAt) return "terminiert";
-  if (assigneeUserId && PRE_SCHEDULE.includes(state)) return "zugewiesen";
+  if (state === "scheduled" || (scheduledAt != null && state === "acknowledged")) return "terminiert";
+  if (state === "transmitted") return "uebermittelt";
+  if (state === "handed_off") return "uebergeben";
+  if (state === "queued") return "warteschlange";
+  if (state === "acknowledged" || (assigneeUserId && PRE_SCHEDULE.includes(state))) return "zugewiesen";
   return "erfasst";
 }
 
-/** Console may advance through scheduling; completion is recorded in Prüfpartner. */
-const CONSOLE_ADVANCE_CHAIN: DispositionDisplayState[] = [
-  "erfasst",
-  "zugewiesen",
-  "terminiert",
-  "in_arbeit",
-];
+/** Each open step advances to the next console action. Completion stays in the inspection. */
+const NEXT_DISPLAY: Record<DispositionDisplayState, DispositionDisplayState | null> = {
+  erfasst: "zugewiesen",
+  warteschlange: "zugewiesen",
+  uebermittelt: "zugewiesen",
+  uebergeben: "zugewiesen",
+  zugewiesen: "terminiert",
+  terminiert: "in_arbeit",
+  in_arbeit: null,
+  abgeschlossen: null,
+  abgelehnt: null,
+};
 
 export function nextDispositionDisplayState(
   current: DispositionDisplayState,
 ): DispositionDisplayState | null {
-  const i = CONSOLE_ADVANCE_CHAIN.indexOf(current);
-  if (i < 0 || i >= CONSOLE_ADVANCE_CHAIN.length - 1) return null;
-  return CONSOLE_ADVANCE_CHAIN[i + 1] ?? null;
+  return NEXT_DISPLAY[current] ?? null;
 }
 
 function shortExecutorCode(code: string | null | undefined): string | null {
@@ -735,7 +748,12 @@ export const dispositionService = {
 
       let nextState: ServiceRequestState = row.state;
       if (next === "zugewiesen") {
-        if (row.state === "captured" || row.state === "queued" || row.state === "transmitted") {
+        if (
+          row.state === "captured" ||
+          row.state === "queued" ||
+          row.state === "transmitted" ||
+          row.state === "handed_off"
+        ) {
           nextState = "acknowledged";
         }
       } else if (next === "terminiert") {

@@ -140,11 +140,9 @@ async function findMatchingDeviceIds(
 
   const modelIds = scopes.map((s) => s.deviceModelId).filter(Boolean) as string[];
   const udis = scopes.map((s) => s.basicUdiDi?.trim()).filter(Boolean) as string[];
-  const serialOnly = scopes.some((s) => !s.deviceModelId && !s.basicUdiDi?.trim());
   const orClauses = [
     ...(modelIds.length ? [{ modelId: { in: modelIds } }] : []),
     ...(udis.length ? [{ model: { basicUdiDi: { in: udis } } }] : []),
-    ...(serialOnly ? [{ serialNumber: { not: null } }] : []),
   ];
   if (orClauses.length === 0) return [];
 
@@ -394,10 +392,35 @@ export const fieldSafetyService = {
     input: MatchFieldSafetyDeviceInput,
   ): Promise<FieldSafetyActionDTO> {
     requirePermission(ctx, "fieldsafety:create");
-    const action = await prisma.fieldSafetyAction.findFirst({ where: { id: actionId } });
+    const action = await prisma.fieldSafetyAction.findFirst({
+      where: { id: actionId },
+      include: { affectedModels: true },
+    });
     if (!action) throw notFound("Field safety action not found");
-    const device = await prisma.deviceInstance.findFirst({ where: { id: input.deviceInstanceId } });
+    const device = await prisma.deviceInstance.findFirst({
+      where: { id: input.deviceInstanceId },
+      include: { model: { select: { basicUdiDi: true } } },
+    });
     if (!device) throw notFound("Device not found");
+    const matches = filterCandidateDevices(
+      [
+        {
+          id: device.id,
+          modelId: device.modelId,
+          serialNumber: device.serialNumber,
+          modelBasicUdiDi: device.model?.basicUdiDi ?? null,
+        },
+      ],
+      action.affectedModels.map((s) => ({
+        deviceModelId: s.deviceModelId,
+        basicUdiDi: s.basicUdiDi,
+        serialFrom: s.serialFrom,
+        serialTo: s.serialTo,
+      })),
+    );
+    if (matches.length === 0) {
+      throw badRequest("This device is not one of the named models on this field safety action.");
+    }
 
     const attr = recordedByAttribution(ctx);
     await prisma.fieldSafetyDeviceAction.upsert({
@@ -445,13 +468,17 @@ export const fieldSafetyService = {
       include: includeActions,
     });
     if (!existing) throw notFound("Field safety action not found");
+    if (existing.affectedModels.length === 0) {
+      throw badRequest("Name the affected model before closing.");
+    }
+    const stillToSuggest = await suggestedCountForAction(ctx.tenantId, existing);
     const unmatched = existing.deviceActions.filter((d) => d.affected === null).length;
     const pendingMeasure = existing.deviceActions.filter(
       (d) => d.affected === true && d.actionTakenAt == null,
     ).length;
-    if (unmatched > 0 || pendingMeasure > 0) {
+    if (existing.deviceActions.length === 0 || stillToSuggest > 0 || unmatched > 0 || pendingMeasure > 0) {
       throw badRequest(
-        `Cannot close: ${unmatched} device(s) still to check, ${pendingMeasure} affected without recorded measure`,
+        `Cannot close: ${stillToSuggest} suggested device(s) not on the list, ${unmatched} still to check, ${pendingMeasure} affected without a recorded measure.`,
       );
     }
     const row = await prisma.fieldSafetyAction.update({

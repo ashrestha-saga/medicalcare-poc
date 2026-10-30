@@ -11,9 +11,12 @@ import { changedFields, recordAudit } from "@/services/audit/auditService";
 import { conflict, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { toDeviceInstanceDTO } from "@/services/shared/mappers";
+import { readableCourseLabel } from "@/lib/inventory/courseLabel";
 import { inspectionTagsFromFlags } from "@/lib/inspectionTags";
 import {
   computeNextMaintenanceDueAt,
+  earliestDue,
+  overlayMaintenanceDue,
   resolveMaintenanceCycleMonths,
 } from "@/lib/maintenance/schedule";
 import { listDutiesForInstance, nextObligationDueAt, syncWartungDutyOnComplete } from "@/services/registration/dutyService";
@@ -157,6 +160,28 @@ async function resolveModelClassification(
   };
 }
 
+async function overlayListMaintenance(tenantId: string, devices: DeviceInstanceDTO[]): Promise<DeviceInstanceDTO[]> {
+  if (devices.length === 0) return devices;
+  const duties = await prisma.deviceDuty.findMany({
+    where: {
+      tenantId,
+      deviceInstanceId: { in: devices.map((d) => d.id) },
+      applicable: true,
+      suspendedAt: null,
+      dueAt: { not: null },
+      OR: [{ dutyKey: "wartung" }, { inspectionTypeCode: "MAINT" }],
+    },
+    select: { deviceInstanceId: true, dueAt: true },
+  });
+  const byDevice = new Map<string, Date>();
+  for (const duty of duties) {
+    if (!duty.dueAt) continue;
+    const prev = byDevice.get(duty.deviceInstanceId);
+    if (!prev || duty.dueAt.getTime() < prev.getTime()) byDevice.set(duty.deviceInstanceId, duty.dueAt);
+  }
+  return devices.map((device) => overlayMaintenanceDue(device, byDevice.get(device.id)));
+}
+
 async function buildDeviceCourse(
   row: NonNullable<Awaited<ReturnType<typeof loadInstance>>>,
 ): Promise<DeviceInstanceDetailDTO["course"]> {
@@ -174,7 +199,7 @@ async function buildDeviceCourse(
   ]);
 
   const course: DeviceInstanceDetailDTO["course"] = unitEvents.map((e) => ({
-    label: e.note?.trim() || e.action,
+    label: readableCourseLabel(e.note?.trim() || e.action),
     at: e.occurredAt.toISOString(),
     actor: e.actor || null,
     actorKind: null,
@@ -183,7 +208,7 @@ async function buildDeviceCourse(
 
   for (const e of audits) {
     course.push({
-      label: e.summary || e.action,
+      label: readableCourseLabel(e.summary || e.action),
       at: e.occurredAt.toISOString(),
       actor: e.actorName,
       actorKind: e.actorKind,
@@ -213,8 +238,14 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
       ? base.inspectionTags
       : inspectionTagsFromFlags(modelClassification);
   const duties = await listDutiesForInstance(row.tenantId, row.id);
+  const maintenanceDue = earliestDue(
+    duties
+      .filter((d) => d.applicable && (d.dutyKey === "wartung" || d.inspectionTypeCode === "MAINT"))
+      .map((d) => (d.dueAt ? new Date(d.dueAt) : null)),
+  );
+  const presented = overlayMaintenanceDue(base, maintenanceDue);
   return {
-    ...base,
+    ...presented,
     inspectionTags,
     udiDi: row.model?.udiDi ?? null,
     modelSource: (row.model?.source as DeviceInstanceDetailDTO["modelSource"]) ?? null,
@@ -307,7 +338,7 @@ export const deviceInventoryService: InventoryResolver & {
       orderBy: [{ inventoryNumber: "asc" }],
       take: 100,
     });
-    return rows.map(toDeviceInstanceDTO);
+    return overlayListMaintenance(tenantId, rows.map(toDeviceInstanceDTO));
   },
 
   async list(ctx, query = {}) {
@@ -367,7 +398,7 @@ export const deviceInventoryService: InventoryResolver & {
       take: 500,
     });
 
-    return rows.map(toDeviceInstanceDTO);
+    return overlayListMaintenance(ctx.tenantId, rows.map(toDeviceInstanceDTO));
   },
 
   async get(ctx, id) {

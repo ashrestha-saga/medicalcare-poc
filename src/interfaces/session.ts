@@ -25,6 +25,10 @@ export interface SessionUser {
   customerNumber?: string | null;
   /** Prefill for the account-bar delivery line (from Me address/billing). */
   deliveryLine?: string | null;
+  /** Primary work area for clinic staff (AccountBar place line). */
+  homeAreaId?: string | null;
+  /** "Site · Area" from homeArea — preferred over the first site in the database. */
+  workLocationLine?: string | null;
 }
 
 export type ClinicSessionUser = SessionUser & {

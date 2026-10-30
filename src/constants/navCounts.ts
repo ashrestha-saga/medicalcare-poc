@@ -23,6 +23,8 @@ export type NavCountEntry = {
   warn: boolean;
   mark?: "!";
   mode?: "overdue" | "due";
+  /** Optional i18n key under `nav.*` for the badge title/aria. */
+  hintKey?: "catalogBadgeDerived";
 };
 
 export type NavCountsResponse = Partial<Record<NavCountKey, NavCountEntry>>;

@@ -181,7 +181,8 @@ export const registrationIdentityFormSchema = z
 /** POST /api/duties/[id]/complete */
 export const completeDutySchema = z.object({
   performedAt: z.string().trim().nullable().optional(),
-  note: z.string().trim().max(2000).nullable().optional(),
+  result: z.enum(["passed", "passed_with_conditions", "failed"]),
+  note: z.string().trim().min(1, "Describe what was done.").max(2000),
 });
 
 export type CreateRegistrationDraftInput = z.infer<typeof createRegistrationDraftSchema>;

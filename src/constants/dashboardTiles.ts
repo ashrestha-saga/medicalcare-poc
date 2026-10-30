@@ -1,5 +1,12 @@
 import type { UserRole } from "@/interfaces/session";
 
+/** Today primary shift list: late, due this month, release blocked. */
+export const TODAY_PRIMARY_TILE_KEYS = [
+  "ueberfaellig",
+  "faellig-30",
+  "freigabe-blockiert",
+] as const;
+
 /** Mockup KACHELART — Übersicht tiles leave work zones. */
 export type DashboardTileKind = "arbeit" | "gemischt" | "eigen" | "uebersicht";
 

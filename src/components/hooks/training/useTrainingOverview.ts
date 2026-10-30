@@ -11,6 +11,9 @@ export function useTrainingOverview() {
   const { sync } = useSyncQueryParams();
   const mineParam = useQueryParam("mine");
   const expiringParam = useQueryParam("expiring");
+  const withoutRecordParam = useQueryParam("withoutRecord");
+  const viewParam = useQueryParam("view");
+  const withoutRecord = withoutRecordParam === "1" || withoutRecordParam === "true";
   const mine = mineParam === "1" || mineParam === "true";
   const expiringDays = expiringParam && Number(expiringParam) > 0 ? Number(expiringParam) : null;
 
@@ -51,16 +54,25 @@ export function useTrainingOverview() {
     return [...seen.entries()].map(([id, name]) => ({ id, name }));
   }, [data]);
 
+  const peopleWithAnyRecord = useMemo(() => {
+    const ids = new Set<string>();
+    for (const event of data?.events ?? []) {
+      for (const record of event.records) ids.add(record.personId);
+    }
+    return ids;
+  }, [data]);
+
   const matrixPeople = useMemo(() => {
     if (!data) return [];
     const seen = new Map<string, { name: string; jobTitle: string | null }>();
     for (const cell of data.matrix) {
+      if (withoutRecord && peopleWithAnyRecord.has(cell.personId)) continue;
       if (!seen.has(cell.personId)) {
         seen.set(cell.personId, { name: cell.personName, jobTitle: cell.personJobTitle });
       }
     }
     return [...seen.entries()].map(([id, meta]) => ({ id, ...meta }));
-  }, [data]);
+  }, [data, withoutRecord, peopleWithAnyRecord]);
 
   const cellMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -73,14 +85,18 @@ export function useTrainingOverview() {
   const goOverview = useCallback(() => {
     setView("overview");
     setSelectedId(null);
-  }, []);
+    sync({ view: null, withoutRecord: null });
+  }, [sync]);
 
   const openEvent = useCallback((id: string) => {
     setSelectedId(id);
     setView("detail");
   }, []);
 
-  const openMatrix = useCallback(() => setView("matrix"), []);
+  const openMatrix = useCallback(() => {
+    setView("matrix");
+    sync({ view: "matrix" });
+  }, [sync]);
   const openRecord = useCallback(() => setView("record"), []);
 
   const onCreated = useCallback(
@@ -117,12 +133,40 @@ export function useTrainingOverview() {
     [sync],
   );
 
+  const setWithoutRecord = useCallback(
+    (next: boolean) => {
+      // Do not jump to matrix; KPI/filter stay on overview unless already on matrix.
+      sync({
+        withoutRecord: next ? "1" : null,
+        ...(view === "matrix" ? { view: "matrix" } : next ? { view: null } : {}),
+      });
+    },
+    [sync, view],
+  );
+
   const setExpiring = useCallback(
     (days: number | null) => {
       sync({ expiring: days == null ? null : String(days) });
     },
     [sync],
   );
+
+  // Honor explicit view=matrix only; plain /training stays on the overview with no auto filter.
+  useEffect(() => {
+    if (viewParam === "matrix") setView("matrix");
+  }, [viewParam]);
+
+  const peopleWithoutRecord = useMemo(() => {
+    if (!data) return [];
+    const seen = new Map<string, { name: string; jobTitle: string | null }>();
+    for (const cell of data.matrix) {
+      if (peopleWithAnyRecord.has(cell.personId)) continue;
+      if (!seen.has(cell.personId)) {
+        seen.set(cell.personId, { name: cell.personName, jobTitle: cell.personJobTitle });
+      }
+    }
+    return [...seen.entries()].map(([id, meta]) => ({ id, ...meta }));
+  }, [data, peopleWithAnyRecord]);
 
   return {
     data,
@@ -132,12 +176,15 @@ export function useTrainingOverview() {
     selectedEvent,
     matrixModels,
     matrixPeople,
+    peopleWithoutRecord,
     cellMap,
     filteredEvents,
     mine,
     setMine,
     expiringDays,
     setExpiring,
+    withoutRecord,
+    setWithoutRecord,
     goOverview,
     openEvent,
     openMatrix,

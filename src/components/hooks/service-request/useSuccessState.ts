@@ -107,6 +107,7 @@ export function useSuccessState() {
         "captured",
         "queued",
         "transmitted",
+        "handed_off",
         "acknowledged",
         "in_progress",
         "completed",

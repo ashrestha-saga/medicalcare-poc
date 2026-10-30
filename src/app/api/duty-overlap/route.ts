@@ -9,12 +9,13 @@ export async function GET(req: Request) {
     const ctx = await requireTenantContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
-      const [decisions, devices] = await Promise.all([
+      const [decisions, devices, pending] = await Promise.all([
         dutyOverlapService.list(ctx),
         dutyOverlapService.listCandidateDevices(ctx),
+        dutyOverlapService.listPendingDguvCoverage(ctx),
       ]);
       return Response.json(
-        { decisions, devices },
+        { decisions, devices, pending },
         { headers: { "x-correlation-id": ctx.correlationId } },
       );
     });

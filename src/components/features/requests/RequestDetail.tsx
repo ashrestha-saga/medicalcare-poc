@@ -76,6 +76,7 @@ export function RequestDetail({
       "captured",
       "queued",
       "transmitted",
+      "handed_off",
       "acknowledged",
       "scheduled",
       "in_progress",

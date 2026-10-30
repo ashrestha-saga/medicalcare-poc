@@ -67,12 +67,17 @@ describe("idempotency fingerprint — 23.1", () => {
 });
 
 describe("completeDutySchema", () => {
-  it("accepts an empty body (performedAt defaults server-side)", () => {
-    expect(completeDutySchema.safeParse({}).success).toBe(true);
+  it("requires a result and a note", () => {
+    expect(completeDutySchema.safeParse({}).success).toBe(false);
+    expect(
+      completeDutySchema.safeParse({ result: "passed", note: "Visual check and function test." }).success,
+    ).toBe(true);
   });
 
   it("rejects an overlong note", () => {
-    expect(completeDutySchema.safeParse({ note: "x".repeat(2001) }).success).toBe(false);
+    expect(
+      completeDutySchema.safeParse({ result: "failed", note: "x".repeat(2001) }).success,
+    ).toBe(false);
   });
 });
 

@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type {
@@ -114,6 +115,14 @@ export function ReprocessingScreen() {
   const [result, setResult] = useState<ReleaseChoice>("released");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [recordTarget, setRecordTarget] = useState<RefReprocessingCheckDTO | null>(null);
+  const [recDeviceId, setRecDeviceId] = useState("");
+  const [recSiteId, setRecSiteId] = useState("");
+  const [recBatchId, setRecBatchId] = useState("");
+  const [recDate, setRecDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [recPassed, setRecPassed] = useState<"" | "yes" | "no">("");
+  const [recValue, setRecValue] = useState("");
+  const [recNote, setRecNote] = useState("");
 
   const openBatches = list.batches.filter((b) => !b.releaseResult);
   const rejected = list.batches.filter((b) => b.releaseResult === "rejected");
@@ -155,6 +164,18 @@ export function ReprocessingScreen() {
     };
   }, [list.allRefs, list.latestByCode, list.batches, openTodayCodes, openBatches.length, rejected.length]);
 
+  // Open / overdue / never-done checks first; keeps catalogue order otherwise.
+  const sortedRefs = useMemo(() => {
+    const rank = (r: RefReprocessingCheckDTO) => {
+      const kind = computeStand(r, list.latestByCode.get(r.code), openTodayCodes).kind;
+      return kind === "open" ? 0 : kind === "overdue" ? 1 : kind === "never" ? 2 : 3;
+    };
+    return list.refs
+      .map((r, i) => ({ r, i, k: rank(r) }))
+      .sort((a, b) => a.k - b.k || a.i - b.i)
+      .map((x) => x.r);
+  }, [list.refs, list.latestByCode, openTodayCodes]);
+
   if (!list.canView) {
     return (
       <AccessDenied
@@ -175,6 +196,49 @@ export function ReprocessingScreen() {
       setReleaseTarget(null);
       setNote("");
       setResult("released");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openRecord = (ref: RefReprocessingCheckDTO) => {
+    const last = list.latestByCode.get(ref.code);
+    setRecordTarget(ref);
+    setRecDeviceId(ref.scope === "equipment" ? (last?.equipmentDeviceId ?? "") : "");
+    setRecSiteId(ref.scope !== "equipment" ? (last?.siteId ?? "") : "");
+    setRecBatchId("");
+    setRecDate(new Date().toISOString().slice(0, 10));
+    setRecPassed("");
+    setRecValue("");
+    setRecNote("");
+    void list.loadRecordOptions();
+  };
+
+  const recordNeedsSite = (ref: RefReprocessingCheckDTO) =>
+    ref.scope === "water" || ref.scope === "chemistry" || ref.scope === "sterile_storage";
+
+  const recordInvalid =
+    !recordTarget ||
+    !recDate ||
+    (recordTarget.scope === "equipment" && !recDeviceId) ||
+    (recordNeedsSite(recordTarget) && !recSiteId) ||
+    (recordTarget.cadence === "per_batch" && !recBatchId);
+
+  const submitRecord = async () => {
+    if (!recordTarget || recordInvalid) return;
+    setBusy(true);
+    try {
+      const ok = await list.recordCheck({
+        checkCode: recordTarget.code,
+        equipmentDeviceId: recordTarget.scope === "equipment" ? recDeviceId : null,
+        siteId: recordNeedsSite(recordTarget) ? recSiteId : null,
+        batchId: recordTarget.cadence === "per_batch" ? recBatchId : null,
+        performedAt: recDate,
+        passed: recPassed === "" ? null : recPassed === "yes",
+        measuredValue: recValue.trim() || null,
+        note: recNote.trim() || null,
+      });
+      if (ok) setRecordTarget(null);
     } finally {
       setBusy(false);
     }
@@ -331,6 +395,18 @@ export function ReprocessingScreen() {
             </div>
           ) : null}
 
+          <div className="mb-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={list.openToday ? "default" : "outline"}
+              onClick={() => list.setOpenToday(!list.openToday)}
+              data-testid="reprocessing-filter-open-today"
+            >
+              {t("filter.openToday")}
+            </Button>
+          </div>
+
           <div className="mb-4 flex flex-wrap gap-1 border-b border-border">
             {TABS.map((key) => {
               const meta = tabMeta[key];
@@ -482,14 +558,14 @@ export function ReprocessingScreen() {
                   </tr>
                 </thead>
                 <tbody>
-                  {list.refs.length === 0 ? (
+                  {sortedRefs.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-3 py-6 text-muted-foreground">
-                        {t("emptyChecks")}
+                        {list.openToday ? t("emptyOpenToday") : t("emptyChecks")}
                       </td>
                     </tr>
                   ) : (
-                    list.refs.map((r) => {
+                    sortedRefs.map((r) => {
                       const last = list.latestByCode.get(r.code);
                       const place =
                         last?.siteName
@@ -506,7 +582,12 @@ export function ReprocessingScreen() {
                             }`
                           : null;
                       return (
-                        <tr key={r.code} className="border-b border-border last:border-0">
+                        <tr
+                          key={r.code}
+                          className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30"
+                          onClick={() => openRecord(r)}
+                          data-testid={`reprocessing-check-${r.code}`}
+                        >
                           <td className="px-3 py-3 align-top">
                             <b className="text-[13px] font-semibold leading-snug">{r.label}</b>
                             {place ? (
@@ -536,7 +617,20 @@ export function ReprocessingScreen() {
                               </>
                             ) : null}
                           </td>
-                          <td className="px-3 py-3 align-top">{standCell(r, last)}</td>
+                          <td className="px-3 py-3 align-top">
+                            {standCell(r, last)}
+                            <button
+                              type="button"
+                              className="mt-1 text-[12.5px] font-semibold text-primary hover:underline"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openRecord(r);
+                              }}
+                              data-testid={`reprocessing-record-${r.code}`}
+                            >
+                              {t("actions.record")}
+                            </button>
+                          </td>
                         </tr>
                       );
                     })
@@ -595,6 +689,134 @@ export function ReprocessingScreen() {
               type="button"
               disabled={busy || (result === "released_with_conditions" && !note.trim())}
               onClick={() => void submitRelease()}
+            >
+              {t("actions.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!recordTarget} onOpenChange={(o) => !o && setRecordTarget(null)}>
+        <DialogContent className="max-w-md" data-testid="reprocessing-record-dialog">
+          <DialogHeader>
+            <DialogTitle>{t("record.title")}</DialogTitle>
+            <DialogDescription>
+              {recordTarget
+                ? [recordTarget.label, recordTarget.limitText ? `${t("limit")} ${recordTarget.limitText}` : null]
+                    .filter(Boolean)
+                    .join(" · ")
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {recordTarget ? (
+            <div className="space-y-3">
+              {recordTarget.scope === "equipment" ? (
+                <div className="space-y-1">
+                  <Label htmlFor="rec-device">{t("record.device")}</Label>
+                  <select
+                    id="rec-device"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={recDeviceId}
+                    onChange={(e) => setRecDeviceId(e.target.value)}
+                    data-testid="reprocessing-record-device"
+                  >
+                    <option value="">
+                      {list.equipment.length === 0
+                        ? t("record.deviceEmpty")
+                        : t("record.devicePlaceholder")}
+                    </option>
+                    {list.equipment.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.inventoryNumber} · {d.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              {recordNeedsSite(recordTarget) ? (
+                <div className="space-y-1">
+                  <Label htmlFor="rec-site">{t("record.site")}</Label>
+                  <select
+                    id="rec-site"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={recSiteId}
+                    onChange={(e) => setRecSiteId(e.target.value)}
+                    data-testid="reprocessing-record-site"
+                  >
+                    <option value="">{t("record.sitePlaceholder")}</option>
+                    {list.sites.map((site) => (
+                      <option key={site.id} value={site.id}>
+                        {site.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              {recordTarget.cadence === "per_batch" ? (
+                <div className="space-y-1">
+                  <Label htmlFor="rec-batch">{t("record.batch")}</Label>
+                  <select
+                    id="rec-batch"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={recBatchId}
+                    onChange={(e) => setRecBatchId(e.target.value)}
+                    data-testid="reprocessing-record-batch"
+                  >
+                    <option value="">{t("record.batchPlaceholder")}</option>
+                    {list.batches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.batchNumber} · {b.equipmentLabel || b.inventoryNumber || "—"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="rec-date">{t("record.performedAt")}</Label>
+                  <Input
+                    id="rec-date"
+                    type="date"
+                    value={recDate}
+                    onChange={(e) => setRecDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="rec-passed">{t("record.passed")}</Label>
+                  <select
+                    id="rec-passed"
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    value={recPassed}
+                    onChange={(e) => setRecPassed(e.target.value as "" | "yes" | "no")}
+                  >
+                    <option value="">{t("record.passedNone")}</option>
+                    <option value="yes">{t("record.passedYes")}</option>
+                    <option value="no">{t("record.passedNo")}</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="rec-value">
+                  {t("record.value")}
+                  {recordTarget.unit ? ` (${recordTarget.unit})` : ""}
+                </Label>
+                <Input id="rec-value" value={recValue} onChange={(e) => setRecValue(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="rec-note">{t("record.note")}</Label>
+                <Textarea id="rec-note" value={recNote} onChange={(e) => setRecNote(e.target.value)} rows={2} />
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRecordTarget(null)}>
+              {t("actions.cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={busy || recordInvalid}
+              onClick={() => void submitRecord()}
+              data-testid="reprocessing-record-save"
             >
               {t("actions.save")}
             </Button>

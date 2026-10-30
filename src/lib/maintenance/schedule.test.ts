@@ -4,6 +4,7 @@ import {
   addWorkingDaysUtc,
   computeNextMaintenanceDueAt,
   deriveMaintenanceStatus,
+  overlayMaintenanceDue,
   onOrAfterWorkingDayUtc,
   resolveMaintenanceCycleMonths,
 } from "./schedule";
@@ -72,6 +73,20 @@ describe("deriveMaintenanceStatus", () => {
     expect(deriveMaintenanceStatus(new Date("2025-01-15T23:00:00.000Z"), now)).toBe("due");
     expect(deriveMaintenanceStatus(new Date("2025-02-01T00:00:00.000Z"), now)).toBe("ok");
     expect(deriveMaintenanceStatus(null, now)).toBe("unset");
+  });
+});
+
+describe("overlayMaintenanceDue", () => {
+  it("replaces the instance date with the frozen duty date", () => {
+    const overlaid = overlayMaintenanceDue(
+      {
+        nextMaintenanceDueAt: "2024-03-15T00:00:00.000Z",
+        maintenanceStatus: "overdue" as const,
+      },
+      new Date("2027-10-07T00:00:00.000Z"),
+    );
+    expect(overlaid.nextMaintenanceDueAt).toBe("2027-10-07T00:00:00.000Z");
+    expect(overlaid.maintenanceStatus).toBe("ok");
   });
 });
 

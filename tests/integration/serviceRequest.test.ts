@@ -157,6 +157,11 @@ describe("service requests — Phase 5 (AC #4, #7, #8, #11, #12)", () => {
     expect(updated.state).toBe("acknowledged");
     expect(updated.statusEvents.at(-1)).toMatchObject({ state: "acknowledged", source: "oxid" });
     await expect(
+      serviceRequestService.applyStatusFeedback(request.reference, { state: "completed", source: "oxid" }),
+    ).rejects.toMatchObject({ status: 422 });
+    const stillOpen = await prisma.serviceRequest.findUnique({ where: { reference: request.reference } });
+    expect(stillOpen?.state).toBe("acknowledged");
+    await expect(
       serviceRequestService.applyStatusFeedback("SR-00000000-NOPE", { state: "completed", source: "oxid" }),
     ).rejects.toBeInstanceOf(AppError);
   });

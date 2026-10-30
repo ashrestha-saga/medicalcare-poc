@@ -5,6 +5,7 @@ export const OPEN_REQUEST_STATES = [
   "captured",
   "queued",
   "transmitted",
+  "handed_off",
   "acknowledged",
   "in_progress",
 ] as const satisfies readonly ServiceRequestState[];
@@ -14,6 +15,7 @@ export const STARTABLE_REQUEST_STATES = [
   "captured",
   "queued",
   "transmitted",
+  "handed_off",
   "acknowledged",
 ] as const satisfies readonly ServiceRequestState[];
 
@@ -21,7 +23,8 @@ export const STARTABLE_REQUEST_STATES = [
 export const SERVICE_REQUEST_STATE_LABELS: Record<string, string> = {
   captured: "Captured",
   queued: "Queued",
-  transmitted: "Transmitted",
+  transmitted: "Sent",
+  handed_off: "Handed off",
   acknowledged: "Acknowledged",
   in_progress: "In progress",
   completed: "Completed",
@@ -68,6 +71,12 @@ export const SERVICE_REQUEST_STATE_BADGES: Record<string, ServiceRequestStateBad
     variant: "default",
     className: "border-transparent bg-primary/15 text-primary",
     colorCode: "#1e7fe0",
+  },
+  handed_off: {
+    tone: "open",
+    variant: "warning",
+    className: "border-transparent bg-amber-500/15 text-amber-800 dark:text-amber-300",
+    colorCode: "#f5a524",
   },
   acknowledged: {
     tone: "open",

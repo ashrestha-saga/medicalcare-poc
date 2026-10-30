@@ -61,6 +61,7 @@
     "groupOutput": "Ausgabe",
     "badgeCount": "{label}: {count}",
     "badgeWarn": "{label}: Aufmerksamkeit nötig",
+    "catalogBadgeDerived": "Katalog: offene Einstufungen sind noch abgeleitet oder geschätzt",
     "searchPlaceholder": "Suchen / Scannen …",
     "searchShortcut": "⌘K",
     "searchBestand": "Gerät suchen: Inventarnummer, Seriennummer, Raum, Person",
@@ -89,6 +90,30 @@
       "takte": "Takte festgelegt",
       "aufbereitung": "Aufbereitung eingerichtet",
       "export": "Bestandsverzeichnis geprüft"
+    },
+    "why": {
+      "sitesOk": "{count, plural, one {# Standort angelegt} other {# Standorte angelegt}}",
+      "sitesOpen": "Noch kein Standort — ohne Standort kein Gerät",
+      "personenMpsbOpen": "{count, plural, one {# pflichtiger Standort ohne bekanntgemachten Beauftragten} other {# pflichtige Standorte ohne bekanntgemachten Beauftragten}}",
+      "personenOk": "{count, plural, one {# aktive Person, alle pflichtigen Standorte mit Beauftragtem} other {# aktive Personen, alle pflichtigen Standorte mit Beauftragtem}}",
+      "traegerschaftOpen": "Pflichten sieht niemand im Dashboard — Kacheln zuweisen",
+      "traegerschaftOk": "Jede Pflichtart hat einen Träger",
+      "betreuungOk": "Vertrag seit {since}",
+      "betreuungOpen": "Noch kein aktiver Dienstleistervertrag",
+      "bestandOk": "{count, plural, one {# Gerät außer Entwurf (Import oder Erstanlage)} other {# Geräte außer Entwurf (Import oder Erstanlage)}}",
+      "bestandOpen": "Noch kein Gerät über den Entwurf hinaus",
+      "einstufungOpen": "{derived} nur abgeleitet, {missing} ohne Einstufung",
+      "einstufungOk": "Alle genutzten Modelle belegt eingestuft",
+      "klaerlisteOpen": "{count, plural, one {# Gerät mit mindestens einem Mangel} other {# Geräte mit mindestens einem Mangel}}",
+      "klaerlisteOk": "Alle Datensätze tragen die Pflichtangaben",
+      "takteMissing": "{count, plural, one {# Konstanzprüfung ohne Takt} other {# Konstanzprüfungen ohne Takt}}",
+      "takteOk": "{count, plural, one {# Fälligkeit aus STK, MTK, Wartung abgeleitet} other {# Fälligkeiten aus STK, MTK, Wartung abgeleitet}}",
+      "takteNone": "Noch keine Fälligkeiten abgeleitet",
+      "aufbereitungNa": "Nicht einschlägig — keine Aufbereitungsgeräte im Bestand",
+      "aufbereitungOk": "{count, plural, one {# Person mit Sachkunde, Routinekontrollen definiert} other {# Personen mit Sachkunde, Routinekontrollen definiert}}",
+      "aufbereitungOpen": "Keine Person mit Sachkunde Aufbereitung",
+      "exportOk": "{count, plural, one {Zuletzt # Export § 14} other {Zuletzt # Exporte § 14}}",
+      "exportOpen": "Noch kein Export § 14 erzeugt — Probelauf vor der ersten Begehung"
     }
   },
   "common": {
@@ -405,6 +430,9 @@
     "colSchedule": "Termin",
     "colManaged": "Betreut",
     "displayState_erfasst": "Erfasst",
+    "displayState_warteschlange": "Warteschlange",
+    "displayState_uebermittelt": "Eingegangen",
+    "displayState_uebergeben": "Eingegangen, nur in der App",
     "displayState_zugewiesen": "Zugewiesen",
     "displayState_terminiert": "Terminiert",
     "displayState_in_arbeit": "In Arbeit",
@@ -726,6 +754,10 @@
         "decided": "Festgelegt",
         "actions": "Aktionen"
       },
+      "pending": {
+        "title": "Offene DGUV-Festlegungen ({count})",
+        "hint": "Diese Geräte haben eine aktive DGUV-Pflicht ohne Abdeckungsfestlegung. Auswählen, um das Formular vorzubefüllen."
+      },
       "form": {
         "title": "Überlappung festlegen",
         "hint": "Die abgedeckte Pflicht wird ausgesetzt (nicht gelöscht). Widerruf reaktiviert sie, wenn nichts anderes sie abdeckt.",
@@ -736,7 +768,8 @@
         "satisfiedBy": "Erfüllt durch",
         "reason": "Grund",
         "reasonPlaceholder": "z. B. STK-Protokoll deckt DGUV-Elektrosicherheit für dieses Exemplar ab",
-        "decidedAt": "Festgelegt am"
+        "decidedAt": "Festgelegt am",
+        "sameDuty": "Abgedeckte und erfüllende Pflicht müssen sich unterscheiden."
       },
       "actions": {
         "save": "Entscheidung speichern",
@@ -816,7 +849,11 @@
         "stateExternal": "außerhalb",
         "laidOut": "Bereitgelegt",
         "documentRef": "Ablage / Dokumentreferenz",
-        "otherOpenStates": "Weitere offene Zustände"
+        "otherOpenStates": "Weitere offene Zustände",
+        "folderPdf": "Mappe als PDF",
+        "folderPdfBusy": "PDF wird erstellt…",
+        "folderPdfDone": "Begehungsmappe heruntergeladen",
+        "folderPdfFailed": "Begehungsmappe konnte nicht erstellt werden."
       },
       "inspections": {
         "record": "Begehung erfassen",
@@ -996,9 +1033,10 @@
       },
       "form": {
         "title": "Takt festlegen · {object}",
-        "hint": "Die Qualitätssicherungs-Richtlinie nennt „{cadence}“. Das ist ein Vorschlag — keine Frist — bis Sie bestätigen oder einen anderen Abstand wählen.",
+        "hint": "Die Qualitätssicherungs-Richtlinie nennt „{cadence}“. Behalten Sie diese Einheit; der Abstand darf mit dokumentierter Grundlage angepasst werden.",
         "interval": "Abstand",
         "unit": "Einheit",
+        "unitMismatch": "Einheit passt nicht zur QS-RL „{guideline}“ — verwenden Sie {unit}.",
         "basis": "Grundlage der Festlegung",
         "basisPlaceholder": "Etwa: QS-RL Röntgendiagnostik, Abschnitt zur Konstanzprüfung",
         "basisPrefill": "Qualitätssicherungs-Richtlinie: {cadence}",
@@ -1082,7 +1120,8 @@
       "actions": {
         "decide": "Freigabe entscheiden",
         "save": "Speichern",
-        "cancel": "Abbrechen"
+        "cancel": "Abbrechen",
+        "record": "Kontrolle erfassen"
       },
       "release": {
         "title": "Chargenfreigabe",
@@ -1091,6 +1130,27 @@
         "rejected": "Ablehnen",
         "noteRequired": "Notiz (erforderlich)",
         "noteOptional": "Notiz (optional)"
+      },
+      "filter": {
+        "openToday": "Nur heute offen"
+      },
+      "emptyOpenToday": "Heute keine offenen Kontrollen in diesem Reiter.",
+      "record": {
+        "title": "Kontrolle erfassen",
+        "device": "Aufbereitungsgerät",
+        "devicePlaceholder": "Gerät wählen…",
+        "deviceEmpty": "Kein Aufbereitungsgerät gefunden",
+        "site": "Standort",
+        "sitePlaceholder": "Standort wählen…",
+        "batch": "Charge",
+        "batchPlaceholder": "Charge wählen…",
+        "performedAt": "Durchgeführt am",
+        "passed": "Ergebnis",
+        "passedNone": "Nicht angegeben",
+        "passedYes": "Bestanden",
+        "passedNo": "Beanstandet",
+        "value": "Messwert",
+        "note": "Notiz"
       }
     },
     "fieldSafety": {
@@ -1329,6 +1389,10 @@
       "peopleFootnote": "Aus der Zuweisung des Dienstleistungsunternehmens. Sie können sie hier nicht ändern — aber jederzeit sehen, wer es ist.",
       "latestAccess": "Letzter Zugriff der Organisation",
       "latestAccessBody": "Zugriffe in der Rolle der betreibenden Organisation werden in diesem POC noch nicht protokolliert. Sobald der Audit-Trail angebunden ist, erscheinen hier nur partnerbezogene Aktionen — sonst ließe sich der Zugriff des Anbieters nicht von Ihrem eigenen trennen.",
+      "latestAccessEmpty": "Noch keine Partneraktionen an dieser Klinik.",
+      "accessWhen": "Wann",
+      "accessWho": "Wer",
+      "accessWhat": "Was",
       "scopeInventory": "Bestand",
       "scopeDueDates": "Fristen",
       "scopeInspection": "Prüfung",
@@ -1371,7 +1435,9 @@
       "zones": {
         "decides": "Entscheidet den Tag",
         "worklist": "Arbeitsvorrat",
-        "watch": "Beobachtung"
+        "watch": "Beobachtung",
+        "more": "Mehr ({count})",
+        "hideMore": "Mehr ausblenden"
       },
       "overview": {
         "title": "Was geführt wird",
@@ -1651,6 +1717,7 @@
     "captured": "Erfasst",
     "queued": "Warteschlange",
     "transmitted": "Übermittelt",
+    "handed_off": "Übergeben",
     "acknowledged": "Bestätigt",
     "scheduled": "Terminiert",
     "in_progress": "In Bearbeitung",
@@ -1905,10 +1972,13 @@
     "scheduledOnly": "Mit Termin",
     "missingClassification": "Ohne Einstufung",
     "missingClassificationActive": "Ohne Einstufung (aktiv)",
+    "catalogOwned": "Unsere Modelle",
+    "catalogOwnedOff": "Alle Modelle",
     "mpsbMissing": "Ohne MPSB",
     "mpsbAppointed": "MPSB bestellt",
     "expiring": "Auslaufend",
-    "mineOnly": "Nur meine"
+    "mineOnly": "Nur meine",
+    "withoutRecord": "Ohne Nachweis"
   },
   "dueDatesCards": {
     "due": "Fällig",
@@ -2947,6 +3017,16 @@
     "colDue": "Fällig",
     "colLastDone": "Zuletzt erledigt",
     "markDone": "Erledigt",
+    "markDoneTitle": "Pflicht als erledigt erfassen",
+    "markDoneWho": "Erfasst von {name}. Dieser Name wird mit dem Ergebnis gespeichert.",
+    "markDoneResult": "Ergebnis",
+    "markDoneResultPassed": "Bestanden",
+    "markDoneResultConditions": "Bestanden mit Auflagen",
+    "markDoneResultFailed": "Nicht bestanden",
+    "markDoneNote": "Was wurde gemacht",
+    "markDoneNotePlaceholder": "Kurzes Ergebnis — der Name kommt aus der Anmeldung",
+    "markDoneSave": "Ergebnis speichern",
+    "markDoneCancel": "Abbrechen",
     "years": "Jahre",
     "monthsUnit": "Monate",
     "workingDaysUnit": "Arbeitstage",

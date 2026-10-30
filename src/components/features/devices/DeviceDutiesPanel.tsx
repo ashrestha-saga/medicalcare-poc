@@ -6,8 +6,20 @@ import { useLocale, useTranslations } from "next-intl";
 import type { DeviceDutyDTO, DeviceInstanceDetailDTO } from "@/interfaces";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field } from "@/components/ui/Field";
 import { formatDate } from "@/lib/format";
 import type { AppLocale } from "@/lib/locale";
+import { useSessionStore } from "@/store/sessionStore";
+
+type DutyResult = "passed" | "passed_with_conditions" | "failed";
 
 function anchorLabelKey(
   anchor: string,
@@ -51,7 +63,7 @@ interface DeviceDutiesPanelProps {
   device: DeviceInstanceDetailDTO;
   canComplete?: boolean;
   completingId?: string | null;
-  onComplete?: (dutyId: string) => void;
+  onComplete?: (dutyId: string, input: { note: string; result: DutyResult }) => void;
 }
 
 export function DeviceDutiesPanel({
@@ -63,7 +75,11 @@ export function DeviceDutiesPanel({
   const t = useTranslations("inventoryDetail");
   const tCommon = useTranslations("common");
   const locale = useLocale() as AppLocale;
+  const actorName = useSessionStore((s) => s.user?.name) ?? "";
   const [showNotApplicable, setShowNotApplicable] = useState(false);
+  const [pendingDuty, setPendingDuty] = useState<DeviceDutyDTO | null>(null);
+  const [result, setResult] = useState<DutyResult>("passed");
+  const [note, setNote] = useState("");
   const duties = device.duties ?? [];
   const applicable = duties.filter((d) => d.applicable);
   const notApplicable = duties.filter((d) => !d.applicable);
@@ -180,7 +196,11 @@ export function DeviceDutiesPanel({
                           size="sm"
                           className="h-8"
                           disabled={Boolean(completingId)}
-                          onClick={() => onComplete?.(duty.id)}
+                          onClick={() => {
+                            setPendingDuty(duty);
+                            setResult("passed");
+                            setNote("");
+                          }}
                           data-testid={`device-duty-complete-${duty.dutyKey}`}
                         >
                           {completingId === duty.id && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -195,6 +215,56 @@ export function DeviceDutiesPanel({
           </table>
         </div>
       )}
+
+      <Dialog open={pendingDuty != null} onOpenChange={(open) => !open && setPendingDuty(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("markDoneTitle")}</DialogTitle>
+            <DialogDescription>
+              {pendingDuty?.title}
+              {actorName ? ` — ${t("markDoneWho", { name: actorName })}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <Field label={t("markDoneResult")} htmlFor="duty-result" required>
+            <select
+              id="duty-result"
+              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+              value={result}
+              onChange={(e) => setResult(e.target.value as DutyResult)}
+            >
+              <option value="passed">{t("markDoneResultPassed")}</option>
+              <option value="passed_with_conditions">{t("markDoneResultConditions")}</option>
+              <option value="failed">{t("markDoneResultFailed")}</option>
+            </select>
+          </Field>
+          <Field label={t("markDoneNote")} htmlFor="duty-note" required>
+            <textarea
+              id="duty-note"
+              className="min-h-20 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+              value={note}
+              placeholder={t("markDoneNotePlaceholder")}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </Field>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPendingDuty(null)}>
+              {t("markDoneCancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={!note.trim() || !pendingDuty || Boolean(completingId)}
+              onClick={() => {
+                if (!pendingDuty || !note.trim()) return;
+                onComplete?.(pendingDuty.id, { note: note.trim(), result });
+                setPendingDuty(null);
+              }}
+            >
+              {completingId && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t("markDoneSave")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

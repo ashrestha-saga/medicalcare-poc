@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 function StepCard({ step, index }: { step: SetupStepDTO; index: number }) {
   const t = useTranslations("commissioning");
   const title = t(`steps.${step.titleKey}` as "steps.sites");
+  const why = t(`why.${step.whyKey}` as "why.sitesOk", step.whyParams ?? {});
 
   return (
     <div
@@ -29,7 +30,7 @@ function StepCard({ step, index }: { step: SetupStepDTO; index: number }) {
       </span>
       <div className="min-w-0">
         <b className="p-setup-step__title text-foreground">{title}</b>
-        <p className="p-setup-step__why text-muted-foreground">{step.why}</p>
+        <p className="p-setup-step__why text-muted-foreground">{why}</p>
         {step.status === "open" ? (
           <div className="mt-2">
             <Button asChild size="sm" variant="outline" data-testid={`commissioning-go-${step.id}`}>

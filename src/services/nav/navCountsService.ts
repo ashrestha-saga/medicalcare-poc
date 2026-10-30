@@ -2,6 +2,8 @@ import type { PermissionSlug, TenantContext, TenantWorkContext } from "@/interfa
 import type { NavCountEntry, NavCountsResponse } from "@/constants/navCounts";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { prisma } from "@/lib/prisma";
+import { countMissingConstancyCadences } from "@/services/constancy/missingCadenceMetrics";
+import { countDatedDuties, countOverdueDuties } from "@/services/dueDates/dutyDueMetrics";
 import { countKlarlisteDevices } from "@/services/nav/klarlisteIssues";
 import { reprocessingEvidenceService } from "@/services/reprocessingEvidence/reprocessingEvidenceService";
 
@@ -33,42 +35,26 @@ export const navCountsService = {
     if (can(ctx, "duties:view")) {
       tasks.push(
         (async () => {
-          const overdue = await prisma.deviceDuty.count({
-            where: { applicable: true, dueAt: { lt: today } },
-          });
+          const overdue = await countOverdueDuties();
           out.dash = entry(overdue > 0 ? overdue : null, overdue > 0);
         })(),
       );
 
       tasks.push(
         (async () => {
-          const overdue = await prisma.deviceDuty.count({
-            where: { applicable: true, dueAt: { lt: today } },
-          });
+          const overdue = await countOverdueDuties();
           if (overdue > 0) {
             out.faelligkeiten = entry(overdue, true, { mode: "overdue" });
             return;
           }
-          const due = await prisma.deviceDuty.count({
-            where: { applicable: true, dueAt: { not: null } },
-          });
+          const due = await countDatedDuties();
           out.faelligkeiten = entry(due, due > 0, { mode: "due" });
         })(),
       );
 
       tasks.push(
         (async () => {
-          // Konstanz duties without an open ConstancyCadence (“Takt festzulegen”).
-          const missing = await prisma.deviceDuty.count({
-            where: {
-              applicable: true,
-              dutyKey: "konstanz",
-              deviceInstance: {
-                state: { not: "retired" },
-                constancyCadences: { none: { validTo: null } },
-              },
-            },
-          });
+          const missing = await countMissingConstancyCadences();
           out.konstanztakt = entry(missing, missing > 0);
         })(),
       );
@@ -78,7 +64,8 @@ export const navCountsService = {
       tasks.push(
         (async () => {
           const n = await countKlarlisteDevices(ctx);
-          out.list = entry(n, n > 0);
+          // Volume only — amber is reserved for action-required counts.
+          out.list = entry(n, false);
         })(),
       );
     }
@@ -89,11 +76,11 @@ export const navCountsService = {
           const open = await prisma.serviceRequest.count({
             where: {
               state: {
-                in: ["captured", "queued", "transmitted", "acknowledged", "scheduled", "in_progress"],
+                in: ["captured", "queued", "transmitted", "handed_off", "acknowledged", "scheduled", "in_progress"],
               },
             },
           });
-          out.auftraege = entry(open, open > 0);
+          out.auftraege = entry(open, false);
         })(),
       );
     }
@@ -179,7 +166,12 @@ export const navCountsService = {
             },
             select: { id: true },
           });
-          out.models = entry(null, Boolean(hit), hit ? { mark: "!" } : undefined);
+          // Mark only — not amber; derived classifications are informational.
+          out.models = entry(
+            null,
+            false,
+            hit ? { mark: "!", hintKey: "catalogBadgeDerived" } : undefined,
+          );
         })(),
       );
     }

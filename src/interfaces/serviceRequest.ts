@@ -9,7 +9,8 @@ export type ServiceRequestState =
   | "acknowledged"
   | "in_progress"
   | "completed"
-  | "rejected";
+  | "rejected"
+  | "handed_off";
 
 /** List scope for GET /api/service-requests. */
 export type RequestScope = "mine" | "open" | "all";

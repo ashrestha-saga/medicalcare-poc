@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type {
   AuthorityFindingDTO,
@@ -13,9 +13,11 @@ import type {
   DisclosureSessionDTO,
   PreparationListDTO,
 } from "@/interfaces";
-import { api, ApiError } from "@/lib/http/apiClient";
+import { ACTING_TENANT_HEADER, CORRELATION_HEADER } from "@/constants/session";
+import { api, ApiError, newClientId } from "@/lib/http/apiClient";
 import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
+import { useActingTenantStore } from "@/store/actingTenantStore";
 import { toast } from "@/store/toastStore";
 
 export type BegehTab = "vorbereitung" | "begehungen" | "sitzungen" | "notifications";
@@ -32,7 +34,7 @@ export type FindingFilter =
 export type BegehMode = "vorbereitung" | "begehung";
 
 function parseTab(raw: string | null): BegehTab {
-  if (raw === "begehungen" || raw === "befunde") return "begehungen";
+  if (raw === "begehungen" || raw === "befunde" || raw === "findings") return "begehungen";
   if (raw === "sitzungen" || raw === "disclosure") return "sitzungen";
   if (raw === "notifications") return "notifications";
   if (raw === "luecken" || raw === "mappe" || raw === "vorbereitung") return "vorbereitung";
@@ -67,6 +69,7 @@ export function useAuthorityList() {
   const { sync } = useSyncQueryParams();
 
   const tabParam = useQueryParam("tab");
+  const sectionParam = useQueryParam("section");
   const listParam = useQueryParam("list");
   const checklistParam = useQueryParam("checklist");
   const filterParam = useQueryParam("filter");
@@ -74,7 +77,7 @@ export function useAuthorityList() {
   const findingIdParam = useQueryParam("findingId");
   const resolvedListParam = listParam ?? checklistParam;
 
-  const tab = parseTab(tabParam);
+  const tab = parseTab(tabParam ?? sectionParam);
   const prepFilter = parsePrepFilter(filterParam);
   const findingFilter = parseFindingFilter(filterParam);
 
@@ -85,6 +88,7 @@ export function useAuthorityList() {
   const [sessions, setSessions] = useState<DisclosureSessionDTO[]>([]);
   const [preparation, setPreparation] = useState<PreparationListDTO | null>(null);
   const [overview, setOverview] = useState<AuthorityOverviewDTO | null>(null);
+  const [overviewCode, setOverviewCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const setTab = useCallback(
@@ -108,6 +112,14 @@ export function useAuthorityList() {
   const setList = useCallback(
     (code: string | null) => {
       sync({ list: code, checklist: null });
+    },
+    [sync],
+  );
+
+  /** Switch checklist and jump straight to its open findings. */
+  const openListFindings = useCallback(
+    (code: string) => {
+      sync({ list: code, checklist: null, tab: "begehungen", filter: "offen" }, { dropKeys: ["section"] });
     },
     [sync],
   );
@@ -155,6 +167,7 @@ export function useAuthorityList() {
       setSessions(s.sessions);
       setChecklists(prepLegacy.checklists);
       setOverview(overviewRes);
+      setOverviewCode(activeListCode);
       setPreparation(preparationRes);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t("toast.loadFailed"));
@@ -166,6 +179,39 @@ export function useAuthorityList() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Land on authority work with findings: pick the checklist with most open findings, then open them.
+  const landedRef = useRef(false);
+  useEffect(() => {
+    if (landedRef.current || loading || !overview) return;
+    if (checklists.length === 0 || overviewCode !== activeListCode) return;
+    landedRef.current = true;
+    const hasExplicitTab = Boolean(tabParam || sectionParam || filterParam);
+    let best = { code: activeListCode, open: overview.findingsOpen };
+    if (!resolvedListParam) {
+      for (const o of overview.otherLists) {
+        if (o.open > best.open) best = { code: o.checklistCode, open: o.open };
+      }
+    }
+    if (best.code !== activeListCode && best.open > 0) {
+      sync({ list: best.code, ...(hasExplicitTab ? {} : { tab: "begehungen", filter: "offen" }) });
+      return;
+    }
+    if (!hasExplicitTab && overview.findingsOpen > 0) {
+      sync({ tab: "begehungen", filter: "offen" });
+    }
+  }, [
+    loading,
+    overview,
+    overviewCode,
+    checklists,
+    activeListCode,
+    resolvedListParam,
+    tabParam,
+    sectionParam,
+    filterParam,
+    sync,
+  ]);
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.active) ?? null,
@@ -265,6 +311,49 @@ export function useAuthorityList() {
       }
     },
     [],
+  );
+
+  const downloadDossierPdf = useCallback(
+    async (opts?: { siteId?: string | null; sections?: string[]; locale?: "de" | "en" }) => {
+      const actingTenantId = useActingTenantStore.getState().tenantId;
+      const res = await fetch("/api/authority/dossier.pdf", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [CORRELATION_HEADER]: newClientId(),
+          ...(actingTenantId ? { [ACTING_TENANT_HEADER]: actingTenantId } : {}),
+        },
+        body: JSON.stringify({
+          list: activeListCode,
+          siteId: opts?.siteId ?? siteParam,
+          sections: opts?.sections,
+          locale: opts?.locale ?? "en",
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => undefined);
+        const err = (body as { error?: { code?: string; message?: string } } | undefined)?.error;
+        throw new ApiError(
+          res.status,
+          err?.code ?? "http_error",
+          err?.message ?? t("prep.folderPdfFailed"),
+        );
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const match = /filename="([^"]+)"/.exec(disposition);
+      const filename = match?.[1] ?? `authority-dossier-${activeListCode}.pdf`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(t("prep.folderPdfDone"));
+    },
+    [activeListCode, siteParam, t],
   );
 
   const setReadiness = useCallback(
@@ -377,6 +466,7 @@ export function useAuthorityList() {
     activeListCode,
     setChecklist: setList,
     setList,
+    openListFindings,
     siteId: siteParam,
     setSite,
     sessions,
@@ -402,6 +492,7 @@ export function useAuthorityList() {
     closeDisclosure,
     listDisclosed,
     recordShown,
+    downloadDossierPdf,
     setReadiness,
     createInspection,
     addFinding,

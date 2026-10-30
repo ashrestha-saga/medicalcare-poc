@@ -44,6 +44,7 @@ import type {
   DisclosureSessionDTO,
 } from "@/interfaces";
 import { cn } from "@/lib/utils";
+import { toast } from "@/store/toastStore";
 
 const TAB_KEYS: BegehTab[] = ["vorbereitung", "begehungen", "sitzungen", "notifications"];
 const PREP_FILTER_KEYS: PrepFilter[] = ["all", "bereit", "luecke", "aussen"];
@@ -512,9 +513,19 @@ export function AuthorityScreen() {
             {ov && ov.otherLists.length > 0 ? (
               <p className="text-xs text-muted-foreground">
                 {t("otherAuthorities")}{" "}
-                {ov.otherLists
-                  .map((o) => t("otherAuthorityOpen", { name: o.authorityName, count: o.open }))
-                  .join(" · ")}
+                {ov.otherLists.map((o, idx) => (
+                  <span key={o.checklistCode}>
+                    {idx > 0 ? " · " : null}
+                    <button
+                      type="button"
+                      className="font-medium text-primary hover:underline"
+                      onClick={() => list.openListFindings(o.checklistCode)}
+                      data-testid={`authority-other-list-${o.checklistCode}`}
+                    >
+                      {t("otherAuthorityOpen", { name: o.authorityName, count: o.open })}
+                    </button>
+                  </span>
+                ))}
               </p>
             ) : null}
 
@@ -556,7 +567,7 @@ export function AuthorityScreen() {
                         })
                       : t("emDash")}
                   </p>
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap items-center gap-1">
                     {PREP_FILTER_KEYS.map((key) => (
                       <Button
                         key={key}
@@ -568,6 +579,29 @@ export function AuthorityScreen() {
                         {t(`prepFilter.${key}`)}
                       </Button>
                     ))}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={busy || list.loading}
+                      data-testid="authority-folder-pdf"
+                      onClick={() => {
+                        setBusy(true);
+                        void list
+                          .downloadDossierPdf({
+                            locale: dossierLocale,
+                            siteId: list.siteId,
+                          })
+                          .catch((err) => {
+                            toast.error(
+                              err instanceof Error ? err.message : t("prep.folderPdfFailed"),
+                            );
+                          })
+                          .finally(() => setBusy(false));
+                      }}
+                    >
+                      {busy ? t("prep.folderPdfBusy") : t("prep.folderPdf")}
+                    </Button>
                   </div>
                 </div>
 

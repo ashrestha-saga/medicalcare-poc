@@ -21,7 +21,10 @@ interface DeviceDetailProps {
   onBack: () => void;
   onEdit?: () => void;
   completingDutyId?: string | null;
-  onCompleteDuty?: (dutyId: string) => void;
+  onCompleteDuty?: (
+    dutyId: string,
+    input: { note: string; result: "passed" | "passed_with_conditions" | "failed" },
+  ) => void;
 }
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {

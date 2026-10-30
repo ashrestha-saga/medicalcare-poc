@@ -213,7 +213,7 @@ export const dutyService = {
   async complete(
     ctx: TenantWorkContext,
     dutyId: string,
-    input?: { performedAt?: string | null; note?: string | null },
+    input?: { performedAt?: string | null; note?: string | null; result?: "passed" | "passed_with_conditions" | "failed" },
   ): Promise<DeviceDutyDTO> {
     requirePermission(ctx, "inventory:update");
     const existing = await prisma.deviceDuty.findFirst({
@@ -256,6 +256,7 @@ export const dutyService = {
         performedBy: ctx.user.name,
         actorUserId: ctx.user.id,
         note: input?.note?.trim() || null,
+        result: input?.result,
         source: "duty_complete",
       });
       return tx.deviceDuty.findFirstOrThrow({ where: { id: existing.id } });

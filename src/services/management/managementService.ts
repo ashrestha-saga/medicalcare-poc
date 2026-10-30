@@ -1,4 +1,9 @@
-import type { ManagementContractDTO, ManagementOverviewDTO, TenantContext } from "@/interfaces";
+import type {
+  ManagementContractDTO,
+  ManagementOverviewDTO,
+  ManagementPartnerAccessRowDTO,
+  TenantContext,
+} from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { prisma } from "@/lib/prisma";
 import { isLiveContract } from "@/services/access/partnerAccessService";
@@ -68,6 +73,31 @@ export const managementService = {
           })),
       }));
 
-    return { tenantId: ctx.tenantId, contracts: active };
+    const orgIds = active.map((c) => c.organisationId);
+    let latestAccess: ManagementPartnerAccessRowDTO[] = [];
+    if (orgIds.length > 0) {
+      const events = await prisma.auditEvent.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          actorKind: "partner",
+          organisationId: { in: orgIds },
+        },
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+        take: 20,
+      });
+      latestAccess = events.map((e) => ({
+        id: e.id,
+        occurredAt: e.occurredAt.toISOString(),
+        actorName: e.actorName,
+        actorRole: e.actorRole,
+        organisationName: e.organisationName,
+        summary: e.summary,
+        resource: e.resource,
+        resourceId: e.resourceId,
+        action: e.action,
+      }));
+    }
+
+    return { tenantId: ctx.tenantId, contracts: active, latestAccess };
   },
 };

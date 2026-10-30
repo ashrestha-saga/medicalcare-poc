@@ -1,5 +1,6 @@
 "use client";
 
+import type { KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
 import type { TrainingEventDTO } from "@/interfaces";
 import { Spinner } from "@/components/ui/Loading";
@@ -21,15 +22,33 @@ function SummaryTile({
   hint,
   tone,
   testId,
+  onClick,
 }: {
   label: string;
   value: number;
   hint: string;
   tone?: "warning";
   testId: string;
+  onClick?: () => void;
 }) {
   return (
-    <Card className="shadow-none" data-testid={testId}>
+    <Card
+      className={cn("shadow-none", onClick && "cursor-pointer transition-colors hover:bg-muted/40")}
+      data-testid={testId}
+      {...(onClick
+        ? {
+            role: "button" as const,
+            tabIndex: 0,
+            onClick,
+            onKeyDown: (e: KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            },
+          }
+        : {})}
+    >
       <CardContent className="px-4 py-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           {label}
@@ -168,12 +187,15 @@ export function TrainingScreen() {
     selectedEvent,
     matrixModels,
     matrixPeople,
+    peopleWithoutRecord,
     cellMap,
     filteredEvents,
     mine,
     setMine,
     expiringDays,
     setExpiring,
+    withoutRecord,
+    setWithoutRecord,
     goOverview,
     openEvent,
     openMatrix,
@@ -254,6 +276,7 @@ export function TrainingScreen() {
                       hint={tCards("withoutRecordHint")}
                       tone={data.summary.withoutRecord > 0 ? "warning" : undefined}
                       testId="training-kpi-without-record"
+                      onClick={() => setWithoutRecord(true)}
                     />
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -275,6 +298,15 @@ export function TrainingScreen() {
                         data-testid="training-filter-expiring"
                       >
                         {tFilters("expiring")}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={withoutRecord ? "default" : "outline"}
+                        onClick={() => setWithoutRecord(!withoutRecord)}
+                        data-testid="training-filter-without-record"
+                      >
+                        {tFilters("withoutRecord")}
                       </Button>
                     </div>
                     <div className="flex flex-wrap justify-end gap-2">
@@ -301,7 +333,36 @@ export function TrainingScreen() {
               }
             >
               <div className="space-y-4">
-                <TrainingEventsTable events={filteredEvents} loading={loading} onOpen={openEvent} />
+                {withoutRecord ? (
+                  <div
+                    className="rounded-md border border-border bg-card/40"
+                    data-testid="training-without-record-list"
+                  >
+                    <div className="border-b border-border px-4 py-3">
+                      <h2 className="text-sm font-semibold">{tCards("withoutRecord")}</h2>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {tCards("withoutRecordHint")} · {peopleWithoutRecord.length}
+                      </p>
+                    </div>
+                    {peopleWithoutRecord.length === 0 ? (
+                      <p className="p-train__empty px-4 py-6">{tDetail("matrixEmpty")}</p>
+                    ) : (
+                      <ul className="p-train__people divide-y divide-border">
+                        {peopleWithoutRecord.map((p) => (
+                          <li key={p.id} className="p-train__person px-4 py-3">
+                            <div className="p-train__person-main">
+                              <b>{p.name}</b>
+                              {p.jobTitle ? <span>{p.jobTitle}</span> : null}
+                            </div>
+                            <span className="p-train__tag is-open">{tDetail("matrixOpen")}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <TrainingEventsTable events={filteredEvents} loading={loading} onOpen={openEvent} />
+                )}
 
                 <aside
                   className="rounded-md border border-border border-l-4 border-l-primary bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
@@ -336,6 +397,17 @@ export function TrainingScreen() {
                 className="!pt-2"
               >
               <div className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={withoutRecord ? "default" : "outline"}
+                    onClick={() => setWithoutRecord(!withoutRecord)}
+                    data-testid="training-matrix-filter-without-record"
+                  >
+                    {tFilters("withoutRecord")}
+                  </Button>
+                </div>
                 <div
                   className="overflow-hidden rounded-md border border-border bg-card/40"
                   data-testid="training-matrix"

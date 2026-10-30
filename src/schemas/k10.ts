@@ -383,6 +383,16 @@ export const openDisclosureSchema = z.object({
 });
 export type OpenDisclosureInput = z.infer<typeof openDisclosureSchema>;
 
+/** Authority Mappe PDF (v26.1 increment 2 / Path B). */
+export const dossierPdfSchema = z.object({
+  list: z.string().min(1),
+  siteId: z.string().optional().nullable(),
+  /** Dossier section keys; omit/empty = all sections present on the checklist. */
+  sections: z.array(z.string()).optional(),
+  locale: z.enum(["de", "en"]).optional().default("en"),
+});
+export type DossierPdfInput = z.infer<typeof dossierPdfSchema>;
+
 export const discloseResourceSchema = z.object({
   resource: z.string().min(1),
   resourceId: z.string().optional().nullable(),

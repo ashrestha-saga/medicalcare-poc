@@ -178,12 +178,48 @@ export function ManagementScreen() {
             ))}
 
           {!loading && data && data.contracts.length > 0 ? (
-            <Card className="mt-4 border-border/80">
+            <Card className="mt-4 border-border/80" data-testid="management-latest-access">
               <CardHeader>
                 <CardTitle className="text-base">{t("latestAccess")}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{t("latestAccessBody")}</p>
+                {data.latestAccess.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("latestAccessEmpty")}</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                          <th className="py-2 pr-3 font-medium">{t("accessWhen")}</th>
+                          <th className="py-2 pr-3 font-medium">{t("accessWho")}</th>
+                          <th className="py-2 font-medium">{t("accessWhat")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.latestAccess.map((row) => (
+                          <tr key={row.id} className="border-b border-border/60 align-top">
+                            <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
+                              {new Date(row.occurredAt).toLocaleString()}
+                            </td>
+                            <td className="py-2 pr-3">
+                              <div className="font-medium">{row.actorName}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {[row.organisationName, row.actorRole].filter(Boolean).join(" · ")}
+                              </div>
+                            </td>
+                            <td className="py-2">
+                              <div>{row.summary}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {row.resource}
+                                {row.resourceId ? ` · ${row.resourceId}` : ""}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ) : null}

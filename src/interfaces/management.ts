@@ -21,7 +21,21 @@ export interface ManagementContractDTO {
   people: ManagementPersonDTO[];
 }
 
+export interface ManagementPartnerAccessRowDTO {
+  id: string;
+  occurredAt: string;
+  actorName: string;
+  actorRole: string | null;
+  organisationName: string | null;
+  summary: string;
+  resource: string;
+  resourceId: string;
+  action: string;
+}
+
 export interface ManagementOverviewDTO {
   tenantId: string;
   contracts: ManagementContractDTO[];
+  /** Partner actions on this clinic (newest first). */
+  latestAccess: ManagementPartnerAccessRowDTO[];
 }

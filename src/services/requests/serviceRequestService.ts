@@ -352,21 +352,23 @@ export const serviceRequestService = {
           const outcomes = await dispatchService.dispatch(dto, tenantId, correlationId, ctx.user, {
             executorOrgId: internal.id,
           });
-          // Internal with no targets still locks as transmitted (clinic-side handoff).
-          if (outcomes.length === 0 || outcomes.some((o) => o.result.success)) {
+          // A channel that accepts is Sent. No channel is an in-app handoff.
+          const dispatched = outcomes.some((o) => o.result.success);
+          if (dispatched || outcomes.length === 0) {
+            const nextState: ServiceRequestState = dispatched ? "transmitted" : "handed_off";
             await prisma.serviceRequest.update({
               where: { id: dto.id },
-              data: { transmittedAt: new Date(), state: "transmitted" },
+              data: { transmittedAt: new Date(), state: nextState },
             });
-            if (outcomes.length === 0) {
+            if (!dispatched) {
               await prisma.statusEvent.create({
                 data: {
                   tenantId,
                   serviceRequestId: dto.id,
-                  state: "transmitted",
+                  state: "handed_off",
                   source: "devicecare",
                   actor: ctx.user.name,
-                  note: `Transmitted in-house (${internal.name}) — no outbound channels`,
+                  note: `Handed off in-app to ${internal.name} — no outbound channel accepted`,
                 },
               });
             }
@@ -517,9 +519,9 @@ export const serviceRequestService = {
   },
 
   /**
-   * FA-714 — lock allocation and hand off to the executor.
-   * Dispatch channels are optional: when none are enabled, transmit still succeeds
-   * (in-app handover); callers may surface `warning` for the clinic UI.
+   * FA-714 — lock allocation and hand the job to the executor.
+   * `transmitted` only when at least one outbound channel accepts the payload.
+   * With no enabled channel the job is `handed_off` (visible in-app, not sent).
    */
   async transmit(
     reference: string,
@@ -555,7 +557,7 @@ export const serviceRequestService = {
       });
     }
 
-    let dto = await toDto(existing);
+    const dto = await toDto(existing);
     let outcomes: Awaited<ReturnType<typeof dispatchService.dispatch>> = [];
     if (enabledCount > 0) {
       try {
@@ -580,17 +582,18 @@ export const serviceRequestService = {
     }
 
     const successLabels = outcomes.filter((o) => o.result.success).map((o) => o.target);
-    const note =
-      successLabels.length > 0
-        ? `Transmitted to ${org.name} · ${successLabels.join(", ")}`
-        : `Transmitted to ${org.name} (no outbound channels)`;
+    const dispatched = successLabels.length > 0;
+    const nextState: ServiceRequestState = dispatched ? "transmitted" : "handed_off";
+    const note = dispatched
+      ? `Sent to ${org.name} · ${successLabels.join(", ")}`
+      : `Handed off in-app to ${org.name} — no outbound channel accepted`;
 
     const row = await prisma.$transaction(async (tx) => {
       await tx.statusEvent.create({
         data: {
           tenantId: existing.tenantId,
           serviceRequestId: existing.id,
-          state: "transmitted",
+          state: nextState,
           source: "devicecare",
           actor: ctx.user.name,
           note,
@@ -598,7 +601,7 @@ export const serviceRequestService = {
       });
       return tx.serviceRequest.update({
         where: { id: existing.id },
-        data: { state: "transmitted", transmittedAt: new Date() },
+        data: { state: nextState, transmittedAt: new Date() },
         include: includeAll,
       });
     });
@@ -608,9 +611,9 @@ export const serviceRequestService = {
       resource: "request",
       resourceId: reference,
       action: "transition",
-      summary: `Transmitted ${reference}`,
+      summary: dispatched ? `Sent ${reference}` : `Handed off ${reference} in-app`,
       before: { state: existing.state },
-      after: { state: "transmitted" },
+      after: { state: nextState },
     });
     return { request: await toDto(row), warning };
   },
@@ -779,8 +782,9 @@ export const serviceRequestService = {
   },
 
   /**
-   * FA-601/602 — state only ever changes through a StatusEvent driven by external
-   * feedback. Unknown references are a 404, never a silent discard.
+   * FA-601/602 — external status feedback. Unknown references are a 404.
+   * `completed` is refused: a duty is performed only by a sealed inspection
+   * or an in-app completion with a recorded result.
    */
   async applyStatusFeedback(reference: string, feedback: StatusFeedbackDTO): Promise<ServiceRequestDTO> {
     const existing = await prisma.serviceRequest.findUnique({
@@ -788,6 +792,12 @@ export const serviceRequestService = {
       select: { id: true, tenantId: true, dutyId: true },
     });
     if (!existing) throw notFound(`Unknown service request reference ${reference}.`);
+    if (feedback.state === "completed") {
+      throw unprocessable(
+        "Status feedback cannot complete a duty. Completion is recorded by a sealed inspection.",
+        { field: "state" },
+      );
+    }
     const nextState = feedback.state as ServiceRequestState;
     const row = await prisma.$transaction(async (tx) => {
       await tx.statusEvent.create({
@@ -821,17 +831,6 @@ export const serviceRequestService = {
       summary: `External status ${feedback.state} on ${reference}`,
       after: { state: feedback.state, source: feedback.source, actor: feedback.actor ?? null },
     });
-
-    if (feedback.state === "completed" && existing.dutyId) {
-      await writeDutyPerformanceOnComplete({
-        tenantId: existing.tenantId,
-        dutyId: existing.dutyId,
-        serviceRequestId: existing.id,
-        performedBy: feedback.actor ?? feedback.source,
-        note: feedback.note ?? null,
-        source: "assignment",
-      });
-    }
 
     return toDto(row);
   },

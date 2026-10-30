@@ -66,6 +66,30 @@ function startOfUtcDay(d: Date): number {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
+/**
+ * Header, list, and label read the frozen Wartung duty when it has a date.
+ * The instance column can lag behind that duty.
+ */
+export function overlayMaintenanceDue<
+  T extends { nextMaintenanceDueAt: string | null; maintenanceStatus: MaintenanceStatus },
+>(dto: T, dueAt: Date | null | undefined): T {
+  if (!dueAt || Number.isNaN(dueAt.getTime())) return dto;
+  return {
+    ...dto,
+    nextMaintenanceDueAt: dueAt.toISOString(),
+    maintenanceStatus: deriveMaintenanceStatus(dueAt),
+  };
+}
+
+export function earliestDue(dates: Array<Date | null | undefined>): Date | null {
+  let best: Date | null = null;
+  for (const d of dates) {
+    if (!d || Number.isNaN(d.getTime())) continue;
+    if (!best || d.getTime() < best.getTime()) best = d;
+  }
+  return best;
+}
+
 /** Derive status from next due date (calendar-day UTC). */
 export function deriveMaintenanceStatus(
   nextDueAt: Date | null | undefined,

@@ -55,7 +55,10 @@ interface DueDatesSummaryProps {
 
 export function DueDatesSummary({ summary, filter, onFilter }: DueDatesSummaryProps) {
   const t = useTranslations("dueDatesCards");
-  const toggle = (next: DueDatesBoardFilter) => onFilter(filter === next ? "all" : next);
+  /** Click active card again to clear; otherwise switch chips without a no-op race. */
+  const select = (next: DueDatesBoardFilter) => {
+    onFilter(filter === next ? "all" : next);
+  };
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-testid="due-dates-summary">
@@ -64,7 +67,7 @@ export function DueDatesSummary({ summary, filter, onFilter }: DueDatesSummaryPr
         value={summary.due}
         hint={t("dueHint")}
         active={filter === "due"}
-        onClick={() => toggle("due")}
+        onClick={() => select("due")}
         testId="due-dates-card-due"
       />
       <SummaryCard
@@ -73,7 +76,7 @@ export function DueDatesSummary({ summary, filter, onFilter }: DueDatesSummaryPr
         hint={t("overdueHint")}
         tone="warning"
         active={filter === "overdue"}
-        onClick={() => toggle("overdue")}
+        onClick={() => select("overdue")}
         testId="due-dates-card-overdue"
       />
       <SummaryCard
@@ -81,7 +84,7 @@ export function DueDatesSummary({ summary, filter, onFilter }: DueDatesSummaryPr
         value={summary.unassigned}
         hint={t("unassignedHint")}
         active={filter === "unassigned"}
-        onClick={() => toggle("unassigned")}
+        onClick={() => select("unassigned")}
         testId="due-dates-card-unassigned"
       />
       <SummaryCard
@@ -89,7 +92,7 @@ export function DueDatesSummary({ summary, filter, onFilter }: DueDatesSummaryPr
         value={summary.openAssignments}
         hint={t("openHint")}
         active={filter === "open"}
-        onClick={() => toggle("open")}
+        onClick={() => select("open")}
         testId="due-dates-card-open"
       />
     </div>

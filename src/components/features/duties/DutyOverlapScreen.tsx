@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type DutyPair = "dguv" | "stk";
 
@@ -37,6 +38,12 @@ export function DutyOverlapScreen() {
   const [decidedAt, setDecidedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [busy, setBusy] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+
+  // Pending devices may not carry STK, so keep them selectable in the form.
+  const deviceOptions = [
+    ...list.devices,
+    ...list.pending.filter((p) => !list.devices.some((d) => d.id === p.id)),
+  ];
 
   if (!list.canView) {
     return (
@@ -83,6 +90,40 @@ export function DutyOverlapScreen() {
     <div className="p-work" data-testid="duty-overlap-page">
       <main className="p-main">
         <ListPageShell variant="compose" title={t("title")} description={t("description")}>
+          {list.pending.length > 0 ? (
+            <section
+              className="mb-6 rounded-lg border border-l-4 border-l-amber-500 bg-background p-4"
+              data-testid="duty-overlap-pending"
+            >
+              <h2 className="text-sm font-semibold">
+                {t("pending.title", { count: list.pending.length })}
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">{t("pending.hint")}</p>
+              <ul className="mt-3 divide-y rounded-md border">
+                {list.pending.map((d) => (
+                  <li key={d.id}>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted/50",
+                        deviceInstanceId === d.id && "bg-muted/60",
+                      )}
+                      onClick={() => {
+                        setDeviceInstanceId(d.id);
+                        setCoveredDutyKey("dguv");
+                        setSatisfiedByDutyKey("stk");
+                      }}
+                      data-testid={`duty-overlap-pending-${d.id}`}
+                    >
+                      <span className="font-mono text-xs">{d.inventoryNumber}</span>
+                      <span className="truncate text-muted-foreground">{d.label}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
           <section
             className="mb-6 rounded-lg border border-l-4 border-l-primary bg-background p-4"
             data-testid="duty-overlap-form"
@@ -101,14 +142,14 @@ export function DutyOverlapScreen() {
                   value={deviceInstanceId}
                   onChange={(e) => setDeviceInstanceId(e.target.value)}
                   data-testid="duty-overlap-device"
-                  disabled={list.devices.length === 0}
+                  disabled={deviceOptions.length === 0}
                 >
                   <option value="">
-                    {list.devices.length === 0
+                    {deviceOptions.length === 0
                       ? t("form.deviceEmpty")
                       : t("form.devicePlaceholder")}
                   </option>
-                  {list.devices.map((d) => (
+                  {deviceOptions.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.inventoryNumber} · {d.label}
                     </option>
@@ -171,6 +212,12 @@ export function DutyOverlapScreen() {
                 />
               </div>
             </div>
+
+            {coveredDutyKey === satisfiedByDutyKey ? (
+              <p className="mt-3 text-xs text-destructive" data-testid="duty-overlap-same-duty">
+                {t("form.sameDuty")}
+              </p>
+            ) : null}
 
             <div className="mt-4">
               <Button

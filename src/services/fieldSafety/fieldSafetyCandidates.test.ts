@@ -50,6 +50,17 @@ describe("deviceMatchesScope", () => {
     ).toBe(true);
   });
 
+  it("does not match a serial range when no model is named", () => {
+    expect(
+      deviceMatchesScope(device, {
+        deviceModelId: null,
+        basicUdiDi: null,
+        serialFrom: "SN-050",
+        serialTo: "SN-200",
+      }),
+    ).toBe(false);
+  });
+
   it("rejects wrong model", () => {
     expect(
       deviceMatchesScope(device, {

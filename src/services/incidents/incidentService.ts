@@ -18,6 +18,7 @@ import {
 } from "@/services/users/userAreaScope";
 import { actorAttribution, recordedByAttribution } from "@/lib/auth/attribution";
 import { authorityNotificationService } from "@/services/authority/authorityNotificationService";
+import { shouldHideFromRegisterIncident } from "@/lib/registerQuality";
 
 function isoDate(d: Date | null | undefined): string | null {
   if (!d) return null;
@@ -149,7 +150,16 @@ export const incidentService = {
       return { incidents: [], kpis: { unassessed: 0, unreported: 0, total: 0 } };
     }
 
-    const base = areaWhere ?? {};
+    // Demo / keyboard-mash rows are hidden from the list and from KPI counts alike.
+    const candidates = await prisma.deviceIncident.findMany({
+      where: { ...(areaWhere ?? {}) },
+      select: { id: true, description: true, harmDescription: true },
+    });
+    const hiddenIds = candidates.filter((c) => shouldHideFromRegisterIncident(c)).map((c) => c.id);
+    const base = {
+      ...(areaWhere ?? {}),
+      ...(hiddenIds.length ? { id: { notIn: hiddenIds } } : {}),
+    };
     const [rows, unassessed, unreported, total] = await Promise.all([
       prisma.deviceIncident.findMany({
         where: { ...viewWhere, ...base },

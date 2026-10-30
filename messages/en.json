@@ -61,6 +61,7 @@
     "groupOutput": "Output",
     "badgeCount": "{label}: {count}",
     "badgeWarn": "{label}: attention required",
+    "catalogBadgeDerived": "Catalog: open classifications are still derived or guessed",
     "searchPlaceholder": "Search / scan …",
     "searchShortcut": "⌘K",
     "searchBestand": "Search device: inventory number, serial, room, person",
@@ -89,6 +90,30 @@
       "takte": "Intervals set",
       "aufbereitung": "Reprocessing set up",
       "export": "Register checked"
+    },
+    "why": {
+      "sitesOk": "{count, plural, one {# site created} other {# sites created}}",
+      "sitesOpen": "No site yet — without a site there is no device",
+      "personenMpsbOpen": "{count, plural, one {# mandatory site without a published officer} other {# mandatory sites without a published officer}}",
+      "personenOk": "{count, plural, one {# active person, all mandatory sites have an officer} other {# active people, all mandatory sites have an officer}}",
+      "traegerschaftOpen": "Nobody sees duties on the dashboard — assign tiles",
+      "traegerschaftOk": "Every duty type has an owner",
+      "betreuungOk": "Contract since {since}",
+      "betreuungOpen": "No active service provider contract yet",
+      "bestandOk": "{count, plural, one {# device beyond draft (import or first entry)} other {# devices beyond draft (import or first entry)}}",
+      "bestandOpen": "No device beyond draft yet",
+      "einstufungOpen": "{derived} derived only, {missing} without classification",
+      "einstufungOk": "All models in use have evidenced classification",
+      "klaerlisteOpen": "{count, plural, one {# device with at least one gap} other {# devices with at least one gap}}",
+      "klaerlisteOk": "Every record carries the mandatory fields",
+      "takteMissing": "{count, plural, one {# constancy check without an interval} other {# constancy checks without an interval}}",
+      "takteOk": "{count, plural, one {# due date derived from STK, MTK, maintenance} other {# due dates derived from STK, MTK, maintenance}}",
+      "takteNone": "No due dates derived yet",
+      "aufbereitungNa": "Not applicable — no reprocessing equipment in inventory",
+      "aufbereitungOk": "{count, plural, one {# person with competence, routine checks defined} other {# people with competence, routine checks defined}}",
+      "aufbereitungOpen": "No person with reprocessing competence",
+      "exportOk": "{count, plural, one {# § 14 export so far} other {# § 14 exports so far}}",
+      "exportOpen": "No § 14 export yet — run a trial before the first inspection"
     }
   },
   "common": {
@@ -405,6 +430,9 @@
     "colSchedule": "Appointment",
     "colManaged": "Managed",
     "displayState_erfasst": "Captured",
+    "displayState_warteschlange": "Queued",
+    "displayState_uebermittelt": "Received",
+    "displayState_uebergeben": "Received, in app only",
     "displayState_zugewiesen": "Assigned",
     "displayState_terminiert": "Scheduled",
     "displayState_in_arbeit": "In progress",
@@ -726,6 +754,10 @@
         "decided": "Decided",
         "actions": "Actions"
       },
+      "pending": {
+        "title": "Pending DGUV decisions ({count})",
+        "hint": "These devices have an active DGUV duty with no coverage decision. Select one to prefill the form."
+      },
       "form": {
         "title": "Record overlap",
         "hint": "The covered duty is suspended (not deleted). Revoking reactivates it if nothing else covers it.",
@@ -736,7 +768,8 @@
         "satisfiedBy": "Satisfied by",
         "reason": "Reason",
         "reasonPlaceholder": "e.g. STK protocol covers DGUV electrical safety for this unit",
-        "decidedAt": "Decided on"
+        "decidedAt": "Decided on",
+        "sameDuty": "Covered and satisfying duty must differ."
       },
       "actions": {
         "save": "Save decision",
@@ -816,7 +849,11 @@
         "stateExternal": "external",
         "laidOut": "Laid out",
         "documentRef": "Document ref",
-        "otherOpenStates": "Other open states"
+        "otherOpenStates": "Other open states",
+        "folderPdf": "Folder as PDF",
+        "folderPdfBusy": "Building PDF…",
+        "folderPdfDone": "Dossier PDF downloaded",
+        "folderPdfFailed": "Could not build dossier PDF."
       },
       "inspections": {
         "record": "Record inspection",
@@ -996,9 +1033,10 @@
       },
       "form": {
         "title": "Set takt · {object}",
-        "hint": "The quality assurance guideline suggests “{cadence}”. That is a suggestion — not a deadline — until you confirm or choose another interval.",
+        "hint": "The quality assurance guideline suggests “{cadence}”. Keep that unit; the interval value may still be adjusted with a documented basis.",
         "interval": "Interval",
         "unit": "Unit",
+        "unitMismatch": "Unit does not match QS-RL “{guideline}” — use {unit}.",
         "basis": "Basis of determination",
         "basisPlaceholder": "e.g. QS-RL diagnostic radiology, section on constancy testing",
         "basisPrefill": "Quality assurance guideline: {cadence}",
@@ -1082,7 +1120,8 @@
       "actions": {
         "decide": "Decide release",
         "save": "Save",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "record": "Record check"
       },
       "release": {
         "title": "Batch release decision",
@@ -1091,6 +1130,27 @@
         "rejected": "Reject",
         "noteRequired": "Note (required)",
         "noteOptional": "Note (optional)"
+      },
+      "filter": {
+        "openToday": "Open today only"
+      },
+      "emptyOpenToday": "No checks open today in this tab.",
+      "record": {
+        "title": "Record check",
+        "device": "Reprocessing equipment",
+        "devicePlaceholder": "Select equipment…",
+        "deviceEmpty": "No reprocessing equipment found",
+        "site": "Site",
+        "sitePlaceholder": "Select site…",
+        "batch": "Batch",
+        "batchPlaceholder": "Select batch…",
+        "performedAt": "Performed on",
+        "passed": "Result",
+        "passedNone": "Not stated",
+        "passedYes": "Passed",
+        "passedNo": "Objected",
+        "value": "Measured value",
+        "note": "Note"
       }
     },
     "fieldSafety": {
@@ -1329,6 +1389,10 @@
       "peopleFootnote": "From the service company's assignment. You cannot change it here — but you can see at any time who it is.",
       "latestAccess": "Latest access by the organisation",
       "latestAccessBody": "Access in the capacity of managing organisation is not recorded in this POC yet. When the audit trail is connected, only partner-scoped actions will appear here — otherwise a provider's access could not be separated from your own.",
+      "latestAccessEmpty": "No partner actions on this clinic yet.",
+      "accessWhen": "When",
+      "accessWho": "Who",
+      "accessWhat": "What",
       "scopeInventory": "Inventory",
       "scopeDueDates": "Due dates",
       "scopeInspection": "Inspection",
@@ -1371,7 +1435,9 @@
       "zones": {
         "decides": "Decides the day",
         "worklist": "Worklist",
-        "watch": "Watch"
+        "watch": "Watch",
+        "more": "More ({count})",
+        "hideMore": "Hide more"
       },
       "overview": {
         "title": "What is on record",
@@ -1650,7 +1716,8 @@
   "status": {
     "captured": "Captured",
     "queued": "Queued",
-    "transmitted": "Transmitted",
+    "transmitted": "Sent",
+    "handed_off": "Handed off",
     "acknowledged": "Acknowledged",
     "scheduled": "Scheduled",
     "in_progress": "In progress",
@@ -1905,10 +1972,13 @@
     "scheduledOnly": "With due date",
     "missingClassification": "Without classification",
     "missingClassificationActive": "Without classification (on)",
+    "catalogOwned": "Our models",
+    "catalogOwnedOff": "All models",
     "mpsbMissing": "Without MPSB",
     "mpsbAppointed": "MPSB appointed",
     "expiring": "Expiring",
-    "mineOnly": "Mine only"
+    "mineOnly": "Mine only",
+    "withoutRecord": "Without record"
   },
   "dueDatesCards": {
     "due": "Due",
@@ -2947,6 +3017,16 @@
     "colDue": "Due",
     "colLastDone": "Last done",
     "markDone": "Mark done",
+    "markDoneTitle": "Record this duty as done",
+    "markDoneWho": "Recorded by {name}. This name is stored with the result.",
+    "markDoneResult": "Result",
+    "markDoneResultPassed": "Passed",
+    "markDoneResultConditions": "Passed with conditions",
+    "markDoneResultFailed": "Failed",
+    "markDoneNote": "What was done",
+    "markDoneNotePlaceholder": "Short result — who checked it is taken from your sign-in",
+    "markDoneSave": "Save result",
+    "markDoneCancel": "Cancel",
     "years": "years",
     "monthsUnit": "months",
     "workingDaysUnit": "working days",

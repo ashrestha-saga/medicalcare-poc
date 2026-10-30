@@ -4,17 +4,30 @@ import { useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useSites } from "@/components/hooks/location/useSites";
 import { useRequestStore } from "@/store/requestStore";
+import { useScanStore } from "@/store/scanStore";
 
 /**
  * Compact place-of-use fields for inventory-hit confirmation.
  * Writes into requestStore so ServiceRequestForm / submit reuse the same values.
+ * Prefills from the resolved device when the form is still empty.
  */
 export function InventoryLocationCheck({ error }: { error?: string | null }) {
   const t = useTranslations("device");
   const form = useRequestStore((s) => s.form);
   const patch = useRequestStore((s) => s.patch);
+  const prefillLocation = useRequestStore((s) => s.prefillLocation);
+  const deviceLocation = useScanStore((s) => s.resolution?.device?.location ?? null);
   const sites = useSites();
   const site = sites.find((s) => s.id === form.siteId);
+
+  useEffect(() => {
+    if (form.siteId || !deviceLocation?.siteId) return;
+    prefillLocation({
+      siteId: deviceLocation.siteId,
+      areaId: deviceLocation.areaId,
+      room: deviceLocation.room,
+    });
+  }, [form.siteId, deviceLocation, prefillLocation]);
 
   useEffect(() => {
     const preset = site?.deliveryAddress?.trim() || site?.address?.trim();

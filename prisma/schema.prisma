@@ -118,6 +118,8 @@ enum ServiceRequestState {
   in_progress
   completed
   rejected
+  /** Executor can see the job inside DeviceCare; no outbound channel accepted it. */
+  handed_off
 }
 
 enum OutboxState {

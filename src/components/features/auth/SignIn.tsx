@@ -135,11 +135,13 @@ export function SignIn({ notice, door = "clinic" }: SignInProps) {
 
           {!needs2fa && (
             <>
-              <p style={{ marginTop: 14, fontSize: 11.5, color: "var(--on-dark-soft)", lineHeight: 1.5 }}>
-                {isPartner
-                  ? "Demo: k.adler@msr.example / demo · j.reinhardt@msr.example / demo"
-                  : "Demo: anna@demo.local / demo (device admin) · admin@demo.local / demo (superadmin)"}
-              </p>
+              {process.env.NEXT_PUBLIC_DEMO_LOGIN_HINT === "1" ? (
+                <p style={{ marginTop: 14, fontSize: 11.5, color: "var(--on-dark-soft)", lineHeight: 1.5 }}>
+                  {isPartner
+                    ? "Demo: k.adler@msr.example / demo · j.reinhardt@msr.example / demo"
+                    : "Demo: anna@demo.local / demo (device admin) · admin@demo.local / demo (superadmin)"}
+                </p>
+              ) : null}
               <p style={{ marginTop: 10, fontSize: 12, color: "var(--on-dark-soft)" }}>
                 {isPartner ? (
                   <Link href="/login" data-testid="login-switch-clinic">

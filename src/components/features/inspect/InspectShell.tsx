@@ -19,7 +19,7 @@ export function InspectShell({ children }: { children: ReactNode }) {
   const tenantName = useInspectQueueStore((s) => s.tenantName);
 
   return (
-    <div className="pp-shell" data-testid="inspect-shell">
+    <div className="pp-shell p-work--readable" data-testid="inspect-shell" data-page="inspect">
       <header className="pp-head">
         <div className="pp-head__brand">
           <span className="pp-mark">DeviceCare</span>

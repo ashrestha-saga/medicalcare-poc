@@ -474,7 +474,7 @@ export function ScanApp() {
 
   if (!isCapturer) {
     return (
-      <div className="p-work" data-testid="scan-app" data-capturer="0">
+      <div className="p-work p-work--readable" data-testid="scan-app" data-page="scan" data-capturer="0">
         {showPersistentCamera && !overlay && (
           <aside className="p-campane">
             <CameraPane tabletHint />
@@ -503,8 +503,11 @@ export function ScanApp() {
 
   return (
     <div
-      className={["p-work", showBottomTabs ? "p-work--scan-tabs" : ""].filter(Boolean).join(" ")}
+      className={["p-work", "p-work--readable", showBottomTabs ? "p-work--scan-tabs" : ""]
+        .filter(Boolean)
+        .join(" ")}
       data-testid="scan-app"
+      data-page="scan"
       data-capturer="1"
       data-tab={activeTab}
       data-bottom-tabs={showBottomTabs ? "1" : "0"}

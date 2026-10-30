@@ -1,6 +1,8 @@
 import type { TenantWorkContext } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { prisma } from "@/lib/prisma";
+import { countMissingConstancyCadences } from "@/services/constancy/missingCadenceMetrics";
+import { countDatedDuties } from "@/services/dueDates/dutyDueMetrics";
 import { countKlarlisteDevices } from "@/services/nav/klarlisteIssues";
 
 /** MPSB threshold: regularly more than 20 employees → appointment required. */
@@ -20,13 +22,16 @@ export type SetupStepId =
 
 export type SetupStepStatus = "ok" | "open" | "na";
 
+export type SetupStepWhyParams = Record<string, string | number>;
+
 export type SetupStepDTO = {
   id: SetupStepId;
   /** i18n key under `commissioning.steps.*` */
   titleKey: string;
   status: SetupStepStatus;
-  /** Server-built reason string (DE for now; numbers included). */
-  why: string;
+  /** i18n key under `commissioning.why.*` — client formats with whyParams. */
+  whyKey: string;
+  whyParams?: SetupStepWhyParams;
   href: string;
 };
 
@@ -112,19 +117,8 @@ export const setupProgressService = {
         .catch(() => null),
       prisma.deviceInstance.count({ where: { state: { not: "draft" } } }),
       countKlarlisteDevices(ctx).catch(() => 0),
-      prisma.deviceDuty.count({ where: { applicable: true, dueAt: { not: null } } }).catch(() => 0),
-      prisma.deviceDuty
-        .count({
-          where: {
-            applicable: true,
-            dutyKey: "konstanz",
-            deviceInstance: {
-              state: { not: "retired" },
-              constancyCadences: { none: { validTo: null } },
-            },
-          },
-        })
-        .catch(() => 0),
+      countDatedDuties().catch(() => 0),
+      countMissingConstancyCadences().catch(() => 0),
       prisma.deviceInstance
         .count({
           where: {
@@ -182,10 +176,8 @@ export const setupProgressService = {
       id: "sites",
       titleKey: "sites",
       status: siteCount > 0 ? "ok" : "open",
-      why:
-        siteCount > 0
-          ? `${siteCount} Standort${siteCount === 1 ? "" : "e"} angelegt`
-          : "Noch kein Standort — ohne Standort kein Gerät",
+      whyKey: siteCount > 0 ? "sitesOk" : "sitesOpen",
+      whyParams: siteCount > 0 ? { count: siteCount } : undefined,
       href: "/locations",
     });
 
@@ -195,9 +187,8 @@ export const setupProgressService = {
       id: "personen",
       titleKey: "personen",
       status: personenOk ? "ok" : "open",
-      why: mpsbOffen
-        ? `${mpsbOffen} pflichtige Standort${mpsbOffen === 1 ? "" : "e"} ohne bekanntgemachten Beauftragten`
-        : `${activeStaff} aktive Personen, alle pflichtigen Standorte mit Beauftragtem`,
+      whyKey: mpsbOffen ? "personenMpsbOpen" : "personenOk",
+      whyParams: mpsbOffen ? { count: mpsbOffen } : { count: activeStaff },
       href: mpsbOffen ? "/locations?mpsb=missing" : "/users",
     });
 
@@ -207,9 +198,7 @@ export const setupProgressService = {
       id: "traegerschaft",
       titleKey: "traegerschaft",
       status: tl === 0 ? "ok" : "open",
-      why: tl
-        ? "Pflichten sieht niemand im Dashboard — Kacheln zuweisen"
-        : "Jede Pflichtart hat einen Träger",
+      whyKey: tl ? "traegerschaftOpen" : "traegerschaftOk",
       href: "/today/assignments",
     });
 
@@ -219,9 +208,10 @@ export const setupProgressService = {
       id: "betreuung",
       titleKey: "betreuung",
       status: betreuungOk ? "ok" : "open",
-      why: contract
-        ? `Vertrag seit ${contract.validFrom.toISOString().slice(0, 10)}`
-        : "Noch kein aktiver Dienstleistervertrag",
+      whyKey: contract ? "betreuungOk" : "betreuungOpen",
+      whyParams: contract
+        ? { since: contract.validFrom.toISOString().slice(0, 10) }
+        : undefined,
       href: "/management",
     });
 
@@ -230,9 +220,8 @@ export const setupProgressService = {
       id: "bestand",
       titleKey: "bestand",
       status: erfasst > 0 ? "ok" : "open",
-      why: erfasst
-        ? `${erfasst} Geräte außer Entwurf (Import oder Erstanlage)`
-        : "Noch kein Gerät über den Entwurf hinaus",
+      whyKey: erfasst ? "bestandOk" : "bestandOpen",
+      whyParams: erfasst ? { count: erfasst } : undefined,
       href: "/devices",
     });
 
@@ -242,10 +231,11 @@ export const setupProgressService = {
       id: "einstufung",
       titleKey: "einstufung",
       status: einstufungOk ? "ok" : "open",
-      why:
+      whyKey: derivedCls || missingCls ? "einstufungOpen" : "einstufungOk",
+      whyParams:
         derivedCls || missingCls
-          ? `${derivedCls} nur abgeleitet, ${missingCls} ohne Einstufung`
-          : "Alle genutzten Modelle belegt eingestuft",
+          ? { derived: derivedCls, missing: missingCls }
+          : undefined,
       href: "/catalog",
     });
 
@@ -254,9 +244,8 @@ export const setupProgressService = {
       id: "klaerliste",
       titleKey: "klaerliste",
       status: klarCount === 0 ? "ok" : "open",
-      why: klarCount
-        ? `${klarCount} Geräte mit mindestens einem Mangel`
-        : "Alle Datensätze tragen die Pflichtangaben",
+      whyKey: klarCount ? "klaerlisteOpen" : "klaerlisteOk",
+      whyParams: klarCount ? { count: klarCount } : undefined,
       href: "/devices?tab=klaerliste",
     });
 
@@ -266,11 +255,16 @@ export const setupProgressService = {
       id: "takte",
       titleKey: "takte",
       status: takteOk ? "ok" : "open",
-      why: konstanzMissingTakt
-        ? `${konstanzMissingTakt} Konstanzprüfungen ohne Takt`
+      whyKey: konstanzMissingTakt
+        ? "takteMissing"
         : dutiesWithDue
-          ? `${dutiesWithDue} Fälligkeiten aus STK, MTK, Wartung abgeleitet`
-          : "Noch keine Fälligkeiten abgeleitet",
+          ? "takteOk"
+          : "takteNone",
+      whyParams: konstanzMissingTakt
+        ? { count: konstanzMissingTakt }
+        : dutiesWithDue
+          ? { count: dutiesWithDue }
+          : undefined,
       href: konstanzMissingTakt ? "/constancy-cadence?section=missing" : "/due-dates",
     });
 
@@ -280,19 +274,17 @@ export const setupProgressService = {
         id: "aufbereitung",
         titleKey: "aufbereitung",
         status: "na",
-        why: "Nicht einschlägig — keine Aufbereitungsgeräte im Bestand",
-        href: "/reprocessing",
+        whyKey: "aufbereitungNa",
+        href: "/reprocessing?section=checks&openToday=1",
       });
     } else {
       steps.push({
         id: "aufbereitung",
         titleKey: "aufbereitung",
         status: sachkunde > 0 ? "ok" : "open",
-        why:
-          sachkunde > 0
-            ? `${sachkunde} Personen mit Sachkunde, Routinekontrollen definiert`
-            : "Keine Person mit Sachkunde Aufbereitung",
-        href: "/reprocessing",
+        whyKey: sachkunde > 0 ? "aufbereitungOk" : "aufbereitungOpen",
+        whyParams: sachkunde > 0 ? { count: sachkunde } : undefined,
+        href: "/reprocessing?section=checks&openToday=1",
       });
     }
 
@@ -301,9 +293,8 @@ export const setupProgressService = {
       id: "export",
       titleKey: "export",
       status: exportCount > 0 ? "ok" : "open",
-      why: exportCount
-        ? `Zuletzt ${exportCount} Export${exportCount === 1 ? "" : "s"} § 14`
-        : "Noch kein Export § 14 erzeugt — Probelauf vor der ersten Begehung",
+      whyKey: exportCount ? "exportOk" : "exportOpen",
+      whyParams: exportCount ? { count: exportCount } : undefined,
       href: "/devices?tab=released",
     });
 

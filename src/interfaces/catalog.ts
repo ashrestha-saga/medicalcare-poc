@@ -122,8 +122,14 @@ export interface CatalogModelsListApi {
   setQ: (value: string) => void;
   missingClassification: boolean;
   setMissingClassification: (value: boolean) => void;
+  showAll: boolean;
+  setShowAll: (value: boolean) => void;
   loading: boolean;
-  refresh: (override?: { q?: string; missingClassification?: boolean }) => Promise<void>;
+  refresh: (override?: {
+    q?: string;
+    missingClassification?: boolean;
+    showAll?: boolean;
+  }) => Promise<void>;
   create: (input: CatalogModelWriteDTO) => Promise<CatalogModelListItemDTO>;
   update: (id: string, input: CatalogModelWriteDTO) => Promise<CatalogModelDetailDTO>;
   importFile: (file: File) => Promise<CatalogModelImportResult>;

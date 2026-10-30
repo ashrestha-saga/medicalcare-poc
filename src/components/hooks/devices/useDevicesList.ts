@@ -170,12 +170,12 @@ export function useDevicesList() {
   const [completingDutyId, setCompletingDutyId] = useState<string | null>(null);
 
   const completeDuty = useCallback(
-    async (dutyId: string) => {
+    async (dutyId: string, input: { note: string; result: "passed" | "passed_with_conditions" | "failed" }) => {
       setCompletingDutyId(dutyId);
       try {
         const res = await api<{ device: DeviceInstanceDetailDTO }>(`/api/duties/${dutyId}/complete`, {
           method: "POST",
-          body: JSON.stringify({}),
+          body: JSON.stringify(input),
         });
         toast.success("Duty marked done; next due date updated.");
         applyUpdated(res.device);

@@ -93,7 +93,7 @@ export function DevicesScreen() {
             onBack={list.clearSelection}
             onEdit={() => void editor.openEdit(list.selected!)}
             completingDutyId={list.completingDutyId}
-            onCompleteDuty={(id) => void list.completeDuty(id)}
+            onCompleteDuty={(id, input) => void list.completeDuty(id, input)}
           />
         ) : (
           <ListPageShell

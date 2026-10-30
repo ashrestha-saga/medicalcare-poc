@@ -26,6 +26,15 @@ export const env = {
       return str("SESSION_SECRET", "insecure-dev-session-secret");
     },
   },
+  /**
+   * HMAC secret for POST /api/service-requests/:reference/status.
+   * Callers send `X-DeviceCare-Signature: sha256=<hmac of the raw body>`.
+   */
+  statusWebhook: {
+    get secret() {
+      return str("STATUS_WEBHOOK_SECRET");
+    },
+  },
   /** Shared secret for cron job routes (`Authorization: Bearer …`). Required in production. */
   cron: {
     get secret() {
