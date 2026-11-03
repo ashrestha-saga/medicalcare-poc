@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import type { ConsoleStaffMemberDTO } from "@/interfaces/console";
@@ -12,11 +13,12 @@ import { Button } from "@/components/ui/button";
 import { staffSkillLevelMessageKey } from "@/lib/console/staffLabels";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 
-export function StaffScreen() {
+function StaffBody() {
   const t = useTranslations("console");
   const { checkPermission } = usePermissions();
   const canInviteUi = checkPermission("console:staff:invite");
-  const { data, filtered, error, loading, keyword, setKeyword } = useStaffList();
+  const { data, filtered, error, loading, keyword, setKeyword, expiringOnly, setExpiringOnly } =
+    useStaffList();
   const columns = useStaffColumns();
 
   return (
@@ -26,11 +28,21 @@ export function StaffScreen() {
           title={t("staffTitle")}
           description={t("staffIntro")}
           headerExtra={
-            canInviteUi && data?.canInvite ? (
-              <Button asChild>
-                <Link href="/partner/staff/new">{t("staffCreateCta")}</Link>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={expiringOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setExpiringOnly(!expiringOnly)}
+              >
+                {t("staffExpiringOnly")}
               </Button>
-            ) : null
+              {canInviteUi && data?.canInvite ? (
+                <Button asChild>
+                  <Link href="/partner/staff/new">{t("staffCreateCta")}</Link>
+                </Button>
+              ) : null}
+            </div>
           }
         >
           {error ? (
@@ -76,5 +88,13 @@ export function StaffScreen() {
         </ListPageShell>
       </main>
     </div>
+  );
+}
+
+export function StaffScreen() {
+  return (
+    <Suspense fallback={<div className="p-work p-4 text-sm text-muted-foreground">…</div>}>
+      <StaffBody />
+    </Suspense>
   );
 }

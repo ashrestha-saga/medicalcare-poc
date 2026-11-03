@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useExternalInspectorsList } from "@/components/hooks/partner/external-inspectors/useExternalInspectorsList";
@@ -27,11 +28,11 @@ function SoftChip({ children, tone = "green" }: { children: React.ReactNode; ton
   );
 }
 
-export function ExternalInspectorsScreen() {
+function ExternalInspectorsBody() {
   const t = useTranslations("console");
   const { checkPermission } = usePermissions();
   const canManage = checkPermission("console:external:manage");
-  const { data, groups, error, loading } = useExternalInspectorsList();
+  const { data, groups, error, loading, readyOnly, setReadyOnly } = useExternalInspectorsList();
 
   return (
     <div className="p-work" data-testid="console-external">
@@ -40,11 +41,21 @@ export function ExternalInspectorsScreen() {
           title={t("externalTitle")}
           description={t("externalIntro")}
           headerExtra={
-            canManage && data?.canManage ? (
-              <Button asChild>
-                <Link href="/partner/external-inspectors/new">{t("externalCreateCta")}</Link>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={readyOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setReadyOnly(!readyOnly)}
+              >
+                {t("externalReadyOnly")}
               </Button>
-            ) : null
+              {canManage && data?.canManage ? (
+                <Button asChild>
+                  <Link href="/partner/external-inspectors/new">{t("externalCreateCta")}</Link>
+                </Button>
+              ) : null}
+            </div>
           }
         >
           {loading ? (
@@ -183,5 +194,13 @@ export function ExternalInspectorsScreen() {
         </ListPageShell>
       </main>
     </div>
+  );
+}
+
+export function ExternalInspectorsScreen() {
+  return (
+    <Suspense fallback={<div className="p-work p-4 text-sm text-muted-foreground">…</div>}>
+      <ExternalInspectorsBody />
+    </Suspense>
   );
 }

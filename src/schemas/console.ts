@@ -111,7 +111,7 @@ export const consoleStaffSkillDraftSchema = z.object({
 export const consoleStaffInviteSchema = z.object({
   email: z.string().trim().email().max(200),
   name: z.string().trim().max(120).optional().nullable(),
-  appRole: z.enum(["admin", "inspector", "order"]),
+  appRole: z.enum(["admin", "service_lead", "inspector", "order", "management"]),
   jobTitle: z.string().trim().max(120).nullable().optional(),
   validFrom: z
     .string()
@@ -131,7 +131,7 @@ export const consoleStaffInviteSchema = z.object({
 export const consoleStaffPatchSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   jobTitle: z.string().trim().max(120).nullable().optional(),
-  appRole: z.enum(["admin", "inspector", "order"]).optional(),
+  appRole: z.enum(["admin", "service_lead", "inspector", "order", "management"]).optional(),
   validFrom: z
     .string()
     .trim()
@@ -196,6 +196,8 @@ export const dispositionAssignSchema = z.object({
   executorOrgId: z.string().trim().min(1).nullable().optional(),
   assigneeUserId: z.string().trim().min(1).nullable().optional(),
   scheduledAt: appointmentInputSchema,
+  /** D2 — attach order to an existing ServiceVisit. */
+  visitId: z.string().trim().min(1).nullable().optional(),
 });
 
 export type DispositionAssignParsed = z.infer<typeof dispositionAssignSchema>;

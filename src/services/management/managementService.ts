@@ -4,6 +4,7 @@ import type {
   ManagementPartnerAccessRowDTO,
   TenantContext,
 } from "@/interfaces";
+import { isPartnerOrgLead } from "@/constants/partnerPermissions";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { prisma } from "@/lib/prisma";
 import { isLiveContract } from "@/services/access/partnerAccessService";
@@ -63,7 +64,7 @@ export const managementService = {
         scope: parseScope(c.scope),
         // Same rule as partner customer detail: org admins always; others only if assigned.
         people: c.organisation.memberships
-          .filter((m) => m.appRole === "admin" || m.staffAssignments.length > 0)
+          .filter((m) => isPartnerOrgLead(m.appRole) || m.staffAssignments.length > 0)
           .map((m) => ({
             id: m.user.id,
             name: m.user.name,

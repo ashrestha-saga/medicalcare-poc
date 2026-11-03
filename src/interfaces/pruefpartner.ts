@@ -16,6 +16,12 @@ export interface InspectionStepResultDTO {
   baselineFlag: boolean;
   note: string | null;
   source: "catalogue" | "family";
+  /** D11 — persisted no-photo reason for failed steps. */
+  noPhotoReason?: string | null;
+  /** D11 — count of Mangelbild attachments. */
+  photoCount?: number;
+  /** Result row id when a draft/sealed run exists (for photo upload). */
+  resultId?: string | null;
 }
 
 export interface ResolvedCataloguePreviewDTO {
@@ -54,6 +60,13 @@ export interface CataloguePreviewDTO {
   manufacturer: string | null;
   locationText: string;
   accessHint: string | null;
+  /** Clinic site (Standort) for day-plan grouping. */
+  siteId: string | null;
+  siteName: string | null;
+  /** Disposition appointment — preferred for Heute/Woche buckets. */
+  scheduledAt: string | null;
+  visitId: string | null;
+  visitStartedAt: string | null;
   overdue: boolean;
   serviceType: string;
   dueAt: string | null;
@@ -108,6 +121,18 @@ export interface InspectionRunDTO {
   testEquipmentId: string | null;
   steps: InspectionStepResultDTO[];
   sealed: boolean;
+  /** D2 — linked ServiceVisit id (Phase 1 always set before seal). */
+  visitId?: string | null;
+  visitStartedAt?: string | null;
+  /** D10 — seal signature summary. */
+  signatures?: {
+    kind: string;
+    signerName: string | null;
+    signerRole: string | null;
+    signedAt: string | null;
+    absent: boolean;
+    absentReason: string | null;
+  }[];
 }
 
 export interface TestEquipmentDTO {
@@ -122,6 +147,33 @@ export interface TestEquipmentDTO {
 
 export type InspectionResultCode = "passed" | "passed_with_conditions" | "failed";
 
+/** Inspect-rail status for a follow-up proposal (Nachbesuch). */
+export type InspectFollowUpStatus =
+  | "waiting"
+  | "assigned"
+  | "scheduled"
+  | "in_progress"
+  | "done";
+
+export interface InspectFollowUpRowDTO {
+  reference: string;
+  parentReference: string | null;
+  tenantId: string;
+  tenantName: string | null;
+  deviceLabel: string;
+  followUpNeeds: string | null;
+  followUpUrgency: string | null;
+  state: string;
+  status: InspectFollowUpStatus;
+  assigneeName: string | null;
+  scheduledAt: string | null;
+  createdAt: string;
+}
+
+export interface InspectFollowUpListDTO {
+  rows: InspectFollowUpRowDTO[];
+}
+
 /** Client-side draft for step ratings before PATCH. */
 export type InspectionStepDraft = Record<
   string,
@@ -129,5 +181,11 @@ export type InspectionStepDraft = Record<
     confirmed?: boolean | null;
     measuredValue?: string | null;
     rating?: "ok" | "defect" | null;
+    noPhotoReason?: string | null;
+    /** Justification when rating OK despite outside limit. */
+    limitOverrideReason?: string | null;
+    /** P3 — possible patient relevance → partner_hint clarification. */
+    mpsbHint?: boolean;
+    mpsbText?: string | null;
   }
 >;

@@ -72,6 +72,7 @@ export const testEquipmentService = {
       calibratedUntil: string | null;
       traceabilityRef: string | null;
       active: boolean;
+      assignedMembershipId: string | null;
     }>,
   ): Promise<TestEquipmentDTO> {
     requirePartnerPermission(ctx, "testequipment:manage");
@@ -79,6 +80,13 @@ export const testEquipmentService = {
       where: { id, organisationId: ctx.organisationId },
     });
     if (!existing) throw notFound("Test equipment not found.");
+    if (input.assignedMembershipId) {
+      const membership = await prisma.orgMembership.findFirst({
+        where: { id: input.assignedMembershipId, organisationId: ctx.organisationId },
+        select: { id: true },
+      });
+      if (!membership) throw notFound("Membership not found.");
+    }
     const row = await prisma.testEquipment.update({
       where: { id },
       data: {
@@ -93,6 +101,9 @@ export const testEquipmentService = {
           : {}),
         ...(input.traceabilityRef !== undefined ? { traceabilityRef: input.traceabilityRef } : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),
+        ...(input.assignedMembershipId !== undefined
+          ? { assignedMembershipId: input.assignedMembershipId }
+          : {}),
       },
     });
     return toDto(row);

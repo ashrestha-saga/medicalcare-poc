@@ -17,7 +17,7 @@ type FormState = {
   name: string;
   jobTitle: string;
   email: string;
-  appRole: "admin" | "inspector" | "order";
+  appRole: "admin" | "service_lead" | "inspector" | "order" | "management";
   validFrom: string;
   dispatchOrigin: "home" | "partner_site" | "organisation";
   originPostalCode: string;

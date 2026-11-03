@@ -249,8 +249,10 @@ See also the simplified ERD in [SCHEMA_AND_ARCHITECTURE.md](./SCHEMA_AND_ARCHITE
 | `TestEquipment` | Sicherheitstester | Inspect equipment gate |
 | `RefInspectionCatalogue` + steps | Abnahme / STK / Konstanz | Protocol resolution |
 | `InspectionRun` sealed | Sets `BaselineMeasurement` | Konstanz can start later |
+| `ServiceRequest` follow-up (`parentRequestId`) | Nachbesuch after fail | `/inspect/nachbesuche` + disposition Proposal chip — **not in this pack** (create via protocol) |
+| `ServiceVisit` / `InspectionSignature` | Visit + seal signatures | Inspect day plan / seal path — usually created at runtime |
 
-**Connection:** Partner user → membership → org → contract → tenant; run → device + catalogue + optional duty/SR.
+**Connection:** Partner user → membership → org → contract → tenant; disposition assigns `assigneeUserId` → My institutions → session queue → inspect; run → device + catalogue + optional duty/SR/visit. Follow-ups are proposer-scoped until disposition assigns them.
 
 **Seed pack alone:** provider-operated tenants are **structurally incomplete** for partner SaaS demos.
 

@@ -6,25 +6,43 @@ import { useTranslations } from "next-intl";
 import type { MySitesInstitutionDTO, MySitesListDTO } from "@/interfaces/console";
 import { aggregateMySitesInstitutions } from "@/services/console/mySitesAggregate";
 import { api, ApiError } from "@/lib/http/apiClient";
+import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
 import { useSessionStore } from "@/store/sessionStore";
 
 export type MySitesDueFilter = "alle" | "ueber" | "30" | "90";
 export type MySitesDistanceFilter = "alle" | "nah" | "mittel" | "fern";
 
-/** Partner console — my sites list with filters. */
+function parseDue(raw: string | null): MySitesDueFilter {
+  if (raw === "ueber" || raw === "30" || raw === "90" || raw === "alle") return raw;
+  return "alle";
+}
+
+/** Partner console — my sites list with filters (URL: ?due=ueber). */
 export function useMySitesList() {
   const t = useTranslations("console");
   const router = useRouter();
+  const dueParam = useQueryParam("due");
+  const { sync } = useSyncQueryParams();
   const sessionUser = useSessionStore((s) => s.user);
-  const isAdmin = sessionUser?.appRole === "admin";
 
   const [data, setData] = useState<MySitesListDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [responsibility, setResponsibility] = useState<string>(isAdmin ? "all" : "self");
   const [distance, setDistance] = useState<MySitesDistanceFilter>("alle");
-  const [due, setDue] = useState<MySitesDueFilter>("alle");
+  const [due, setDueState] = useState<MySitesDueFilter>(() => parseDue(dueParam));
   const [keyword, setKeyword] = useState("");
+
+  useEffect(() => {
+    setDueState(parseDue(dueParam));
+  }, [dueParam]);
+
+  const setDue = useCallback(
+    (value: MySitesDueFilter) => {
+      setDueState(value);
+      sync({ due: value === "alle" ? null : value });
+    },
+    [sync],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -51,14 +69,15 @@ export function useMySitesList() {
 
   const institutions = useMemo(() => {
     if (!data || !sessionUser) return [];
+    // Strict: only institutions / counts for the signed-in user — never colleagues' jobs.
     return aggregateMySitesInstitutions(
       data.tenants,
       data.staffAssignments,
       data.inspections,
-      responsibility,
+      "self",
       sessionUser.id,
     );
-  }, [data, responsibility, sessionUser]);
+  }, [data, sessionUser]);
 
   const filtered = useMemo(() => {
     const today = new Date();
@@ -94,9 +113,6 @@ export function useMySitesList() {
     data,
     error,
     loading,
-    isAdmin,
-    responsibility,
-    setResponsibility,
     distance,
     setDistance,
     due,

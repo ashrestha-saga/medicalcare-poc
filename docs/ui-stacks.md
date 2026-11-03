@@ -7,7 +7,7 @@ DeviceCare uses **three intentional stacks**. Do not invent a fourth. When touch
 | **Field / clinic chrome** | Scan, registration, device detail, cart, capturer | BEM `p-*` / `t-*` in `globals.css`, form-factor | `.p-cta`, `.p-field`, native select when in mockup flows |
 | **Clinic admin lists** | Dashboard, inventory, incidents, duty-overlap, … inside AppShell | Tailwind + shadcn + `ListPageShell` | `@/components/ui/button`, Dialog, Select, Field |
 | **Partner console** | `/partner/*` | Tailwind + shadcn + `ConsoleShell` | Same as clinic admin |
-| **Inspect portal** | `/inspect/*` | `pp-*` CSS (thin); prefer shadcn when adding new chrome | Labelled controls; Dialog for overlays |
+| **Inspect portal** | `/inspect/*` | `pp-*` CSS (day plan, steps, gates, signatures); prefer shadcn when adding new chrome | Labelled controls; Dialog for overlays; theme tokens for fail wash (no hard-coded light pink) |
 
 ## Do
 

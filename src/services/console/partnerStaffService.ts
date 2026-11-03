@@ -9,6 +9,7 @@ import type {
   ConsoleStaffSkillCreateInput,
   ConsoleStaffExpiringItemDTO,
 } from "@/interfaces/console";
+import { isPartnerOrgLead } from "@/constants/partnerPermissions";
 import { runWithoutTenantAsync } from "@/lib/auth/tenantStore";
 import { conflict, forbidden, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -171,7 +172,7 @@ export const partnerStaffService = {
 
       const activeMembers: ConsoleStaffMemberDTO[] = memberships.map((m) => {
         const assignedTenantIds =
-          m.appRole === "admin" && !m.isExternal
+          isPartnerOrgLead(m.appRole) && !m.isExternal
             ? liveTenantIds
             : m.staffAssignments.map((a) => a.tenantId);
         return {
@@ -514,7 +515,7 @@ export const partnerStaffService = {
         where: { id: membershipId, organisationId: ctx.organisationId },
       });
       if (!membership) throw notFound("Staff member not found.");
-      if (membership.appRole === "admin" && !membership.isExternal) {
+      if (isPartnerOrgLead(membership.appRole) && !membership.isExternal) {
         throw forbidden();
       }
 
@@ -567,7 +568,7 @@ export const partnerStaffService = {
         },
       });
       if (!membership) throw notFound("Staff member not found.");
-      if (membership.appRole === "admin") {
+      if (isPartnerOrgLead(membership.appRole)) {
         throw forbidden();
       }
 

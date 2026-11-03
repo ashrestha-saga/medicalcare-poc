@@ -22,7 +22,7 @@ export const createClinicInviteSchema = z.object({
 export const createPartnerInviteSchema = z.object({
   email: z.string().trim().email("Please enter a valid email.").max(200),
   name: z.string().trim().max(120).optional().nullable(),
-  appRole: z.enum(["inspector", "admin", "order"]),
+  appRole: z.enum(["inspector", "admin", "service_lead", "order", "management"]),
 });
 
 export const redeemInviteSchema = z

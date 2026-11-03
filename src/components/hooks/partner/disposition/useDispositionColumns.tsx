@@ -101,9 +101,21 @@ export function useDispositionColumns(
         header: ({ column }) => <SortHeader label={t("colDevice")} column={column} />,
         cell: ({ row }) => (
           <div>
-            <div>{row.original.deviceLabel}</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span>{row.original.deviceLabel}</span>
+              {row.original.proposedByOrgId ? (
+                <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                  {t("proposalChip")}
+                </Badge>
+              ) : null}
+            </div>
             {row.original.deviceDetail ? (
               <div className="text-xs text-muted-foreground">{row.original.deviceDetail}</div>
+            ) : null}
+            {row.original.reason ? (
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                {row.original.reason}
+              </div>
             ) : null}
           </div>
         ),

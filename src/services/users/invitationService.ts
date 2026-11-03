@@ -327,7 +327,7 @@ export const invitationService = {
     input: {
       email: string;
       name?: string | null;
-      appRole: "inspector" | "admin" | "order";
+      appRole: "inspector" | "admin" | "service_lead" | "order" | "management";
       external?: ExternalInviteMeta;
       staffDraft?: StaffInviteDraft | null;
     },

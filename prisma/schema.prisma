@@ -138,8 +138,21 @@ enum ReminderStatus {
 
 enum PartnerAppRole {
   inspector
+  /// Org superuser — full console access; configures tiles/settings.
   admin
+  /// Serviceleitung — day-to-day ops (former operational admin).
+  service_lead
   order
+  /// Geschäftsführung (E35) — org-wide read + contracts/members/SMTP; no dispatch/inspection.
+  management
+}
+
+enum ServiceRequestReason {
+  faelligkeit
+  befund
+  rueckruf
+  stoerung
+  instandsetzung
 }
 
 enum RoleGrantKind {
@@ -405,6 +418,7 @@ model Tenant {
   userAreaAssignments UserAreaAssignment[]
   authorityNotifications AuthorityNotification[]
   notificationDocuments NotificationDocument[]
+  serviceVisits         ServiceVisit[]
 
   @@index([institutionOrgId])
 }
@@ -460,6 +474,9 @@ model User {
   inspectionRuns       InspectionRun[] @relation("InspectionPerformer")
   dashboardTiles       UserDashboardTile[]
   disclosureSessions   DisclosureSession[]
+  serviceVisits        ServiceVisit[] @relation("VisitTechnician")
+  navUsages            NavUsage[]
+  userPreferences      UserPreference[]
   areaAssignments      UserAreaAssignment[]
   releasedBatches      ReprocessingBatch[] @relation("BatchReleasedBy")
   performedChecks      ReprocessingCheck[] @relation("CheckPerformedBy")
@@ -574,6 +591,7 @@ model Site {
   authorityInspections      AuthorityInspection[]
   authorityNotifications    AuthorityNotification[]
   disclosureSessions       DisclosureSession[]
+  serviceVisits             ServiceVisit[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -774,6 +792,10 @@ model DeviceInstance {
   dutyOverlapDecisions   DutyOverlapDecision[]
   authorityFindings      AuthorityFinding[]
   authorityNotifications AuthorityNotification[] @relation("NotificationDevice")
+  /// Set when a failed safety-relevant inspection step locks the device (D4).
+  lockedAt               DateTime?
+  lockReason             String?                  @db.Text
+  lockedByRunId          String?
 
   @@unique([tenantId, inventoryNumber])
   /** SCH-01 — same serial under the same model is rejected (NULLs allowed). */
@@ -783,6 +805,7 @@ model DeviceInstance {
   @@index([tenantId, state])
   @@index([responsibleUserId])
   @@index([tenantId, retainUntil])
+  @@index([lockedAt])
 }
 
 model MaintenanceEvent {
@@ -1152,6 +1175,9 @@ model Organisation {
   organisationSites OrganisationSite[]
   testEquipment     TestEquipment[]
   inspectionRuns    InspectionRun[]
+  serviceVisits     ServiceVisit[]
+  followUpProposals ServiceRequest[] @relation("FollowUpProposedBy")
+  fieldSafetySources FieldSafetyAction[] @relation("FieldSafetySourceOrg")
 
   @@index([activeTo])
 }
@@ -1195,7 +1221,7 @@ model OrgMembership {
   user           User         @relation(fields: [userId], references: [id])
   organisationId String
   organisation   Organisation @relation(fields: [organisationId], references: [id])
-  /** inspector | admin | order */
+  /** inspector | admin | order | management */
   appRole        PartnerAppRole
   /** MySQL DATE cannot default to CURRENT_TIMESTAMP — set in app/seed. */
   validFrom      DateTime     @db.Date
@@ -1217,6 +1243,7 @@ model OrgMembership {
   organisationSiteId     String?
   organisationSite       OrganisationSite? @relation(fields: [organisationSiteId], references: [id])
   staffAssignments PartnerStaffAssignment[]
+  assignedEquipment TestEquipment[]
 
   @@unique([organisationId, userId])
   @@index([userId])
@@ -1486,6 +1513,21 @@ model ServiceRequest {
   assigneeUser    User?               @relation("ServiceRequestAssignee", fields: [assigneeUserId], references: [id])
   /** Appointment date/time — moves state to scheduled when set. */
   scheduledAt     DateTime?
+  /** D1 — why the order exists (due date, finding, recall, fault, repair). */
+  reason          ServiceRequestReason @default(faelligkeit)
+  /** D1 — external deadline for befund/rueckruf; null when duty.dueAt applies. */
+  reasonDueDate   DateTime?           @db.Date
+  /** D2 — scheduled onto a ServiceVisit. */
+  visitId         String?
+  visit           ServiceVisit?       @relation(fields: [visitId], references: [id])
+  /** D3 — follow-up created from a failed inspection step. */
+  parentRequestId String?
+  parentRequest   ServiceRequest?     @relation("FollowUp", fields: [parentRequestId], references: [id])
+  followUps       ServiceRequest[]    @relation("FollowUp")
+  proposedByOrgId String?
+  proposedByOrg   Organisation?       @relation("FollowUpProposedBy", fields: [proposedByOrgId], references: [id])
+  followUpNeeds   String?             @db.Text
+  followUpUrgency String?
   statusEvents    StatusEvent[]
   attachments     Attachment[]
   dispatchRecords DispatchRecord[]
@@ -1499,6 +1541,35 @@ model ServiceRequest {
   @@index([executorOrgId])
   @@index([tenantId, assigneeUserId])
   @@index([tenantId, source, state])
+  @@index([tenantId, visitId])
+  @@index([parentRequestId])
+  @@index([proposedByOrgId])
+}
+
+/// D2 — one site visit that can carry multiple ServiceRequests / InspectionRuns.
+model ServiceVisit {
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  organisationId   String
+  organisation     Organisation   @relation(fields: [organisationId], references: [id])
+  siteId           String?
+  site             Site?          @relation(fields: [siteId], references: [id])
+  plannedAt        DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  technicianUserId String?
+  technician       User?          @relation("VisitTechnician", fields: [technicianUserId], references: [id])
+  note             String?        @db.Text
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  requests         ServiceRequest[]
+  inspectionRuns   InspectionRun[]
+
+  @@index([tenantId, organisationId])
+  @@index([organisationId, plannedAt])
+  @@index([technicianUserId])
+  @@index([siteId])
 }
 
 model StatusEvent {
@@ -1778,7 +1849,7 @@ model DeviceClarification {
   tenant           Tenant         @relation(fields: [tenantId], references: [id])
   deviceInstanceId String
   deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
-  /** classification | evidence | duplicate | mandatory_field */
+  /** classification | evidence | duplicate | mandatory_field | partner_hint */
   kind             String
   field            String?
   prerequisiteCode String?
@@ -1788,9 +1859,15 @@ model DeviceClarification {
   resolvedBy       String?
   resolvedAt       DateTime?
   resolutionNote   String?        @db.Text
+  /** D6 — partner org that raised a partner_hint. */
+  raisedByOrganisationId String?
+  inspectionRunId        String?
+  inspectionRun          InspectionRun? @relation(fields: [inspectionRunId], references: [id])
 
   @@index([tenantId, deviceInstanceId])
   @@index([tenantId, resolvedAt])
+  @@index([inspectionRunId])
+  @@index([raisedByOrganisationId])
 }
 
 model DeviceEvidence {
@@ -1918,6 +1995,8 @@ model RefInspectionCatalogue {
   draft                Boolean           @default(false)
   noCatalogue          Boolean           @default(false)
   note                 String?           @db.Text
+  /** D13 — draft limit provenance [{stepPosition, limit, derivedFrom, lastReviewedAt}]. */
+  draftReasons         Json?
   steps                RefInspectionStep[]
   qualifications       RefCatalogueQualification[]
   runs                 InspectionRun[]
@@ -1985,9 +2064,13 @@ model TestEquipment {
   traceabilityRef String?
   active          Boolean               @default(true)
   runs            InspectionRun[]
+  /** D9 — person currently holding this instrument. */
+  assignedMembershipId String?
+  assignedMembership   OrgMembership? @relation(fields: [assignedMembershipId], references: [id])
 
   @@index([organisationId, classCode])
   @@index([calibratedUntil])
+  @@index([assignedMembershipId])
 }
 
 model RefAppliedPartType {
@@ -2081,13 +2164,20 @@ model InspectionRun {
   deviceConfirmed     Boolean                @default(false)
   deviceConfirmSkipped Boolean               @default(false)
   deviceConfirmCode   String?
+  /** D2 — visit that owns this protocol. */
+  visitId             String?
+  visit               ServiceVisit?          @relation(fields: [visitId], references: [id])
   stepResults         InspectionStepResult[]
   baselines           BaselineMeasurement[]
+  signatures          InspectionSignature[]
+  notes               InspectionRunNote[]
+  clarifications      DeviceClarification[]
 
   @@index([tenantId, deviceInstanceId, performedAt])
   @@index([catalogueId])
   @@index([deviceDutyId])
   @@index([serviceRequestId])
+  @@index([visitId])
 }
 
 model InspectionStepResult {
@@ -2101,9 +2191,54 @@ model InspectionStepResult {
   withinLimit   Boolean?
   baselineFlag  Boolean           @default(false)
   note          String?           @db.Text
+  /** D11 — set server-side on first write of confirmed/measuredValue. */
+  recordedAt    DateTime?
+  noPhotoReason String?           @db.Text
+  attachments   InspectionStepAttachment[]
 
   @@unique([runId, stepId])
   @@index([stepId])
+}
+
+/// D10 — institution or inspector signature on a sealed protocol.
+model InspectionSignature {
+  id           String        @id @default(cuid())
+  runId        String
+  run          InspectionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  kind         String // institution | inspector
+  signerName   String?
+  signerRole   String?
+  blobId       String?
+  signedAt     DateTime?
+  absent       Boolean       @default(false)
+  absentReason String?       @db.Text
+
+  @@unique([runId, kind])
+}
+
+/// D11 — photo attached to a failed step.
+model InspectionStepAttachment {
+  id        String               @id @default(cuid())
+  resultId  String
+  result    InspectionStepResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  blobId    String
+  kind      String               @default("mangelbild")
+  createdAt DateTime             @default(now())
+
+  @@index([resultId])
+}
+
+/// D12 — free finding outside catalogue steps.
+model InspectionRunNote {
+  id               String        @id @default(cuid())
+  runId            String
+  run              InspectionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  text             String        @db.Text
+  patientRelevance Boolean       @default(false)
+  blobId           String?
+  createdAt        DateTime      @default(now())
+
+  @@index([runId])
 }
 
 model BaselineMeasurement {
@@ -2262,6 +2397,10 @@ model FieldSafetyAction {
   recordedByUserId String?
   recordedByUser   User?    @relation("FieldSafetyRecorder", fields: [recordedByUserId], references: [id])
   recordedAt       DateTime @default(now())
+  /** D5 — shared key across N tenant rows from one console rollout. */
+  rolloutKey           String?
+  sourceOrganisationId String?
+  sourceOrganisation   Organisation? @relation("FieldSafetySourceOrg", fields: [sourceOrganisationId], references: [id])
   deviceActions    FieldSafetyDeviceAction[]
   /// Structured scope from the manufacturer letter — drives candidate suggestion.
   affectedModels   FieldSafetyAffectedModel[]
@@ -2271,6 +2410,8 @@ model FieldSafetyAction {
   @@index([tenantId, dueAt])
   @@index([tenantId, closedAt])
   @@index([recordedByUserId])
+  @@index([rolloutKey])
+  @@index([sourceOrganisationId])
 }
 
 /// Which models / serial ranges / lots the recall names. Suggestion only —
@@ -2589,6 +2730,38 @@ model UserDashboardTile {
 
   @@unique([userId, tileKey])
   @@index([tenantId, userId])
+}
+
+/// D7 — last-used timestamps for partner console / inspect nav frequency bands.
+model NavUsage {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisationId String?
+  surface        String // console | inspect
+  navKey         String
+  lastUsedAt     DateTime @default(now())
+  useCount       Int      @default(1)
+
+  @@unique([userId, surface, navKey])
+  @@index([userId, surface, lastUsedAt])
+  @@index([organisationId])
+}
+
+/// D8 — generic preference bag (console tiles, inspect nav, etc.).
+model UserPreference {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organisationId String?
+  scope          String // console_tiles | inspect_nav | general
+  key            String
+  value          Json
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  @@unique([userId, scope, key])
+  @@index([userId, organisationId])
 }
 
 // ===========================================================================

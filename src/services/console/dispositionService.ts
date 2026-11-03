@@ -17,6 +17,7 @@ import { isLiveContract } from "@/services/access/partnerAccessService";
 import { requirePartnerPermission } from "@/lib/auth/tenantContext";
 import { ensureExecutorForContract } from "@/services/contracts/executorSyncService";
 import { parseAppointmentInput } from "@/lib/format";
+import { isPartnerOrgLead } from "@/constants/partnerPermissions";
 import { addMonthsUtc, addWorkingDaysUtc } from "@/lib/maintenance/schedule";
 import { computeDutyDueAt } from "@/services/registration/dueDate";
 import type { ServiceRequestState } from "@prisma/client";
@@ -173,6 +174,10 @@ function mapRow(
     assigneeUserId: string | null;
     scheduledAt: Date | null;
     createdAt: Date;
+    updatedAt?: Date;
+    reason?: string | null;
+    proposedByOrgId?: string | null;
+    visitId?: string | null;
     executorOrg: { name: string; code?: string; organisationId?: string | null } | null;
     assigneeUser: { name: string } | null;
   },
@@ -201,8 +206,12 @@ function mapRow(
     displayState,
     nextDisplayState: nextDispositionDisplayState(displayState),
     raisedAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt ? r.updatedAt.toISOString() : null,
     managed,
     isExecutor,
+    reason: r.reason ?? null,
+    proposedByOrgId: r.proposedByOrgId ?? null,
+    visitId: r.visitId ?? null,
   };
 }
 
@@ -332,7 +341,7 @@ export const dispositionService = {
 
   async listMySites(ctx: PartnerContext): Promise<MySitesListDTO> {
     requirePartnerPermission(ctx, "console:disposition:view");
-    const isAdmin = ctx.user.appRole === "admin";
+    const isAdmin = isPartnerOrgLead(ctx.user.appRole);
     const depotPostalCode = "53111";
     const depotLabel = "Bonn";
 
@@ -379,6 +388,8 @@ export const dispositionService = {
                 tenantId: { in: liveTenantIds },
                 transmittedAt: { not: null },
                 state: { not: "rejected" },
+                // Strict: only jobs assigned to the signed-in technician.
+                assigneeUserId: ctx.user.id,
               },
               select: { tenantId: true, scheduledAt: true },
               orderBy: { createdAt: "desc" },
@@ -390,7 +401,7 @@ export const dispositionService = {
       const staffAssignments: MySitesListDTO["staffAssignments"] = [];
       for (const m of memberships) {
         const tenantIdsForMember =
-          m.appRole === "admin"
+          isPartnerOrgLead(m.appRole)
             ? liveTenantIds
             : m.staffAssignments
                 .map((a) => a.tenantId)
@@ -474,7 +485,7 @@ export const dispositionService = {
         throw notFound("Institution not found.");
       }
 
-      if (ctx.user.appRole !== "admin") {
+      if (!isPartnerOrgLead(ctx.user.appRole)) {
         const membership = await prisma.orgMembership.findFirst({
           where: {
             organisationId: ctx.organisationId,
@@ -497,11 +508,13 @@ export const dispositionService = {
         site?.address?.trim() ||
         null;
 
+      // Strict: only jobs assigned to the signed-in technician.
       const rows = await prisma.serviceRequest.findMany({
         where: {
           tenantId,
           transmittedAt: { not: null },
           state: { not: "rejected" },
+          assigneeUserId: ctx.user.id,
         },
         include: {
           assigneeUser: { select: { id: true, name: true } },
@@ -596,7 +609,7 @@ export const dispositionService = {
       });
       const assignees = assigneesMemberships
         .filter((m) => {
-          if (m.appRole === "admin" && !m.isExternal) return true;
+          if (isPartnerOrgLead(m.appRole) && !m.isExternal) return true;
           if (m.isExternal) {
             return (
               m.commissionedFrom &&
@@ -658,7 +671,7 @@ export const dispositionService = {
         throw unprocessable("Assignment was withdrawn.", { field: "state" });
       }
       const isOwn = row.assigneeUserId === ctx.user.id;
-      const isAdminClaim = ctx.user.appRole === "admin" && row.assigneeUserId == null;
+      const isAdminClaim = isPartnerOrgLead(ctx.user.appRole) && row.assigneeUserId == null;
       if (!isOwn && !isAdminClaim) {
         throw forbidden();
       }
@@ -792,7 +805,10 @@ export const dispositionService = {
       }
 
       await recordAudit({
-        actor: actorFromPartnerOrg(ctx),
+        actor: {
+          ...actorFromPartnerOrg(ctx),
+          tenantId: row.tenantId,
+        },
         resource: "service_request",
         resourceId: row.id,
         action: "update",
@@ -923,7 +939,7 @@ export const dispositionService = {
                 field: "assigneeUserId",
               });
             }
-          } else if (membership.appRole !== "admin") {
+          } else if (!isPartnerOrgLead(membership.appRole)) {
             const assigned = membership.staffAssignments.some((a) => a.tenantId === row.tenantId);
             if (!assigned) {
               throw unprocessable("Assignee is not assigned to this tenant.", {
@@ -952,12 +968,31 @@ export const dispositionService = {
         }
       }
 
+      let nextVisitId = row.visitId;
+      if (input.visitId !== undefined) {
+        if (input.visitId) {
+          const visit = await prisma.serviceVisit.findFirst({
+            where: {
+              id: input.visitId,
+              organisationId: ctx.organisationId,
+              tenantId: row.tenantId,
+            },
+            select: { id: true },
+          });
+          if (!visit) throw unprocessable("Unknown visit.", { field: "visitId" });
+          nextVisitId = visit.id;
+        } else {
+          nextVisitId = null;
+        }
+      }
+
       const updated = await prisma.serviceRequest.update({
         where: { id: row.id },
         data: {
           executorOrgId: nextExecutorId,
           allocatedAt: nextExecutorId ? new Date() : null,
           allocatedBy: nextExecutorId ? ctx.user.name : null,
+          visitId: nextVisitId,
           assigneeUserId: nextAssignee,
           scheduledAt: nextScheduled,
           state: nextState,
@@ -991,7 +1026,10 @@ export const dispositionService = {
       }
 
       await recordAudit({
-        actor: actorFromPartnerOrg(ctx),
+        actor: {
+          ...actorFromPartnerOrg(ctx),
+          tenantId: row.tenantId,
+        },
         resource: "service_request",
         resourceId: row.id,
         action: "update",
@@ -1040,7 +1078,7 @@ export const dispositionService = {
 
       return memberships
         .filter((m) => {
-          if (m.appRole === "admin" && !m.isExternal) return true;
+          if (isPartnerOrgLead(m.appRole) && !m.isExternal) return true;
           if (m.isExternal) {
             return (
               m.commissionedFrom &&

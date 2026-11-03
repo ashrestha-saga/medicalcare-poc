@@ -8,7 +8,7 @@ import type {
   CreateClinicResult,
 } from "@/interfaces/console";
 import type { CreateClinicParsed, UpdateClinicContractParsed } from "@/schemas/console";
-import { parseContractScope } from "@/constants/partnerPermissions";
+import { parseContractScope, isPartnerOrgLead } from "@/constants/partnerPermissions";
 import { actorFromPartnerOnTenant } from "@/lib/auth/actorContext";
 import { runWithoutTenantAsync } from "@/lib/auth/tenantStore";
 import { conflict, forbidden, notFound } from "@/lib/errors";
@@ -83,6 +83,7 @@ function toClinicDTO(args: {
   overdueDuties?: number;
   openClarifications?: number;
   openMpsb?: number;
+  setupStuck?: boolean;
 }): ConsoleClinicDTO {
   return {
     tenantId: args.tenantId,
@@ -104,6 +105,7 @@ function toClinicDTO(args: {
     overdueDuties: args.overdueDuties,
     openClarifications: args.openClarifications,
     openMpsb: args.openMpsb,
+    setupStuck: args.setupStuck,
   };
 }
 
@@ -123,6 +125,7 @@ function toDetail(
     mpsbStatus: extras.mpsbStatus,
     mpsbName: extras.mpsbName,
     avvMissing: extras.avvMissing,
+    siteNames: extras.siteNames,
     staff: extras.staff,
     assignments: extras.assignments,
   };
@@ -160,33 +163,15 @@ export const clinicOnboardService = {
       ]),
     );
 
-    const clinics = contracts.map((c) =>
-      toClinicDTO({
-        tenantId: c.tenantId,
-        tenantCode: c.tenant.code,
-        tenantName: c.tenant.name,
-        city: c.tenant.sites[0]?.city ?? c.tenant.sites[0]?.address ?? null,
-        operatingModel: c.tenant.operatingModel,
-        siteCount: c.tenant._count.sites,
-        deviceCount: c.tenant._count.instances,
-        contractId: c.id,
-        validFrom: c.validFrom,
-        validTo: c.validTo,
-        billingRef: c.billingRef,
-        avvRef: c.avvRef,
-        scope: parseContractScope(c.scope),
-        live: isLiveContract(c, now),
-        suspendedAt: c.suspendedAt,
-        terminatedAt: c.terminatedAt,
-      }),
-    );
+    const liveTenantIds = contracts
+      .filter((c) => isLiveContract(c, now))
+      .map((c) => c.tenantId);
 
-    const liveTenantIds = clinics.filter((c) => c.live).map((c) => c.tenantId);
-    const [overdueDuties, openClarifications, openMpsb] =
+    const [overdueDuties, openClarifications, openMpsbByTenant, clarificationsByTenant] =
       liveTenantIds.length === 0
-        ? [0, 0, 0]
+        ? ([0, 0, new Map<string, number>(), new Map<string, number>()] as const)
         : await runWithoutTenantAsync(async () => {
-            const [overdue, clarifications, sites, appointments] = await Promise.all([
+            const [overdue, clarificationGroups, sites, appointments] = await Promise.all([
               prisma.deviceDuty.count({
                 where: {
                   tenantId: { in: liveTenantIds },
@@ -195,28 +180,74 @@ export const clinicOnboardService = {
                   dueAt: { lt: now },
                 },
               }),
-              prisma.deviceClarification.count({
+              prisma.deviceClarification.groupBy({
+                by: ["tenantId"],
                 where: {
                   tenantId: { in: liveTenantIds },
                   resolvedAt: null,
                 },
+                _count: { _all: true },
               }),
               prisma.site.findMany({
                 where: { tenantId: { in: liveTenantIds } },
-                select: { id: true },
+                select: { id: true, tenantId: true },
               }),
+              // Same rule as Heute § 6 tile: published appointment required.
               prisma.safetyOfficerAppointment.findMany({
                 where: {
                   tenantId: { in: liveTenantIds },
-                  appointedFrom: { lte: now },
-                  OR: [{ appointedTo: null }, { appointedTo: { gte: now } }],
+                  publishedAt: { not: null },
                 },
                 select: { siteId: true },
               }),
             ]);
             const covered = new Set(appointments.map((a) => a.siteId));
-            return [overdue, clarifications, sites.filter((s) => !covered.has(s.id)).length] as const;
+            const mpsbByTenant = new Map<string, number>();
+            for (const site of sites) {
+              if (covered.has(site.id)) continue;
+              mpsbByTenant.set(site.tenantId, (mpsbByTenant.get(site.tenantId) ?? 0) + 1);
+            }
+            const clarByTenant = new Map<string, number>();
+            let clarTotal = 0;
+            for (const row of clarificationGroups) {
+              clarByTenant.set(row.tenantId, row._count._all);
+              clarTotal += row._count._all;
+            }
+            return [overdue, clarTotal, mpsbByTenant, clarByTenant] as const;
           });
+
+    const clinics = contracts.map((c) => {
+      const live = isLiveContract(c, now);
+      const siteCount = c.tenant._count.sites;
+      const deviceCount = c.tenant._count.instances;
+      const openMpsb = live ? (openMpsbByTenant.get(c.tenantId) ?? 0) : 0;
+      const openClar = live ? (clarificationsByTenant.get(c.tenantId) ?? 0) : 0;
+      const setupStuck =
+        live && (siteCount === 0 || deviceCount === 0 || openMpsb > 0 || openClar > 0);
+      return toClinicDTO({
+        tenantId: c.tenantId,
+        tenantCode: c.tenant.code,
+        tenantName: c.tenant.name,
+        city: c.tenant.sites[0]?.city ?? c.tenant.sites[0]?.address ?? null,
+        operatingModel: c.tenant.operatingModel,
+        siteCount,
+        deviceCount,
+        contractId: c.id,
+        validFrom: c.validFrom,
+        validTo: c.validTo,
+        billingRef: c.billingRef,
+        avvRef: c.avvRef,
+        scope: parseContractScope(c.scope),
+        live,
+        suspendedAt: c.suspendedAt,
+        terminatedAt: c.terminatedAt,
+        openClarifications: openClar,
+        openMpsb,
+        setupStuck,
+      });
+    });
+
+    const openMpsb = [...openMpsbByTenant.values()].reduce((sum, n) => sum + n, 0);
 
     return {
       organisationId: ctx.organisationId,
@@ -252,6 +283,7 @@ export const clinicOnboardService = {
               sites: {
                 select: {
                   id: true,
+                  name: true,
                   street: true,
                   postalCode: true,
                   city: true,
@@ -282,72 +314,87 @@ export const clinicOnboardService = {
             country: primarySite.country,
           }) || primarySite.address;
 
-    const [institution, appointments, memberships, requests] = await runWithoutTenantAsync(() =>
-      Promise.all([
-        row.tenant.institutionOrgId
-          ? prisma.organisation.findFirst({
-              where: { id: row.tenant.institutionOrgId },
-              select: { contact: true },
-            })
-          : Promise.resolve(null),
-        prisma.safetyOfficerAppointment.findMany({
-          where: {
-            tenantId,
-            appointedFrom: { lte: now },
-            OR: [{ appointedTo: null }, { appointedTo: { gte: now } }],
-          },
-          select: { personName: true, siteId: true },
-          orderBy: { appointedFrom: "desc" },
-        }),
-        prisma.orgMembership.findMany({
-          where: {
-            organisationId: ctx.organisationId,
-            isExternal: false,
-            validFrom: { lte: now },
-            OR: [{ validTo: null }, { validTo: { gte: now } }],
-            user: { active: true, accountKind: "partner" },
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                jobTitle: true,
-                qualifications: {
-                  include: { qualification: { select: { code: true, label: true } } },
+    const [institution, appointments, memberships, requests, overdueDuties] =
+      await runWithoutTenantAsync(() =>
+        Promise.all([
+          row.tenant.institutionOrgId
+            ? prisma.organisation.findFirst({
+                where: { id: row.tenant.institutionOrgId },
+                select: { contact: true },
+              })
+            : Promise.resolve(null),
+          prisma.safetyOfficerAppointment.findMany({
+            where: {
+              tenantId,
+              publishedAt: { not: null },
+            },
+            select: { personName: true, siteId: true },
+            orderBy: { appointedFrom: "desc" },
+          }),
+          prisma.orgMembership.findMany({
+            where: {
+              organisationId: ctx.organisationId,
+              isExternal: false,
+              validFrom: { lte: now },
+              OR: [{ validTo: null }, { validTo: { gte: now } }],
+              user: { active: true, accountKind: "partner" },
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  jobTitle: true,
+                  qualifications: {
+                    include: { qualification: { select: { code: true, label: true } } },
+                  },
                 },
               },
+              staffAssignments: { where: { tenantId }, select: { tenantId: true } },
             },
-            staffAssignments: { where: { tenantId }, select: { tenantId: true } },
-          },
-          orderBy: [{ appRole: "asc" }, { user: { name: "asc" } }],
-        }),
-        prisma.serviceRequest.findMany({
-          where: {
-            tenantId,
-            transmittedAt: { not: null },
-            state: { not: "rejected" },
-          },
-          include: {
-            executorOrg: { select: { name: true, code: true, organisationId: true } },
-            assigneeUser: { select: { name: true } },
-          },
-          orderBy: { createdAt: "desc" },
-          take: 50,
-        }),
-      ]),
-    );
+            orderBy: [{ appRole: "asc" }, { user: { name: "asc" } }],
+          }),
+          prisma.serviceRequest.findMany({
+            where: {
+              tenantId,
+              transmittedAt: { not: null },
+              state: { not: "rejected" },
+            },
+            include: {
+              executorOrg: { select: { name: true, code: true, organisationId: true } },
+              assigneeUser: { select: { name: true } },
+            },
+            orderBy: { createdAt: "desc" },
+            take: 50,
+          }),
+          prisma.deviceDuty.count({
+            where: {
+              tenantId,
+              applicable: true,
+              suspendedAt: null,
+              dueAt: { lt: now },
+            },
+          }),
+        ]),
+      );
 
     const siteIds = new Set(sites.map((s) => s.id));
     const coveredSites = new Set(
       appointments.filter((a) => siteIds.has(a.siteId)).map((a) => a.siteId),
     );
-    const mpsbOpen = sites.length === 0 || [...siteIds].some((id) => !coveredSites.has(id));
+    const openMpsbCount = [...siteIds].filter((id) => !coveredSites.has(id)).length;
+    const mpsbOpen = sites.length === 0 || openMpsbCount > 0;
     const mpsbName = appointments[0]?.personName?.trim() || null;
+    const siteNames = sites.map((s, i) => {
+      const label = s.name?.trim();
+      if (label) return label;
+      const city = s.city?.trim();
+      return city ? `${city}${i === 0 ? "" : ` (${i + 1})`}` : `Site ${i + 1}`;
+    });
 
     const staff: ConsoleClinicStaffRowDTO[] = memberships.map((m) => {
-      const accessLocked = m.appRole === "admin";
+      const accessLocked = isPartnerOrgLead(m.appRole);
       const assigned = accessLocked || m.staffAssignments.length > 0;
       return {
         membershipId: m.id,
@@ -410,6 +457,8 @@ export const clinicOnboardService = {
       live,
       suspendedAt: row.suspendedAt,
       terminatedAt: row.terminatedAt,
+      overdueDuties,
+      openMpsb: openMpsbCount,
     });
 
     return toDetail(base, {
@@ -419,6 +468,7 @@ export const clinicOnboardService = {
       mpsbName: mpsbOpen ? null : mpsbName,
       avvMissing:
         row.tenant.operatingModel === "provider_operated" && !row.avvRef?.trim(),
+      siteNames,
       staff,
       assignments,
     });

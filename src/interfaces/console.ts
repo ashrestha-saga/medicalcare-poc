@@ -33,6 +33,11 @@ export interface ConsoleClinicDTO {
   overdueDuties?: number;
   openClarifications?: number;
   openMpsb?: number;
+  /**
+   * Live customer whose commissioning is incomplete
+   * (no sites/devices, open MPSB gap, or open clarifications).
+   */
+  setupStuck?: boolean;
 }
 
 export interface ConsoleClinicListDTO {
@@ -74,6 +79,8 @@ export interface ConsoleClinicDetailDTO extends ConsoleClinicDTO {
   mpsbName: string | null;
   /** True when provider-operated and avvRef empty. */
   avvMissing: boolean;
+  /** Site display names for Standorte & Partner. */
+  siteNames: string[];
   /** Partner org staff vs this tenant. */
   staff: ConsoleClinicStaffRowDTO[];
   /** Open/recent service requests in this tenant. */
@@ -144,9 +151,16 @@ export interface ConsoleRequestRowDTO {
   /** Next console-advanceable display state, or null when done / rejected / awaiting Prüfpartner. */
   nextDisplayState: DispositionDisplayState | null;
   raisedAt: string;
+  /** Last mutation — used for return-flow (>48h completed) filters. */
+  updatedAt?: string | null;
   managed: boolean;
   /** True when the caller's partner organisation is the executing contractor. */
   isExecutor: boolean;
+  /** D1 — why the order exists. */
+  reason?: string | null;
+  /** D3 — set when this is a follow-up proposal from a partner org. */
+  proposedByOrgId?: string | null;
+  visitId?: string | null;
 }
 
 export interface ConsoleRequestListDTO {
@@ -157,6 +171,7 @@ export interface DispositionAssignInput {
   executorOrgId?: string | null;
   assigneeUserId?: string | null;
   scheduledAt?: string | null;
+  visitId?: string | null;
 }
 
 export interface ConsoleStaffQualificationDTO {
@@ -301,7 +316,7 @@ export interface ConsoleStaffSkillDraftInput {
 export interface ConsoleStaffInviteInput {
   email: string;
   name?: string | null;
-  appRole: "admin" | "inspector" | "order";
+  appRole: "admin" | "service_lead" | "inspector" | "order" | "management";
   jobTitle?: string | null;
   validFrom?: string | null;
   dispatchOrigin?: "home" | "partner_site" | "organisation" | null;
@@ -314,7 +329,7 @@ export interface ConsoleStaffInviteInput {
 export interface ConsoleStaffPatchInput {
   name?: string;
   jobTitle?: string | null;
-  appRole?: "admin" | "inspector" | "order";
+  appRole?: "admin" | "service_lead" | "inspector" | "order" | "management";
   validFrom?: string;
   dispatchOrigin?: "home" | "partner_site" | "organisation";
   originPostalCode?: string | null;

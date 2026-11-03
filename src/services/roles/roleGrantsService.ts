@@ -20,7 +20,13 @@ import { prisma } from "@/lib/prisma";
 import type { PrismaClient, RoleGrantKind } from "@prisma/client";
 
 const ALL_SET = new Set<string>(ALL_PERMISSIONS);
-const PARTNER_APP_ROLES: readonly PartnerAppRole[] = ["admin", "inspector", "order"];
+const PARTNER_APP_ROLES: readonly PartnerAppRole[] = [
+  "admin",
+  "service_lead",
+  "inspector",
+  "order",
+  "management",
+];
 
 const CLINIC_KIND = "clinic" as const satisfies RoleGrantKind;
 const CONSOLE_KIND = "partner_console" as const satisfies RoleGrantKind;

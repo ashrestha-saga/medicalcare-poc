@@ -1,5 +1,6 @@
-import { AssignmentQueueScreen } from "@/components/features/inspect/AssignmentQueueScreen";
+import { redirect } from "next/navigation";
 
-export default function InspectQueuePage() {
-  return <AssignmentQueueScreen />;
+/** /inspect → Heute (Prüfpartner v10-A default). */
+export default function InspectIndexPage() {
+  redirect("/inspect/heute");
 }

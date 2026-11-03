@@ -41,7 +41,10 @@ function formatDate(iso: string | null): string {
   }
 }
 
-export function useDueDatesColumns(): ColumnDef<ConsoleDutyRowDTO>[] {
+export function useDueDatesColumns(opts?: {
+  onAssign?: (dutyId: string) => void;
+  assigningId?: string | null;
+}): ColumnDef<ConsoleDutyRowDTO>[] {
   const t = useTranslations("console");
 
   return useMemo(
@@ -112,7 +115,28 @@ export function useDueDatesColumns(): ColumnDef<ConsoleDutyRowDTO>[] {
           <span className="text-xs text-muted-foreground">{row.original.confidence}</span>
         ),
       },
+      ...(opts?.onAssign
+        ? [
+            {
+              id: "actions",
+              header: () => <span className="text-xs">{t("colActions")}</span>,
+              cell: ({ row }: { row: { original: ConsoleDutyRowDTO } }) => (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={opts.assigningId === row.original.dutyId}
+                  onClick={() => opts.onAssign?.(row.original.dutyId)}
+                >
+                  {opts.assigningId === row.original.dutyId
+                    ? t("dueDatesAssigning")
+                    : t("dueDatesAssign")}
+                </Button>
+              ),
+            } satisfies ColumnDef<ConsoleDutyRowDTO>,
+          ]
+        : []),
     ],
-    [t],
+    [t, opts?.onAssign, opts?.assigningId],
   );
 }

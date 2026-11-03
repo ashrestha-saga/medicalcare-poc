@@ -25,6 +25,7 @@ export const inspectionStepPatchSchema = z.object({
   confirmed: z.boolean().nullable().optional(),
   measuredValue: z.string().trim().max(100).nullable().optional(),
   note: z.string().trim().max(2000).nullable().optional(),
+  noPhotoReason: z.string().trim().max(2000).nullable().optional(),
 });
 
 export const saveInspectionStepsSchema = z.object({
@@ -57,6 +58,8 @@ export const updateTestEquipmentSchema = z.object({
   calibratedUntil: z.string().trim().max(32).nullable().optional(),
   traceabilityRef: z.string().trim().max(200).nullable().optional(),
   active: z.boolean().optional(),
+  /** D9 — OrgMembership currently holding this instrument. */
+  assignedMembershipId: z.string().trim().min(1).nullable().optional(),
 });
 
 export type UpdateTestEquipmentInput = z.infer<typeof updateTestEquipmentSchema>;

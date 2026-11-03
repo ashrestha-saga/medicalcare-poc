@@ -1,4 +1,9 @@
-export type PartnerAppRole = "admin" | "inspector" | "order";
+export type PartnerAppRole =
+  | "admin"
+  | "service_lead"
+  | "inspector"
+  | "order"
+  | "management";
 
 export interface ManagementPersonDTO {
   id: string;

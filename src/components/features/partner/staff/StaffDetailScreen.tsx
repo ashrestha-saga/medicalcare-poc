@@ -85,9 +85,13 @@ export function StaffDetailScreen({ membershipId }: { membershipId: string }) {
           ? t("staffStatusInvited")
           : member.appRole === "admin"
             ? t("staffRoleAdmin")
-            : member.appRole === "order"
-              ? t("staffRoleOrder")
-              : t("staffRoleInspector"),
+            : member.appRole === "service_lead"
+              ? t("staffRoleServiceLead")
+              : member.appRole === "order"
+                ? t("staffRoleOrder")
+                : member.appRole === "management"
+                  ? t("staffRoleManagement")
+                  : t("staffRoleInspector"),
       ]
         .filter(Boolean)
         .join(" · ")
@@ -150,10 +154,19 @@ export function StaffDetailScreen({ membershipId }: { membershipId: string }) {
                       value={appRole}
                       disabled={isInvited || !canEdit || busy}
                       onChange={(e) =>
-                        setAppRole(e.target.value as "admin" | "inspector" | "order")
+                        setAppRole(
+                          e.target.value as
+                            | "admin"
+                            | "service_lead"
+                            | "inspector"
+                            | "order"
+                            | "management",
+                        )
                       }
                     >
                       <option value="admin">{t("staffRoleAdmin")}</option>
+                      <option value="service_lead">{t("staffRoleServiceLead")}</option>
+                      <option value="management">{t("staffRoleManagement")}</option>
                       <option value="inspector">{t("staffRoleInspector")}</option>
                       <option value="order">{t("staffRoleOrder")}</option>
                     </select>

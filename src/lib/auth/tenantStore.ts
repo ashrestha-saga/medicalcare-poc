@@ -6,7 +6,18 @@ type TenantStoreState = {
   bypass: boolean;
 };
 
-const storage = new AsyncLocalStorage<TenantStoreState>();
+/**
+ * Pin ALS on globalThis. Turbopack/Webpack can evaluate this module in multiple
+ * chunks; separate `new AsyncLocalStorage()` instances make `runWithoutTenantAsync`
+ * invisible to the Prisma tenant extension (SEC-01).
+ */
+const globalForTenant = globalThis as unknown as {
+  __msrTenantAls?: AsyncLocalStorage<TenantStoreState>;
+};
+
+const storage =
+  globalForTenant.__msrTenantAls ??
+  (globalForTenant.__msrTenantAls = new AsyncLocalStorage<TenantStoreState>());
 
 export function runWithTenant<T>(tenantId: string, fn: () => T): T {
   return storage.run({ tenantId, bypass: false }, fn);

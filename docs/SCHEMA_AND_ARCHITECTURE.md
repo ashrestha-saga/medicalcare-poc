@@ -10,7 +10,7 @@ Detailed reference for the Prisma/MySQL data model and how the application layer
 2. [Architecture (layers)](#2-architecture-layers)
 3. [Tenancy & identity](#3-tenancy--identity)
 4. [Schema by domain](#4-schema-by-domain)
-5. [Core workflows](#5-core-workflows) (resolve, Erstanlage, service handoff, **Prüfpartner**, auth)
+5. [Core workflows](#5-core-workflows) (resolve, Erstanlage, service handoff → my-sites → inspect, **Prüfpartner** + Nachbesuche, auth)
 6. [Client architecture](#6-client-architecture)
 7. [Security (schema-related)](#7-security-schema-related)
 8. [Entity relationship (simplified)](#8-entity-relationship-simplified)
@@ -494,7 +494,7 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 |---|---|---|
 | **Organisation** | Legal entity once (partners and institutions) | Partner seed, contracts |
 | **OrganisationRole** | Capacity: institution \| service_provider \| inspection_partner \| platform_operator | Manage-tenant gate |
-| **OrgMembership** | Partner user ↔ org; `appRole`: inspector \| admin \| order | Partner login door |
+| **OrgMembership** | Partner user ↔ org; `appRole`: admin \| service_lead \| inspector \| order \| management | Partner login door / console RBAC |
 | **ServiceContract** | Org may open one clinic; legacy `scope` JSON + `ServiceContractScopeGrant` catalogue (dual-read; grants win; `denied` = nie); `terminatedAt` / `suspendedAt`; optional `billingRef` | Partner home / console / access control |
 | **ExecutorOrg** | In-clinic executor catalog (O-MSR, O-RTS, O-INT) | Service request allocation (FA-713), dispatch targets per org |
 | **SmtpSettings** | Outbound SMTP for clinic tenant **or** partner org (exactly one owner) | Settings SMTP panels, invite/reset/dispatch mail |
@@ -513,7 +513,7 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 #### OrgMembership
 
-**Purpose:** Places a partner `User` inside an organisation with an `appRole` (`inspector` \| `admin` \| `order`) and validity window.
+**Purpose:** Places a partner `User` inside an organisation with an `appRole` (`admin` \| `service_lead` \| `inspector` \| `order` \| `management`) and validity window. Inspectors get `inspection:propose` / `inspection:sign`; disposition assign stays on order / org-lead roles.
 
 **In the app:** Partner login door; authorises partner UI capabilities. Clinic users do **not** get membership rows.
 
@@ -579,9 +579,9 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 **Purpose:** Primary work ticket for service / inspection work raised from scan, due-dates, or apps. Idempotent create via unique `idempotencyKey` + content `fingerprint` (safe offline retries).
 
-**Key fields:** `reference` (human id), `subjectType` / `subjectId` (`instance` \| `model` \| `captured`), `serviceType`, location/delivery/contact, `state` (starts `captured`), `source` (`app` \| `due_date`), optional `dutyId`, allocation fields (`executorOrgId`, `allocatedAt`, `transmittedAt`), optional `assigneeUserId` / `scheduledAt` (partner disposition).
+**Key fields:** `reference` (human id), `subjectType` / `subjectId` (`instance` \| `model` \| `captured`), `serviceType`, location/delivery/contact, `state` (starts `captured`), `source` (`app` \| `due_date`), optional `dutyId`, allocation fields (`executorOrgId`, `allocatedAt`, `transmittedAt`), optional `assigneeUserId` / `scheduledAt` (partner disposition), optional `visitId` (D2 site visit), D3 follow-up fields (`parentRequestId`, `proposedByOrgId`, `followUpNeeds`, `followUpUrgency`), `reason` (e.g. `faelligkeit` \| `instandsetzung`).
 
-**In the app:** Home scan workflow; `/requests`; due-date assign → navigate to assignment; clinic **allocate → transmit** (locks allocation). Transmit always sets `transmittedAt` when allocation is valid; if the executor has no enabled outbound channels, response may include `warning` (in-app handoff only). Partner lists only rows with `transmittedAt` set; clinic may **withdraw** (hard-delete) only **before** transmit; inspect portal loads assignment for protocol work.
+**In the app:** Home scan workflow; `/requests`; due-date assign → navigate to assignment; clinic **allocate → transmit** (locks allocation). Transmit always sets `transmittedAt` when allocation is valid; if the executor has no enabled outbound channels, response may include `warning` (in-app handoff only). Partner disposition / my-sites / inspection-orders lists only rows with `transmittedAt` set. **My institutions and inspect resolve/start are assignee-strict** (`assigneeUserId ===` signed-in partner user); unassigned jobs do not appear there. Clinic may **withdraw** (hard-delete) only **before** transmit. Failed inspect steps can **propose a Nachbesuch** child SR (`POST …/disposition/[reference]/follow-up`) — handed off to the same executor, **no assignee**, `proposedByOrgId` set; disposition shows a Proposal chip until assign/schedule.
 
 #### StatusEvent
 
@@ -642,9 +642,12 @@ Seeded from `prisma/fixtures/seed-pruefpartner.json` via `prisma/seeds/refPruefp
 | **RefDeviceFamily** / **RefDeviceFamilyStep** | Extra STK functional steps by product family | Appended when classification has `deviceFamilyCode` |
 | **RefValidationOccasion** / **RefAttachmentKind** / **RefHandoverItem** | Occasions, attachment kinds, handover checklist refs | Catalogue occasions / future protocol extras |
 | **OrganisationSite** | Partner org site codes (depot / branch) | Partner org master data |
-| **InspectionRun** | One performance of a catalogue on a device (+ optional SR / duty / equipment) | Inspect start → confirm device → seal |
-| **InspectionStepResult** | Measured / confirmed values per step on a run | Protocol steps save |
+| **ServiceVisit** | D2 — one site visit that can carry multiple SRs / runs (`startedAt`, planned site) | Day-plan “Start visit”; protocol `ensureAndStartVisit` before seal |
+| **InspectionRun** | One performance of a catalogue on a device (+ optional SR / duty / equipment / visit) | Inspect start → confirm device → seal |
+| **InspectionStepResult** | Measured / confirmed values per step; fail evidence (`noPhotoReason`, Mangelbild attachments) | Protocol steps save; seal refuses fail without photo or reason |
+| **InspectionSignature** | D10 — inspector / institution sign-off or marked absent (+ optional signature blob) | Protocol signatures; required before seal |
 | **BaselineMeasurement** | Active Bezugswerte per device × measure key (`validTo` null = current) | Written when sealing a `setsBaseline` catalogue; required by `requiresBaseline` catalogues |
+| **DeviceClarification** (`partner_hint`) | Optional MPSB / safety hint from a failed step | Best-effort on complete; does not block seal |
 
 #### Catalogue resolution (`resolveCatalogueForAssignment`)
 
@@ -661,7 +664,15 @@ Then adapt steps: skip applied-part-dependent steps when no applied part; for **
 
 **Purpose:** Field protocol execution. Start creates a draft run linked to `ServiceRequest` / `DeviceDuty` / chosen `TestEquipment`. Seal creates `DutyPerformance`, may complete the assignment, and if the catalogue `setsBaseline`, upserts `BaselineMeasurement` rows (measure key = step label).
 
-**In the app:** `(inspect)` screens + `/api/partner/inspection-runs/*`. Gates before start: transmitted assignment, assignee/admin, qualification, baselines (if needed), test equipment of required class (calibration / traceability).
+**In the app:** `(inspect)` screens + `/api/partner/inspection-runs/*` (+ visits, signatures, partner-hint, follow-ups list). Gates before start/resolve: transmitted assignment, **assignee = caller** (org-lead bypass removed from start/resolve), qualification, baselines (if needed), test equipment of required class (calibration / traceability). Seal gates (`sealGates.ts`): visit started, both signatures (or absent+reason), fail evidence (photo or reason). Protocol UI mirrors those gates with a checklist; does not weaken them.
+
+#### ServiceVisit (D2)
+
+**Purpose:** Site-level visit that can link several assignments/runs. Day-plan site card calls `startSiteVisit`; protocol calls `ensureAndStartVisit` so the run has `visitStartedAt` before seal. Same APIs; UI avoids a second identical “Start visit” when the job visit is already started.
+
+#### Follow-up proposals (D3 / Nachbesuche)
+
+**Purpose:** Child `ServiceRequest` with `parentRequestId`, `reason=instandsetzung` (typical), `followUpNeeds` / `followUpUrgency`, `proposedByOrgId`. Created from a failed protocol step; listed on `/inspect/nachbesuche` for the proposer (`raisedById`) and on disposition with a Proposal chip. Unassigned children stay out of Heute / my-sites until disposition assigns them.
 
 ---
 
@@ -793,11 +804,16 @@ Due date / scan
   → POST …/transmit  → StatusEvent(transmitted) + transmittedAt
        → optional: dispatch enabled channels for that executor
        → if none enabled: warning, in-app handoff only
-       → partner portal/disposition/my-sites lists only if transmittedAt set
-  → partner disposition (assignee, schedule) → inspect protocol
+       → partner disposition lists transmitted rows for the org
+  → partner disposition (assignee, schedule)
+  → My institutions (assignee-strict) → Start inspection
+       → session inspectQueueStore (userId + tenant + references)
+       → /inspect/heute (site groups; Start visit) → protocol
 ```
 
 **Withdraw (clinic):** `POST /api/service-requests/[reference]/withdraw` deletes the SR and related rows. Allowed only while **`transmittedAt` is null** (and not completed / sealed). After transmit, allocation and withdraw are locked.
+
+**Assignee rule:** my-sites / site portal / inspection-run resolve & start require `assigneeUserId ===` caller. Foreign refs in a stale session queue are dropped (403 → `retainReferences`).
 
 Optional link: `DeviceDuty` → request (`dutyId`); completion → `DutyPerformance` + roll `dueAt`.
 
@@ -806,17 +822,24 @@ Optional link: `DeviceDuty` → request (`dutyId`); completion → `DutyPerforma
 ### 5.4 Prüfpartner inspection protocol
 
 ```
-Partner opens /inspect/[reference]  (assignment must be transmitted)
+My institutions → Start inspection (session queue)
+  → /inspect/heute (time → site groups; optional Start visit)
+  → /inspect/[reference]  (transmitted + assigned to caller)
   → resolveCatalogueForAssignment + qualification / equipment / baseline gates
   → POST start run (testEquipmentId, occasion if required)
+  → ensure visit started (site visit and/or job visit)
   → confirm device (scan or skip)
-  → save step results (pass/fail + measurements)
-  → POST complete / seal
+  → save step results (pass/fail + measurements; fail → photo or reason)
+  → optional: propose follow-up (Nachbesuch) → disposition
+  → signatures (inspector + institution) → POST complete / seal
+       → sealGates: visit + signatures + fail evidence
        → DutyPerformance; optional BaselineMeasurement if catalogue.setsBaseline
        → ServiceRequest → completed
 ```
 
-**Services:** `src/services/pruefpartner/*` (catalogueResolution, inspectionRun, baseline, limitEvaluation, qualificationGate, testEquipmentGate, testEquipment).
+**Inspect rail:** Heute / Woche (session queue), Erledigt, Nachbesuche (`GET /api/partner/inspect/follow-ups` — own proposals), Zugang, Kataloge. Nachbesuche is a proposal tracker only; scheduling stays on `/partner/orders?tab=disposition`.
+
+**Services:** `src/services/pruefpartner/*` (catalogueResolution, inspectionRun, sealGates, inspectFollowUp, inspectAccess, baseline, limitEvaluation, qualificationGate, testEquipmentGate, testEquipment).
 
 ### 5.5 Auth
 
@@ -850,6 +873,7 @@ Partner path: same `User` row with `accountKind=partner` + `OrgMembership` + `Se
 | `scanStore` | Resolve → classify → service/parts → success \| queued state machine |
 | `requestStore` | Draft request fields / cart |
 | `sessionStore` | Client mirror of `/api/auth/session` (user / tenantName); no local PIN lock |
+| `inspectQueueStore` | Session hand-off from My institutions → Heute (`userId`, `tenantId`, references); cleared/filtered if another user or 403 |
 | `offlineQueueStore` + `idb` | Queue failed submits; `replayQueue` mutex |
 | `themeStore` / `toastStore` / `logStore` | UX chrome |
 
@@ -945,7 +969,8 @@ Tenant ─┬─ User (clinic) ── UserPermission?
         │               │                   ├─ ReprocessingOnDevice
         │               │                   └─ DeviceReprocessingProfile
         ├─ ServiceRequest ─┬─ StatusEvent / Attachment / DispatchRecord
-        │                  ├─ DispatchOutbox / InspectionRun?
+        │                  ├─ DispatchOutbox / InspectionRun? / ServiceVisit?
+        │                  ├─ follow-ups (parentRequestId) / proposedByOrg
         │                  └─ (optional) DeviceDuty / ExecutorOrg / assignee User
         ├─ OrderRequest ─ OrderItem
         ├─ DispatchTarget / ExecutorOrg
@@ -963,7 +988,7 @@ DeviceModel ─┬─ DeviceInstance*
              └─ TrainingEvent (subject)
 
 RefInspectionCatalogue ─ RefInspectionStep / RefCatalogueQualification
-                       └─ InspectionRun ─ InspectionStepResult
+                       └─ InspectionRun ─ InspectionStepResult / InspectionSignature
 
 RoleGrant (kind: clinic|partner_console|partner_acting)
 AuditEvent (tenant-scoped rows)    TotpChallenge → User

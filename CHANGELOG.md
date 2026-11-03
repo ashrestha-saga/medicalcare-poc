@@ -35,6 +35,10 @@ Keep entries short, user-facing, and in the past tense (“Added X”, “Fixed 
 
 ### Added
 
+- Inspect day plan (`/inspect/heute`, `/inspect/woche`): My institutions session queue → time then site grouping, site **Start visit**, job cards
+- Protocol UX: seal progress checklist, staged closeout until visit + device confirm, distinct job-visit labels, fail evidence one-liner
+- Follow-up proposals from failed steps (`POST /api/partner/disposition/[reference]/follow-up`) and inspect list (`GET /api/partner/inspect/follow-ups`, `/inspect/nachbesuche`)
+- Inspection signatures (pad / absent + institution role dropdown), Mangelbild photo or reason, optional MPSB partner hint
 - Erstanlage (initial registration) wizard: identity → characteristics → duties → prerequisites; duties preview and release APIs under `/api/registration/*`
 - Admin model reclassification at `/registration/reclassify/[modelId]` (third-party / document evidence on apply)
 - `POST /api/registration/preview` (derive duties without a draft) and payload `POST /api/registration/release`
@@ -73,7 +77,9 @@ Keep entries short, user-facing, and in the past tense (“Added X”, “Fixed 
 - Locale switch swaps message catalogs in place (no full page reload), so wizard form state is preserved
 - New modules (training, management, partner, inspect) follow page → feature → hooks → interface → service → schema layering
 - Partner assignment lists (disposition, my-sites, inspection orders) require `transmittedAt` (clinic transmit handoff)
-- Inspection step UX: row layout with pass/fail (EN) / In Ordnung·Mangel (DE) and measured value under the title
+- My institutions / inspect resolve & start are **assignee-strict** (only the signed-in technician’s jobs; session queue drops foreign refs)
+- Inspection step UX: three-column row with pass/fail (EN) / In Ordnung·Mangel (DE); fail / over-limit uses a theme-aware red wash + evidence fields
+- Inspect empty Heute/protocol copy points at My institutions hand-off (session queue unchanged)
 
 ### Removed
 

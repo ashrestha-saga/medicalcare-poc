@@ -34,7 +34,9 @@ function roleBadgeLabel(
 ): string {
   if (member.status === "invited") return t("staffStatusInvited");
   if (member.appRole === "admin") return t("staffRoleAdmin");
+  if (member.appRole === "service_lead") return t("staffRoleServiceLead");
   if (member.appRole === "order") return t("staffRoleOrder");
+  if (member.appRole === "management") return t("staffRoleManagement");
   return t("staffRoleInspector");
 }
 

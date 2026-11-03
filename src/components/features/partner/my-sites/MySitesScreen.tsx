@@ -1,5 +1,7 @@
 "use client";
 
+import { Suspense } from "react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
@@ -10,6 +12,7 @@ import {
   type MySitesDueFilter,
 } from "@/components/hooks/partner/my-sites/useMySitesList";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,15 +22,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export function MySitesScreen() {
+function MySitesBody() {
   const t = useTranslations("console");
   const {
     data,
     error,
     loading,
-    isAdmin,
-    responsibility,
-    setResponsibility,
     distance,
     setDistance,
     due,
@@ -43,37 +43,24 @@ export function MySitesScreen() {
   return (
     <div className="p-work" data-testid="console-my-sites">
       <main className="p-main">
-        <ListPageShell title={t("mySitesTitle")} description={t("mySitesIntro")}>
+        <ListPageShell
+          title={t("mySitesTitle")}
+          description={t("mySitesIntro")}
+          headerExtra={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button asChild data-testid="my-sites-start-inspection">
+                <Link href="/inspect/heute">{t("mySitesStartInspection")}</Link>
+              </Button>
+            </div>
+          }
+        >
           {error ? (
             <Alert variant="destructive" className="mb-4">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           ) : null}
 
-          <div className="mb-4 grid gap-3 rounded-lg border border-border bg-card p-3 sm:grid-cols-3">
-            <div className="grid gap-1.5">
-              <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {t("mySitesFilterResponsibility")}
-              </Label>
-              <Select value={responsibility} onValueChange={setResponsibility} disabled={!isAdmin}>
-                <SelectTrigger data-testid="my-sites-responsibility">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="self">{t("mySitesResponsibilitySelf")}</SelectItem>
-                  {isAdmin ? (
-                    <SelectItem value="all">{t("mySitesResponsibilityAll")}</SelectItem>
-                  ) : null}
-                  {isAdmin
-                    ? (data?.colleagues ?? []).map((c) => (
-                        <SelectItem key={c.userId} value={c.userId}>
-                          {c.name}
-                        </SelectItem>
-                      ))
-                    : null}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="mb-4 grid gap-3 rounded-lg border border-border bg-card p-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {t("mySitesFilterDistance", {
@@ -143,5 +130,13 @@ export function MySitesScreen() {
         </ListPageShell>
       </main>
     </div>
+  );
+}
+
+export function MySitesScreen() {
+  return (
+    <Suspense fallback={<div className="p-work p-4 text-sm text-muted-foreground">…</div>}>
+      <MySitesBody />
+    </Suspense>
   );
 }

@@ -80,8 +80,9 @@ describe("partner permission intersection", () => {
 });
 
 describe("partner console RBAC", () => {
-  it("admin gets all console slugs including create and lifecycle", () => {
+  it("admin and service_lead get all console slugs including create and lifecycle", () => {
     const perms = partnerConsolePermissions("admin");
+    expect(partnerConsolePermissions("service_lead")).toEqual(perms);
     expect(perms).toContain("console:nav");
     expect(perms).toContain("console:customers:create");
     expect(perms).toContain("console:contracts:lifecycle");
@@ -90,17 +91,22 @@ describe("partner console RBAC", () => {
     expect(perms).toContain("console:staff:assign");
     expect(perms).toContain("console:external:manage");
     expect(consoleMenuFromPermissions(perms).map((m) => m.id)).toEqual([
+      "console-today",
       "console-customers",
       "console-due-dates",
+      "console-orders",
       "console-my-sites",
-      "console-disposition",
-      "console-assignments",
+      "console-field-safety",
       "console-staff",
       "console-external",
       "console-organisation",
       "console-activity",
       "console-settings",
     ]);
+    expect(consoleMenuFromPermissions(perms).map((m) => m.href)).not.toContain("/partner/disposition");
+    expect(consoleMenuFromPermissions(perms).map((m) => m.href)).not.toContain(
+      "/partner/inspection-orders",
+    );
   });
 
   it("inspector can view but not create or invite", () => {
@@ -113,17 +119,17 @@ describe("partner console RBAC", () => {
     expect(partnerHasConsolePermission("inspector", "console:disposition:assign")).toBe(false);
     expect(consoleMenuFromPermissions(perms).some((m) => m.id === "console-staff")).toBe(false);
     expect(consoleMenuFromPermissions(perms).some((m) => m.id === "console-customers")).toBe(true);
-    expect(consoleMenuFromPermissions(perms).some((m) => m.id === "console-disposition")).toBe(true);
+    expect(consoleMenuFromPermissions(perms).some((m) => m.id === "console-orders")).toBe(true);
   });
 
   it("order sees ops views including disposition assign but not staff", () => {
     const menuIds = consoleMenuFromPermissions(partnerConsolePermissions("order")).map((m) => m.id);
     expect(menuIds).toEqual([
+      "console-today",
       "console-customers",
       "console-due-dates",
+      "console-orders",
       "console-my-sites",
-      "console-disposition",
-      "console-assignments",
     ]);
     expect(partnerHasConsolePermission("order", "console:disposition:assign")).toBe(true);
   });

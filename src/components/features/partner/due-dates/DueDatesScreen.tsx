@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
@@ -9,7 +10,7 @@ import { useDueDatesList } from "@/components/hooks/partner/due-dates/useDueDate
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
-export function DueDatesScreen() {
+function DueDatesBody() {
   const t = useTranslations("console");
   const tFilters = useTranslations("filters");
   const {
@@ -20,8 +21,11 @@ export function DueDatesScreen() {
     setOverdueOnly,
     keyword,
     setKeyword,
+    assignDuty,
+    assigningId,
+    assignMessage,
   } = useDueDatesList();
-  const columns = useDueDatesColumns();
+  const columns = useDueDatesColumns({ onAssign: assignDuty, assigningId });
 
   return (
     <div className="p-work" data-testid="console-due-dates">
@@ -40,7 +44,7 @@ export function DueDatesScreen() {
                 {t("dueDatesOverdueOnly")}
               </Button>
               <Button type="button" variant="outline" size="sm" asChild>
-                <Link href="/partner/inspection-orders">{t("dueDatesToDisposition")}</Link>
+                <Link href="/partner/orders">{t("dueDatesToDisposition")}</Link>
               </Button>
             </div>
           }
@@ -48,6 +52,11 @@ export function DueDatesScreen() {
           {error ? (
             <Alert variant="destructive" className="mb-4">
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+          {assignMessage ? (
+            <Alert className="mb-4">
+              <AlertDescription>{assignMessage}</AlertDescription>
             </Alert>
           ) : null}
           <DataTable
@@ -68,5 +77,13 @@ export function DueDatesScreen() {
         </ListPageShell>
       </main>
     </div>
+  );
+}
+
+export function DueDatesScreen() {
+  return (
+    <Suspense fallback={<div className="p-work p-4 text-sm text-muted-foreground">…</div>}>
+      <DueDatesBody />
+    </Suspense>
   );
 }

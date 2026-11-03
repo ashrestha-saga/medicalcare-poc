@@ -10,7 +10,7 @@ const PARTNER_ADMIN: SessionUser = {
   accountKind: "partner",
   organisationId: MSR_ID,
   organisationName: "Medtech Service Rhein GmbH",
-  appRole: "admin",
+  appRole: "service_lead",
 };
 
 const PARTNER_INSPECTOR: SessionUser = {

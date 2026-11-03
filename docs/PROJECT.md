@@ -4,7 +4,7 @@ Mobile-first web application for clinical technicians and nursing staff: scan or
 
 This document describes how the system works, the domain model, and the technical features available in the codebase.
 
-For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) (incl. **§4.8 Prüfpartner**, ModelDocument IFU, ExecutorOrg↔contract sync, soft transmit / dispatch channel settings, transmit/withdraw handoff, SWOT finishing 30.09.: enums, reprocessing link history, deriveDuties P1–P3 / AED, RoleGrant / UserPermission / SMTP / password reset).
+For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) (incl. **§4.8 Prüfpartner** — visits, signatures, follow-ups; **§5.3–5.4** assignee-strict my-sites → session queue → inspect / Nachbesuche; ModelDocument IFU, ExecutorOrg↔contract sync, soft transmit / dispatch channel settings, transmit/withdraw handoff, RoleGrant / UserPermission / SMTP / password reset).
 
 ---
 
@@ -128,7 +128,7 @@ Primary entities (see `prisma/schema.prisma`):
 - **ModelDocument** — tenant-scoped IFU (and related kinds) on a **shared** `DeviceModel`. Same current IFU is used by catalog detail, Erstanlage prerequisites, device book, and scan “open IFU”.
 - **DeviceModelClassification** — historised model-level Einstufung (open row = `validTo` null). Anlage 2 via wizard; `appliedPartCode` / `deviceFamilyCode` exist on the schema for Prüfpartner but are not set by the registration UI yet.
 - **Erstanlage** — wizard holds identity/characteristics in the client; release (`POST /api/registration/release`) creates the instance and freezes duties (`DeviceReleaseSnapshot` / `DeviceDuty`). Inventarize still creates a draft and deep-links to `/registration/[id]`. Scan uses **manual** service-type select (no proposal engine).
-- **Prüfpartner** — `RefInspectionCatalogue` + steps; `InspectionRun` / `InspectionStepResult`; `BaselineMeasurement`; partner `TestEquipment`. See [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) §4.8 / §5.4.
+- **Prüfpartner** — catalogues / steps; `InspectionRun` / step results / signatures; `ServiceVisit`; `BaselineMeasurement`; partner `TestEquipment`; D3 follow-up SRs (`parentRequestId`). See [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) §4.8 / §5.3–5.4.
 - **ExternalSourceRecord** — BEUDAMED (and similar) cache entries.
 - **TenantOxidConnection** — OAuth tokens for the linked OXID shop (server-side only).
 - **TotpChallenge** — short-lived login challenge between password success and session issue.
@@ -147,7 +147,10 @@ Primary entities (see `prisma/schema.prisma`):
 | `/registration/reclassify/[modelId]` | Admin model-wide reclassification (incl. third-party evidence) |
 | `/catalog`, `/catalog/[id]` | Device model catalog |
 | `/requests`, `/requests/[reference]` | Assignments: allocate, **transmit**, **withdraw** (pre-transmit) |
-| `/inspect`, `/inspect/[reference]` | Partner/clinic field protocol (catalogue, equipment, steps, seal) |
+| `/inspect/heute`, `/inspect/woche` | Day/week plan from My institutions session queue (time → site groups; Start visit) |
+| `/inspect/[reference]` | Field protocol (catalogue, visit, device confirm, steps, fail evidence, signatures, seal) |
+| `/inspect/nachbesuche` | Own follow-up proposals (status only; scheduling in disposition) |
+| `/inspect/zugang`, `/inspect/kataloge`, `/inspect/erledigt` | Access evidence, catalogues, completed jobs |
 | `/partner/*` | Partner console: disposition, my-sites, due-dates, inspection orders, staff, settings (test equipment) |
 | `/users` | User administration |
 | `/locations` | Sites and areas |
@@ -221,9 +224,13 @@ Route handlers under `src/app/api/`:
 
 | Method | Path |
 |---|---|
-| `GET`/`POST` | `/api/partner/inspection-runs` (+ `[id]`, steps, confirm-device, complete, resolve) |
+| `GET`/`POST` | `/api/partner/inspection-runs` (+ `[id]`, steps, confirm-device, complete, signatures, partner-hint, visit/start, resolve) |
+| `POST` | `/api/partner/inspect/visits/start` | Site-card visit (links request refs) |
+| `GET` | `/api/partner/inspect/follow-ups` | Own Nachbesuch proposals for `/inspect/nachbesuche` |
+| `GET` | `/api/partner/inspect/access`, `/api/partner/inspect/catalogues` |
+| `POST` | `/api/partner/disposition/[reference]/follow-up` | Propose repair follow-up from a failed step |
 | `GET`/`POST`/`PATCH` | `/api/partner/test-equipment` (+ `[id]`) |
-| `GET` | `/api/partner/due-dates`, disposition / my-sites assignment APIs |
+| `GET` | `/api/partner/due-dates`, disposition / my-sites assignment APIs (my-sites **assignee-strict**) |
 
 ### Admin / settings / ops
 
@@ -318,9 +325,12 @@ Released instances reject identity/classification-changing PATCHes (`state === '
 4. Clinic **allocate** executor → **transmit** sets `transmittedAt` (partner portals only list transmitted assignments).
 5. Outbound dispatch runs only the allocated executor’s **enabled** targets (isolated per target). If none are enabled, transmit still locks handoff and may return `warning` (in-app only).
 6. **Withdraw** (pre-transmit only) deletes a wrong assignment so the duty is free again.
-7. Partner disposition → `/inspect/[reference]` for the Prüfpartner protocol (catalogue, equipment, seal / baselines).
+7. Partner **disposition** assigns a handler and optional appointment.
+8. **My institutions** (only jobs assigned to the signed-in user) → **Start inspection** fills a session queue → `/inspect/heute` → protocol at `/inspect/[reference]`.
+9. Protocol: start/link visit → confirm device → rate steps (fail needs photo or reason) → optional Nachbesuch proposal → signatures → seal (`sealGates`: visit, signatures, fail evidence).
+10. Follow-up children wait on disposition (Proposal chip) and appear on `/inspect/nachbesuche` for the proposer; they enter Heute only after assign + my-sites hand-off.
 
-Downstream systems can push status via `POST .../status`. Staff can transition open requests when permitted (`requests:transition`).
+Downstream systems can push status via `POST .../status`. Staff can transition open requests when permitted (`requests:transition`). Clinic `/requests` scopes remain **mine** / **open** (and **all** with `requests:view-all`); open excludes completed.
 
 ### Spare-parts orders
 
@@ -599,6 +609,6 @@ Try these identifiers after seed:
 - `src/constants/permissions.ts` — RBAC defaults + path/menu helpers
 - `src/services/roles/roleGrantsService.ts` — DB-backed RoleGrant cache + catalog CRUD
 - `src/services/resolve/resolveService.ts` — resolution chain
-- `src/services/pruefpartner/*` — catalogue resolution, inspection runs, baselines, test equipment
+- `src/services/pruefpartner/*` — catalogue resolution, inspection runs, seal gates, follow-ups list, access evidence, baselines, test equipment
 - `src/services/auth/totpService.ts` — 2FA lifecycle
 - `src/services/inventory/deviceInventoryService.ts` — inventarnummer allocation & inventarize create

@@ -156,35 +156,66 @@ const ORDER_BASE: readonly PermissionSlug[] = [
   "audit:view",
 ];
 
+/** GF acting: read inventory/duties/requests; no create/dispatch/inspection write. */
+const MANAGEMENT_BASE: readonly PermissionSlug[] = [
+  "shell:nav",
+  "inventory:view",
+  "catalog:view",
+  "clarifications:view",
+  "locations:view",
+  "duties:view",
+  "requests:view-mine",
+  "requests:view-open",
+  "requests:view-all",
+  "inspections:view",
+  "catalogues:view",
+  "qualifications:view",
+  "fieldsafety:view",
+  "audit:view",
+  "audit:export",
+];
+
 export const PARTNER_ROLE_PERMISSIONS: Record<PartnerAppRole, readonly PermissionSlug[]> = {
+  /** Org superuser — same acting baseline as service lead for now. */
   admin: ADMIN_BASE,
+  /** Serviceleitung — former operational admin acting baseline. */
+  service_lead: ADMIN_BASE,
   inspector: INSPECTOR_BASE,
   order: ORDER_BASE,
+  management: MANAGEMENT_BASE,
 };
 
 /** All console capability slugs (admin baseline). */
 export const ALL_CONSOLE_PERMISSIONS: readonly PermissionSlug[] = [
   "console:nav",
+  "console:today:view",
   "console:customers:view",
   "console:customers:create",
   "console:contracts:update",
   "console:contracts:lifecycle",
+  "contracts:manage",
   "console:due-dates:view",
   "console:disposition:view",
   "console:disposition:assign",
+  "visits:manage",
   "console:assignments:view",
   "console:staff:view",
   "console:staff:invite",
   "console:staff:assign",
+  "members:manage",
   "console:external:view",
   "console:external:manage",
   "console:organisation:view",
   "console:audit:view",
   "console:settings:view",
   "console:settings:smtp",
+  "smtp:manage",
   "catalogues:view",
   "catalogues:edit",
   "inspections:view",
+  "inspection:sign",
+  "inspection:propose",
+  "fieldsafety:rollout",
   "testequipment:manage",
   "qualifications:view",
   "qualifications:manage",
@@ -192,6 +223,7 @@ export const ALL_CONSOLE_PERMISSIONS: readonly PermissionSlug[] = [
 
 const CONSOLE_VIEW_BASE: readonly PermissionSlug[] = [
   "console:nav",
+  "console:today:view",
   "console:customers:view",
   "console:due-dates:view",
   "console:disposition:view",
@@ -205,19 +237,67 @@ const CONSOLE_VIEW_BASE: readonly PermissionSlug[] = [
 
 /** Operator-console grants by OrgMembership.appRole (no acting tenant). */
 export const CONSOLE_ROLE_PERMISSIONS: Record<PartnerAppRole, readonly PermissionSlug[]> = {
+  /** Org superuser — full console. */
   admin: ALL_CONSOLE_PERMISSIONS,
-  inspector: [...CONSOLE_VIEW_BASE, "testequipment:manage"],
+  /** Serviceleitung — former operational admin console set (unchanged capabilities). */
+  service_lead: ALL_CONSOLE_PERMISSIONS,
+  inspector: [
+    ...CONSOLE_VIEW_BASE,
+    "testequipment:manage",
+    "visits:manage",
+    "inspection:sign",
+    "inspection:propose",
+  ],
   order: [
     "console:nav",
+    "console:today:view",
     "console:customers:view",
     "console:due-dates:view",
     "console:disposition:view",
     "console:disposition:assign",
+    "visits:manage",
     "console:assignments:view",
+  ],
+  /** GF: org-wide read + contract/member/SMTP manage; no dispatch/visit/inspection write. */
+  management: [
+    "console:nav",
+    "console:today:view",
+    "console:customers:view",
+    "console:contracts:update",
+    "console:contracts:lifecycle",
+    "contracts:manage",
+    "console:due-dates:view",
+    "console:disposition:view",
+    "console:assignments:view",
+    "console:staff:view",
+    "console:staff:invite",
+    "console:staff:assign",
+    "members:manage",
+    "console:external:view",
+    "console:organisation:view",
+    "console:audit:view",
+    "console:settings:view",
+    "console:settings:smtp",
+    "smtp:manage",
+    "catalogues:view",
+    "inspections:view",
+    "qualifications:view",
+    "fieldsafety:rollout",
   ],
 };
 
+/**
+ * Flat catalog of console destinations (v14-A).
+ * Portfolio + dispatch are NOT top-level — they live under /partner/orders tabs.
+ */
 export const CONSOLE_MENU_MODULES: readonly MenuModule[] = [
+  {
+    id: "console-today",
+    label: "Today",
+    href: "/partner/today",
+    slug: "console:today:view",
+    group: "ops",
+  },
   {
     id: "console-customers",
     label: "Customers",
@@ -233,6 +313,13 @@ export const CONSOLE_MENU_MODULES: readonly MenuModule[] = [
     group: "ops",
   },
   {
+    id: "console-orders",
+    label: "Orders",
+    href: "/partner/orders",
+    slug: "console:disposition:view",
+    group: "ops",
+  },
+  {
     id: "console-my-sites",
     label: "My institutions",
     href: "/partner/my-sites",
@@ -240,17 +327,10 @@ export const CONSOLE_MENU_MODULES: readonly MenuModule[] = [
     group: "ops",
   },
   {
-    id: "console-disposition",
-    label: "Customer portfolio",
-    href: "/partner/disposition",
-    slug: "console:disposition:view",
-    group: "ops",
-  },
-  {
-    id: "console-assignments",
-    label: "Our dispatch",
-    href: "/partner/inspection-orders",
-    slug: "console:assignments:view",
+    id: "console-field-safety",
+    label: "Field safety",
+    href: "/partner/field-safety",
+    slug: "fieldsafety:rollout",
     group: "ops",
   },
   {
@@ -292,13 +372,18 @@ export const CONSOLE_MENU_MODULES: readonly MenuModule[] = [
 
 /** Exact / prefix path → required console slug. */
 export const CONSOLE_PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
-  "/partner": "console:customers:view",
+  "/partner": "console:today:view",
+  "/partner/today": "console:today:view",
+  "/partner/today/assignments": "console:settings:view",
   "/partner/customers": "console:customers:view",
   "/partner/customers/new": "console:customers:create",
   "/partner/due-dates": "console:due-dates:view",
+  "/partner/orders": "console:disposition:view",
   "/partner/my-sites": "console:disposition:view",
   "/partner/disposition": "console:disposition:view",
-  "/partner/inspection-orders": "console:assignments:view",
+  "/partner/visits": "visits:manage",
+  "/partner/inspection-orders": "console:disposition:view",
+  "/partner/field-safety": "fieldsafety:rollout",
   "/partner/staff": "console:staff:view",
   "/partner/external-inspectors": "console:external:view",
   "/partner/organisation": "console:organisation:view",
@@ -329,19 +414,41 @@ function stripForbidden(slugs: Iterable<PermissionSlug>): PermissionSlug[] {
   return [...slugs].filter((slug) => !FORBIDDEN.has(slug));
 }
 
-function normalizePartnerAppRole(appRole: PartnerAppRole | string): PartnerAppRole {
-  return appRole === "admin" || appRole === "order" || appRole === "inspector" ? appRole : "inspector";
+export const KNOWN_PARTNER_APP_ROLES: readonly PartnerAppRole[] = [
+  "admin",
+  "service_lead",
+  "inspector",
+  "order",
+  "management",
+];
+
+/**
+ * Org ops leads that previously shared the `admin` slug (Serviceleitung).
+ * True `admin` remains included so full-access checks keep working.
+ */
+export function isPartnerOrgLead(appRole: string | null | undefined): boolean {
+  return appRole === "admin" || appRole === "service_lead";
+}
+
+/** Unknown roles get empty grants — never silently become inspector. */
+function normalizePartnerAppRole(appRole: PartnerAppRole | string): PartnerAppRole | null {
+  return KNOWN_PARTNER_APP_ROLES.includes(appRole as PartnerAppRole)
+    ? (appRole as PartnerAppRole)
+    : null;
 }
 
 /** Partner appRole grants with reserved slugs removed. Clinic-acting baseline (no console:*). */
 export function partnerOrgPermissions(appRole: PartnerAppRole | string): PermissionSlug[] {
   const role = normalizePartnerAppRole(appRole);
+  if (!role) return [];
   return stripForbidden(PARTNER_ROLE_PERMISSIONS[role]);
 }
 
 /** Console-only grants for Betreiberkonsole (no acting tenant). */
 export function partnerConsolePermissions(appRole: PartnerAppRole | string): PermissionSlug[] {
-  return [...CONSOLE_ROLE_PERMISSIONS[normalizePartnerAppRole(appRole)]];
+  const role = normalizePartnerAppRole(appRole);
+  if (!role) return [];
+  return [...CONSOLE_ROLE_PERMISSIONS[role]];
 }
 
 export function consoleMenuFromPermissions(permissions: readonly PermissionSlug[]): MenuModule[] {

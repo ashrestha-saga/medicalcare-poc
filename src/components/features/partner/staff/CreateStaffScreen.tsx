@@ -106,11 +106,21 @@ export function CreateStaffScreen() {
                       className="flex h-9 w-full rounded-md border border-border bg-transparent px-3 text-sm"
                       value={form.appRole}
                       onChange={(e) =>
-                        patch("appRole", e.target.value as "admin" | "inspector" | "order")
+                        patch(
+                          "appRole",
+                          e.target.value as
+                            | "admin"
+                            | "service_lead"
+                            | "inspector"
+                            | "order"
+                            | "management",
+                        )
                       }
                       data-testid="staff-role"
                     >
                       <option value="admin">{t("staffRoleAdmin")}</option>
+                      <option value="service_lead">{t("staffRoleServiceLead")}</option>
+                      <option value="management">{t("staffRoleManagement")}</option>
                       <option value="inspector">{t("staffRoleInspector")}</option>
                       <option value="order">{t("staffRoleOrder")}</option>
                     </select>

@@ -13,7 +13,11 @@ import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { cn } from "@/lib/utils";
 import type { PortfolioContractorFilter } from "@/schemas/console";
 
-export function DispositionScreen() {
+function DispositionBody({
+  embedded,
+}: {
+  embedded: boolean;
+}) {
   const t = useTranslations("console");
   const { checkPermission } = usePermissions();
   const canManage = checkPermission("console:disposition:assign");
@@ -46,6 +50,90 @@ export function DispositionScreen() {
   ];
 
   return (
+    <>
+      {error ? (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div
+          className="flex flex-wrap gap-1.5"
+          role="tablist"
+          aria-label={t("portfolioFilterLabel")}
+        >
+          {filters.map((f) => (
+            <Button
+              key={f.id}
+              type="button"
+              role="tab"
+              aria-selected={contractorFilter === f.id}
+              variant={contractorFilter === f.id ? "default" : "outline"}
+              size="sm"
+              className={cn("h-8", contractorFilter === f.id && "shadow-sm")}
+              onClick={() => setContractorFilter(f.id)}
+            >
+              {f.label}
+              <span className="ml-1.5 tabular-nums text-xs opacity-70">{f.count}</span>
+            </Button>
+          ))}
+        </div>
+        {!embedded && checkPermission("console:assignments:view") ? (
+          <Button asChild variant="secondary" size="sm" className="h-8">
+            <Link href="/partner/orders?tab=disposition">{t("portfolioGoDispatch")}</Link>
+          </Button>
+        ) : null}
+      </div>
+
+      <DataTable
+        data={filtered}
+        columns={columns}
+        search
+        visibility
+        displayPagination
+        keyword={keyword}
+        setKeyword={setKeyword}
+        removeKeyword={() => setKeyword("")}
+        isLoading={loading}
+        totalItems={filtered.length}
+        getRowId={(row) => row.reference}
+        emptyMessage={t("dispositionEmpty")}
+        searchPlaceholder={t("dispositionSearch")}
+        className="min-w-0"
+      />
+
+      <div className="mt-4 space-y-3">
+        <div className="rounded-md border border-border border-l-[3px] border-l-primary bg-muted/30 px-4 py-3 text-sm leading-relaxed">
+          <b>{t("dispositionNoteRolesTitle")}</b> {t("dispositionNoteRolesBody")}
+        </div>
+        <div className="rounded-md border border-border border-l-[3px] border-l-primary bg-muted/30 px-4 py-3 text-sm leading-relaxed">
+          <b>{t("dispositionNoteLifecycleTitle")}</b> {t("dispositionNoteLifecycleBody")}
+        </div>
+      </div>
+
+      <TakeOverDialog
+        row={pendingTakeOver}
+        busy={Boolean(pendingTakeOver && busyRef === pendingTakeOver.reference)}
+        onClose={cancelTakeOver}
+        onConfirm={() => void confirmTakeOver()}
+      />
+    </>
+  );
+}
+
+export function DispositionScreen({ embedded = false }: { embedded?: boolean }) {
+  const t = useTranslations("console");
+
+  if (embedded) {
+    return (
+      <div data-testid="console-disposition">
+        <DispositionBody embedded />
+      </div>
+    );
+  }
+
+  return (
     <div className="p-work" data-testid="console-disposition">
       <main className="p-main">
         <ListPageShell
@@ -53,74 +141,8 @@ export function DispositionScreen() {
           description={t("dispositionIntro")}
           contentClassName="max-w-none"
         >
-          {error ? (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ) : null}
-
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div
-              className="flex flex-wrap gap-1.5"
-              role="tablist"
-              aria-label={t("portfolioFilterLabel")}
-            >
-              {filters.map((f) => (
-                <Button
-                  key={f.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={contractorFilter === f.id}
-                  variant={contractorFilter === f.id ? "default" : "outline"}
-                  size="sm"
-                  className={cn("h-8", contractorFilter === f.id && "shadow-sm")}
-                  onClick={() => setContractorFilter(f.id)}
-                >
-                  {f.label}
-                  <span className="ml-1.5 tabular-nums text-xs opacity-70">{f.count}</span>
-                </Button>
-              ))}
-            </div>
-            {checkPermission("console:assignments:view") ? (
-              <Button asChild variant="secondary" size="sm" className="h-8">
-                <Link href="/partner/inspection-orders">{t("portfolioGoDispatch")}</Link>
-              </Button>
-            ) : null}
-          </div>
-
-          <DataTable
-            data={filtered}
-            columns={columns}
-            search
-            visibility
-            displayPagination
-            keyword={keyword}
-            setKeyword={setKeyword}
-            removeKeyword={() => setKeyword("")}
-            isLoading={loading}
-            totalItems={filtered.length}
-            getRowId={(row) => row.reference}
-            emptyMessage={t("dispositionEmpty")}
-            searchPlaceholder={t("dispositionSearch")}
-            className="min-w-0"
-          />
-
-          <div className="mt-4 space-y-3">
-            <div className="rounded-md border border-border border-l-[3px] border-l-primary bg-card px-4 py-3 text-sm leading-relaxed">
-              <b>{t("dispositionNoteRolesTitle")}</b> {t("dispositionNoteRolesBody")}
-            </div>
-            <div className="rounded-md border border-border border-l-[3px] border-l-primary bg-card px-4 py-3 text-sm leading-relaxed">
-              <b>{t("dispositionNoteLifecycleTitle")}</b> {t("dispositionNoteLifecycleBody")}
-            </div>
-          </div>
+          <DispositionBody embedded={false} />
         </ListPageShell>
-
-        <TakeOverDialog
-          row={pendingTakeOver}
-          busy={Boolean(pendingTakeOver && busyRef === pendingTakeOver.reference)}
-          onClose={cancelTakeOver}
-          onConfirm={() => void confirmTakeOver()}
-        />
       </main>
     </div>
   );

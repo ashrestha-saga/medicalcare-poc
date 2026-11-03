@@ -1,8 +1,12 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useCustomerList } from "@/components/hooks/partner/customers/useCustomerList";
+import {
+  useCustomerList,
+  type CustomerListFilter,
+} from "@/components/hooks/partner/customers/useCustomerList";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { OpenButton } from "@/components/features/shared/OpenButton";
 import {
@@ -13,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/Loading";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
+import { cn } from "@/lib/utils";
 
 const SCOPE_KEYS: Record<
   string,
@@ -25,12 +30,20 @@ const SCOPE_KEYS: Record<
   training: "scopeTraining",
 };
 
-export function CustomersScreen() {
+function CustomersBody() {
   const t = useTranslations("console");
   const tCommon = useTranslations("common");
-  const { data, error, loading } = useCustomerList();
+  const { data, clinics, error, loading, filter, setFilter } = useCustomerList();
   const { checkPermission } = usePermissions();
   const canCreate = checkPermission("console:customers:create") && Boolean(data?.canCreate);
+
+  const filterChips: { id: CustomerListFilter; label: string }[] = [
+    { id: "all", label: t("customersFilterAll") },
+    { id: "live", label: t("customersFilterLive") },
+    { id: "ending", label: t("customersFilterEnding") },
+    { id: "mpsb", label: t("customersFilterMpsb") },
+    { id: "setup", label: t("customersFilterSetup") },
+  ];
 
   return (
     <div className="p-work" data-testid="console-customers-page">
@@ -48,6 +61,22 @@ export function CustomersScreen() {
             ) : null
           }
         >
+          <div className="mb-4 flex flex-wrap gap-1.5" role="tablist" aria-label={t("customersFilterLabel")}>
+            {filterChips.map((chip) => (
+              <Button
+                key={chip.id}
+                type="button"
+                role="tab"
+                aria-selected={filter === chip.id}
+                variant={filter === chip.id ? "default" : "outline"}
+                size="sm"
+                className={cn("h-8", filter === chip.id && "shadow-sm")}
+                onClick={() => setFilter(chip.id)}
+              >
+                {chip.label}
+              </Button>
+            ))}
+          </div>
           {loading ? (
             <div className="p-wait">
               <Spinner />
@@ -83,12 +112,12 @@ export function CustomersScreen() {
               <Kpi label={t("kpiLive")} value={data.kpis.customersLive} hint={t("kpiLiveHint")} />
             </div>
           ) : null}
-          {!loading && data && data.clinics.length === 0 ? (
+          {!loading && clinics.length === 0 ? (
             <p className="text-sm text-muted-foreground" data-testid="console-customers-empty">
               {t("customersEmpty")}
             </p>
           ) : null}
-          {!loading && data && data.clinics.length > 0 ? (
+          {!loading && clinics.length > 0 ? (
             <ResponsiveTableSwitch
               table={
                 <div className="overflow-x-auto">
@@ -107,7 +136,7 @@ export function CustomersScreen() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.clinics.map((clinic) => (
+                      {clinics.map((clinic) => (
                         <tr key={clinic.contractId} className="border-b border-border/70">
                           <td className="py-2.5 pr-3">
                             <div className="font-medium" data-testid={`clinic-name-${clinic.contractId}`}>
@@ -151,7 +180,7 @@ export function CustomersScreen() {
                   </table>
                 </div>
               }
-              cards={data.clinics.map((clinic) => (
+              cards={clinics.map((clinic) => (
                 <AdminListCard
                   key={clinic.contractId}
                   title={
@@ -195,6 +224,14 @@ export function CustomersScreen() {
         </ListPageShell>
       </main>
     </div>
+  );
+}
+
+export function CustomersScreen() {
+  return (
+    <Suspense fallback={<div className="p-work p-4 text-sm text-muted-foreground">…</div>}>
+      <CustomersBody />
+    </Suspense>
   );
 }
 

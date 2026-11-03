@@ -7,6 +7,7 @@ import type {
   ConsoleStaffMemberDTO,
   ConsoleStaffRefsDTO,
 } from "@/interfaces/console";
+import { isPartnerOrgLead } from "@/constants/partnerPermissions";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { toast } from "@/store/toastStore";
@@ -28,7 +29,11 @@ export function useStaffDetail(membershipId: string) {
 
   const [name, setName] = useState("");
   const [jobTitle, setJobTitle] = useState("");
-  const [appRole, setAppRole] = useState<"admin" | "inspector" | "order">("inspector");
+  const [appRole, setAppRole] = useState<
+    "admin" | "service_lead" | "inspector" | "order" | "management"
+  >(
+    "inspector",
+  );
   const [validFrom, setValidFrom] = useState("");
   const [dispatchOrigin, setDispatchOrigin] = useState<
     "home" | "partner_site" | "organisation"
@@ -49,7 +54,10 @@ export function useStaffDetail(membershipId: string) {
     setMember(m);
     setName(m.name);
     setJobTitle(m.jobTitle ?? "");
-    setAppRole((m.appRole as "admin" | "inspector" | "order") || "inspector");
+    setAppRole(
+      (m.appRole as "admin" | "service_lead" | "inspector" | "order" | "management") ||
+        "inspector",
+    );
     setValidFrom(m.validFrom ?? "");
     setDispatchOrigin(m.dispatchOrigin ?? "organisation");
     setOriginPostalCode(m.originPostalCode ?? "");
@@ -88,7 +96,7 @@ export function useStaffDetail(membershipId: string) {
   }, [refresh]);
 
   const isInvited = member?.status === "invited";
-  const isAdmin = member?.appRole === "admin" && !member.isExternal;
+  const isAdmin = isPartnerOrgLead(member?.appRole) && !member?.isExternal;
 
   async function saveProfile() {
     setBusy(true);

@@ -111,7 +111,7 @@ export function useCustomerDetail(contractId: string) {
     }
   }
 
-  function openBackoffice() {
+  function openBackoffice(href = "/") {
     if (!clinic?.live) return;
     setActingTenant({
       tenantId: clinic.tenantId,
@@ -119,7 +119,7 @@ export function useCustomerDetail(contractId: string) {
       tenantCode: clinic.tenantCode,
       contractId: clinic.contractId,
     });
-    router.push("/");
+    router.push(href);
   }
 
   return {

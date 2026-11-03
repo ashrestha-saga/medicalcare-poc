@@ -49,7 +49,7 @@ export function SiteAssignmentsScreen({ tenantId }: { tenantId: string }) {
     selectableMine,
     toggle,
     selectAllMine,
-    onSelectInspections,
+    startInspection,
     patchAssignment,
   } = useSiteAssignments(tenantId);
 
@@ -173,10 +173,11 @@ export function SiteAssignmentsScreen({ tenantId }: { tenantId: string }) {
           </Button>
           <Button
             type="button"
-            onClick={onSelectInspections}
-            disabled={selected.size === 0}
+            data-testid="site-portal-start-inspection"
+            onClick={startInspection}
+            disabled={selectableMine.length === 0}
           >
-            {t("sitePortalSelectInspections")}
+            {t("mySitesStartInspection")}
           </Button>
         </div>
         </div>
@@ -205,13 +206,13 @@ function AssignmentRow({
   onAssign: (userId: string | null) => void;
 }) {
   const t = useTranslations("console");
-  /** Fade colleagues' assignments and completed rows that cannot be selected. */
-  const muted = Boolean((row.assigneeUserId && !row.isMine) || !selectable && row.isMine);
+  /** Fade completed / non-selectable own rows. */
+  const muted = !selectable && row.isMine;
 
   return (
     <tr
       className={`border-b border-border/70 align-top ${muted ? "opacity-55" : ""}`}
-      data-testid={row.isMine ? "site-assignment-mine" : "site-assignment-other"}
+      data-testid={row.isMine ? "site-assignment-mine" : "site-assignment-unassigned"}
     >
       <td className="px-3 py-3">
         {row.isMine ? (

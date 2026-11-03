@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** /partner — operator console lands on customers. */
+/** /partner — Version A lands on Heute. */
 export default function PartnerIndexPage() {
-  redirect("/partner/customers");
+  redirect("/partner/today");
 }

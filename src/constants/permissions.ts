@@ -48,11 +48,19 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "incidents:manage",
   "fieldsafety:view",
   "fieldsafety:create",
+  "fieldsafety:rollout",
   "devicebook:view",
   "reprocessing:view",
   "reprocessing:release",
   "authority:view",
   "authority:manage",
+  "visits:manage",
+  "inspection:sign",
+  "inspection:propose",
+  "contracts:manage",
+  "members:manage",
+  "smtp:manage",
+  "console:today:view",
 ] as const;
 
 /** Staff who manage the service queue — includes the nav rail. */

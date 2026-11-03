@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import type { ConsoleRequestListDTO, ConsoleRequestRowDTO } from "@/interfaces/console";
 import { toDatetimeLocalValue } from "@/lib/format";
 import { api, ApiError } from "@/lib/http/apiClient";
+import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
 import {
   dispatchPipelineFilterSchema,
   type DispatchPipelineFilter,
@@ -17,6 +18,12 @@ export type DispatchAssignee = {
   isExternal: boolean;
 };
 
+export type DispositionFocus =
+  | "unscheduled"
+  | "return"
+  | "out_of_contract"
+  | null;
+
 function pipelineBucket(row: ConsoleRequestRowDTO): DispatchPipelineFilter {
   if (row.displayState === "abgeschlossen" || row.displayState === "abgelehnt") return "done";
   if (row.displayState === "in_arbeit") return "in_progress";
@@ -25,16 +32,50 @@ function pipelineBucket(row: ConsoleRequestRowDTO): DispatchPipelineFilter {
   return "needs_handler";
 }
 
+function parseFocus(raw: string | null): DispositionFocus {
+  if (raw === "unscheduled" || raw === "return" || raw === "out_of_contract") return raw;
+  return null;
+}
+
+const RETURN_MS = 48 * 3600 * 1000;
+
+function matchesFocus(row: ConsoleRequestRowDTO, focus: DispositionFocus): boolean {
+  if (!focus) return true;
+  if (focus === "unscheduled") {
+    return (
+      !row.scheduledAt &&
+      row.displayState !== "abgeschlossen" &&
+      row.displayState !== "abgelehnt"
+    );
+  }
+  if (focus === "return") {
+    if (row.displayState !== "abgeschlossen" && row.state !== "completed") return false;
+    const stamp = row.updatedAt ?? row.raisedAt;
+    if (!stamp) return false;
+    return Date.now() - new Date(stamp).getTime() > RETURN_MS;
+  }
+  if (focus === "out_of_contract") return row.managed === false;
+  return true;
+}
+
 /** Partner console — Our dispatch (executor queue: handler, appointment, advance). */
 export function useInspectionOrdersList() {
   const t = useTranslations("console");
+  const qParam = useQueryParam("q");
+  const pipelineParam = useQueryParam("pipeline");
+  const reasonParam = useQueryParam("reason");
+  const focusParam = useQueryParam("focus");
+  const { sync } = useSyncQueryParams();
   const [rows, setRows] = useState<ConsoleRequestRowDTO[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeywordState] = useState(qParam ?? "");
   const [busyRef, setBusyRef] = useState<string | null>(null);
   const [draftDates, setDraftDates] = useState<Record<string, string>>({});
-  const [pipeline, setPipelineRaw] = useState<DispatchPipelineFilter>("all");
+  const [pipeline, setPipelineRaw] = useState<DispatchPipelineFilter>(() => {
+    const parsed = dispatchPipelineFilterSchema.safeParse(pipelineParam);
+    return parsed.success ? parsed.data : "all";
+  });
   const [assigneesByTenant, setAssigneesByTenant] = useState<
     Record<string, DispatchAssignee[]>
   >({});
@@ -42,10 +83,39 @@ export function useInspectionOrdersList() {
   assigneesCacheRef.current = assigneesByTenant;
   const [assigneesLoading, setAssigneesLoading] = useState<string | null>(null);
 
-  const setPipeline = useCallback((value: string) => {
-    const parsed = dispatchPipelineFilterSchema.safeParse(value);
-    if (parsed.success) setPipelineRaw(parsed.data);
-  }, []);
+  const focus = parseFocus(focusParam);
+  const reason = reasonParam?.trim() || null;
+
+  useEffect(() => {
+    const parsed = dispatchPipelineFilterSchema.safeParse(pipelineParam);
+    setPipelineRaw(parsed.success ? parsed.data : "all");
+  }, [pipelineParam]);
+
+  const setPipeline = useCallback(
+    (value: string) => {
+      const parsed = dispatchPipelineFilterSchema.safeParse(value);
+      if (!parsed.success) return;
+      setPipelineRaw(parsed.data);
+      sync({ pipeline: parsed.data === "all" ? null : parsed.data });
+    },
+    [sync],
+  );
+
+  const clearFocusFilters = useCallback(() => {
+    sync({ reason: null, focus: null });
+  }, [sync]);
+
+  useEffect(() => {
+    setKeywordState(qParam ?? "");
+  }, [qParam]);
+
+  const setKeyword = useCallback(
+    (value: string) => {
+      setKeywordState(value);
+      sync({ q: value.trim() || null });
+    },
+    [sync],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -80,11 +150,17 @@ export function useInspectionOrdersList() {
   }, [rows]);
 
   const filtered = useMemo(() => {
-    const byPipe =
+    let list =
       pipeline === "all" ? rows : rows.filter((row) => pipelineBucket(row) === pipeline);
+    if (reason) {
+      list = list.filter((row) => (row.reason ?? "").toLowerCase() === reason.toLowerCase());
+    }
+    if (focus) {
+      list = list.filter((row) => matchesFocus(row, focus));
+    }
     const q = keyword.trim().toLowerCase();
-    if (!q) return byPipe;
-    return byPipe.filter((row) =>
+    if (!q) return list;
+    return list.filter((row) =>
       [
         row.reference,
         row.tenantName,
@@ -93,13 +169,14 @@ export function useInspectionOrdersList() {
         row.serviceType,
         row.assigneeName ?? "",
         row.displayState,
+        row.reason ?? "",
         row.managed ? "managed" : "external",
       ]
         .join(" ")
         .toLowerCase()
         .includes(q),
     );
-  }, [rows, keyword, pipeline]);
+  }, [rows, keyword, pipeline, reason, focus]);
 
   const appointmentValue = useCallback(
     (row: ConsoleRequestRowDTO) =>
@@ -180,6 +257,9 @@ export function useInspectionOrdersList() {
     busyRef,
     pipeline,
     setPipeline,
+    reason,
+    focus,
+    clearFocusFilters,
     counts,
     appointmentValue,
     onDraftDate,

@@ -1,5 +1,6 @@
-import { InspectionOrdersScreen } from "@/components/features/partner/inspection-orders/InspectionOrdersScreen";
+import { redirect } from "next/navigation";
 
+/** Legacy URL — dispatch/scheduling is Aufträge → Disposition. */
 export default function PartnerInspectionOrdersPage() {
-  return <InspectionOrdersScreen />;
+  redirect("/partner/orders?tab=disposition");
 }

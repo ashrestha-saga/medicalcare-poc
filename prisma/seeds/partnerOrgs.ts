@@ -103,8 +103,28 @@ const PARTNER_USERS = [
     organisationId: MSR_ID,
     email: "k.adler@msr.example",
     name: "K. Adler",
-    jobTitle: "Betriebsleitung",
+    jobTitle: "Serviceleitung",
+    appRole: "service_lead",
+    validFrom: new Date("2021-01-01T00:00:00.000Z"),
+  },
+  {
+    userId: "user-partner-msr-admin",
+    membershipId: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    organisationId: MSR_ID,
+    email: "admin@msr.example",
+    name: "A. Admin",
+    jobTitle: "Organisation Admin",
     appRole: "admin",
+    validFrom: new Date("2021-01-01T00:00:00.000Z"),
+  },
+  {
+    userId: "user-partner-msr-richter",
+    membershipId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    organisationId: MSR_ID,
+    email: "s.richter@msr.example",
+    name: "S. Richter",
+    jobTitle: "Geschäftsführung",
+    appRole: "management",
     validFrom: new Date("2021-01-01T00:00:00.000Z"),
   },
   {
@@ -251,7 +271,7 @@ export async function seedPartnerOrgs(
     });
 
     // Non-admin members need an explicit staff assignment (fail closed).
-    if (p.appRole !== "admin" && p.organisationId === MSR_ID) {
+    if (p.appRole !== "admin" && p.appRole !== "service_lead" && p.organisationId === MSR_ID) {
       await prisma.partnerStaffAssignment.upsert({
         where: {
           membershipId_tenantId: { membershipId: p.membershipId, tenantId },

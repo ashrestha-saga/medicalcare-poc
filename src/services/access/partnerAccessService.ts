@@ -3,7 +3,11 @@ import type { PartnerContext } from "@/interfaces/session";
 import { forbidden } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { runWithoutTenantAsync } from "@/lib/auth/tenantStore";
-import { normalizeContractScope, parseContractScope } from "@/constants/partnerPermissions";
+import {
+  isPartnerOrgLead,
+  normalizeContractScope,
+  parseContractScope,
+} from "@/constants/partnerPermissions";
 import { resolveContractScopeSlugs } from "@/services/contracts/contractScopeService";
 
 export interface PartnerManageResult {
@@ -33,7 +37,7 @@ export function isLiveContract(row: {
 }
 
 export function requirePartnerAdmin(ctx: PartnerContext): void {
-  if (ctx.user.appRole !== "admin") throw forbidden();
+  if (!isPartnerOrgLead(ctx.user.appRole)) throw forbidden();
 }
 
 export async function assertOrgHasServiceProvider(organisationId: string, now = new Date()): Promise<void> {
@@ -73,8 +77,8 @@ export async function assertPartnerManagesTenant(
     }
     if (!contract || !isLiveContract(contract, now)) throw forbidden();
 
-    // Non-admin: must have an explicit PartnerStaffAssignment for this tenant (fail closed).
-    if (membership.appRole !== "admin") {
+    // Non-leads: must have an explicit PartnerStaffAssignment for this tenant (fail closed).
+    if (!isPartnerOrgLead(membership.appRole)) {
       const assignment = await prisma.partnerStaffAssignment.findFirst({
         where: { membershipId: membership.id, tenantId },
       });
