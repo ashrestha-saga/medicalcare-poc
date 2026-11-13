@@ -2,7 +2,7 @@ import type {
   ScanDeviceCardDTO,
   ScanFurtherActionDTO,
   ScanPrimaryActionDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { notFound } from "@/lib/errors";
@@ -177,7 +177,7 @@ function toFurtherDto(list: ReturnType<typeof resolveFurtherActions>): ScanFurth
 }
 
 export const scanDeviceCardService = {
-  async get(ctx: TenantContext, deviceId: string): Promise<ScanDeviceCardDTO> {
+  async get(ctx: TenantWorkContext, deviceId: string): Promise<ScanDeviceCardDTO> {
     requirePermission(ctx, "inventory:view");
     const device = await prisma.deviceInstance.findFirst({
       where: { id: deviceId },

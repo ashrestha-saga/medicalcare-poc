@@ -96,7 +96,7 @@ async function deviceStateSegments(): Promise<{
   };
 }
 
-async function valueForTile(ctx: TenantContext, key: string): Promise<TileValue> {
+async function valueForTile(ctx: TenantWorkContext, key: string): Promise<TileValue> {
   const today = startOfTodayUtc();
   const in30 = addDays(today, 30);
   const monthEnd = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 0, 23, 59, 59, 999));

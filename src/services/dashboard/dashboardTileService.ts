@@ -1,10 +1,10 @@
-import type { TenantContext, TenantWorkContext } from "@/interfaces";
+import type { TenantWorkContext } from "@/interfaces";
 import type { PartnerAppRole } from "@/interfaces/management";
 import type { PermissionSlug } from "@/interfaces/permissions";
 import type { UserRole } from "@/interfaces/session";
 import { isPartnerSession } from "@/interfaces/session";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
@@ -77,12 +77,12 @@ export const dashboardTileService = {
       .sort((a, b) => a.zone.localeCompare(b.zone) || a.sortOrder - b.sortOrder);
   },
 
-  async listCatalog(ctx: TenantContext) {
+  async listCatalog(ctx: TenantWorkContext) {
     requirePermission(ctx, "roles:view");
     return prisma.refDashboardTile.findMany({ orderBy: [{ zone: "asc" }, { sortOrder: "asc" }] });
   },
 
-  async getRoleAssignment(ctx: TenantContext, role: UserRole) {
+  async getRoleAssignment(ctx: TenantWorkContext, role: UserRole) {
     requirePermission(ctx, "roles:view");
     if (!USER_ROLES.includes(role)) throw badRequest("Unknown role");
     const grants = await prisma.dashboardTileGrant.findMany({
@@ -97,7 +97,7 @@ export const dashboardTileService = {
     };
   },
 
-  async setRoleTiles(ctx: TenantContext, input: SetRoleDashboardTilesInput) {
+  async setRoleTiles(ctx: TenantWorkContext, input: SetRoleDashboardTilesInput) {
     requirePermission(ctx, "roles:update");
     if (!USER_ROLES.includes(input.role)) throw badRequest("Unknown role");
 
@@ -123,7 +123,7 @@ export const dashboardTileService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DashboardTileGrant",
       resourceId: input.role,
       action: "assign",

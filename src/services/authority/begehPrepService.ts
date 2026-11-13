@@ -1,4 +1,4 @@
-import type { BegehGapDTO, ChecklistPrepDTO, TenantContext } from "@/interfaces";
+import type { BegehGapDTO, ChecklistPrepDTO, TenantWorkContext } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { prisma } from "@/lib/prisma";
 import { reprocessingEvidenceService } from "@/services/reprocessingEvidence/reprocessingEvidenceService";
@@ -14,7 +14,7 @@ export interface BegehPrepDTO {
 }
 
 /** Live “what a Behörde would miss” — points to views, not forms. */
-export async function listBegehGaps(ctx: TenantContext): Promise<BegehGapDTO[]> {
+export async function listBegehGaps(ctx: TenantWorkContext): Promise<BegehGapDTO[]> {
   requirePermission(ctx, "authority:view");
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
@@ -124,7 +124,7 @@ async function countMissingDutyOverlapDecisions(): Promise<number> {
  * Live mappe coverage: seed `covered` is a baseline; override with live signals
  * when mapsToSection is known and data exists (or is clearly empty).
  */
-export async function liveChecklistCoverage(ctx: TenantContext): Promise<ChecklistPrepDTO[]> {
+export async function liveChecklistCoverage(ctx: TenantWorkContext): Promise<ChecklistPrepDTO[]> {
   requirePermission(ctx, "authority:view");
 
   const [
@@ -185,7 +185,7 @@ export async function liveChecklistCoverage(ctx: TenantContext): Promise<Checkli
   });
 }
 
-export async function getBegehPrep(ctx: TenantContext): Promise<BegehPrepDTO> {
+export async function getBegehPrep(ctx: TenantWorkContext): Promise<BegehPrepDTO> {
   requirePermission(ctx, "authority:view");
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);

@@ -2,10 +2,10 @@ import type {
   RefReprocessingCheckDTO,
   ReprocessingBatchDTO,
   ReprocessingCheckDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { recordedByAttribution } from "@/lib/auth/attribution";
 import { badRequest, forbidden, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -37,7 +37,7 @@ function startOfTodayUtc(): Date {
 
 /** Prisma filter: equipment / site / batch linked to caller's work areas. */
 async function reprocessingAccessWhere(
-  ctx: TenantContext,
+  ctx: TenantWorkContext,
 ): Promise<Prisma.ReprocessingCheckWhereInput | "empty" | null> {
   const scope = await getEffectiveAreaScope(ctx);
   if (scope.mode === "all") return null;
@@ -195,7 +195,7 @@ function scopeFilter(scope?: string, scopes?: string[]): string[] | undefined {
 
 export const reprocessingEvidenceService = {
   async listRefChecks(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     query: { cadence?: string; scope?: string; scopes?: string[] } = {},
   ): Promise<RefReprocessingCheckDTO[]> {
     requirePermission(ctx, "reprocessing:view");
@@ -217,7 +217,7 @@ export const reprocessingEvidenceService = {
    * Area-scoped callers only see refs relevant to their work areas / sites.
    */
   async listOpenDailyChecks(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     scopes?: string[],
   ): Promise<RefReprocessingCheckDTO[]> {
     const areaScope = await getEffectiveAreaScope(ctx);
@@ -269,13 +269,13 @@ export const reprocessingEvidenceService = {
     return relevant.filter((r) => !doneSet.has(r.code)).map(mapRef);
   },
 
-  async countOpenDailyChecks(ctx: TenantContext, scopes?: string[]): Promise<number> {
+  async countOpenDailyChecks(ctx: TenantWorkContext, scopes?: string[]): Promise<number> {
     const open = await this.listOpenDailyChecks(ctx, scopes);
     return open.length;
   },
 
   async listChecks(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     query: ReprocessingCheckListQuery = {},
   ): Promise<ReprocessingCheckDTO[]> {
     requirePermission(ctx, "reprocessing:view");
@@ -305,7 +305,7 @@ export const reprocessingEvidenceService = {
     return rows.map(mapCheck);
   },
 
-  async recordCheck(ctx: TenantContext, input: CreateReprocessingCheckInput): Promise<ReprocessingCheckDTO> {
+  async recordCheck(ctx: TenantWorkContext, input: CreateReprocessingCheckInput): Promise<ReprocessingCheckDTO> {
     requirePermission(ctx, "reprocessing:view");
     const ref = await prisma.refReprocessingCheck.findUnique({ where: { code: input.checkCode } });
     if (!ref) throw badRequest("Unknown check code");
@@ -363,7 +363,7 @@ export const reprocessingEvidenceService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ReprocessingCheck",
       resourceId: row.id,
       action: "create",
@@ -373,7 +373,7 @@ export const reprocessingEvidenceService = {
     return mapCheck(row);
   },
 
-  async listBatches(ctx: TenantContext): Promise<ReprocessingBatchDTO[]> {
+  async listBatches(ctx: TenantWorkContext): Promise<ReprocessingBatchDTO[]> {
     requirePermission(ctx, "reprocessing:view");
     const scope = await getEffectiveAreaScope(ctx);
     if (scope.mode === "none") return [];
@@ -389,7 +389,7 @@ export const reprocessingEvidenceService = {
     return rows.map(mapBatch);
   },
 
-  async createBatch(ctx: TenantContext, input: CreateReprocessingBatchInput): Promise<ReprocessingBatchDTO> {
+  async createBatch(ctx: TenantWorkContext, input: CreateReprocessingBatchInput): Promise<ReprocessingBatchDTO> {
     requirePermission(ctx, "reprocessing:view");
     const device = await prisma.deviceInstance.findFirst({
       where: { id: input.equipmentDeviceId },
@@ -432,7 +432,7 @@ export const reprocessingEvidenceService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ReprocessingBatch",
       resourceId: row.id,
       action: "create",
@@ -442,7 +442,7 @@ export const reprocessingEvidenceService = {
     return mapBatch(row);
   },
 
-  async release(ctx: TenantContext, id: string, input: ReleaseBatchInput): Promise<ReprocessingBatchDTO> {
+  async release(ctx: TenantWorkContext, id: string, input: ReleaseBatchInput): Promise<ReprocessingBatchDTO> {
     requirePermission(ctx, "reprocessing:release");
     const existing = await prisma.reprocessingBatch.findFirst({
       where: { id },
@@ -466,7 +466,7 @@ export const reprocessingEvidenceService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ReprocessingBatch",
       resourceId: id,
       action: "release",
@@ -477,7 +477,7 @@ export const reprocessingEvidenceService = {
   },
 
   /** Hard gate: unreleased batches must not be treated as usable. */
-  async assertBatchUsable(ctx: TenantContext, batchId: string): Promise<void> {
+  async assertBatchUsable(ctx: TenantWorkContext, batchId: string): Promise<void> {
     requirePermission(ctx, "reprocessing:view");
     const batch = await prisma.reprocessingBatch.findFirst({ where: { id: batchId } });
     if (!batch) throw notFound("Batch not found");

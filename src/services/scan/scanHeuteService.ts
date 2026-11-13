@@ -1,4 +1,4 @@
-import type { ScanHeuteBand, ScanHeuteDTO, ScanHeuteItemDTO, TenantContext } from "@/interfaces";
+import type { ScanHeuteBand, ScanHeuteDTO, ScanHeuteItemDTO, TenantWorkContext } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { prisma } from "@/lib/prisma";
 import { isReprocessingEquipmentDevice } from "@/services/registration/reprocessingLinkService";
@@ -26,7 +26,7 @@ function startOfTodayUtc(): Date {
  * open batches / done-today) — mixed users see both workstreams.
  */
 export const scanHeuteService = {
-  async list(ctx: TenantContext): Promise<ScanHeuteDTO> {
+  async list(ctx: TenantWorkContext): Promise<ScanHeuteDTO> {
     requirePermission(ctx, "inventory:view");
 
     const scope = await getEffectiveAreaScope(ctx);

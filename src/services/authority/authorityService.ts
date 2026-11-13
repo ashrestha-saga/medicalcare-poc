@@ -6,10 +6,10 @@ import type {
   DisclosureCloseSummaryDTO,
   DisclosureGapSnapshotDTO,
   DisclosureSessionDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { recordedByAttribution } from "@/lib/auth/attribution";
 import { badRequest, conflict, forbidden, notFound } from "@/lib/errors";
 import type { DisputeFindingInput, ProveFindingInput } from "@/schemas/k10";
@@ -129,7 +129,7 @@ function mapDisclosed(r: {
 }
 
 async function gapsSnapshot(
-  ctx: TenantContext,
+  ctx: TenantWorkContext,
   checklistCode: string | null | undefined,
 ): Promise<DisclosureGapSnapshotDTO[]> {
   if (!checklistCode) return [];
@@ -154,7 +154,7 @@ async function gapsSnapshot(
 }
 
 export const authorityService = {
-  async listInspections(ctx: TenantContext): Promise<AuthorityInspectionDTO[]> {
+  async listInspections(ctx: TenantWorkContext): Promise<AuthorityInspectionDTO[]> {
     requirePermission(ctx, "authority:view");
     const rows = await prisma.authorityInspection.findMany({
       include: {
@@ -184,7 +184,7 @@ export const authorityService = {
   },
 
   async createInspection(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     input: CreateAuthorityInspectionInput,
   ): Promise<AuthorityInspectionDTO> {
     requirePermission(ctx, "authority:manage");
@@ -220,7 +220,7 @@ export const authorityService = {
       },
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "AuthorityInspection",
       resourceId: row.id,
       action: "create",
@@ -245,7 +245,7 @@ export const authorityService = {
   },
 
   async listFindings(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     query: {
       inspectionId?: string;
       findingId?: string;
@@ -281,7 +281,7 @@ export const authorityService = {
   },
 
   async addFinding(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     inspectionId: string,
     input: CreateAuthorityFindingInput,
   ): Promise<AuthorityFindingDTO> {
@@ -301,7 +301,7 @@ export const authorityService = {
       },
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "AuthorityFinding",
       resourceId: row.id,
       action: "create",
@@ -323,7 +323,7 @@ export const authorityService = {
   },
 
   async remediate(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     findingId: string,
     input: RemediateFindingInput & {
       /** When set, also records an AuthorityNotification (finding_remediation). */
@@ -357,7 +357,7 @@ export const authorityService = {
     }
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "AuthorityFinding",
       resourceId: findingId,
       action: "remediate",
@@ -378,7 +378,7 @@ export const authorityService = {
     };
   },
 
-  async checklistPrep(ctx: TenantContext, code?: string): Promise<ChecklistPrepDTO[]> {
+  async checklistPrep(ctx: TenantWorkContext, code?: string): Promise<ChecklistPrepDTO[]> {
     requirePermission(ctx, "authority:view");
     const lists = await prisma.refAuthorityChecklist.findMany({
       where: code ? { code } : undefined,
@@ -401,7 +401,7 @@ export const authorityService = {
     }));
   },
 
-  async openDisclosure(ctx: TenantContext, input: OpenDisclosureInput): Promise<DisclosureSessionDTO> {
+  async openDisclosure(ctx: TenantWorkContext, input: OpenDisclosureInput): Promise<DisclosureSessionDTO> {
     requirePermission(ctx, "authority:manage");
     const open = await prisma.disclosureSession.findFirst({
       where: { closedAt: null, expiresAt: { gt: new Date() } },
@@ -435,7 +435,7 @@ export const authorityService = {
       },
       include: { site: { select: { name: true } } },
     });
-    const actor = actorFromTenant(ctx);
+    const actor = actorFromContext(ctx);
     await recordAudit({
       actor: { ...actor, correlationId: row.id },
       resource: "DisclosureSession",
@@ -456,7 +456,7 @@ export const authorityService = {
     });
   },
 
-  async closeDisclosure(ctx: TenantContext, id: string): Promise<DisclosureCloseSummaryDTO> {
+  async closeDisclosure(ctx: TenantWorkContext, id: string): Promise<DisclosureCloseSummaryDTO> {
     requirePermission(ctx, "authority:manage");
     const existing = await prisma.disclosureSession.findFirst({
       where: { id },
@@ -500,7 +500,7 @@ export const authorityService = {
       Math.round((closedAt.getTime() - existing.openedAt.getTime()) / 60_000),
     );
     await recordAudit({
-      actor: { ...actorFromTenant(ctx), correlationId: row.id },
+      actor: { ...actorFromContext(ctx), correlationId: row.id },
       resource: "DisclosureSession",
       resourceId: id,
       action: "session.closed",
@@ -519,7 +519,7 @@ export const authorityService = {
     };
   },
 
-  async listDisclosed(ctx: TenantContext, sessionId: string): Promise<DisclosedEventDTO[]> {
+  async listDisclosed(ctx: TenantWorkContext, sessionId: string): Promise<DisclosedEventDTO[]> {
     requirePermission(ctx, "authority:view");
     const session = await prisma.disclosureSession.findFirst({ where: { id: sessionId } });
     if (!session) throw notFound("Disclosure session not found");
@@ -532,7 +532,7 @@ export const authorityService = {
   },
 
   async recordDisclosed(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     sessionId: string,
     input: { resource: string; resourceId?: string | null; label: string },
   ) {
@@ -555,7 +555,7 @@ export const authorityService = {
     if (dup) return { id: dup.id, duplicate: true };
 
     await recordAudit({
-      actor: { ...actorFromTenant(ctx), correlationId: sessionId },
+      actor: { ...actorFromContext(ctx), correlationId: sessionId },
       resource: input.resource,
       resourceId: input.resourceId ?? "",
       action: "disclosed",
@@ -565,7 +565,7 @@ export const authorityService = {
   },
 
   async prove(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     findingId: string,
     input: ProveFindingInput,
   ): Promise<AuthorityFindingDTO> {
@@ -582,7 +582,7 @@ export const authorityService = {
       data: { status: "proven", provenAt },
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "AuthorityFinding",
       resourceId: findingId,
       action: "finding.prove",
@@ -592,7 +592,7 @@ export const authorityService = {
   },
 
   async dispute(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     findingId: string,
     input: DisputeFindingInput,
   ): Promise<AuthorityFindingDTO> {
@@ -609,7 +609,7 @@ export const authorityService = {
       },
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "AuthorityFinding",
       resourceId: findingId,
       action: "finding.dispute",
@@ -626,7 +626,7 @@ export const authorityService = {
     }
   },
 
-  async listDisclosures(ctx: TenantContext): Promise<DisclosureSessionDTO[]> {
+  async listDisclosures(ctx: TenantWorkContext): Promise<DisclosureSessionDTO[]> {
     requirePermission(ctx, "authority:view");
     const rows = await prisma.disclosureSession.findMany({
       orderBy: { openedAt: "desc" },

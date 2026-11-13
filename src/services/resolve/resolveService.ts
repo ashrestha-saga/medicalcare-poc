@@ -1,4 +1,4 @@
-import type { ParsedIdentifier, ResolveResponse, TenantContext } from "@/interfaces";
+import type { ParsedIdentifier, ResolveResponse, TenantWorkContext } from "@/interfaces";
 import { forbidden, notFound } from "@/lib/errors";
 import { errorMessage, logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
@@ -139,7 +139,7 @@ export function createResolveService(deps: Deps = {}) {
       tenantId: string,
       correlationId: string,
       userId?: string,
-      areaCtx?: Pick<TenantContext, "tenantId" | "user">,
+      areaCtx?: Pick<TenantWorkContext, "tenantId" | "user">,
       options: ResolveOptions = {},
     ): Promise<ResolveResponse> {
       logger.info("resolve.start", {
@@ -210,7 +210,7 @@ export function createResolveService(deps: Deps = {}) {
      * Work-area check runs here (on continue), not when listing candidates.
      */
     async selectDevice(
-      ctx: Pick<TenantContext, "tenantId" | "user" | "correlationId">,
+      ctx: Pick<TenantWorkContext, "tenantId" | "user" | "correlationId">,
       deviceId: string,
       identifier: ParsedIdentifier,
     ): Promise<ResolveResponse> {

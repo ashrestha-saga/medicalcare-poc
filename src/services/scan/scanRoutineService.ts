@@ -3,10 +3,10 @@ import type {
   ScanRoutineOpenDTO,
   ScanRoutineResultDTO,
   ScanRoutineStepDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { badRequest, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
@@ -108,7 +108,7 @@ export function evaluateWithinLimit(
 }
 
 export const scanRoutineService = {
-  async listOpen(ctx: TenantContext, deviceId: string): Promise<ScanRoutineOpenDTO> {
+  async listOpen(ctx: TenantWorkContext, deviceId: string): Promise<ScanRoutineOpenDTO> {
     requirePermission(ctx, "reprocessing:view");
     const device = await prisma.deviceInstance.findFirst({
       where: { id: deviceId },
@@ -237,7 +237,7 @@ export const scanRoutineService = {
   },
 
   async submit(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     deviceId: string,
     input: SubmitScanRoutineInput,
   ): Promise<ScanRoutineResultDTO> {
@@ -312,7 +312,7 @@ export const scanRoutineService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ReprocessingCheck",
       resourceId: createdIds[0] ?? deviceId,
       action: "create",

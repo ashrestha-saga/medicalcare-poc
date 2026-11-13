@@ -3,10 +3,10 @@ import type {
   ScanChargeListDTO,
   ScanChargeListItemDTO,
   ScanChargeReleaseResultDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { recordedByAttribution } from "@/lib/auth/attribution";
 import { badRequest, forbidden, notFound, unprocessable } from "@/lib/errors";
 import { blobMetaFromDataUrl } from "@/lib/blobMeta";
@@ -43,7 +43,7 @@ function sha256HexFromDataUrl(dataUrl: string): string | null {
   }
 }
 
-async function assertSachkunde(ctx: TenantContext): Promise<void> {
+async function assertSachkunde(ctx: TenantWorkContext): Promise<void> {
   const today = startOfTodayUtc();
   const catalog = await prisma.refQualification.findMany({
     where: {
@@ -135,7 +135,7 @@ function mapListItem(r: {
 }
 
 export const scanChargeService = {
-  async listOpen(ctx: TenantContext, equipmentDeviceId?: string): Promise<ScanChargeListDTO> {
+  async listOpen(ctx: TenantWorkContext, equipmentDeviceId?: string): Promise<ScanChargeListDTO> {
     requirePermission(ctx, "reprocessing:view");
     const scope = await getEffectiveAreaScope(ctx);
     if (scope.mode === "none") return { items: [] };
@@ -169,7 +169,7 @@ export const scanChargeService = {
     return { items: rows.map(mapListItem) };
   },
 
-  async get(ctx: TenantContext, batchId: string): Promise<ScanChargeDetailDTO> {
+  async get(ctx: TenantWorkContext, batchId: string): Promise<ScanChargeDetailDTO> {
     requirePermission(ctx, "reprocessing:view");
     const row = await prisma.reprocessingBatch.findFirst({
       where: { id: batchId },
@@ -276,7 +276,7 @@ export const scanChargeService = {
     };
   },
 
-  async create(ctx: TenantContext, input: CreateScanChargeInput): Promise<ScanChargeDetailDTO> {
+  async create(ctx: TenantWorkContext, input: CreateScanChargeInput): Promise<ScanChargeDetailDTO> {
     requirePermission(ctx, "reprocessing:view");
     const device = await prisma.deviceInstance.findFirst({
       where: { id: input.equipmentDeviceId },
@@ -334,7 +334,7 @@ export const scanChargeService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ReprocessingBatch",
       resourceId: row.id,
       action: "create",
@@ -345,7 +345,7 @@ export const scanChargeService = {
   },
 
   async attachBeleg(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     batchId: string,
     input: AttachScanChargeBelegInput,
   ): Promise<ScanChargeDetailDTO> {
@@ -379,7 +379,7 @@ export const scanChargeService = {
       data: { processRecordBlobId: blob.id },
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ReprocessingBatch",
       resourceId: batchId,
       action: "update",
@@ -389,7 +389,7 @@ export const scanChargeService = {
   },
 
   async release(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     batchId: string,
     input: ReleaseScanChargeInput,
   ): Promise<ScanChargeReleaseResultDTO> {
@@ -482,7 +482,7 @@ export const scanChargeService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ReprocessingBatch",
       resourceId: batchId,
       action: "release",

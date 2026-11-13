@@ -2,7 +2,6 @@ import type {
   ClarificationItemDTO,
   ClarificationsResponse,
   ClarificationSummaryDTO,
-  TenantContext,
   TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
@@ -136,7 +135,7 @@ export const clarificationService = {
   },
 
   /** Dashboard tile count — same open-case set as {@link list}. */
-  async countOpenCases(_ctx: TenantContext): Promise<number> {
+  async countOpenCases(_ctx: TenantWorkContext): Promise<number> {
     const items = await collectOpenItems();
     return items.length;
   },

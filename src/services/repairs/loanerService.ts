@@ -1,5 +1,5 @@
-import type { TenantContext } from "@/interfaces";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import type { TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { forbidden, notFound, unprocessable } from "@/lib/errors";
 import { isRepairsEnabled } from "@/lib/features/repairs";
@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
 import { transitionOperationalState } from "@/services/repairs/operationalStateService";
 
-async function assertRepairs(ctx: TenantContext) {
+async function assertRepairs(ctx: TenantWorkContext) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: ctx.tenantId },
     select: { featureFlags: true },
@@ -19,7 +19,7 @@ async function assertRepairs(ctx: TenantContext) {
 
 /** R14 — link an existing instance as loaner, or create a loaner instance. */
 export async function assignReplacement(
-  ctx: TenantContext,
+  ctx: TenantWorkContext,
   defectiveId: string,
   input: {
     instanceId?: string;
@@ -106,7 +106,7 @@ export async function assignReplacement(
   });
 
   await recordAudit({
-    actor: actorFromTenant(ctx),
+    actor: actorFromContext(ctx),
     resource: "DeviceInstance",
     resourceId: defective.id,
     action: "assign_replacement",

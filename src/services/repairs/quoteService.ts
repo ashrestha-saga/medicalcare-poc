@@ -1,6 +1,6 @@
 import type { QuoteDecision, ServiceRequestState } from "@prisma/client";
-import type { ActingContext, TenantContext } from "@/interfaces";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import type { ActingContext, TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import {
   requireActingPartnerConsolePermission,
   requirePermission,
@@ -157,7 +157,7 @@ export async function upsertQuote(
 
 /** R10 — clinic approve/reject. */
 export async function decideQuote(
-  ctx: TenantContext,
+  ctx: TenantWorkContext,
   serviceRequestId: string,
   input: { decision: Exclude<QuoteDecision, "open">; decisionNote?: string | null },
 ) {
@@ -217,7 +217,7 @@ export async function decideQuote(
   });
 
   await recordAudit({
-    actor: actorFromTenant(ctx),
+    actor: actorFromContext(ctx),
     resource: "Quote",
     resourceId: updated.id,
     action: "decide",

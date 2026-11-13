@@ -1,10 +1,10 @@
 import type {
   ConstancyCadenceDTO,
   MissingConstancyCadenceDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { actorAttribution } from "@/lib/auth/attribution";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -70,7 +70,7 @@ function openKey(deviceInstanceId: string, constancyObjectCode: string): string 
 }
 
 export const constancyCadenceService = {
-  async listOpen(ctx: TenantContext): Promise<ConstancyCadenceDTO[]> {
+  async listOpen(ctx: TenantWorkContext): Promise<ConstancyCadenceDTO[]> {
     requirePermission(ctx, "duties:view");
     const rows = await prisma.constancyCadence.findMany({
       where: { validTo: null },
@@ -84,7 +84,7 @@ export const constancyCadenceService = {
     return rows.map(mapCadence);
   },
 
-  async listMissing(ctx: TenantContext): Promise<MissingConstancyCadenceDTO[]> {
+  async listMissing(ctx: TenantWorkContext): Promise<MissingConstancyCadenceDTO[]> {
     requirePermission(ctx, "duties:view");
     const duties = await prisma.deviceDuty.findMany({
       where: {
@@ -117,7 +117,7 @@ export const constancyCadenceService = {
       }));
   },
 
-  async determine(ctx: TenantContext, input: CreateConstancyCadenceInput): Promise<ConstancyCadenceDTO> {
+  async determine(ctx: TenantWorkContext, input: CreateConstancyCadenceInput): Promise<ConstancyCadenceDTO> {
     requirePermission(ctx, "duties:view");
     const device = await prisma.deviceInstance.findFirst({
       where: { id: input.deviceInstanceId },
@@ -168,7 +168,7 @@ export const constancyCadenceService = {
     await recomputeDutyProjection(prisma, input.deviceInstanceId);
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ConstancyCadence",
       resourceId: row.id,
       action: "determine",

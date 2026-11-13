@@ -1,6 +1,6 @@
-import type { ModelDocumentDTO, TenantContext, TenantWorkContext } from "@/interfaces";
+import type { ModelDocumentDTO, TenantWorkContext } from "@/interfaces";
 import { actorAttribution } from "@/lib/auth/attribution";
-import { actorFromContext, actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -75,7 +75,7 @@ export const modelDocumentService = {
    * Publish a new model IFU (or other kind). Supersedes the previous current of same kind+language.
    */
   async publish(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     input: {
       deviceModelId: string;
       kind?: DocumentKind;
@@ -154,7 +154,7 @@ export const modelDocumentService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ModelDocument",
       resourceId: row.id,
       action: "publish",

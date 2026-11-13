@@ -5,10 +5,9 @@ import type {
   CatalogModelListItemDTO,
   CatalogSpreadRow,
   RegistrationCharacteristics,
-  TenantContext,
   TenantWorkContext,
 } from "@/interfaces";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { recordAudit } from "@/services/audit/auditService";
 import { conflict, notFound, unprocessable } from "@/lib/errors";
@@ -201,7 +200,7 @@ export const deviceModelCatalogService = {
     return toDetail(row as ModelWithAggregates, ctx.tenantId);
   },
 
-  async create(ctx: TenantContext, input: CreateCatalogModelInput): Promise<CatalogModelListItemDTO> {
+  async create(ctx: TenantWorkContext, input: CreateCatalogModelInput): Promise<CatalogModelListItemDTO> {
     requirePermission(ctx, "catalog:update");
     if (input.basicUdiDi) {
       const clash = await prisma.deviceModel.findUnique({ where: { basicUdiDi: input.basicUdiDi } });
@@ -226,7 +225,7 @@ export const deviceModelCatalogService = {
       include: listIncludeForTenant(ctx.tenantId),
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "catalog_model",
       resourceId: created.id,
       action: "create",
@@ -236,7 +235,7 @@ export const deviceModelCatalogService = {
     return toListItem(created as ModelWithAggregates);
   },
 
-  async update(ctx: TenantContext, id: string, input: UpdateCatalogModelInput): Promise<CatalogModelDetailDTO> {
+  async update(ctx: TenantWorkContext, id: string, input: UpdateCatalogModelInput): Promise<CatalogModelDetailDTO> {
     requirePermission(ctx, "catalog:update");
     const existing = await prisma.deviceModel.findUnique({
       where: { id },
@@ -312,7 +311,7 @@ export const deviceModelCatalogService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "catalog_model",
       resourceId: id,
       action: "update",
@@ -321,7 +320,7 @@ export const deviceModelCatalogService = {
     return this.getById(ctx, id);
   },
 
-  async importRows(ctx: TenantContext, rows: UpdateCatalogModelInput[]): Promise<CatalogModelImportResult> {
+  async importRows(ctx: TenantWorkContext, rows: UpdateCatalogModelInput[]): Promise<CatalogModelImportResult> {
     requirePermission(ctx, "catalog:update");
     if (!rows.length) throw unprocessable("No rows to import.");
 
@@ -393,7 +392,7 @@ export const deviceModelCatalogService = {
     }
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "catalog_model",
       resourceId: ctx.tenantId,
       action: "import",

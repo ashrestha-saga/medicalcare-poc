@@ -1,6 +1,6 @@
 import type { RepairResult } from "@prisma/client";
-import type { TenantContext } from "@/interfaces";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import type { TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { recordedByAttribution } from "@/lib/auth/attribution";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { fingerprint, newReference } from "@/lib/crypto";
@@ -14,7 +14,7 @@ import {
 import { recordAudit } from "@/services/audit/auditService";
 import { loadClassHints } from "@/services/repairs/repairOutcomeService";
 
-async function assertRepairs(ctx: TenantContext) {
+async function assertRepairs(ctx: TenantWorkContext) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: ctx.tenantId },
     select: { featureFlags: true },
@@ -24,7 +24,7 @@ async function assertRepairs(ctx: TenantContext) {
   }
 }
 
-function hasPermissionAny(ctx: TenantContext, ...slugs: Parameters<typeof requirePermission>[1][]) {
+function hasPermissionAny(ctx: TenantWorkContext, ...slugs: Parameters<typeof requirePermission>[1][]) {
   for (const s of slugs) {
     try {
       requirePermission(ctx, s);
@@ -38,7 +38,7 @@ function hasPermissionAny(ctx: TenantContext, ...slugs: Parameters<typeof requir
 
 /** R17 — clinic records an external (third-party) repair. */
 export async function createExternalRepairReport(
-  ctx: TenantContext,
+  ctx: TenantWorkContext,
   input: {
     deviceInstanceId: string;
     performedAt: string;
@@ -163,7 +163,7 @@ export async function createExternalRepairReport(
   });
 
   await recordAudit({
-    actor: actorFromTenant(ctx),
+    actor: actorFromContext(ctx),
     resource: "MaintenanceEvent",
     resourceId: result.event.id,
     action: "external_repair",

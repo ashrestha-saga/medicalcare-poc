@@ -1,6 +1,6 @@
-import type { DeviceIncidentDTO, TenantContext } from "@/interfaces";
+import type { DeviceIncidentDTO, TenantWorkContext } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
@@ -104,13 +104,13 @@ export type IncidentKpis = {
   total: number;
 };
 
-function isAreaBypassed(ctx: TenantContext): boolean {
+function isAreaBypassed(ctx: TenantWorkContext): boolean {
   const role = ctx.user.role as UserRole | null;
   return Boolean(role && (AREA_UNSCOPED_ROLES as readonly string[]).includes(role));
 }
 
 async function areaFilter(
-  ctx: TenantContext,
+  ctx: TenantWorkContext,
 ): Promise<{ deviceInstance: { areaId: { in: string[] } } } | undefined | "none"> {
   if (isAreaBypassed(ctx) || ctx.permissions?.includes("incidents:manage")) return undefined;
   const scope = await getEffectiveAreaScope(ctx);
@@ -132,7 +132,7 @@ const deviceInclude = {
 
 export const incidentService = {
   async list(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     view: IncidentListView = "all",
   ): Promise<{ incidents: DeviceIncidentDTO[]; kpis: IncidentKpis }> {
     requirePermission(ctx, "incidents:view");
@@ -178,7 +178,7 @@ export const incidentService = {
     return { incidents: rows.map(mapIncident), kpis: { unassessed, unreported, total } };
   },
 
-  async create(ctx: TenantContext, input: CreateIncidentInput): Promise<DeviceIncidentDTO> {
+  async create(ctx: TenantWorkContext, input: CreateIncidentInput): Promise<DeviceIncidentDTO> {
     requirePermission(ctx, "incidents:manage");
     if (!input.deviceInstanceId && !input.deviceModelId) {
       throw badRequest("Provide deviceInstanceId or deviceModelId");
@@ -206,7 +206,7 @@ export const incidentService = {
       include: deviceInclude,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DeviceIncident",
       resourceId: row.id,
       action: "create",
@@ -215,7 +215,7 @@ export const incidentService = {
     return mapIncident(row);
   },
 
-  async assess(ctx: TenantContext, id: string, input: AssessIncidentInput): Promise<DeviceIncidentDTO> {
+  async assess(ctx: TenantWorkContext, id: string, input: AssessIncidentInput): Promise<DeviceIncidentDTO> {
     requirePermission(ctx, "incidents:manage");
     const existing = await prisma.deviceIncident.findFirst({ where: { id } });
     if (!existing) throw notFound("Incident not found");
@@ -232,7 +232,7 @@ export const incidentService = {
       include: deviceInclude,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DeviceIncident",
       resourceId: id,
       action: "assess",
@@ -242,7 +242,7 @@ export const incidentService = {
     return mapIncident(row);
   },
 
-  async report(ctx: TenantContext, id: string, input: ReportIncidentInput): Promise<DeviceIncidentDTO> {
+  async report(ctx: TenantWorkContext, id: string, input: ReportIncidentInput): Promise<DeviceIncidentDTO> {
     requirePermission(ctx, "incidents:manage");
     const existing = await prisma.deviceIncident.findFirst({ where: { id } });
     if (!existing) throw notFound("Incident not found");
@@ -274,7 +274,7 @@ export const incidentService = {
       include: deviceInclude,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DeviceIncident",
       resourceId: id,
       action: "report",
@@ -283,7 +283,7 @@ export const incidentService = {
     return mapIncident(row);
   },
 
-  async close(ctx: TenantContext, id: string): Promise<DeviceIncidentDTO> {
+  async close(ctx: TenantWorkContext, id: string): Promise<DeviceIncidentDTO> {
     requirePermission(ctx, "incidents:manage");
     const existing = await prisma.deviceIncident.findFirst({ where: { id } });
     if (!existing) throw notFound("Incident not found");
@@ -301,7 +301,7 @@ export const incidentService = {
       include: deviceInclude,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DeviceIncident",
       resourceId: id,
       action: "close",
@@ -310,7 +310,7 @@ export const incidentService = {
     return mapIncident(row);
   },
 
-  async assign(ctx: TenantContext, id: string, input: AssignIncidentInput): Promise<DeviceIncidentDTO> {
+  async assign(ctx: TenantWorkContext, id: string, input: AssignIncidentInput): Promise<DeviceIncidentDTO> {
     requirePermission(ctx, "incidents:manage");
     const existing = await prisma.deviceIncident.findFirst({ where: { id } });
     if (!existing) throw notFound("Incident not found");
@@ -330,7 +330,7 @@ export const incidentService = {
       include: deviceInclude,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DeviceIncident",
       resourceId: id,
       action: "assign",

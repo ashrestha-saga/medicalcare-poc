@@ -1,17 +1,20 @@
 import type { LockSource, OperationalState, Prisma } from "@prisma/client";
-import type { TenantContext } from "@/interfaces";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import type { TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { conflict, forbidden, notFound, unprocessable } from "@/lib/errors";
 import { isRepairsEnabled } from "@/lib/features/repairs";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
 
-type OpsCtx = {
-  tenantId: string;
-  user: { id: string; name: string; role?: string };
-  correlationId: string;
-};
+/** Full acting/clinic ctx, or minimal system-driven ctx (repair outcomes pass `system` + `tx`). */
+type TransitionCtx =
+  | TenantWorkContext
+  | {
+      tenantId: string;
+      user: { id: string; name: string; role?: string };
+      correlationId: string;
+    };
 
 /** Pure transition table (R13) — exported for unit tests. */
 export const OPERATIONAL_STATE_TRANSITIONS: Record<OperationalState, OperationalState[]> = {
@@ -30,7 +33,7 @@ export function canTransitionOperationalState(
   return OPERATIONAL_STATE_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
-async function assertRepairs(ctx: OpsCtx) {
+async function assertRepairs(ctx: TransitionCtx) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: ctx.tenantId },
     select: { featureFlags: true },
@@ -41,7 +44,7 @@ async function assertRepairs(ctx: OpsCtx) {
 }
 
 export async function transitionOperationalState(
-  ctx: OpsCtx,
+  ctx: TransitionCtx,
   input: {
     deviceInstanceId: string;
     to: OperationalState;
@@ -73,7 +76,7 @@ export async function transitionOperationalState(
   if (from === to) return { from, to };
 
   if (!input.system && (input.unlock || (from === "locked" && to === "in_service"))) {
-    requirePermission(ctx as TenantContext, "inventory:update");
+    requirePermission(ctx as TenantWorkContext, "inventory:update");
   }
 
   if (!canTransitionOperationalState(from, to)) {
@@ -111,11 +114,7 @@ export async function transitionOperationalState(
 
   if (!input.tx) {
     await recordAudit({
-      actor: actorFromTenant({
-        tenantId: ctx.tenantId,
-        user: ctx.user as TenantContext["user"],
-        correlationId: ctx.correlationId,
-      }),
+      actor: actorFromContext(ctx as TenantWorkContext),
       resource: "DeviceInstance",
       resourceId: device.id,
       action: "operational_state",
@@ -129,7 +128,7 @@ export async function transitionOperationalState(
 
 export const operationalStateService = {
   async unlock(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     deviceInstanceId: string,
     note: string,
   ): Promise<{ from: OperationalState; to: OperationalState }> {

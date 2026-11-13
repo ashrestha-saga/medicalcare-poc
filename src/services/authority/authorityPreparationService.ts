@@ -1,4 +1,4 @@
-import type { TenantContext } from "@/interfaces";
+import type { TenantWorkContext } from "@/interfaces";
 import {
   PREPARATION_GAPS,
   UNMAPPED_PREPARATION_GAPS,
@@ -7,7 +7,7 @@ import {
 } from "@/constants/authorityPreparationGaps";
 import { isDossierSectionKey } from "@/constants/authorityDossier";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { recordedByAttribution } from "@/lib/auth/attribution";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -72,7 +72,7 @@ const GAP_LABELS: Record<PreparationGapCode, string> = {
   missing_duty_overlap: "Overlap questions without an operator decision",
 };
 
-async function gapCounts(ctx: TenantContext): Promise<Record<PreparationGapCode, number>> {
+async function gapCounts(ctx: TenantWorkContext): Promise<Record<PreparationGapCode, number>> {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
   const { listBegehGaps } = await import("@/services/authority/begehPrepService");
@@ -113,7 +113,7 @@ function sectionGapTotal(
 /** R6 — derived readiness state for one checklist. */
 export const authorityPreparationService = {
   async overview(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     listCode: string,
     siteId?: string | null,
   ): Promise<AuthorityOverviewDTO> {
@@ -178,7 +178,7 @@ export const authorityPreparationService = {
     };
   },
 
-  async preparation(ctx: TenantContext, listCode: string): Promise<PreparationListDTO> {
+  async preparation(ctx: TenantWorkContext, listCode: string): Promise<PreparationListDTO> {
     requirePermission(ctx, "authority:view");
     const checklist = await prisma.refAuthorityChecklist.findUnique({
       where: { code: listCode },
@@ -269,7 +269,7 @@ export const authorityPreparationService = {
   },
 
   async setReadiness(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     itemId: string,
     input: { externalReady: boolean; documentRef?: string | null },
   ) {
@@ -301,7 +301,7 @@ export const authorityPreparationService = {
       },
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "ChecklistItemReadiness",
       resourceId: row.id,
       action: "readiness.set",

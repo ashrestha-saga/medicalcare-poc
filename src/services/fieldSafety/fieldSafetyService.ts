@@ -1,6 +1,6 @@
-import type { FieldSafetyActionDTO, FieldSafetyAffectedModelDTO, TenantContext } from "@/interfaces";
+import type { FieldSafetyActionDTO, FieldSafetyAffectedModelDTO, TenantWorkContext } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { recordedByAttribution } from "@/lib/auth/attribution";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -190,7 +190,7 @@ export type FieldSafetyListView = "all" | "open" | "unmatched";
 
 export const fieldSafetyService = {
   async list(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     view: FieldSafetyListView = "all",
     opts: { actionId?: string } = {},
   ): Promise<FieldSafetyActionDTO[]> {
@@ -222,7 +222,7 @@ export const fieldSafetyService = {
   },
 
   async create(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     input: CreateFieldSafetyInput | CreateFieldSafetyWithDevicesInput,
   ): Promise<FieldSafetyActionDTO> {
     requirePermission(ctx, "fieldsafety:create");
@@ -290,7 +290,7 @@ export const fieldSafetyService = {
       include: includeActions,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "FieldSafetyAction",
       resourceId: row.id,
       action: "create",
@@ -300,7 +300,7 @@ export const fieldSafetyService = {
   },
 
   async addAffectedModels(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     actionId: string,
     input: AddFieldSafetyAffectedModelsInput,
   ): Promise<FieldSafetyActionDTO> {
@@ -328,7 +328,7 @@ export const fieldSafetyService = {
       include: includeActions,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "FieldSafetyAffectedModel",
       resourceId: actionId,
       action: "add",
@@ -341,7 +341,7 @@ export const fieldSafetyService = {
    * Enqueue inventory matches from affectedModels onto Abgleich (affected=null).
    * Does not mark devices as affected.
    */
-  async suggestCandidates(ctx: TenantContext, actionId: string): Promise<FieldSafetyActionDTO> {
+  async suggestCandidates(ctx: TenantWorkContext, actionId: string): Promise<FieldSafetyActionDTO> {
     requirePermission(ctx, "fieldsafety:create");
     const action = await prisma.fieldSafetyAction.findFirst({
       where: { id: actionId },
@@ -376,7 +376,7 @@ export const fieldSafetyService = {
       include: includeActions,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "FieldSafetyAction",
       resourceId: actionId,
       action: "suggest",
@@ -387,7 +387,7 @@ export const fieldSafetyService = {
   },
 
   async matchDevice(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     actionId: string,
     input: MatchFieldSafetyDeviceInput,
   ): Promise<FieldSafetyActionDTO> {
@@ -452,7 +452,7 @@ export const fieldSafetyService = {
       include: includeActions,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "FieldSafetyDeviceAction",
       resourceId: actionId,
       action: "match",
@@ -461,7 +461,7 @@ export const fieldSafetyService = {
     return mapAction(row, await suggestedCountForAction(ctx.tenantId, row));
   },
 
-  async close(ctx: TenantContext, id: string): Promise<FieldSafetyActionDTO> {
+  async close(ctx: TenantWorkContext, id: string): Promise<FieldSafetyActionDTO> {
     requirePermission(ctx, "fieldsafety:create");
     const existing = await prisma.fieldSafetyAction.findFirst({
       where: { id },
@@ -487,7 +487,7 @@ export const fieldSafetyService = {
       include: includeActions,
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "FieldSafetyAction",
       resourceId: id,
       action: "close",

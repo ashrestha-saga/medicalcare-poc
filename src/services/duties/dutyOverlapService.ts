@@ -1,6 +1,6 @@
-import type { DutyOverlapDecisionDTO, TenantContext } from "@/interfaces";
+import type { DutyOverlapDecisionDTO, TenantWorkContext } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
@@ -54,7 +54,7 @@ function mapDecision(row: {
 }
 
 export const dutyOverlapService = {
-  async list(ctx: TenantContext): Promise<DutyOverlapDecisionDTO[]> {
+  async list(ctx: TenantWorkContext): Promise<DutyOverlapDecisionDTO[]> {
     requirePermission(ctx, "duties:view");
     const rows = await prisma.dutyOverlapDecision.findMany({
       where: { validTo: null },
@@ -69,7 +69,7 @@ export const dutyOverlapService = {
    * Released devices that currently carry both STK and DGUV duties
    * (the only pairs the overlap UI records).
    */
-  async listCandidateDevices(ctx: TenantContext): Promise<OverlapCandidateDevice[]> {
+  async listCandidateDevices(ctx: TenantWorkContext): Promise<OverlapCandidateDevice[]> {
     requirePermission(ctx, "duties:view");
     const duties = await prisma.deviceDuty.findMany({
       where: {
@@ -120,7 +120,7 @@ export const dutyOverlapService = {
    * Devices with an applicable, unsuspended DGUV duty and no open overlap
    * decision covering DGUV (mirrors dashboard tile `dguv-ohne-festlegung`).
    */
-  async listPendingDguvCoverage(ctx: TenantContext): Promise<OverlapCandidateDevice[]> {
+  async listPendingDguvCoverage(ctx: TenantWorkContext): Promise<OverlapCandidateDevice[]> {
     requirePermission(ctx, "duties:view");
     const withDecision = await prisma.dutyOverlapDecision.findMany({
       where: { validTo: null, coveredDutyKey: "dguv" },
@@ -154,7 +154,7 @@ export const dutyOverlapService = {
     return [...byDevice.values()].sort((a, b) => a.inventoryNumber.localeCompare(b.inventoryNumber));
   },
 
-  async decide(ctx: TenantContext, input: CreateDutyOverlapInput): Promise<DutyOverlapDecisionDTO> {
+  async decide(ctx: TenantWorkContext, input: CreateDutyOverlapInput): Promise<DutyOverlapDecisionDTO> {
     requirePermission(ctx, "duties:view");
     if (input.coveredDutyKey === input.satisfiedByDutyKey) {
       throw badRequest("coveredDutyKey and satisfiedByDutyKey must differ");
@@ -208,7 +208,7 @@ export const dutyOverlapService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DutyOverlapDecision",
       resourceId: row.id,
       action: "decide",
@@ -222,7 +222,7 @@ export const dutyOverlapService = {
    * Close an open overlap decision and reactivate the covered duty
    * when no other open decision still covers it.
    */
-  async revoke(ctx: TenantContext, decisionId: string): Promise<DutyOverlapDecisionDTO> {
+  async revoke(ctx: TenantWorkContext, decisionId: string): Promise<DutyOverlapDecisionDTO> {
     requirePermission(ctx, "duties:view");
     const existing = await prisma.dutyOverlapDecision.findFirst({
       where: { id: decisionId },
@@ -246,7 +246,7 @@ export const dutyOverlapService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DutyOverlapDecision",
       resourceId: row.id,
       action: "revoke",

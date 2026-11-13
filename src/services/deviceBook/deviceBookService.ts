@@ -4,10 +4,10 @@ import type {
   ComposedBookEvidenceDTO,
   DeviceBookEntryDTO,
   ScanStoerungResultDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { badRequest, notFound, unprocessable } from "@/lib/errors";
 import { isRepairsEnabled } from "@/lib/features/repairs";
 import { prisma } from "@/lib/prisma";
@@ -98,7 +98,7 @@ function mapEntry(row: {
 }
 
 export const deviceBookService = {
-  async list(ctx: TenantContext, deviceInstanceId?: string): Promise<DeviceBookEntryDTO[]> {
+  async list(ctx: TenantWorkContext, deviceInstanceId?: string): Promise<DeviceBookEntryDTO[]> {
     requirePermission(ctx, "devicebook:view");
     const scope = await getEffectiveAreaScope(ctx);
     if (scope.mode === "none") return [];
@@ -125,7 +125,7 @@ export const deviceBookService = {
   },
 
   /** Append-only — corrections reference correctsEntryId; no update/delete. */
-  async create(ctx: TenantContext, input: CreateBookEntryInput): Promise<DeviceBookEntryDTO> {
+  async create(ctx: TenantWorkContext, input: CreateBookEntryInput): Promise<DeviceBookEntryDTO> {
     requirePermission(ctx, "devicebook:view");
     const device = await prisma.deviceInstance.findFirst({ where: { id: input.deviceInstanceId } });
     if (!device) throw notFound("Device not found");
@@ -156,7 +156,7 @@ export const deviceBookService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DeviceBookEntry",
       resourceId: row.id,
       action: "create",
@@ -173,7 +173,7 @@ export const deviceBookService = {
    * When Tenant.featureFlags.repairs is on, delegates book/lock/order to R9 reportFault.
    */
   async reportMalfunction(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     input: ReportMalfunctionInput,
   ): Promise<ScanStoerungResultDTO> {
     requirePermission(ctx, "devicebook:view");
@@ -290,7 +290,7 @@ export const deviceBookService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DeviceBookEntry",
       resourceId: result.entryId,
       action: "create",
@@ -317,7 +317,7 @@ export const deviceBookService = {
    * Devices subject to § 13 book (Anlage 1 STK or Anlage 2 MTK), non-draft.
    * Excludes § 3 Abs. 4 book exceptions (Kompaktthermometer / Hg|aneroid manometer).
    */
-  async listBookableDevices(ctx: TenantContext): Promise<ComposedBookDeviceOptionDTO[]> {
+  async listBookableDevices(ctx: TenantWorkContext): Promise<ComposedBookDeviceOptionDTO[]> {
     requirePermission(ctx, "devicebook:view");
     const scope = await getEffectiveAreaScope(ctx);
     if (scope.mode === "none") return [];
@@ -403,7 +403,7 @@ export const deviceBookService = {
   },
 
   /** Aggregate § 13 Abs. 2 from existing sources for one device. */
-  async getComposed(ctx: TenantContext, deviceInstanceId: string): Promise<ComposedBookDTO> {
+  async getComposed(ctx: TenantWorkContext, deviceInstanceId: string): Promise<ComposedBookDTO> {
     requirePermission(ctx, "devicebook:view");
     const device = await prisma.deviceInstance.findFirst({
       where: { id: deviceInstanceId },
@@ -563,7 +563,7 @@ export const deviceBookService = {
    * Upload IFU: instance DeviceEvidence (accessibility) + when model-linked and
    * user can update catalog, also publish ModelDocument (Bauart).
    */
-  async uploadIfu(ctx: TenantContext, input: UploadDeviceBookIfuInput): Promise<ComposedBookEvidenceDTO> {
+  async uploadIfu(ctx: TenantWorkContext, input: UploadDeviceBookIfuInput): Promise<ComposedBookEvidenceDTO> {
     requirePermission(ctx, "devicebook:view");
     requirePermission(ctx, "inventory:update");
     const device = await prisma.deviceInstance.findFirst({
@@ -603,7 +603,7 @@ export const deviceBookService = {
     }
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "DeviceEvidence",
       resourceId: result.id,
       action: "upload_ifu",

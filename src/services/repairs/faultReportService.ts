@@ -1,6 +1,6 @@
 import type { FaultConsequence, Prisma } from "@prisma/client";
-import type { TenantContext } from "@/interfaces";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import type { TenantWorkContext } from "@/interfaces";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { recordedByAttribution } from "@/lib/auth/attribution";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { fingerprint, newReference } from "@/lib/crypto";
@@ -33,7 +33,7 @@ export type FaultReportResult = {
   operationalState: string;
 };
 
-async function assertRepairs(ctx: TenantContext) {
+async function assertRepairs(ctx: TenantWorkContext) {
   const tenant = await prisma.tenant.findUnique({
     where: { id: ctx.tenantId },
     select: { featureFlags: true },
@@ -45,7 +45,7 @@ async function assertRepairs(ctx: TenantContext) {
 
 /** R9 — fault report → book + lock/order or triage clarification. */
 export async function reportFault(
-  ctx: TenantContext,
+  ctx: TenantWorkContext,
   input: FaultReportInput,
 ): Promise<FaultReportResult> {
   // Clinic form uses requests:create; scan Störung uses devicebook:view.
@@ -220,7 +220,7 @@ export async function reportFault(
   });
 
   await recordAudit({
-    actor: actorFromTenant(ctx),
+    actor: actorFromContext(ctx),
     resource: "DeviceBookEntry",
     resourceId: result.entryId,
     action: "fault_report",
@@ -233,7 +233,7 @@ export async function reportFault(
 
 /** Resolve malfunction_triage → create repair order or close with note. */
 export async function resolveMalfunctionTriage(
-  ctx: TenantContext,
+  ctx: TenantWorkContext,
   clarificationId: string,
   input: { action: "order" | "no_action"; resolutionNote?: string | null },
 ): Promise<FaultReportResult> {

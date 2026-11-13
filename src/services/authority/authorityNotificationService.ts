@@ -1,7 +1,7 @@
-import type { AuthorityNotificationDTO, TenantContext } from "@/interfaces";
+import type { AuthorityNotificationDTO, TenantWorkContext } from "@/interfaces";
 import { actorAttribution } from "@/lib/auth/attribution";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { blobMetaFromDataUrl } from "@/lib/blobMeta";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
@@ -149,7 +149,7 @@ async function assertIncidentNotAlreadyReported(incidentId: string): Promise<voi
 
 export const authorityNotificationService = {
   async list(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     query: { state?: NotificationState; kind?: NotificationKind; incidentId?: string } = {},
   ): Promise<AuthorityNotificationDTO[]> {
     requirePermission(ctx, "authority:view");
@@ -169,7 +169,7 @@ export const authorityNotificationService = {
    * Record that a named person sent (or drafted) a notification.
    * Does not transmit. Exactly one of incident / finding / device / site.
    */
-  async record(ctx: TenantContext, input: RecordNotificationInput): Promise<AuthorityNotificationDTO> {
+  async record(ctx: TenantWorkContext, input: RecordNotificationInput): Promise<AuthorityNotificationDTO> {
     requirePermission(ctx, requiredPermissionForNotification(input));
     assertExactlyOneSubject(input);
     await requireSubjectExists(input);
@@ -256,7 +256,7 @@ export const authorityNotificationService = {
     });
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "AuthorityNotification",
       resourceId: row.id,
       action: "send",
@@ -279,7 +279,7 @@ export const authorityNotificationService = {
    * Does not transmit — state starts at `sent` when sentAt is provided.
    */
   async recordIncidentReport(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     input: {
       incidentId: string;
       recipientName: string;
@@ -306,7 +306,7 @@ export const authorityNotificationService = {
 
   /** Record Abhilfenachweis notification for a finding (does not transmit). */
   async recordFindingRemediation(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     input: {
       findingId: string;
       recipientName: string;
@@ -331,7 +331,7 @@ export const authorityNotificationService = {
   },
 
   async acknowledge(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     id: string,
     input: { acknowledgedAt: string; reference?: string | null },
   ): Promise<AuthorityNotificationDTO> {
@@ -350,7 +350,7 @@ export const authorityNotificationService = {
       },
     });
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "AuthorityNotification",
       resourceId: id,
       action: "acknowledge",

@@ -2,10 +2,10 @@ import type {
   ScanKonstanzItemDTO,
   ScanKonstanzOpenDTO,
   ScanKonstanzResultDTO,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
-import { actorFromTenant } from "@/lib/auth/actorContext";
+import { actorFromContext } from "@/lib/auth/actorContext";
 import { badRequest, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
@@ -161,7 +161,7 @@ export async function deriveKonstanzSperr(deviceId: string): Promise<{
 }
 
 export const scanKonstanzService = {
-  async listOpen(ctx: TenantContext, deviceId: string): Promise<ScanKonstanzOpenDTO> {
+  async listOpen(ctx: TenantWorkContext, deviceId: string): Promise<ScanKonstanzOpenDTO> {
     requirePermission(ctx, "inventory:view");
     const device = await prisma.deviceInstance.findFirst({
       where: { id: deviceId },
@@ -247,7 +247,7 @@ export const scanKonstanzService = {
   },
 
   async submit(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     deviceId: string,
     input: SubmitScanKonstanzInput,
   ): Promise<ScanKonstanzResultDTO> {
@@ -305,7 +305,7 @@ export const scanKonstanzService = {
     );
 
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor: actorFromContext(ctx),
       resource: "duty",
       resourceId: duty.id,
       action: "complete",
