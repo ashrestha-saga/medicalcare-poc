@@ -47,6 +47,7 @@ type Overlay =
       back: OverlayBack;
     }
   | { kind: "routine"; deviceId: string; back: OverlayBack }
+  | { kind: "site-routine"; siteId: string; back: OverlayBack }
   | { kind: "konstanz"; deviceId: string; back: OverlayBack }
   | {
       kind: "charge-neu";
@@ -139,7 +140,9 @@ export function ScanApp() {
       try {
         const res = await api<ScanHeuteDTO>("/api/scan/heute");
         if (!alive) return;
-        setHeuteRemaining(res.items.filter((i) => i.band !== "done").length);
+        const deviceOpen = res.items.filter((i) => i.band !== "done").length;
+        const siteOpen = (res.sites ?? []).filter((s) => s.openDailyChecks).length;
+        setHeuteRemaining(deviceOpen + siteOpen);
       } catch {
         if (alive) setHeuteRemaining(0);
       }
@@ -181,7 +184,7 @@ export function ScanApp() {
   };
 
   const backFromOverlay = (back: OverlayBack, deviceId: string) => {
-    if (back === "flow") {
+    if (back === "flow" || !deviceId) {
       setOverlay(null);
       return;
     }
@@ -227,14 +230,18 @@ export function ScanApp() {
   };
 
   const onRoutineSaved = (result: ScanRoutineResultDTO, back: OverlayBack) => {
+    const isSite = !result.deviceId;
     setOverlay({
       kind: "confirm",
-      deviceId: result.deviceId,
-      back,
+      deviceId: result.deviceId || "",
+      back: isSite ? "flow" : back,
       title: result.hasMangel ? tRoutine("okMangel") : tRoutine("okOk"),
       lines: [
         ...result.lines.slice(0, 6).map((l) => ({ label: l.label, value: l.value })),
-        { label: tConfirm("device"), value: result.inventoryNumber },
+        {
+          label: isSite ? tRoutine("siteSubject") : tConfirm("device"),
+          value: result.inventoryNumber,
+        },
       ],
       hint: result.hasMangel ? tRoutine("hintMangel") : null,
     });
@@ -434,6 +441,16 @@ export function ScanApp() {
           onSaved={(result) => onRoutineSaved(result, overlay.back)}
         />
       ) : null}
+      {overlay?.kind === "site-routine" ? (
+        <TageskontrolleForm
+          siteId={overlay.siteId}
+          onCancel={() => {
+            setOverlay(null);
+            if (isCapturer) setTab("heute");
+          }}
+          onSaved={(result) => onRoutineSaved(result, "flow")}
+        />
+      ) : null}
       {overlay?.kind === "konstanz" ? (
         <KonstanzForm
           deviceId={overlay.deviceId}
@@ -527,7 +544,13 @@ export function ScanApp() {
           />
         ) : null}
         {!overlay && activeTab === "heute" ? (
-          <HeuteScreen active onOpenDevice={(id) => setOverlay({ kind: "device", deviceId: id })} />
+          <HeuteScreen
+            active
+            onOpenDevice={(id) => setOverlay({ kind: "device", deviceId: id })}
+            onOpenSite={(siteId) =>
+              setOverlay({ kind: "site-routine", siteId, back: "flow" })
+            }
+          />
         ) : null}
         {!overlay && activeTab === "bestand" ? (
           <CapturerInventoryPanel

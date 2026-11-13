@@ -189,7 +189,7 @@ export const scanKonstanzService = {
         performances: {
           orderBy: { performedAt: "desc" },
           take: 1,
-          select: { result: true, performedAt: true },
+          select: { result: true, performedAt: true, note: true, performedBy: true, recordedAt: true },
         },
       },
       orderBy: [{ dueAt: "asc" }, { title: "asc" }],
@@ -232,6 +232,51 @@ export const scanKonstanzService = {
       });
     }
 
+    // Today's performances — shown when the form has nothing left to do.
+    const dutyIds = duties.map((d) => d.id);
+    const todayRows =
+      dutyIds.length === 0
+        ? []
+        : await prisma.dutyPerformance.findMany({
+            where: {
+              tenantId: ctx.tenantId,
+              performedAt: today,
+              deviceDutyId: { in: dutyIds },
+            },
+            include: {
+              deviceDuty: {
+                select: {
+                  id: true,
+                  title: true,
+                  dueAt: true,
+                  constancyObject: { select: { label: true } },
+                },
+              },
+            },
+            orderBy: { recordedAt: "asc" },
+          });
+
+    const seenDuty = new Set<string>();
+    const completedToday = [];
+    for (const row of todayRows) {
+      if (seenDuty.has(row.deviceDutyId)) continue;
+      seenDuty.add(row.deviceDutyId);
+      completedToday.push({
+        dutyId: row.deviceDutyId,
+        title:
+          row.deviceDuty.title ??
+          row.deviceDuty.constancyObject?.label ??
+          "Konstanz",
+        constancyObjectLabel: row.deviceDuty.constancyObject?.label ?? null,
+        result: row.result as "passed" | "passed_with_conditions" | "failed",
+        note: row.note,
+        performedBy: row.performedBy,
+        performedAt: isoDate(row.performedAt)!,
+        recordedAt: row.recordedAt.toISOString(),
+        nextDueAt: isoDate(row.deviceDuty.dueAt),
+      });
+    }
+
     const label =
       device.model?.tradeName?.trim() ||
       device.model?.modelName?.trim() ||
@@ -243,6 +288,7 @@ export const scanKonstanzService = {
       label,
       performedAt: isoDate(today)!,
       items,
+      completedToday,
     };
   },
 

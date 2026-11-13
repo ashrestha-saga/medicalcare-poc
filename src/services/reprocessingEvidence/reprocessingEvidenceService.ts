@@ -2,6 +2,10 @@ import type {
   RefReprocessingCheckDTO,
   ReprocessingBatchDTO,
   ReprocessingCheckDTO,
+  ReprocessingExecutionDoneDTO,
+  ReprocessingExecutionItemDTO,
+  ReprocessingExecutionResponse,
+  ReprocessingExecutionStatus,
   TenantWorkContext,
 } from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
@@ -17,6 +21,9 @@ import type {
   ReleaseBatchInput,
 } from "@/schemas/k10";
 import { isReprocessingEquipmentDevice } from "@/services/registration/reprocessingLinkService";
+import {
+  openDailyRefCodesForDevice,
+} from "@/services/scan/scanRoutineService";
 import {
   assertDeviceInWorkAreas,
   assertSiteInWorkAreas,
@@ -272,6 +279,300 @@ export const reprocessingEvidenceService = {
   async countOpenDailyChecks(ctx: TenantWorkContext, scopes?: string[]): Promise<number> {
     const open = await this.listOpenDailyChecks(ctx, scopes);
     return open.length;
+  },
+
+  /**
+   * Execution lens — daily status per reprocessing device (equipment scope)
+   * or per site (water / chemistry / sterile_storage).
+   */
+  async listExecution(
+    ctx: TenantWorkContext,
+    query: { scopes?: string[]; day?: string } = {},
+  ): Promise<ReprocessingExecutionResponse> {
+    requirePermission(ctx, "reprocessing:view");
+    const areaScope = await getEffectiveAreaScope(ctx);
+    if (areaScope.mode === "none") {
+      const day = query.day?.slice(0, 10) || isoDate(startOfTodayUtc())!;
+      return { day, kind: "device", items: [] };
+    }
+
+    const dayStr = query.day?.slice(0, 10) || isoDate(startOfTodayUtc())!;
+    const day = new Date(`${dayStr}T00:00:00.000Z`);
+    const scopes = query.scopes?.length ? query.scopes : ["equipment"];
+    const siteScoped = scopes.some((s) =>
+      s === "water" || s === "chemistry" || s === "sterile_storage",
+    );
+    const equipmentScoped = scopes.includes("equipment");
+
+    const dailyRefs = await prisma.refReprocessingCheck.findMany({
+      where: {
+        cadence: "daily",
+        ...(scopes.length ? { scope: { in: scopes as never[] } } : {}),
+      },
+      orderBy: { code: "asc" },
+    });
+    const refByCode = new Map(dailyRefs.map((r) => [r.code, r]));
+
+    if (siteScoped && !equipmentScoped) {
+      // null = unscoped (all sites); [] = no access.
+      const effectiveSiteIds = await getEffectiveSiteIds(ctx);
+      if (effectiveSiteIds !== null && effectiveSiteIds.length === 0) {
+        return { day: dayStr, kind: "site", items: [] };
+      }
+      const sites = await prisma.site.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          ...(effectiveSiteIds ? { id: { in: effectiveSiteIds } } : {}),
+        },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      });
+      const siteIds = sites.map((s) => s.id);
+      if (siteIds.length === 0) {
+        return { day: dayStr, kind: "site", items: [] };
+      }
+      const siteRefs = dailyRefs.filter(
+        (r) => r.scope === "water" || r.scope === "chemistry" || r.scope === "sterile_storage",
+      );
+      const doneRows =
+        siteRefs.length === 0
+          ? []
+          : await prisma.reprocessingCheck.findMany({
+              where: {
+                tenantId: ctx.tenantId,
+                performedAt: day,
+                siteId: { in: siteIds },
+                checkCode: { in: siteRefs.map((r) => r.code) },
+              },
+              include: { check: true },
+              orderBy: { recordedAt: "asc" },
+            });
+
+      const items: ReprocessingExecutionItemDTO[] = sites.map((site) => {
+        const applicable = siteRefs;
+        const applicableCodes = new Set(applicable.map((r) => r.code));
+        const siteDone = doneRows.filter(
+          (r) => r.siteId === site.id && applicableCodes.has(r.checkCode),
+        );
+        const seen = new Set<string>();
+        const doneToday: ReprocessingExecutionDoneDTO[] = [];
+        for (const row of siteDone) {
+          if (seen.has(row.checkCode)) continue;
+          seen.add(row.checkCode);
+          const ref = refByCode.get(row.checkCode);
+          if (!ref) continue;
+          doneToday.push({
+            checkCode: row.checkCode,
+            label: ref.label,
+            scope: ref.scope,
+            passed: row.passed,
+            measuredValue: row.measuredValue,
+            unit: ref.unit,
+            limitText: ref.limitText,
+            withinLimit: row.withinLimit,
+            performedBy: row.performedBy,
+            performedAt: isoDate(row.performedAt)!,
+            note: row.note,
+          });
+        }
+        const doneCodes = new Set(doneToday.map((d) => d.checkCode));
+        const openRefs = applicable.filter((r) => !doneCodes.has(r.code));
+        const applicableCount = applicable.length;
+        const doneCount = doneToday.length;
+        const openCount = openRefs.length;
+        const status: ReprocessingExecutionStatus =
+          applicableCount === 0
+            ? "done"
+            : openCount === 0
+              ? "done"
+              : doneCount === 0
+                ? "open"
+                : "partial";
+        const last = doneToday[doneToday.length - 1];
+        return {
+          id: site.id,
+          kind: "site" as const,
+          label: site.name,
+          subtitle: null,
+          inventoryNumber: null,
+          siteId: site.id,
+          siteName: site.name,
+          equipmentDeviceId: null,
+          status,
+          applicableCount,
+          doneCount,
+          openCount,
+          openCheckCodes: openRefs.map((r) => r.code),
+          openCheckLabels: openRefs.map((r) => r.label),
+          lastPerformedAt: last?.performedAt ?? null,
+          lastPerformedBy: last?.performedBy ?? null,
+          doneToday,
+        };
+      });
+
+      items.sort((a, b) => {
+        const rank = { open: 0, partial: 1, done: 2 };
+        return rank[a.status] - rank[b.status] || a.label.localeCompare(b.label);
+      });
+      return { day: dayStr, kind: "site", items };
+    }
+
+    // Device execution (equipment tab / mixed with equipment in scopes)
+    const deviceWhere: Prisma.DeviceInstanceWhereInput = {
+      tenantId: ctx.tenantId,
+      state: { not: "retired" },
+      ...(areaScope.mode === "areas" ? { areaId: { in: areaScope.areaIds } } : {}),
+    };
+    const devices = await prisma.deviceInstance.findMany({
+      where: deviceWhere,
+      select: {
+        id: true,
+        inventoryNumber: true,
+        productKindCode: true,
+        characteristicsJson: true,
+        model: { select: { tradeName: true, modelName: true } },
+        area: { select: { name: true, siteId: true, site: { select: { name: true } } } },
+      },
+      orderBy: { inventoryNumber: "asc" },
+      take: 500,
+    });
+    const equipment = devices.filter(isReprocessingEquipmentDevice);
+
+    const equipmentRefs = dailyRefs.filter((r) => r.scope === "equipment");
+    // For pure equipment tab, only equipment-scoped daily checks apply in the matrix.
+    const refsForApplicability = equipmentScoped && !siteScoped
+      ? equipmentRefs
+      : dailyRefs;
+
+    const deviceIds = equipment.map((d) => d.id);
+    const siteIdsFromDevices = [
+      ...new Set(equipment.map((d) => d.area?.siteId).filter(Boolean) as string[]),
+    ];
+    const doneRows =
+      refsForApplicability.length === 0 || deviceIds.length === 0
+        ? []
+        : await prisma.reprocessingCheck.findMany({
+            where: {
+              tenantId: ctx.tenantId,
+              performedAt: day,
+              checkCode: { in: refsForApplicability.map((r) => r.code) },
+              OR: [
+                { equipmentDeviceId: { in: deviceIds } },
+                ...(siteIdsFromDevices.length
+                  ? [{ siteId: { in: siteIdsFromDevices } }]
+                  : []),
+              ],
+            },
+            include: { check: true },
+            orderBy: { recordedAt: "asc" },
+          });
+
+    const items: ReprocessingExecutionItemDTO[] = equipment.map((device) => {
+      const siteId = device.area?.siteId ?? null;
+      const deviceCtx = {
+        id: device.id,
+        productKindCode: device.productKindCode,
+        characteristicsJson: device.characteristicsJson,
+        siteId,
+      };
+      // When only equipment scope is requested, pretend site refs don't apply.
+      const refsInput = refsForApplicability.map((r) => ({
+        code: r.code,
+        scope: r.scope,
+        equipmentTypeCode: r.equipmentTypeCode,
+      }));
+      const applicableCodes = openDailyRefCodesForDevice(deviceCtx, refsInput, []);
+      const openCodes = openDailyRefCodesForDevice(
+        deviceCtx,
+        refsInput,
+        doneRows.map((r) => ({
+          checkCode: r.checkCode,
+          equipmentDeviceId: r.equipmentDeviceId,
+          siteId: r.siteId,
+        })),
+      );
+      const applicableSet = new Set(applicableCodes);
+      const openSet = new Set(openCodes);
+
+      const doneToday: ReprocessingExecutionDoneDTO[] = [];
+      const seen = new Set<string>();
+      for (const row of doneRows) {
+        if (!applicableSet.has(row.checkCode) || seen.has(row.checkCode)) continue;
+        const ref = refByCode.get(row.checkCode);
+        if (!ref) continue;
+        if (ref.scope === "equipment" && row.equipmentDeviceId !== device.id) continue;
+        if (
+          (ref.scope === "water" ||
+            ref.scope === "chemistry" ||
+            ref.scope === "sterile_storage") &&
+          !(siteId && row.siteId === siteId)
+        ) {
+          continue;
+        }
+        if (openSet.has(row.checkCode)) continue;
+        seen.add(row.checkCode);
+        doneToday.push({
+          checkCode: row.checkCode,
+          label: ref.label,
+          scope: ref.scope,
+          passed: row.passed,
+          measuredValue: row.measuredValue,
+          unit: ref.unit,
+          limitText: ref.limitText,
+          withinLimit: row.withinLimit,
+          performedBy: row.performedBy,
+          performedAt: isoDate(row.performedAt)!,
+          note: row.note,
+        });
+      }
+
+      const applicableCount = applicableCodes.length;
+      const openCount = openCodes.length;
+      const doneCount = Math.max(0, applicableCount - openCount);
+      const status: ReprocessingExecutionStatus =
+        applicableCount === 0
+          ? "done"
+          : openCount === 0
+            ? "done"
+            : doneCount === 0
+              ? "open"
+              : "partial";
+      const last = doneToday[doneToday.length - 1];
+      const openLabels = openCodes
+        .map((code) => refByCode.get(code)?.label ?? code)
+        .filter(Boolean);
+
+      return {
+        id: device.id,
+        kind: "device" as const,
+        label: device.inventoryNumber,
+        subtitle:
+          device.model?.tradeName ||
+          device.model?.modelName ||
+          device.area?.name ||
+          null,
+        inventoryNumber: device.inventoryNumber,
+        siteId,
+        siteName: device.area?.site?.name ?? null,
+        equipmentDeviceId: device.id,
+        status,
+        applicableCount,
+        doneCount,
+        openCount,
+        openCheckCodes: openCodes,
+        openCheckLabels: openLabels,
+        lastPerformedAt: last?.performedAt ?? null,
+        lastPerformedBy: last?.performedBy ?? null,
+        doneToday,
+      };
+    });
+
+    items.sort((a, b) => {
+      const rank = { open: 0, partial: 1, done: 2 };
+      return rank[a.status] - rank[b.status] || a.label.localeCompare(b.label);
+    });
+
+    return { day: dayStr, kind: "device", items };
   },
 
   async listChecks(

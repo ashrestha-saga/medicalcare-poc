@@ -13,6 +13,14 @@ import { toast } from "@/store/toastStore";
 
 type Answer = { passed: boolean | null; measuredValue: string };
 
+function formatDay(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const day = iso.slice(0, 10);
+  const [y, m, d] = day.split("-");
+  if (!y || !m || !d) return day;
+  return `${d}.${m}.${y}`;
+}
+
 function formatCompletedValue(
   item: ScanRoutineCompletedItemDTO,
   t: (key: string) => string,
@@ -29,17 +37,33 @@ function formatCompletedValue(
   return "—";
 }
 
+function formatCompletedPill(
+  item: ScanRoutineCompletedItemDTO,
+  t: (key: string) => string,
+): string {
+  if (item.kind === "measure") {
+    if (item.withinLimit === true) return t("withinLimit");
+    if (item.withinLimit === false) return t("outsideLimit");
+    return t("recorded");
+  }
+  if (item.passed === true) return t("ok");
+  if (item.passed === false) return t("defect");
+  return "—";
+}
+
+function completedTone(item: ScanRoutineCompletedItemDTO): "ok" | "warn" | "stop" {
+  if (item.passed === false || item.withinLimit === false) return "stop";
+  if (item.kind === "measure" && item.withinLimit == null && item.measuredValue) return "warn";
+  return "ok";
+}
+
 function formatRecordedAt(iso: string): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return iso.slice(0, 16);
-    return d.toLocaleString(undefined, {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const day = formatDay(d.toISOString());
+    const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return `${day} · ${time}`;
   } catch {
     return iso.slice(0, 16);
   }
@@ -47,10 +71,14 @@ function formatRecordedAt(iso: string): string {
 
 export function TageskontrolleForm({
   deviceId,
+  siteId,
   onCancel,
   onSaved,
 }: {
-  deviceId: string;
+  /** Inventory device pack (equipment dailies). */
+  deviceId?: string;
+  /** Site / Haus pack (water, chemistry, sterile) — mutually exclusive with deviceId. */
+  siteId?: string;
   onCancel: () => void;
   onSaved: (result: ScanRoutineResultDTO) => void;
 }) {
@@ -63,15 +91,26 @@ export function TageskontrolleForm({
   const [showNoteStep, setShowNoteStep] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const isSite = Boolean(siteId);
+  const endpoint = siteId
+    ? `/api/scan/sites/${siteId}/routine`
+    : deviceId
+      ? `/api/scan/devices/${deviceId}/routine`
+      : null;
 
   useEffect(() => {
     let alive = true;
+    if (!endpoint) {
+      setLoading(false);
+      setOpen(null);
+      return;
+    }
     setLoading(true);
     setShowNoteStep(false);
     setStepIndex(0);
     setNote("");
     setError(null);
-    void api<{ routine: ScanRoutineOpenDTO }>(`/api/scan/devices/${deviceId}/routine`)
+    void api<{ routine: ScanRoutineOpenDTO }>(endpoint)
       .then((res) => {
         if (!alive) return;
         setOpen(res.routine);
@@ -90,7 +129,7 @@ export function TageskontrolleForm({
     return () => {
       alive = false;
     };
-  }, [deviceId, t]);
+  }, [endpoint, t]);
 
   const steps = open?.steps ?? [];
   const step: ScanRoutineStepDTO | undefined = steps[stepIndex];
@@ -168,22 +207,20 @@ export function TageskontrolleForm({
       setError(t("errNote"));
       return;
     }
+    if (!endpoint) return;
     setSaving(true);
     try {
-      const res = await api<{ result: ScanRoutineResultDTO }>(
-        `/api/scan/devices/${deviceId}/routine`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            answers: open.steps.map((s) => ({
-              checkCode: s.checkCode,
-              passed: answers[s.checkCode]?.passed ?? null,
-              measuredValue: answers[s.checkCode]?.measuredValue || null,
-            })),
-            note: note.trim() || null,
-          }),
-        },
-      );
+      const res = await api<{ result: ScanRoutineResultDTO }>(endpoint, {
+        method: "POST",
+        body: JSON.stringify({
+          answers: open.steps.map((s) => ({
+            checkCode: s.checkCode,
+            passed: answers[s.checkCode]?.passed ?? null,
+            measuredValue: answers[s.checkCode]?.measuredValue || null,
+          })),
+          note: note.trim() || null,
+        }),
+      });
       onSaved(res.result);
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : t("errSave"));
@@ -213,78 +250,127 @@ export function TageskontrolleForm({
 
   if (steps.length === 0) {
     const completed = open.completedToday ?? [];
-    const performers = [
-      ...new Set(completed.map((c) => c.performedBy?.trim()).filter(Boolean) as string[]),
-    ];
-    const latestAt = completed.reduce<string | null>((acc, c) => {
-      if (!acc || c.recordedAt > acc) return c.recordedAt;
-      return acc;
-    }, null);
     const hasMangelDone = completed.some(
       (c) => c.passed === false || c.withinLimit === false,
     );
+    const hasUnevaluated = completed.some(
+      (c) => c.kind === "measure" && c.withinLimit == null && Boolean(c.measuredValue),
+    );
+    const summaryTone = hasMangelDone
+      ? "stop"
+      : hasUnevaluated
+        ? "warn"
+        : completed.length > 0
+          ? "ok"
+          : "idle";
+    const isSiteSubject = isSite || open.subjectKind === "site";
 
     return (
-      <section className="p-routine" data-testid="tageskontrolle-form">
+      <section className="p-routine p-done" data-testid="tageskontrolle-form">
         <header className="p-routine__head">
           <button type="button" className="p-close" onClick={onCancel} aria-label={t("cancel")}>
             ×
           </button>
-          <h2>{t("title")}</h2>
+          <h2>{isSiteSubject ? t("titleSite") : t("title")}</h2>
           <p className="p-routine__sub">
-            {open.label} · <span className="mono">{open.inventoryNumber}</span>
+            {isSiteSubject ? (
+              <>
+                {t("siteSubject")}
+                <span className="p-done__inv mono">{open.siteName ?? open.label}</span>
+              </>
+            ) : (
+              <>
+                {open.label}
+                <span className="p-done__inv mono">{open.inventoryNumber}</span>
+              </>
+            )}
           </p>
         </header>
-        <p className="p-heute__empty">{t("allDone")}</p>
+
+        <div className="p-done__banner" data-t={summaryTone} data-testid="routine-status-banner">
+          <span className="p-done__banner-dot" aria-hidden />
+          <div className="p-done__banner-text">
+            <strong>
+              {completed.length > 0
+                ? t("allDoneToday")
+                : isSiteSubject
+                  ? t("allDoneSite")
+                  : t("allDone")}
+            </strong>
+            {completed.length > 0 ? (
+              <span>
+                {t("completedCount", { count: completed.length })} · {formatDay(open.performedAt)}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
         {completed.length > 0 ? (
-          <div className="p-routine__done" data-testid="routine-completed-today">
-            <p className="p-routine__done-meta">
-              {t("completedMeta", {
-                date: open.performedAt,
-                by: performers.length ? performers.join(", ") : t("completedByUnknown"),
-                when: latestAt ? formatRecordedAt(latestAt) : "—",
-              })}
-            </p>
-            <dl className="p-routine__done-list">
-              {completed.map((item) => {
-                const tone =
-                  item.passed === false || item.withinLimit === false ? "stop" : "ok";
-                const scopeLabel =
-                  item.scope === "equipment"
-                    ? null
-                    : open.siteName
-                      ? t("siteScope", { site: open.siteName })
-                      : item.scope === "water"
-                        ? t("scope.water")
-                        : item.scope === "chemistry"
-                          ? t("scope.chemistry")
-                          : item.scope === "sterile_storage"
-                            ? t("scope.sterile_storage")
-                            : null;
-                return (
-                  <div
-                    key={item.checkCode}
-                    className="p-routine__done-row"
-                    data-t={tone}
-                    data-testid={`routine-completed-${item.checkCode}`}
-                  >
-                    <dt>
-                      {item.label}
-                      {scopeLabel ? (
-                        <span className="p-routine__done-scope">{scopeLabel}</span>
-                      ) : null}
-                    </dt>
-                    <dd>{formatCompletedValue(item, t)}</dd>
-                    {item.note?.trim() ? (
-                      <p className="p-routine__done-note">{item.note.trim()}</p>
-                    ) : null}
+          <div className="p-done__list" data-testid="routine-completed-today">
+            {completed.map((item) => {
+              const tone = completedTone(item);
+              const scopeLabel =
+                item.scope === "equipment"
+                  ? t("scope.equipment")
+                  : open.siteName
+                    ? t("siteScope", { site: open.siteName })
+                    : item.scope === "water"
+                      ? t("scope.water")
+                      : item.scope === "chemistry"
+                        ? t("scope.chemistry")
+                        : item.scope === "sterile_storage"
+                          ? t("scope.sterile_storage")
+                          : null;
+              const valueLine =
+                item.kind === "measure"
+                  ? formatCompletedValue(item, t)
+                  : null;
+              return (
+                <article
+                  key={item.checkCode}
+                  className="p-done__card"
+                  data-t={tone}
+                  data-testid={`routine-completed-${item.checkCode}`}
+                >
+                  <div className="p-done__card-top">
+                    <div className="p-done__card-titles">
+                      <h3>{item.label}</h3>
+                      {scopeLabel ? <p className="p-done__object">{scopeLabel}</p> : null}
+                    </div>
+                    <span className="p-done__pill" data-t={tone}>
+                      {formatCompletedPill(item, t)}
+                    </span>
                   </div>
-                );
-              })}
-            </dl>
+
+                  <div className="p-done__meta">
+                    {valueLine ? (
+                      <div className="p-done__meta-item p-done__meta-item--wide">
+                        <span className="p-done__meta-k">{t("value")}</span>
+                        <span className="p-done__meta-v">{valueLine}</span>
+                      </div>
+                    ) : null}
+                    <div className="p-done__meta-item">
+                      <span className="p-done__meta-k">{t("performedAt")}</span>
+                      <span className="p-done__meta-v">{formatRecordedAt(item.recordedAt)}</span>
+                    </div>
+                    <div className="p-done__meta-item">
+                      <span className="p-done__meta-k">{t("performedBy")}</span>
+                      <span className="p-done__meta-v">
+                        {item.performedBy?.trim() || t("completedByUnknown")}
+                      </span>
+                    </div>
+                  </div>
+
+                  {item.note?.trim() ? (
+                    <p className="p-done__note">{item.note.trim()}</p>
+                  ) : null}
+                </article>
+              );
+            })}
             {hasMangelDone ? <p className="p-routine__warn">{t("hintMangel")}</p> : null}
           </div>
         ) : null}
+
         <footer className="p-routine__foot">
           <button
             type="button"
@@ -305,9 +391,17 @@ export function TageskontrolleForm({
         <button type="button" className="p-close" onClick={onCancel} aria-label={t("cancel")}>
           ×
         </button>
-        <h2>{t("title")}</h2>
+        <h2>{isSite || open.subjectKind === "site" ? t("titleSite") : t("title")}</h2>
         <p className="p-routine__sub">
-          {open.label} · <span className="mono">{open.inventoryNumber}</span>
+          {open.subjectKind === "site" ? (
+            <>
+              {t("siteSubject")} · <span className="mono">{open.siteName ?? open.label}</span>
+            </>
+          ) : (
+            <>
+              {open.label} · <span className="mono">{open.inventoryNumber}</span>
+            </>
+          )}
         </p>
         <p className="p-routine__progress">
           {t("progress", { current: Math.min(stepIndex + 1, steps.length), total: steps.length })}

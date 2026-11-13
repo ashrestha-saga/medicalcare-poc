@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import type { RowSelectionState } from "@tanstack/react-table";
-import { Download, Printer, ScanLine, Search } from "lucide-react";
+import { Download, Printer, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { DeviceInstanceDTO } from "@/interfaces";
 import { CameraScanner } from "@/components/features/scan/CameraScanner";
@@ -120,7 +119,11 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
     try {
       const actingTenantId = useActingTenantStore.getState().tenantId;
       const qs = new URLSearchParams({ format: "csv" });
-      if (list.siteFilter) qs.set("siteId", list.siteFilter);
+      if (selectedDevices.length > 0) {
+        for (const d of selectedDevices) qs.append("id", d.id);
+      } else if (list.siteFilter) {
+        qs.set("siteId", list.siteFilter);
+      }
       const res = await fetch(`/api/inventory/export?${qs}`, {
         headers: {
           [CORRELATION_HEADER]: newClientId(),
@@ -155,7 +158,7 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
     } finally {
       setExportBusy(false);
     }
-  }, [exportBusy, list.siteFilter, t]);
+  }, [exportBusy, list.siteFilter, selectedDevices, t]);
 
   const onBarcodeSearch = useCallback(
     async (result: BarcodeCaptureResult) => {
@@ -263,7 +266,11 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
                 data-testid="devices-export-14"
               >
                 <Download className="h-4 w-4" />
-                {exportBusy ? t("export14Busy") : t("export14")}
+                {exportBusy
+                  ? t("export14Busy")
+                  : selectedDevices.length > 0
+                    ? t("export14Selected", { count: selectedDevices.length })
+                    : t("export14")}
               </Button>
             )}
             <Button
@@ -277,21 +284,9 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
               <Search className="h-4 w-4" />
               {t("searchScan")}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="h-8"
-              asChild
-              data-testid="devices-request-service"
-            >
-              <Link href="/">
-                <ScanLine className="h-4 w-4" />
-                {t("requestService")}
-              </Link>
-            </Button>
           </div>
         }
+
       />
 
       <Dialog open={scanOpen} onOpenChange={(open) => !scanBusy && setScanOpen(open)}>

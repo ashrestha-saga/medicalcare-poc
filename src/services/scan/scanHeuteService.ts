@@ -1,9 +1,18 @@
-import type { ScanHeuteBand, ScanHeuteDTO, ScanHeuteItemDTO, TenantWorkContext } from "@/interfaces";
+import type {
+  ScanHeuteBand,
+  ScanHeuteDTO,
+  ScanHeuteItemDTO,
+  ScanHeuteSiteItemDTO,
+  TenantWorkContext,
+} from "@/interfaces";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { prisma } from "@/lib/prisma";
 import { isReprocessingEquipmentDevice } from "@/services/registration/reprocessingLinkService";
-import { getEffectiveAreaScope } from "@/services/users/userAreaScope";
-import { openDailyRefCodesForDevice } from "./scanRoutineService";
+import { getEffectiveAreaScope, getEffectiveSiteIds } from "@/services/users/userAreaScope";
+import {
+  openDailyRefCodesForDevice,
+  openDailyRefCodesForSite,
+} from "./scanRoutineService";
 import { consequenceMeansOutOfService } from "./scanPrimaryAction";
 
 const BAND_ORDER: Record<ScanHeuteBand, number> = {
@@ -31,7 +40,7 @@ export const scanHeuteService = {
 
     const scope = await getEffectiveAreaScope(ctx);
     if (scope.mode === "none") {
-      return { items: [], areaIds: [], unscoped: false };
+      return { items: [], sites: [], areaIds: [], unscoped: false };
     }
 
     const canReproc = Boolean(ctx.permissions?.includes("reprocessing:view"));
@@ -78,18 +87,32 @@ export const scanHeuteService = {
             select: { code: true, scope: true, equipmentTypeCode: true },
           })
         : Promise.resolve([]),
-      canReproc && deviceIds.length > 0
-        ? (() => {
-            const siteIds = [
+      canReproc
+        ? (async () => {
+            const fromDevices = [
               ...new Set(
                 devices.map((d) => d.area?.siteId).filter((id): id is string => Boolean(id)),
               ),
             ];
+            const effective = await getEffectiveSiteIds(ctx);
+            const siteIds =
+              effective === null
+                ? fromDevices.length
+                  ? fromDevices
+                  : (
+                      await prisma.site.findMany({
+                        where: { tenantId: ctx.tenantId },
+                        select: { id: true },
+                        take: 200,
+                      })
+                    ).map((s) => s.id)
+                : [...new Set([...fromDevices, ...effective])];
+            if (deviceIds.length === 0 && siteIds.length === 0) return [];
             return prisma.reprocessingCheck.findMany({
               where: {
                 performedAt: today,
                 OR: [
-                  { equipmentDeviceId: { in: deviceIds } },
+                  ...(deviceIds.length ? [{ equipmentDeviceId: { in: deviceIds } }] : []),
                   ...(siteIds.length ? [{ siteId: { in: siteIds } }] : []),
                 ],
               },
@@ -148,6 +171,7 @@ export const scanHeuteService = {
               },
               dailyRefs,
               doneToday,
+              ["equipment"],
             )
           : [];
       const openDailyChecks = openDailyCodes.length > 0;
@@ -195,8 +219,50 @@ export const scanHeuteService = {
       return a.inventoryNumber.localeCompare(b.inventoryNumber);
     });
 
+    const sites: ScanHeuteSiteItemDTO[] = [];
+    if (canReproc) {
+      const effectiveSiteIds = await getEffectiveSiteIds(ctx);
+      if (effectiveSiteIds === null || effectiveSiteIds.length > 0) {
+        const siteRows = await prisma.site.findMany({
+          where: {
+            tenantId: ctx.tenantId,
+            ...(effectiveSiteIds ? { id: { in: effectiveSiteIds } } : {}),
+          },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        });
+        const siteDailyRefs = dailyRefs.filter(
+          (r) =>
+            r.scope === "water" || r.scope === "chemistry" || r.scope === "sterile_storage",
+        );
+        for (const site of siteRows) {
+          const openCodes = openDailyRefCodesForSite(site.id, siteDailyRefs, doneToday);
+          const applicableCount = siteDailyRefs.length;
+          if (applicableCount === 0) continue;
+          const openCount = openCodes.length;
+          const doneCount = Math.max(0, applicableCount - openCount);
+          const openDailyChecks = openCount > 0;
+          sites.push({
+            siteId: site.id,
+            siteName: site.name,
+            band: openDailyChecks ? "open" : "done",
+            openDailyChecks,
+            openCount,
+            doneCount,
+            applicableCount,
+          });
+        }
+        sites.sort((a, b) => {
+          const bandDiff = BAND_ORDER[a.band] - BAND_ORDER[b.band];
+          if (bandDiff !== 0) return bandDiff;
+          return a.siteName.localeCompare(b.siteName);
+        });
+      }
+    }
+
     return {
       items,
+      sites,
       areaIds: scope.mode === "areas" ? scope.areaIds : null,
       unscoped: scope.mode === "all",
     };

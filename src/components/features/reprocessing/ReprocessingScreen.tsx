@@ -6,6 +6,7 @@ import { AccessDenied } from "@/components/features/shared/AccessDenied";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import {
   useReprocessingList,
+  type ExecutionStatusFilter,
   type ReprocessingTab,
 } from "@/components/hooks/reprocessing/useReprocessingList";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ import type {
   RefReprocessingCheckDTO,
   ReprocessingBatchDTO,
   ReprocessingCheckDTO,
+  ReprocessingExecutionItemDTO,
+  ReprocessingExecutionStatus,
 } from "@/interfaces";
 import { cn } from "@/lib/utils";
 
@@ -123,6 +126,7 @@ export function ReprocessingScreen() {
   const [recPassed, setRecPassed] = useState<"" | "yes" | "no">("");
   const [recValue, setRecValue] = useState("");
   const [recNote, setRecNote] = useState("");
+  const [detailItem, setDetailItem] = useState<ReprocessingExecutionItemDTO | null>(null);
 
   const openBatches = list.batches.filter((b) => !b.releaseResult);
   const rejected = list.batches.filter((b) => b.releaseResult === "rejected");
@@ -133,6 +137,30 @@ export function ReprocessingScreen() {
   );
 
   const tabMeta = useMemo(() => {
+    const batchesMeta = {
+      n: list.batches.length,
+      alert:
+        openBatches.length > 0
+          ? ("stop" as const)
+          : rejected.length > 0
+            ? ("warn" as const)
+            : ("ok" as const),
+    };
+
+    // Execution lens: badge = devices/sites in scope (not catalogue size).
+    if (list.lens === "execution" && list.executionTabMeta) {
+      const execBadge = (meta: { n: number; open: number }) => ({
+        n: meta.n,
+        alert: (meta.open > 0 ? "warn" : "ok") as "warn" | "ok" | "stop",
+      });
+      return {
+        equipment: execBadge(list.executionTabMeta.equipment),
+        water: execBadge(list.executionTabMeta.water),
+        sterile: execBadge(list.executionTabMeta.sterile),
+        batches: batchesMeta,
+      };
+    }
+
     const forScopes = (scopes: string[]) => {
       const scoped = list.allRefs.filter((r) => scopes.includes(r.scope));
       let offen = 0;
@@ -152,17 +180,18 @@ export function ReprocessingScreen() {
       equipment: forScopes(["equipment"]),
       water: forScopes(["water", "chemistry"]),
       sterile: forScopes(["sterile_storage"]),
-      batches: {
-        n: list.batches.length,
-        alert:
-          openBatches.length > 0
-            ? ("stop" as const)
-            : rejected.length > 0
-              ? ("warn" as const)
-              : ("ok" as const),
-      },
+      batches: batchesMeta,
     };
-  }, [list.allRefs, list.latestByCode, list.batches, openTodayCodes, openBatches.length, rejected.length]);
+  }, [
+    list.lens,
+    list.executionTabMeta,
+    list.allRefs,
+    list.latestByCode,
+    list.batches,
+    openTodayCodes,
+    openBatches.length,
+    rejected.length,
+  ]);
 
   // Open / overdue / never-done checks first; keeps catalogue order otherwise.
   const sortedRefs = useMemo(() => {
@@ -201,11 +230,20 @@ export function ReprocessingScreen() {
     }
   };
 
-  const openRecord = (ref: RefReprocessingCheckDTO) => {
+  const openRecord = (
+    ref: RefReprocessingCheckDTO,
+    prefills?: { equipmentDeviceId?: string | null; siteId?: string | null },
+  ) => {
     const last = list.latestByCode.get(ref.code);
     setRecordTarget(ref);
-    setRecDeviceId(ref.scope === "equipment" ? (last?.equipmentDeviceId ?? "") : "");
-    setRecSiteId(ref.scope !== "equipment" ? (last?.siteId ?? "") : "");
+    setRecDeviceId(
+      ref.scope === "equipment"
+        ? (prefills?.equipmentDeviceId ?? last?.equipmentDeviceId ?? "")
+        : "",
+    );
+    setRecSiteId(
+      ref.scope !== "equipment" ? (prefills?.siteId ?? last?.siteId ?? "") : "",
+    );
     setRecBatchId("");
     setRecDate(new Date().toISOString().slice(0, 10));
     setRecPassed("");
@@ -213,6 +251,33 @@ export function ReprocessingScreen() {
     setRecNote("");
     void list.loadRecordOptions();
   };
+
+  const openRecordFromExecution = (item: ReprocessingExecutionItemDTO) => {
+    const openCode = item.openCheckCodes[0];
+    const ref =
+      (openCode ? list.allRefs.find((r) => r.code === openCode) : null) ??
+      list.refs[0] ??
+      list.allRefs.find((r) =>
+        item.kind === "device" ? r.scope === "equipment" : r.scope !== "equipment",
+      ) ??
+      null;
+    if (!ref) {
+      setDetailItem(item);
+      return;
+    }
+    openRecord(ref, {
+      equipmentDeviceId: item.equipmentDeviceId,
+      siteId: item.siteId,
+    });
+  };
+
+  const execStatusChip = (status: ReprocessingExecutionStatus) => {
+    if (status === "done") return <Chip tone="ok">{t("exec.statusDone")}</Chip>;
+    if (status === "partial") return <Chip tone="warn">{t("exec.statusPartial")}</Chip>;
+    return <Chip tone="stop">{t("exec.statusOpen")}</Chip>;
+  };
+
+  const statusFilters: ExecutionStatusFilter[] = ["all", "open", "partial", "done"];
 
   const recordNeedsSite = (ref: RefReprocessingCheckDTO) =>
     ref.scope === "water" || ref.scope === "chemistry" || ref.scope === "sterile_storage";
@@ -346,9 +411,11 @@ export function ReprocessingScreen() {
                   list.openTodayRefs.length > 0 && "text-amber-700 dark:text-amber-300",
                 )}
               >
-                {list.openTodayRefs.length}
+                {list.lens === "execution" ? list.executionOpenCount : list.openTodayRefs.length}
               </p>
-              <p className="text-xs text-muted-foreground">{t("kpi.openToday")}</p>
+              <p className="text-xs text-muted-foreground">
+                {list.lens === "execution" ? t("kpi.subjectsOpen") : t("kpi.openToday")}
+              </p>
             </div>
             <div
               className={cn(
@@ -395,7 +462,7 @@ export function ReprocessingScreen() {
             </div>
           ) : null}
 
-          <div className="mb-3 flex flex-wrap gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <Button
               type="button"
               size="sm"
@@ -405,6 +472,58 @@ export function ReprocessingScreen() {
             >
               {t("filter.openToday")}
             </Button>
+            {list.tab !== "batches" ? (
+              <div
+                className="flex rounded-lg border border-border p-0.5"
+                role="group"
+                aria-label={t("lens.aria")}
+                data-testid="reprocessing-lens"
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={list.lens === "programme" ? "default" : "ghost"}
+                  className="h-8"
+                  onClick={() => list.setLens("programme")}
+                  data-testid="reprocessing-lens-programme"
+                >
+                  {t("lens.programme")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={list.lens === "execution" ? "default" : "ghost"}
+                  className="h-8"
+                  onClick={() => list.setLens("execution")}
+                  data-testid="reprocessing-lens-execution"
+                >
+                  {t("lens.execution")}
+                </Button>
+              </div>
+            ) : null}
+            {list.lens === "execution" && list.tab !== "batches"
+              ? statusFilters.map((f) => (
+                  <Button
+                    key={f}
+                    type="button"
+                    size="sm"
+                    variant={list.statusFilter === f ? "default" : "outline"}
+                    className="h-8"
+                    onClick={() => list.setStatusFilter(f)}
+                    data-testid={`reprocessing-status-${f}`}
+                  >
+                    {t(
+                      f === "all"
+                        ? "exec.filterAll"
+                        : f === "open"
+                          ? "exec.filterOpen"
+                          : f === "partial"
+                            ? "exec.filterPartial"
+                            : "exec.filterDone",
+                    )}
+                  </Button>
+                ))
+              : null}
           </div>
 
           <div className="mb-4 flex flex-wrap gap-1 border-b border-border">
@@ -544,8 +663,99 @@ export function ReprocessingScreen() {
                 </tbody>
               </table>
             </div>
+          ) : list.lens === "execution" ? (
+            <div className="overflow-x-auto rounded-xl border border-border bg-card">
+              <table className="w-full min-w-[800px] text-left text-sm" data-testid="reprocessing-execution-table">
+                <thead className="border-b border-border bg-muted/30 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2.5">{t("exec.subject")}</th>
+                    <th className="px-3 py-2.5">{t("exec.today")}</th>
+                    <th className="px-3 py-2.5">{t("exec.progress")}</th>
+                    <th className="px-3 py-2.5">{t("exec.last")}</th>
+                    <th className="px-3 py-2.5">{t("exec.actions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.executionItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-6 text-muted-foreground">
+                        {(list.execution?.items.length ?? 0) === 0
+                          ? t("exec.empty")
+                          : t("exec.emptyFilter")}
+                      </td>
+                    </tr>
+                  ) : (
+                    list.executionItems.map((item) => (
+                      <tr
+                        key={item.id}
+                        className="border-b border-border last:border-0 hover:bg-muted/30"
+                        data-testid={`reprocessing-exec-${item.id}`}
+                      >
+                        <td className="px-3 py-3 align-top">
+                          <b className="text-[13px] font-semibold">{item.label}</b>
+                          {item.subtitle ? (
+                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                              {item.subtitle}
+                              {item.siteName && item.kind === "device" ? ` · ${item.siteName}` : ""}
+                            </span>
+                          ) : item.siteName && item.kind === "device" ? (
+                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                              {item.siteName}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-3 align-top">{execStatusChip(item.status)}</td>
+                        <td className="px-3 py-3 align-top text-xs">
+                          <span className="font-medium">
+                            {t("exec.doneOf", {
+                              done: item.doneCount,
+                              total: item.applicableCount,
+                            })}
+                          </span>
+                          {item.openCount > 0 ? (
+                            <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                              {t("exec.openCount", { count: item.openCount })}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-3 align-top font-mono text-xs">
+                          {item.lastPerformedAt ? formatDate(item.lastPerformedAt) : "—"}
+                          {item.lastPerformedBy ? (
+                            <span className="mt-0.5 block font-sans text-[11px] text-muted-foreground">
+                              {item.lastPerformedBy}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          <div className="flex flex-col items-start gap-1">
+                            <button
+                              type="button"
+                              className="text-[12.5px] font-semibold text-primary hover:underline"
+                              onClick={() => setDetailItem(item)}
+                              data-testid={`reprocessing-exec-view-${item.id}`}
+                            >
+                              {t("exec.viewToday")}
+                            </button>
+                            {item.openCount > 0 || item.applicableCount > 0 ? (
+                              <button
+                                type="button"
+                                className="text-[12.5px] font-semibold text-primary hover:underline"
+                                onClick={() => openRecordFromExecution(item)}
+                                data-testid={`reprocessing-exec-record-${item.id}`}
+                              >
+                                {t("exec.record")}
+                              </button>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           ) : (
-            /* Equipment / Water+Chemie / Sterilgut — Kontrolle table */
+            /* Programme — Kontrolle table by check type */
             <div className="overflow-x-auto rounded-xl border border-border bg-card">
               <table className="w-full min-w-[800px] text-left text-sm">
                 <thead className="border-b border-border bg-muted/30 text-[10px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
@@ -567,6 +777,7 @@ export function ReprocessingScreen() {
                   ) : (
                     sortedRefs.map((r) => {
                       const last = list.latestByCode.get(r.code);
+                      const todayCount = list.todaySubjectCountByCode.get(r.code) ?? 0;
                       const place =
                         last?.siteName
                           ? t("site", { name: last.siteName })
@@ -613,6 +824,20 @@ export function ReprocessingScreen() {
                                   <span className="mt-0.5 block font-sans text-[11px] text-muted-foreground">
                                     {valueLine}
                                   </span>
+                                ) : null}
+                                {todayCount > 1 ? (
+                                  <button
+                                    type="button"
+                                    className="mt-0.5 block font-sans text-[11px] font-semibold text-primary hover:underline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      list.setLens("execution");
+                                    }}
+                                  >
+                                    {r.scope === "equipment"
+                                      ? t("exec.devicesToday", { count: todayCount })
+                                      : t("exec.sitesToday", { count: todayCount })}
+                                  </button>
                                 ) : null}
                               </>
                             ) : null}
@@ -820,6 +1045,88 @@ export function ReprocessingScreen() {
             >
               {t("actions.save")}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!detailItem} onOpenChange={(o) => !o && setDetailItem(null)}>
+        <DialogContent className="max-w-lg" data-testid="reprocessing-exec-detail">
+          <DialogHeader>
+            <DialogTitle>
+              {detailItem ? t("exec.detailTitle", { label: detailItem.label }) : ""}
+            </DialogTitle>
+            <DialogDescription>
+              {detailItem ? execStatusChip(detailItem.status) : null}
+            </DialogDescription>
+          </DialogHeader>
+          {detailItem ? (
+            <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+              <section>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  {t("exec.detailDone")}
+                </p>
+                {detailItem.doneToday.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("exec.detailEmptyDone")}</p>
+                ) : (
+                  <ul className="divide-y divide-border rounded-md border border-border">
+                    {detailItem.doneToday.map((row) => (
+                      <li key={row.checkCode} className="px-3 py-2 text-sm">
+                        <p className="font-medium">{row.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {row.measuredValue != null && row.measuredValue !== ""
+                            ? `${t("value")} ${row.measuredValue}${row.unit ? ` ${row.unit}` : ""}${
+                                row.limitText
+                                  ? `, ${t("limit")} ${row.limitText}`
+                                  : `, ${t("noLimit")}`
+                              }`
+                            : row.passed === true
+                              ? t("exec.passOk")
+                              : row.passed === false
+                                ? t("exec.passFail")
+                                : t("exec.passNone")}
+                          {` · ${row.performedBy}`}
+                        </p>
+                        {row.note ? (
+                          <p className="mt-0.5 text-xs text-muted-foreground">{row.note}</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+              <section>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  {t("exec.detailOpen")}
+                </p>
+                {detailItem.openCheckLabels.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t("exec.detailEmptyOpen")}</p>
+                ) : (
+                  <ul className="list-inside list-disc text-sm">
+                    {detailItem.openCheckLabels.map((label, i) => (
+                      <li key={`${detailItem.openCheckCodes[i]}-${label}`}>{label}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDetailItem(null)}>
+              {t("actions.cancel")}
+            </Button>
+            {detailItem && detailItem.openCount > 0 ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  const item = detailItem;
+                  setDetailItem(null);
+                  openRecordFromExecution(item);
+                }}
+                data-testid="reprocessing-exec-detail-record"
+              >
+                {t("exec.record")}
+              </Button>
+            ) : null}
           </DialogFooter>
         </DialogContent>
       </Dialog>

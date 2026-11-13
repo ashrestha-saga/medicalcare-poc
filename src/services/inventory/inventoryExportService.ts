@@ -24,6 +24,8 @@ const CSV_HEADERS = [
 export type InventoryExportFilters = {
   siteId?: string | null;
   areaId?: string | null;
+  /** When set (non-empty), only these device instance ids are exported. */
+  ids?: string[] | null;
 };
 
 function csvEscape(value: string): string {
@@ -45,14 +47,19 @@ export const inventoryExportService = {
   ): Promise<{ body: Buffer; filename: string; rowCount: number; sha256: string }> {
     requirePermission(ctx, "inventory:export");
 
+    const ids = [...new Set((filters.ids ?? []).map((id) => id.trim()).filter(Boolean))];
+    const scopedToIds = ids.length > 0;
+
     const rows = await prisma.deviceInstance.findMany({
       where: {
         state: "released",
-        ...(filters.areaId
-          ? { areaId: filters.areaId }
-          : filters.siteId
-            ? { area: { siteId: filters.siteId } }
-            : {}),
+        ...(scopedToIds
+          ? { id: { in: ids } }
+          : filters.areaId
+            ? { areaId: filters.areaId }
+            : filters.siteId
+              ? { area: { siteId: filters.siteId } }
+              : {}),
       },
       include: {
         model: { select: { manufacturer: true, modelName: true, tradeName: true } },
@@ -88,8 +95,10 @@ export const inventoryExportService = {
     const sha256 = createHash("sha256").update(body).digest("hex");
     const rowCount = rows.length;
     const filterJson = JSON.stringify({
-      siteId: filters.siteId ?? null,
-      areaId: filters.areaId ?? null,
+      siteId: scopedToIds ? null : (filters.siteId ?? null),
+      areaId: scopedToIds ? null : (filters.areaId ?? null),
+      ids: scopedToIds ? ids : null,
+      idCount: scopedToIds ? ids.length : null,
     });
 
     const log = await prisma.exportLog.create({

@@ -229,6 +229,52 @@ export interface ReprocessingCheckDTO {
   note: string | null;
 }
 
+/** One completed daily check row in the execution (by device/site) lens. */
+export interface ReprocessingExecutionDoneDTO {
+  checkCode: string;
+  label: string;
+  scope: string;
+  passed: boolean | null;
+  measuredValue: string | null;
+  unit: string | null;
+  limitText: string | null;
+  withinLimit: boolean | null;
+  performedBy: string;
+  performedAt: string;
+  note: string | null;
+}
+
+export type ReprocessingExecutionStatus = "done" | "partial" | "open";
+
+/** Device or site row for the reprocessing execution lens. */
+export interface ReprocessingExecutionItemDTO {
+  id: string;
+  kind: "device" | "site";
+  /** Inventory number (device) or site name (site). */
+  label: string;
+  /** Trade/model name for devices; null for sites. */
+  subtitle: string | null;
+  inventoryNumber: string | null;
+  siteId: string | null;
+  siteName: string | null;
+  equipmentDeviceId: string | null;
+  status: ReprocessingExecutionStatus;
+  applicableCount: number;
+  doneCount: number;
+  openCount: number;
+  openCheckCodes: string[];
+  openCheckLabels: string[];
+  lastPerformedAt: string | null;
+  lastPerformedBy: string | null;
+  doneToday: ReprocessingExecutionDoneDTO[];
+}
+
+export interface ReprocessingExecutionResponse {
+  day: string;
+  kind: "device" | "site";
+  items: ReprocessingExecutionItemDTO[];
+}
+
 export interface ReprocessingBatchItemDTO {
   label: string | null;
   inventoryNumber: string | null;

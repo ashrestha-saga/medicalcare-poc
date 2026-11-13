@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Printer } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ExternalLink, Printer, ScanLine } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import type { DeviceInstanceDetailDTO, DeviceInstanceDTO } from "@/interfaces";
 import { Button } from "@/components/ui/button";
@@ -12,9 +13,12 @@ import { printInventoryLabels } from "@/components/features/devices/labels/print
 import { formatDate } from "@/lib/format";
 import { toInventoryLabel } from "@/lib/inventory/label";
 import type { AppLocale } from "@/lib/locale";
+import { ApiError } from "@/lib/http/apiClient";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
+import { startServiceRequestFromDevice } from "@/lib/scan/startServiceRequestFromDevice";
 import { UnlockDevicePanel } from "@/components/features/repairs/UnlockDevicePanel";
 import { LoanerAssignPanel } from "@/components/features/repairs/LoanerAssignPanel";
+import { toast } from "@/store/toastStore";
 import { DeviceDutiesPanel } from "./DeviceDutiesPanel";
 
 interface DeviceDetailProps {
@@ -54,12 +58,15 @@ export function DeviceDetail({
   const t = useTranslations("inventoryDetail");
   const tCommon = useTranslations("common");
   const locale = useLocale() as AppLocale;
+  const router = useRouter();
   const { checkPermission } = usePermissions();
   const canViewCatalog = checkPermission("catalog:view");
+  const canCreateRequest = checkPermission("requests:create");
   const detail = isDetail(device) ? device : null;
   const modelClass = detail?.modelClassification;
   const modelHref = device.modelId && canViewCatalog ? `/catalog/${device.modelId}` : null;
   const label = toInventoryLabel(device);
+  const [requestBusy, setRequestBusy] = useState(false);
 
   const classLabels = (() => {
     const c = modelClass;
@@ -93,6 +100,20 @@ export function DeviceDetail({
     printInventoryLabels([label]);
   }, [label]);
 
+  const onRequestService = useCallback(async () => {
+    const inv = device.inventoryNumber?.trim();
+    if (!inv || requestBusy || device.catalogPending) return;
+    setRequestBusy(true);
+    try {
+      await startServiceRequestFromDevice({ inventoryNumber: inv });
+      router.push("/");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t("requestServiceFailed"));
+    } finally {
+      setRequestBusy(false);
+    }
+  }, [device.catalogPending, device.inventoryNumber, requestBusy, router, t]);
+
   return (
     <div className="px-4 pb-6 sm:px-[18px]" data-testid="device-detail">
       <section className="p-devhead p-admin__head">
@@ -116,6 +137,20 @@ export function DeviceDetail({
             <Printer className="h-4 w-4" />
             {t("printLabel")}
           </Button>
+          {canCreateRequest && (
+            <Button
+              type="button"
+              size="sm"
+              className="h-8"
+              disabled={requestBusy || device.catalogPending || !device.inventoryNumber?.trim()}
+              onClick={() => void onRequestService()}
+              title={device.catalogPending ? t("catalogPending") : t("requestServiceHint")}
+              data-testid="device-request-service"
+            >
+              <ScanLine className="h-4 w-4" />
+              {requestBusy ? t("requestServiceBusy") : t("requestService")}
+            </Button>
+          )}
         </div>
         <h2 data-testid="device-detail-title">{device.tradeName ?? device.inventoryNumber}</h2>
         <p className="p-requests__sub">

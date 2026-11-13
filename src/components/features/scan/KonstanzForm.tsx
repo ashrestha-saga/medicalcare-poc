@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import type {
+  ScanKonstanzCompletedItemDTO,
   ScanKonstanzItemDTO,
   ScanKonstanzOpenDTO,
   ScanKonstanzResultDTO,
@@ -11,6 +12,32 @@ import { api, ApiError } from "@/lib/http/apiClient";
 import { toast } from "@/store/toastStore";
 
 type ResultKind = "passed" | "passed_with_conditions" | "failed";
+
+function formatDay(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const day = iso.slice(0, 10);
+  const [y, m, d] = day.split("-");
+  if (!y || !m || !d) return day;
+  return `${d}.${m}.${y}`;
+}
+
+function formatRecordedAt(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso.slice(0, 16);
+    const day = formatDay(d.toISOString());
+    const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return `${day} · ${time}`;
+  } catch {
+    return iso.slice(0, 16);
+  }
+}
+
+function resultTone(result: ScanKonstanzCompletedItemDTO["result"]): "ok" | "warn" | "stop" {
+  if (result === "failed") return "stop";
+  if (result === "passed_with_conditions") return "warn";
+  return "ok";
+}
 
 export function KonstanzForm({
   deviceId,
@@ -106,17 +133,29 @@ export function KonstanzForm({
   }
 
   if (actionable.length === 0) {
+    const completed = open.completedToday ?? [];
+    const hasMangelDone = completed.some((c) => c.result === "failed");
+    const summaryTone = hasMangelDone
+      ? "stop"
+      : completed.some((c) => c.result === "passed_with_conditions")
+        ? "warn"
+        : completed.length > 0
+          ? "ok"
+          : "idle";
+
     return (
-      <section className="p-routine" data-testid="konstanz-form">
+      <section className="p-routine p-done" data-testid="konstanz-form">
         <header className="p-routine__head">
           <button type="button" className="p-close" onClick={onCancel} aria-label={t("cancel")}>
             ×
           </button>
           <h2>{t("title")}</h2>
           <p className="p-routine__sub">
-            {open.label} · <span className="mono">{open.inventoryNumber}</span>
+            {open.label}
+            <span className="p-done__inv mono">{open.inventoryNumber}</span>
           </p>
         </header>
+
         {blocked.length > 0 ? (
           <ul className="p-charge__hurdles">
             {blocked.map((b) => (
@@ -126,10 +165,78 @@ export function KonstanzForm({
             ))}
           </ul>
         ) : (
-          <p className="p-heute__empty">{t("allDone")}</p>
+          <div className="p-done__banner" data-t={summaryTone} data-testid="konstanz-status-banner">
+            <span className="p-done__banner-dot" aria-hidden />
+            <div className="p-done__banner-text">
+              <strong>
+                {completed.length > 0 ? t("allDoneToday") : t("allDone")}
+              </strong>
+              {completed.length > 0 ? (
+                <span>
+                  {t("completedCount", { count: completed.length })} · {formatDay(open.performedAt)}
+                </span>
+              ) : null}
+            </div>
+          </div>
         )}
+
+        {completed.length > 0 ? (
+          <div className="p-done__list" data-testid="konstanz-completed-today">
+            {completed.map((item: ScanKonstanzCompletedItemDTO) => {
+              const tone = resultTone(item.result);
+              return (
+                <article
+                  key={item.dutyId}
+                  className="p-done__card"
+                  data-t={tone}
+                  data-testid={`konstanz-completed-${item.dutyId}`}
+                >
+                  <div className="p-done__card-top">
+                    <div className="p-done__card-titles">
+                      <h3>{item.title}</h3>
+                      {item.constancyObjectLabel ? (
+                        <p className="p-done__object">{item.constancyObjectLabel}</p>
+                      ) : null}
+                    </div>
+                    <span className="p-done__pill" data-t={tone}>
+                      {t(`result.${item.result}`)}
+                    </span>
+                  </div>
+
+                  <div className="p-done__meta">
+                    <div className="p-done__meta-item">
+                      <span className="p-done__meta-k">{t("performedAt")}</span>
+                      <span className="p-done__meta-v">{formatRecordedAt(item.recordedAt)}</span>
+                    </div>
+                    <div className="p-done__meta-item">
+                      <span className="p-done__meta-k">{t("performedBy")}</span>
+                      <span className="p-done__meta-v">{item.performedBy || t("completedByUnknown")}</span>
+                    </div>
+                    {item.nextDueAt ? (
+                      <div className="p-done__meta-item">
+                        <span className="p-done__meta-k">{t("nextDue")}</span>
+                        <span className="p-done__meta-v">{formatDay(item.nextDueAt)}</span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {item.note?.trim() ? (
+                    <p className="p-done__note">{item.note.trim()}</p>
+                  ) : null}
+                </article>
+              );
+            })}
+            {hasMangelDone ? <p className="p-routine__warn">{t("hintFailed")}</p> : null}
+          </div>
+        ) : null}
+
         <footer className="p-routine__foot">
-          <button type="button" className="p-routine__save" onClick={onCancel}>
+          <button
+            type="button"
+            className="p-routine__save"
+            onClick={onCancel}
+            data-testid="konstanz-completed-back"
+          >
             {t("back")}
           </button>
         </footer>

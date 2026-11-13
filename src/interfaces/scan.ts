@@ -12,14 +12,27 @@ export interface ScanHeuteItemDTO {
   band: ScanHeuteBand;
   /** Open unreleased batches on this device (equipment). */
   openBatchCount: number;
-  /** True when daily reprocessing catalogue items remain open (tenant stub). */
+  /** True when equipment (INV) daily checks remain open — not site/Haus. */
   openDailyChecks: boolean;
   /** True when a constancy duty is due/overdue or last check failed. */
   openKonstanzChecks: boolean;
 }
 
+/** Site / Haus daily work — independent of any inventory device. */
+export interface ScanHeuteSiteItemDTO {
+  siteId: string;
+  siteName: string;
+  band: ScanHeuteBand;
+  openDailyChecks: boolean;
+  openCount: number;
+  doneCount: number;
+  applicableCount: number;
+}
+
 export interface ScanHeuteDTO {
   items: ScanHeuteItemDTO[];
+  /** Site-scoped daily checks (water / chemistry / sterile). */
+  sites: ScanHeuteSiteItemDTO[];
   /** Caller’s effective area ids; empty when unscoped (admin) or none assigned. */
   areaIds: string[] | null;
   unscoped: boolean;
@@ -120,6 +133,8 @@ export interface ScanRoutineCompletedItemDTO {
 }
 
 export interface ScanRoutineOpenDTO {
+  /** device = INV equipment pack; site = Haus water/chemistry/sterile pack. */
+  subjectKind: "device" | "site";
   deviceId: string;
   inventoryNumber: string;
   label: string;
@@ -128,7 +143,7 @@ export interface ScanRoutineOpenDTO {
   areaName: string | null;
   isEquipment: boolean;
   steps: ScanRoutineStepDTO[];
-  /** Filled when steps are empty — today's completed checks for this device/site. */
+  /** Filled when steps are empty — today's completed checks for this subject. */
   completedToday: ScanRoutineCompletedItemDTO[];
   performedAt: string;
 }
@@ -224,12 +239,28 @@ export interface ScanKonstanzItemDTO {
   basisText: string;
 }
 
+/** Today's already-recorded constancy performances for the device. */
+export interface ScanKonstanzCompletedItemDTO {
+  dutyId: string;
+  title: string;
+  constancyObjectLabel: string | null;
+  result: "passed" | "passed_with_conditions" | "failed";
+  note: string | null;
+  performedBy: string;
+  performedAt: string;
+  recordedAt: string;
+  /** Next due after this performance, when known on the duty. */
+  nextDueAt: string | null;
+}
+
 export interface ScanKonstanzOpenDTO {
   deviceId: string;
   inventoryNumber: string;
   label: string;
   performedAt: string;
   items: ScanKonstanzItemDTO[];
+  /** Filled when nothing is open — today's completed constancy results. */
+  completedToday: ScanKonstanzCompletedItemDTO[];
 }
 
 export interface ScanKonstanzResultDTO {

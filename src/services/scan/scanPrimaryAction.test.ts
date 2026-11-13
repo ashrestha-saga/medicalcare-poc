@@ -208,6 +208,22 @@ describe("openDailyRefCodesForDevice", () => {
       refs,
       [{ checkCode: "RC-rdg-1", equipmentDeviceId: "d1", siteId: null }],
     );
+    // Default pack is equipment-only; site/Haus water is a separate Heute tab.
+    expect(open).toEqual([]);
+  });
+
+  it("can still include site pack when explicitly requested", () => {
+    const open = openDailyRefCodesForDevice(
+      {
+        id: "d1",
+        productKindCode: "aufbereitungsgeraet",
+        characteristicsJson: JSON.stringify({ istAufbGeraet: true, eigenTyp: "rdg" }),
+        siteId: "s1",
+      },
+      refs,
+      [{ checkCode: "RC-rdg-1", equipmentDeviceId: "d1", siteId: null }],
+      ["equipment", "site"],
+    );
     expect(open).toEqual(["RC-water-1"]);
   });
 

@@ -3,8 +3,9 @@ import { errorResponse, unprocessable } from "@/lib/errors";
 import { inventoryExportService } from "@/services/inventory/inventoryExportService";
 
 /**
- * GET /api/inventory/export?format=csv&siteId=&areaId=
+ * GET /api/inventory/export?format=csv&siteId=&areaId=&id=&ids=
  * §14 Bestandsverzeichnis CSV (inventory:export). Partner sessions → 403 via requireTenantContext.
+ * Optional `id` (repeated) or comma-separated `ids` limits export to those devices.
  */
 export async function GET(req: Request) {
   let correlationId: string | undefined;
@@ -22,9 +23,16 @@ export async function GET(req: Request) {
       }
       const siteId = params.get("siteId")?.trim() || null;
       const areaId = params.get("areaId")?.trim() || null;
+      const fromRepeated = params.getAll("id").map((v) => v.trim()).filter(Boolean);
+      const fromCsv = (params.get("ids") ?? "")
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      const ids = [...fromRepeated, ...fromCsv];
       const { body, filename, rowCount } = await inventoryExportService.exportCsv(ctx, {
         siteId,
         areaId,
+        ids: ids.length > 0 ? ids : null,
       });
       return new Response(new Uint8Array(body), {
         status: 200,
