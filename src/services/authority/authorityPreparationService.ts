@@ -68,45 +68,27 @@ const GAP_LABELS: Record<PreparationGapCode, string> = {
   unreported_incidents: "Reportable incidents not yet reported",
   missing_constancy_cadence: "Constancy objects without a determined takt",
   field_safety_unmatched: "Recall Abgleich open",
+  open_clarifications: "Open clarifications still unresolved",
+  missing_duty_overlap: "Overlap questions without an operator decision",
 };
 
 async function gapCounts(ctx: TenantContext): Promise<Record<PreparationGapCode, number>> {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const [
-    openDaily,
-    unreleasedBatches,
-    unassessed,
-    unreported,
-    unmatchedFs,
-    missingCadence,
-    draftDevices,
-  ] = await Promise.all([
-    reprocessingEvidenceService.countOpenDailyChecks(ctx),
-    prisma.reprocessingBatch.count({ where: { releaseResult: null } }),
-    prisma.deviceIncident.count({
-      where: { suspectedSerious: null, assessedAt: null, closedAt: null },
-    }),
-    prisma.deviceIncident.count({
-      where: { suspectedSerious: true, reportedAt: null, closedAt: null },
-    }),
-    prisma.fieldSafetyDeviceAction.count({
-      where: {
-        fieldSafetyAction: { closedAt: null },
-        OR: [{ affected: null }, { affected: true, actionTakenAt: null }],
-      },
-    }),
-    constancyCadenceService.listMissing(ctx).then((r) => r.length),
-    prisma.deviceInstance.count({ where: { state: "draft" } }),
-  ]);
+  const { listBegehGaps } = await import("@/services/authority/begehPrepService");
+  // Reuse live gap list so R6 predicates stay in one place.
+  const live = await listBegehGaps(ctx);
+  const byHref = new Map(live.map((g) => [g.href, g.count] as const));
   return {
-    open_daily_checks: openDaily,
-    unreleased_batches: unreleasedBatches,
-    unassessed_incidents: unassessed,
-    unreported_incidents: unreported,
-    field_safety_unmatched: unmatchedFs,
-    missing_constancy_cadence: missingCadence,
-    draft_devices: draftDevices,
+    open_daily_checks: byHref.get("/reprocessing?openToday=1") ?? 0,
+    unreleased_batches: byHref.get("/reprocessing?section=batches") ?? 0,
+    unassessed_incidents: byHref.get("/incidents?view=unassessed") ?? 0,
+    unreported_incidents: byHref.get("/incidents?view=unreported") ?? 0,
+    field_safety_unmatched: byHref.get("/field-safety?view=unmatched") ?? 0,
+    missing_constancy_cadence: byHref.get("/constancy-cadence?section=missing") ?? 0,
+    draft_devices: byHref.get("/devices?state=draft") ?? 0,
+    open_clarifications: byHref.get("/clarifications") ?? 0,
+    missing_duty_overlap: byHref.get("/duty-overlap") ?? 0,
   };
 }
 

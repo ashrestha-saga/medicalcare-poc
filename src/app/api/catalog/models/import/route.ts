@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { requirePermission, requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requirePermission, requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse, unprocessable } from "@/lib/errors";
 import {
   catalogModelSourceSchema,
@@ -103,7 +103,7 @@ function mapRow(raw: Record<string, unknown>): RowPatch | null {
 export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       requirePermission(ctx, "catalog:update");

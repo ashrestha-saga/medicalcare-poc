@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { useTranslations } from "next-intl";
 import type { CataloguePreviewDTO } from "@/interfaces/pruefpartner";
 import type { InspectSiteGroup as SiteGroup } from "@/lib/inspect/siteGroups";
 import { InspectJobCard } from "@/components/features/inspect/InspectJobCard";
-import { api, ApiError } from "@/lib/http/apiClient";
+import { useSiteVisitStart } from "@/components/hooks/inspect/useSiteVisitStart";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -19,31 +18,15 @@ export function InspectSiteGroupCard({
   onVisitStarted?: () => void;
 }) {
   const t = useTranslations("pruefpartner");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const { busy, err, startVisit } = useSiteVisitStart({
+    siteId: group.siteId,
+    references: group.rows.map((r) => r.reference),
+    onVisitStarted,
+  });
   const visitActive = Boolean(group.visitStartedAt);
   const earliestOverdue =
     Boolean(group.earliestDue) &&
     group.rows.some((r) => r.overdue && r.dueAt === group.earliestDue);
-
-  async function startVisit() {
-    setBusy(true);
-    setErr(null);
-    try {
-      await api<{ visitId: string; startedAt: string }>("/api/partner/inspect/visits/start", {
-        method: "POST",
-        body: JSON.stringify({
-          siteId: group.siteId,
-          references: group.rows.map((r) => r.reference),
-        }),
-      });
-      onVisitStarted?.();
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : t("visitStartFailed"));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <article className="pp-site" data-testid="inspect-site-group">

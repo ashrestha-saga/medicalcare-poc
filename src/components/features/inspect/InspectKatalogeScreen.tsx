@@ -1,44 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { api, ApiError } from "@/lib/http/apiClient";
+import { useInspectKataloge } from "@/components/hooks/inspect/useInspectKataloge";
 import { Spinner } from "@/components/ui/Loading";
-
-type Cat = {
-  id: string;
-  code: string;
-  label: string;
-  draft: boolean;
-  noCatalogue: boolean;
-  inspectionTypeCode: string;
-};
 
 export function InspectKatalogeScreen() {
   const t = useTranslations("pruefpartner");
-  const [rows, setRows] = useState<Cat[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api<{ catalogues: Cat[] }>("/api/partner/inspect/catalogues");
-        if (!cancelled) setRows(res.catalogues);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof ApiError ? e.message : t("loadFailed"));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
-
-  const drafts = rows.filter((r) => r.draft);
-  const live = rows.filter((r) => !r.draft);
+  const { drafts, live, error, loading } = useInspectKataloge();
 
   if (loading) {
     return (

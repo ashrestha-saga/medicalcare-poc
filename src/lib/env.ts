@@ -63,6 +63,25 @@ export const env = {
       return str("TOTP_ISSUER", "DeviceCare");
     },
   },
+  /**
+   * DEMO_SHARED_TOTP — demo showcase bridge (see docs/DEMO_SHARED_TOTP.md).
+   * Opt-in in any NODE_ENV except test. Search codebase for DEMO_SHARED_TOTP to remove.
+   */
+  demoSharedTotp: {
+    get enabled() {
+      return str("DEMO_SHARED_TOTP_ENABLED", "false") === "true";
+    },
+    get secret() {
+      return str("DEMO_SHARED_TOTP_SECRET");
+    },
+    get issuer() {
+      return str("DEMO_SHARED_TOTP_ISSUER", str("TOTP_ISSUER", "DeviceCare Demo"));
+    },
+    /** Optional passphrase for /demo/auth-bridge and its API. */
+    get bridgePass() {
+      return str("DEMO_BRIDGE_PASS");
+    },
+  },
   oxid: {
     get clientId() {
       return str("OXID_CLIENT_ID");

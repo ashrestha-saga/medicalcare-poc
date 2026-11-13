@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronsUpDown } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -101,7 +102,12 @@ export function useDispatchColumns(
         id: "assignment",
         header: ({ column }) => <SortHeader label={t("colAssignment")} column={column} />,
         cell: ({ row }) => (
-          <span className="font-mono text-xs">{row.original.reference}</span>
+          <Link
+            href={`/partner/orders/${encodeURIComponent(row.original.reference)}`}
+            className="font-mono text-xs text-primary underline-offset-2 hover:underline"
+          >
+            {row.original.reference}
+          </Link>
         ),
       },
       {
@@ -149,32 +155,52 @@ export function useDispatchColumns(
           const done =
             r.displayState === "abgeschlossen" || r.displayState === "abgelehnt";
           if (!canDispatch || done) {
-            return <span className="text-foreground">{r.assigneeName ?? "—"}</span>;
+            return (
+              <div className="flex flex-col gap-1">
+                <span className="text-foreground">{r.assigneeName ?? "—"}</span>
+                {r.gateOverridden ? (
+                  <Badge variant="warning" className="w-fit text-[10px]">
+                    {t("trainingGateOverriddenChip")}
+                  </Badge>
+                ) : null}
+              </div>
+            );
           }
           const options = assigneesByTenant[r.tenantId] ?? [];
           const loading = assigneesLoading === r.tenantId;
           return (
-            <select
-              className="h-8 max-w-[200px] rounded-md border border-border bg-transparent px-2 text-xs"
-              value={r.assigneeUserId ?? ""}
-              disabled={busyRef === r.reference || loading}
-              data-testid={`dispatch-handler-${r.reference}`}
-              onFocus={() => void ensureAssignees(r.tenantId)}
-              onClick={(e) => e.stopPropagation()}
-              onChange={(e) => onAssignHandler(r, e.target.value || null)}
-            >
-              <option value="">{t("sitePortalUnassigned")}</option>
-              {r.assigneeUserId &&
-              !options.some((a) => a.userId === r.assigneeUserId) ? (
-                <option value={r.assigneeUserId}>{r.assigneeName ?? r.assigneeUserId}</option>
+            <div className="flex flex-col gap-1">
+              <select
+                className="h-8 max-w-[200px] rounded-md border border-border bg-transparent px-2 text-xs"
+                value={r.assigneeUserId ?? ""}
+                disabled={busyRef === r.reference || loading}
+                data-testid={`dispatch-handler-${r.reference}`}
+                onFocus={() => void ensureAssignees(r.tenantId)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => onAssignHandler(r, e.target.value || null)}
+              >
+                <option value="">{t("sitePortalUnassigned")}</option>
+                {r.assigneeUserId &&
+                !options.some((a) => a.userId === r.assigneeUserId) ? (
+                  <option value={r.assigneeUserId}>{r.assigneeName ?? r.assigneeUserId}</option>
+                ) : null}
+                {options.map((a) => (
+                  <option key={a.userId} value={a.userId}>
+                    {a.name}
+                    {a.isExternal ? " *" : ""}
+                  </option>
+                ))}
+              </select>
+              {r.gateOverridden ? (
+                <Badge
+                  variant="warning"
+                  className="w-fit text-[10px]"
+                  title={r.gateOverrideReason ?? t("trainingGateOverridden")}
+                >
+                  {t("trainingGateOverriddenChip")}
+                </Badge>
               ) : null}
-              {options.map((a) => (
-                <option key={a.userId} value={a.userId}>
-                  {a.name}
-                  {a.isExternal ? " *" : ""}
-                </option>
-              ))}
-            </select>
+            </div>
           );
         },
       },

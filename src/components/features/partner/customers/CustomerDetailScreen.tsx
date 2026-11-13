@@ -19,7 +19,7 @@ import { Spinner } from "@/components/ui/Loading";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
 import { api } from "@/lib/http/apiClient";
-import type { SetupProgressDTO, SetupStepDTO } from "@/services/setup/setupProgressService";
+import type { SetupProgressDTO, SetupStepDTO } from "@/interfaces/setup";
 import type { ConsoleClinicDetailDTO } from "@/interfaces/console";
 import { cn } from "@/lib/utils";
 
@@ -132,6 +132,7 @@ function CustomerDetailBody({ contractId }: { contractId: string }) {
     lifecycle,
     setStaffAssigned,
     openBackoffice,
+    canOpenBackoffice,
   } = detail;
 
   useEffect(() => {
@@ -478,9 +479,10 @@ function CustomerDetailBody({ contractId }: { contractId: string }) {
                     <Button
                       type="button"
                       variant="secondary"
-                      disabled={busy}
+                      disabled={busy || !canOpenBackoffice}
                       onClick={() => openBackoffice()}
                       data-testid="open-backoffice"
+                      title={!canOpenBackoffice ? t("backofficeScopeRequired") : undefined}
                     >
                       {t("openBackoffice")}
                     </Button>

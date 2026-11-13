@@ -11,6 +11,7 @@ export type PermissionSlug =
   | "clarifications:view"
   | "duties:view"
   | "requests:create"
+  | "requests:approve"
   | "parts:request"
   | "requests:view-mine"
   | "requests:view-open"
@@ -111,6 +112,8 @@ export type MenuModuleId =
   | "console-external"
   | "console-organisation"
   | "console-activity"
+  | "console-parts-proposals"
+  | "console-test-equipment"
   | "console-settings";
 
 /** Clinic groups mirror mockup v26; console keeps ops | org. */

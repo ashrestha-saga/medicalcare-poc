@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { RowSelectionState } from "@tanstack/react-table";
-import { Download, Printer, Plus, ScanLine, Search } from "lucide-react";
+import { Download, Printer, ScanLine, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { DeviceInstanceDTO } from "@/interfaces";
 import { CameraScanner } from "@/components/features/scan/CameraScanner";
@@ -218,6 +218,7 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
         mineArea={list.mineArea}
         onMineAreaChange={list.setMineArea}
         onClearAll={() => list.clearListFilters()}
+        canRegister={list.canUpdate}
       />
 
       <DataTable
@@ -248,7 +249,7 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
                 data-testid="devices-print-bulk"
               >
                 <Printer className="h-4 w-4" />
-                Print labels ({selectedDevices.length})
+                {t("printLabels", { count: selectedDevices.length })}
               </Button>
             )}
             {canExport && (
@@ -265,17 +266,10 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
                 {exportBusy ? t("export14Busy") : t("export14")}
               </Button>
             )}
-            {list.canUpdate && (
-              <Button type="button" size="sm" variant="outline" className="h-8" asChild data-testid="devices-erstanlage">
-                <Link href="/registration">
-                  <Plus className="h-4 w-4" />
-                  Registration
-                </Link>
-              </Button>
-            )}
             <Button
               type="button"
               size="sm"
+              variant="outline"
               className="h-8"
               onClick={() => setScanOpen(true)}
               data-testid="devices-barcode-search"
@@ -283,7 +277,14 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
               <Search className="h-4 w-4" />
               {t("searchScan")}
             </Button>
-            <Button type="button" size="sm" className="h-8" asChild data-testid="devices-request-service">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8"
+              asChild
+              data-testid="devices-request-service"
+            >
               <Link href="/">
                 <ScanLine className="h-4 w-4" />
                 {t("requestService")}

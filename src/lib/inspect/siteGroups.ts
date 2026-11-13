@@ -70,26 +70,34 @@ export function groupRowsBySite(rows: CataloguePreviewDTO[]): InspectSiteGroup[]
   });
 }
 
+/** E77 — send-ins are workshop jobs, not day-plan visit buckets. */
+export function isSendInRow(row: CataloguePreviewDTO): boolean {
+  return row.fulfilment === "send_in";
+}
+
 export function buildDaySections(
   open: CataloguePreviewDTO[],
   mode: "heute" | "woche" | "erledigt",
   done: CataloguePreviewDTO[] = [],
+  today: Date = new Date(),
 ): InspectDaySection[] {
   if (mode === "erledigt") {
+    const onSiteDone = done.filter((r) => !isSendInRow(r));
     return [
       {
         key: "heute",
-        rows: done,
-        sites: groupRowsBySite(done),
+        rows: onSiteDone,
+        sites: groupRowsBySite(onSiteDone),
         done: true,
       },
     ];
   }
 
-  const bucketOf = (row: CataloguePreviewDTO) => tagesBucket(planDate(row));
+  const onSite = open.filter((r) => !isSendInRow(r));
+  const bucketOf = (row: CataloguePreviewDTO) => tagesBucket(planDate(row), today);
 
   if (mode === "heute") {
-    const rows = open.filter((r) => {
+    const rows = onSite.filter((r) => {
       const b = bucketOf(r);
       return b === "heute" || b === "ohne";
     });
@@ -98,7 +106,7 @@ export function buildDaySections(
 
   const order: DayBucket[] = ["morgen", "woche", "spaeter"];
   return order.map((key) => {
-    const rows = open.filter((r) => bucketOf(r) === key);
+    const rows = onSite.filter((r) => bucketOf(r) === key);
     return { key, rows, sites: groupRowsBySite(rows) };
   });
 }

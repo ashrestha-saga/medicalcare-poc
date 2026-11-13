@@ -25,7 +25,6 @@ describe("partner permission intersection", () => {
     const admin = partnerOrgPermissions("admin");
     expect(admin).not.toContain("users:view");
     expect(admin).not.toContain("roles:update");
-    expect(admin).not.toContain("training:view");
     expect(admin).not.toContain("settings:oxid");
     expect(admin).not.toContain("settings:smtp");
     expect(admin).not.toContain("catalog:update");
@@ -34,6 +33,19 @@ describe("partner permission intersection", () => {
     expect(admin).not.toContain("authority:view");
     expect(admin).toContain("inventory:update");
     expect(admin).toContain("audit:export");
+    expect(admin).toContain("training:view");
+    expect(admin).toContain("reprocessing:view");
+  });
+
+  it("grants training and reprocessing nav slugs only when those scopes are on the contract", () => {
+    const withBoth = partnerActingPermissions("admin", ["training", "reprocessing"]);
+    expect(withBoth).toContain("training:view");
+    expect(withBoth).toContain("reprocessing:view");
+    expect(withBoth).not.toContain("reprocessing:release");
+
+    const inventoryOnly = partnerActingPermissions("admin", ["inventory"]);
+    expect(inventoryOnly).not.toContain("training:view");
+    expect(inventoryOnly).not.toContain("reprocessing:view");
   });
 
   it("intersects inspector with inventory-only scope", () => {
@@ -101,6 +113,8 @@ describe("partner console RBAC", () => {
       "console-external",
       "console-organisation",
       "console-activity",
+      "console-parts-proposals",
+      "console-test-equipment",
       "console-settings",
     ]);
     expect(consoleMenuFromPermissions(perms).map((m) => m.href)).not.toContain("/partner/disposition");
@@ -130,6 +144,7 @@ describe("partner console RBAC", () => {
       "console-due-dates",
       "console-orders",
       "console-my-sites",
+      "console-parts-proposals",
     ]);
     expect(partnerHasConsolePermission("order", "console:disposition:assign")).toBe(true);
   });
@@ -148,5 +163,10 @@ describe("partner console RBAC", () => {
     expect(canAccessConsolePath("/partner/customers/new", admin)).toBe(true);
     expect(canAccessConsolePath("/partner/staff", admin)).toBe(true);
     expect(canAccessConsolePath("/partner/external-inspectors", admin)).toBe(true);
+
+    const serviceLead = partnerConsolePermissions("service_lead");
+    expect(canAccessConsolePath("/partner/orders", serviceLead)).toBe(true);
+    expect(canAccessConsolePath("/partner/orders/new", serviceLead)).toBe(true);
+    expect(canAccessConsolePath("/partner/orders/SR-123/send-in", serviceLead)).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { AccessDenied } from "@/components/features/shared/AccessDenied";
@@ -15,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import type { ComposedBookEvidenceDTO } from "@/interfaces";
 import { formatDate as formatDateIntl, formatDateTime as formatDateTimeIntl } from "@/lib/format";
 import type { AppLocale } from "@/lib/locale";
+import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { cn } from "@/lib/utils";
 
 function placeLine(parts: {
@@ -28,10 +30,12 @@ function placeLine(parts: {
 function Section({
   legal,
   title,
+  actions,
   children,
 }: {
   legal: string;
   title: string;
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -39,7 +43,10 @@ function Section({
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {legal}
       </p>
-      <h3 className="mt-1 text-sm font-semibold">{title}</h3>
+      <div className="mt-1 flex flex-wrap items-start justify-between gap-2">
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {actions}
+      </div>
       <div className="mt-3">{children}</div>
     </section>
   );
@@ -70,6 +77,9 @@ export function DeviceBookScreen() {
   const formatDate = (iso: string | null | undefined) => formatDateIntl(iso, locale);
   const formatDateTime = (iso: string | null | undefined) => formatDateTimeIntl(iso, locale);
   const list = useDeviceBookComposed();
+  const { checkPermission } = usePermissions();
+  const canRecordExternal =
+    checkPermission("inventory:update") || checkPermission("requests:approve");
   const fileRef = useRef<HTMLInputElement>(null);
   const [externalRef, setExternalRef] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -429,7 +439,27 @@ export function DeviceBookScreen() {
                     </dl>
                   </Section>
 
-                  <Section legal="§ 13 Absatz 2 Nummern 3 und 4" title={t("sections.inspections")}>
+                  <Section
+                    legal="§ 13 Absatz 2 Nummern 3 und 4"
+                    title={t("sections.inspections")}
+                    actions={
+                      canRecordExternal && list.deviceId ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          asChild
+                          data-testid="device-book-record-external"
+                        >
+                          <Link
+                            href={`/maintenance-events/new?deviceId=${encodeURIComponent(list.deviceId)}`}
+                          >
+                            {t("recordExternal")}
+                          </Link>
+                        </Button>
+                      ) : null
+                    }
+                  >
                     {book.duties.length === 0 ? (
                       <Empty text={t("emptyDuties")} />
                     ) : (
@@ -479,6 +509,39 @@ export function DeviceBookScreen() {
                               {tr.participants.join(", ") || "—"} · {t("instructor")}{" "}
                               {tr.instructorName}
                             </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Section>
+
+                  <Section legal="§ 13 Absatz 2 Nummer 4" title={t("sections.maintenance")}>
+                    {(book.maintenanceEvents?.length ?? 0) === 0 ? (
+                      <Empty text={t("emptyMaintenance")} />
+                    ) : (
+                      <ul className="space-y-3" data-testid="book-maintenance-events">
+                        {book.maintenanceEvents.map((ev) => (
+                          <li key={ev.id} className="text-sm">
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                              {ev.kind}
+                              {ev.source ? ` · ${ev.source}` : ""}
+                            </span>{" "}
+                            <span className="font-medium">
+                              {formatDate(ev.performedAt.slice(0, 10))}
+                            </span>
+                            <p className="mt-1">
+                              {[ev.action, ev.result].filter(Boolean).join(" · ") || "—"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {[
+                                ev.performedBy,
+                                ev.externalPerformer,
+                                ev.serviceRequestReference,
+                                ev.postRepairCheck,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
                           </li>
                         ))}
                       </ul>

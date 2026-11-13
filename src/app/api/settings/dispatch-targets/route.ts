@@ -1,6 +1,6 @@
-import { z } from "zod";
 import { requirePermission, requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
+import { patchDispatchTargetSchema } from "@/schemas/settings";
 import { dispatchTargetsSettingsService } from "@/services/settings/dispatchTargetsSettingsService";
 
 /** GET /api/settings/dispatch-targets — executor channels (settings:view). */
@@ -18,11 +18,6 @@ export async function GET(req: Request) {
   }
 }
 
-const patchSchema = z.object({
-  targetId: z.string().trim().min(1),
-  enabled: z.boolean(),
-});
-
 /** PATCH /api/settings/dispatch-targets — enable/disable a channel (settings:smtp). */
 export async function PATCH(req: Request) {
   let correlationId: string | undefined;
@@ -31,7 +26,7 @@ export async function PATCH(req: Request) {
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       requirePermission(ctx, "settings:smtp");
-      const body = patchSchema.parse(await req.json());
+      const body = patchDispatchTargetSchema.parse(await req.json());
       const channel = await dispatchTargetsSettingsService.setEnabled(
         ctx,
         body.targetId,

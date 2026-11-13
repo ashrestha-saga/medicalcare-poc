@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { createOrderRequestSchema } from "@/schemas/orderRequest";
 import { orderRequestService } from "@/services/order/orderRequestService";
@@ -7,7 +7,7 @@ import { orderRequestService } from "@/services/order/orderRequestService";
 export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const input = createOrderRequestSchema.parse(await req.json());
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       return Response.json({ orders: await orderRequestService.list(ctx.tenantId) });

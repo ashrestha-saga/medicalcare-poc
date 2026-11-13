@@ -1,12 +1,13 @@
 import type { RequestStateTone, ServiceRequestState } from "@/interfaces";
 
-/** States that appear in the technician open queue. */
+/** States that appear in the technician open queue (not completed/rejected). */
 export const OPEN_REQUEST_STATES = [
   "captured",
   "queued",
   "transmitted",
   "handed_off",
   "acknowledged",
+  "scheduled",
   "in_progress",
 ] as const satisfies readonly ServiceRequestState[];
 
@@ -17,6 +18,7 @@ export const STARTABLE_REQUEST_STATES = [
   "transmitted",
   "handed_off",
   "acknowledged",
+  "scheduled",
 ] as const satisfies readonly ServiceRequestState[];
 
 /** Display labels for list / detail / timeline. */
@@ -26,6 +28,7 @@ export const SERVICE_REQUEST_STATE_LABELS: Record<string, string> = {
   transmitted: "Sent",
   handed_off: "Handed off",
   acknowledged: "Acknowledged",
+  scheduled: "Scheduled",
   in_progress: "In progress",
   completed: "Completed",
   rejected: "Rejected",
@@ -83,6 +86,12 @@ export const SERVICE_REQUEST_STATE_BADGES: Record<string, ServiceRequestStateBad
     variant: "outline",
     className: "border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300",
     colorCode: "#8b5cf6",
+  },
+  scheduled: {
+    tone: "open",
+    variant: "outline",
+    className: "border-teal-500/40 bg-teal-500/10 text-teal-800 dark:text-teal-300",
+    colorCode: "#14b8a6",
   },
   in_progress: {
     tone: "work",

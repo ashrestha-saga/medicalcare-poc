@@ -3,11 +3,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import type { MySitesInstitutionDTO, MySitesListDTO } from "@/interfaces/console";
+import type {
+  MySitesInstitutionDTO,
+  MySitesListDTO,
+  SitePortalDTO,
+} from "@/interfaces/console";
 import { aggregateMySitesInstitutions } from "@/services/console/mySitesAggregate";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { useQueryParam, useSyncQueryParams } from "@/lib/navigation/searchParams";
+import { useActingTenantStore } from "@/store/actingTenantStore";
+import { useInspectQueueStore } from "@/store/inspectQueueStore";
 import { useSessionStore } from "@/store/sessionStore";
+import { toast } from "@/store/toastStore";
 
 export type MySitesDueFilter = "alle" | "ueber" | "30" | "90";
 export type MySitesDistanceFilter = "alle" | "nah" | "mittel" | "fern";
@@ -28,6 +35,7 @@ export function useMySitesList() {
   const [data, setData] = useState<MySitesListDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
   const [distance, setDistance] = useState<MySitesDistanceFilter>("alle");
   const [due, setDueState] = useState<MySitesDueFilter>(() => parseDue(dueParam));
   const [keyword, setKeyword] = useState("");
@@ -109,10 +117,65 @@ export function useMySitesList() {
 
   const summaryCount = filtered.reduce((n, r) => n + r.inspectionCount, 0);
 
+  /**
+   * Hand off open own jobs into /inspect/heute.
+   * Inspect queue is single-tenant — if several institutions have work, open one first
+   * (same as Select all on the institution portal).
+   */
+  const startInspection = useCallback(async () => {
+    if (!sessionUser || starting) return;
+    const withWork = filtered.filter((row) => row.inspectionCount > 0);
+    if (withWork.length === 0) {
+      toast.error(t("mySitesStartNoWork"));
+      return;
+    }
+    if (withWork.length > 1) {
+      toast.info(t("mySitesStartPickInstitution"));
+      return;
+    }
+    const target = withWork[0]!;
+    setStarting(true);
+    try {
+      const portal = await api<SitePortalDTO>(
+        `/api/partner/my-sites/${encodeURIComponent(target.tenantId)}`,
+      );
+      const refs = portal.assignments
+        .filter(
+          (a) =>
+            a.isMine &&
+            a.displayState !== "abgeschlossen" &&
+            a.displayState !== "abgelehnt",
+        )
+        .map((a) => a.reference);
+      if (refs.length === 0) {
+        toast.error(t("mySitesStartNoWork"));
+        return;
+      }
+      useInspectQueueStore.getState().setQueue({
+        userId: sessionUser.id,
+        tenantId: portal.tenantId,
+        tenantName: portal.tenantName,
+        references: refs,
+      });
+      useActingTenantStore.getState().setActingTenant({
+        tenantId: portal.tenantId,
+        tenantName: portal.tenantName,
+        tenantCode: portal.tenantCode,
+        contractId: portal.contractId,
+      });
+      router.push("/inspect/heute");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("sitePortalLoadFailed"));
+    } finally {
+      setStarting(false);
+    }
+  }, [sessionUser, starting, filtered, t, router]);
+
   return {
     data,
     error,
     loading,
+    starting,
     distance,
     setDistance,
     due,
@@ -122,6 +185,7 @@ export function useMySitesList() {
     filtered,
     summaryCount,
     openTenant,
+    startInspection,
     refresh,
   };
 }

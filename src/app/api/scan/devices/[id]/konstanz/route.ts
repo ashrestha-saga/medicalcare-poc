@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { submitScanKonstanzSchema } from "@/schemas/k10";
 import { scanKonstanzService } from "@/services/scan/scanKonstanzService";
@@ -10,7 +10,7 @@ export async function GET(req: Request, { params }: Ctx) {
   let correlationId: string | undefined;
   try {
     const { id } = await params;
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const open = await scanKonstanzService.listOpen(ctx, id);
@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: Ctx) {
   let correlationId: string | undefined;
   try {
     const { id } = await params;
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const input = submitScanKonstanzSchema.parse(await req.json().catch(() => ({})));

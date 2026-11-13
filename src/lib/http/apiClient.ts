@@ -43,7 +43,15 @@ function resolveActingTenantId(apiPath: string): string | null {
   if (!tenantId) return null;
   const onPartnerConsole = window.location.pathname.startsWith("/partner");
   if (!onPartnerConsole) return tenantId;
-  return apiPath.startsWith("/api/partner/inspection-runs") ? tenantId : null;
+  // Partner console keeps capabilities without the header, except clinic-acting
+  // routes (inspection runs + request mutations for quote/send-in/proposals).
+  if (
+    apiPath.startsWith("/api/partner/inspection-runs") ||
+    apiPath.startsWith("/api/partner/requests/")
+  ) {
+    return tenantId;
+  }
+  return null;
 }
 
 export async function api<T>(path: string, init: RequestInit & { correlationId?: string } = {}): Promise<T> {

@@ -21,11 +21,15 @@ export function useRequestsList() {
   const { canWork, scopes, defaultScope } = useRequestCapabilities();
   const scopeParam = useQueryParam("scope");
   const stateParam = useQueryParam("state");
+  const quoteParam = useQueryParam("quote");
   const { sync } = useSyncQueryParams();
 
   const [scope, setScopeState] = useState<RequestScope>(() => parseScope(scopeParam, defaultScope));
   const [stateFilter, setStateFilterState] = useState<string[] | null>(() =>
     stateParam ? stateParam.split(",").filter(Boolean) : null,
+  );
+  const [quoteFilter, setQuoteFilterState] = useState<string[] | null>(() =>
+    quoteParam ? quoteParam.split(",").filter(Boolean) : null,
   );
   const [requests, setRequests] = useState<ServiceRequestDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +37,8 @@ export function useRequestsList() {
   useEffect(() => {
     setScopeState(parseScope(scopeParam, defaultScope));
     setStateFilterState(stateParam ? stateParam.split(",").filter(Boolean) : null);
-  }, [scopeParam, stateParam, defaultScope]);
+    setQuoteFilterState(quoteParam ? quoteParam.split(",").filter(Boolean) : null);
+  }, [scopeParam, stateParam, quoteParam, defaultScope]);
 
   const scopeAllowed = scopes.some((s) => s.id === scope);
   const activeScope: RequestScope = scopeAllowed ? scope : "mine";
@@ -50,6 +55,14 @@ export function useRequestsList() {
     (next: string[] | null) => {
       setStateFilterState(next);
       sync({ state: next?.length ? next.join(",") : null });
+    },
+    [sync],
+  );
+
+  const setQuoteFilter = useCallback(
+    (next: string[] | null) => {
+      setQuoteFilterState(next);
+      sync({ quote: next?.length ? next.join(",") : null });
     },
     [sync],
   );
@@ -83,6 +96,8 @@ export function useRequestsList() {
     setScope,
     stateFilter,
     setStateFilter,
+    quoteFilter,
+    setQuoteFilter,
     requests,
     loading,
     reload: load,

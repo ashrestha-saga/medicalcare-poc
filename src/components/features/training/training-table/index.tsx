@@ -14,6 +14,7 @@ interface TrainingEventsTableProps {
 
 export function TrainingEventsTable({ events, loading, onOpen }: TrainingEventsTableProps) {
   const tFilters = useTranslations("filters");
+  const t = useTranslations("pages.training");
   const [keyword, setKeyword] = useState("");
   const columns = useTrainingColumns(onOpen);
 
@@ -54,7 +55,7 @@ export function TrainingEventsTable({ events, loading, onOpen }: TrainingEventsT
         isLoading={loading}
         totalItems={filtered.length}
         getRowId={(row) => row.id}
-        emptyMessage="No training events recorded yet."
+        emptyMessage={t("emptyEvents")}
         searchPlaceholder={tFilters("searchTraining")}
       />
     </div>

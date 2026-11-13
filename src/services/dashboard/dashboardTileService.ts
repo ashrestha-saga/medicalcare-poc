@@ -1,6 +1,8 @@
-import type { TenantContext } from "@/interfaces";
+import type { TenantContext, TenantWorkContext } from "@/interfaces";
+import type { PartnerAppRole } from "@/interfaces/management";
 import type { PermissionSlug } from "@/interfaces/permissions";
 import type { UserRole } from "@/interfaces/session";
+import { isPartnerSession } from "@/interfaces/session";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { actorFromTenant } from "@/lib/auth/actorContext";
 import { badRequest, notFound } from "@/lib/errors";
@@ -10,6 +12,18 @@ import type { SetRoleDashboardTilesInput } from "@/schemas/k10";
 import { DASHBOARD_ROLE_LABELS } from "@/constants/dashboardTiles";
 import { USER_ROLES } from "@/constants/roles";
 import type { ClinicRole } from "@prisma/client";
+
+/** Partner acting has no clinic User row — map appRole to a tile persona (still filtered by acting permissions). */
+function clinicPersonaForPartnerAppRole(appRole: PartnerAppRole | string | undefined): UserRole {
+  switch (appRole) {
+    case "admin":
+    case "service_lead":
+    case "management":
+      return "device_admin";
+    default:
+      return "user";
+  }
+}
 
 export type ResolvedTile = {
   key: string;
@@ -27,7 +41,10 @@ export type ResolvedTile = {
  * filtered by requiredPermission. No per-user overrides.
  */
 export const dashboardTileService = {
-  async resolveForUser(ctx: TenantContext, userId?: string): Promise<ResolvedTile[]> {
+  async resolveForUser(ctx: TenantWorkContext, userId?: string): Promise<ResolvedTile[]> {
+    if (isPartnerSession(ctx.user) && !userId) {
+      return this.resolveForRole(ctx, clinicPersonaForPartnerAppRole(ctx.user.appRole));
+    }
     const targetUserId = userId ?? ctx.user.id;
     const user = await prisma.user.findFirst({
       where: { id: targetUserId, tenantId: ctx.tenantId },
@@ -37,7 +54,7 @@ export const dashboardTileService = {
     return this.resolveForRole(ctx, user.role as UserRole);
   },
 
-  async resolveForRole(ctx: TenantContext, role: UserRole): Promise<ResolvedTile[]> {
+  async resolveForRole(ctx: TenantWorkContext, role: UserRole): Promise<ResolvedTile[]> {
     const grants = await prisma.dashboardTileGrant.findMany({
       where: { role: role as ClinicRole },
       include: { tile: true },

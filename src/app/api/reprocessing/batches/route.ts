@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { createReprocessingBatchSchema } from "@/schemas/k10";
 import { reprocessingEvidenceService } from "@/services/reprocessingEvidence/reprocessingEvidenceService";
@@ -6,7 +6,7 @@ import { reprocessingEvidenceService } from "@/services/reprocessingEvidence/rep
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const batches = await reprocessingEvidenceService.listBatches(ctx);
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const input = createReprocessingBatchSchema.parse(await req.json().catch(() => ({})));

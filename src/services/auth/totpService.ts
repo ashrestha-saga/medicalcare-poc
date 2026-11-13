@@ -16,11 +16,16 @@ import {
   hashBackupCodes,
   verifyTotpCode,
 } from "@/lib/auth/totp";
+import {
+  clinicUserUsesPersonalTotp,
+  isDemoSharedTotpActive,
+  verifyDemoSharedTotpCode,
+} from "@/lib/demo/sharedTotp"; // DEMO_SHARED_TOTP
 import { badRequest, conflict, unauthorized, unprocessable } from "@/lib/errors";
 import { logger } from "@/lib/logger";
 import { verifyPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
-import { toSessionUser } from "@/services/auth/userAuthService";
+import { toPartnerSessionUser, toSessionUser } from "@/services/auth/userAuthService";
 import QRCode from "qrcode";
 
 export const totpService = {
@@ -53,26 +58,70 @@ export const totpService = {
     }
 
     const row = await prisma.user.findFirst({
-      where: { id: input.userId, active: true, totpEnabled: true, accountKind: "clinic" },
+      where: { id: input.userId, active: true },
       include: { tenant: { select: { name: true } } },
     });
-    if (!row?.totpSecretEnc || !row.tenantId || !row.role || !row.tenant) {
+    if (!row) {
+      await prisma.totpChallenge.delete({ where: { id: challenge.id } });
+      throw unauthorized("Two-factor authentication is not available.");
+    }
+
+    const isPartner = row.accountKind === "partner";
+    if (!isPartner && (!row.tenantId || !row.role || !row.tenant)) {
+      await prisma.totpChallenge.delete({ where: { id: challenge.id } });
+      throw unauthorized("Two-factor authentication is not available.");
+    }
+
+    let partnerMembership: {
+      appRole: string;
+      organisation: { id: string; name: string };
+    } | null = null;
+    if (isPartner) {
+      partnerMembership = await prisma.orgMembership.findFirst({
+        where: {
+          userId: row.id,
+          validFrom: { lte: new Date() },
+          OR: [{ validTo: null }, { validTo: { gte: new Date() } }],
+        },
+        include: { organisation: { select: { id: true, name: true } } },
+        orderBy: { validFrom: "asc" },
+      });
+      if (!partnerMembership) {
+        await prisma.totpChallenge.delete({ where: { id: challenge.id } });
+        throw unauthorized("No active organisation membership for this account.");
+      }
+    }
+
+    const personal = clinicUserUsesPersonalTotp(row);
+    // DEMO_SHARED_TOTP: bridge users have no personal secret yet.
+    if (!personal && !isDemoSharedTotpActive()) {
+      await prisma.totpChallenge.delete({ where: { id: challenge.id } });
+      throw unauthorized("Two-factor authentication is not available.");
+    }
+    if (personal && !row.totpSecretEnc) {
       await prisma.totpChallenge.delete({ where: { id: challenge.id } });
       throw unauthorized("Two-factor authentication is not available.");
     }
 
     let ok = false;
     let remainingBackups: string[] | null = null;
-    try {
-      const secret = decryptTotpSecret(row.totpSecretEnc);
-      ok = verifyTotpCode(secret, input.code);
-    } catch {
-      ok = false;
-    }
+    let usedSharedBridge = false;
 
-    if (!ok) {
-      remainingBackups = consumeBackupCode(row.totpBackupHashes, input.code);
-      ok = remainingBackups !== null;
+    if (personal && row.totpSecretEnc) {
+      try {
+        const secret = decryptTotpSecret(row.totpSecretEnc);
+        ok = verifyTotpCode(secret, input.code);
+      } catch {
+        ok = false;
+      }
+      if (!ok) {
+        remainingBackups = consumeBackupCode(row.totpBackupHashes, input.code);
+        ok = remainingBackups !== null;
+      }
+    } else {
+      // DEMO_SHARED_TOTP — shared authenticator until personal enrollment.
+      ok = verifyDemoSharedTotpCode(input.code);
+      usedSharedBridge = ok;
     }
 
     if (!ok) {
@@ -82,19 +131,33 @@ export const totpService = {
       });
       logger.warn("auth.2fa.fail", { userId: row.id, challengeId: challenge.id });
       await recordAudit({
-        actor: {
-          tenantId: row.tenantId,
-          actorUserId: row.id,
-          actorKind: "clinic",
-          actorRole: row.role,
-          actorName: row.name,
-          organisationId: null,
-          organisationName: null,
-          serviceContractId: null,
-          correlationId: null,
-          ip: null,
-          userAgent: null,
-        },
+        actor: isPartner && partnerMembership
+          ? {
+              tenantId: partnerMembership.organisation.id,
+              actorUserId: row.id,
+              actorKind: "partner",
+              actorRole: partnerMembership.appRole,
+              actorName: row.name,
+              organisationId: partnerMembership.organisation.id,
+              organisationName: partnerMembership.organisation.name,
+              serviceContractId: null,
+              correlationId: null,
+              ip: null,
+              userAgent: null,
+            }
+          : {
+              tenantId: row.tenantId!,
+              actorUserId: row.id,
+              actorKind: "clinic",
+              actorRole: row.role!,
+              actorName: row.name,
+              organisationId: null,
+              organisationName: null,
+              serviceContractId: null,
+              correlationId: null,
+              ip: null,
+              userAgent: null,
+            },
         resource: "session",
         resourceId: row.id,
         action: "login_failed",
@@ -113,16 +176,35 @@ export const totpService = {
       }
     });
 
-    logger.info("auth.2fa.success", { userId: row.id, usedBackup: Boolean(remainingBackups) });
+    logger.info("auth.2fa.success", {
+      userId: row.id,
+      accountKind: row.accountKind,
+      usedBackup: Boolean(remainingBackups),
+      usedSharedBridge, // DEMO_SHARED_TOTP
+    });
+
+    if (isPartner && partnerMembership) {
+      return {
+        user: toPartnerSessionUser({
+          id: row.id,
+          name: row.name,
+          organisationId: partnerMembership.organisation.id,
+          organisationName: partnerMembership.organisation.name,
+          appRole: partnerMembership.appRole,
+        }),
+        tenantName: partnerMembership.organisation.name,
+      };
+    }
+
     return {
       user: toSessionUser({
         id: row.id,
         name: row.name,
-        role: row.role,
-        tenantId: row.tenantId,
+        role: row.role!,
+        tenantId: row.tenantId!,
         tenant: row.tenant,
       }),
-      tenantName: row.tenant.name,
+      tenantName: row.tenant!.name,
     };
   },
 

@@ -87,6 +87,8 @@ export async function assertPartnerManagesTenant(
 
     const tokens = normalizeContractScope(parseContractScope(contract.scope));
     const permissionSlugs = resolveContractScopeSlugs(contract.scope, contract.scopeGrants);
+    // Acting requires a defined contract scope (tokens and/or catalogue grants).
+    if (tokens.length === 0 && permissionSlugs.length === 0) throw forbidden();
 
     return {
       contractId: contract.id,

@@ -2,6 +2,7 @@ import type { ClinicSessionUser, PartnerSessionUser, SessionUser, UserRole } fro
 import type { PartnerAppRole } from "@/interfaces/management";
 import { DEFAULT_USER_ROLE, USER_ROLES } from "@/constants/roles";
 import { env } from "@/lib/env";
+import { clinicLoginRequires2fa } from "@/lib/demo/sharedTotp"; // DEMO_SHARED_TOTP
 import { unauthorized } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/password";
@@ -35,7 +36,7 @@ export function toSessionUser(row: {
   return toClinicSessionUser(row);
 }
 
-function toPartnerSessionUser(row: {
+export function toPartnerSessionUser(row: {
   id: string;
   name: string;
   organisationId: string;
@@ -129,14 +130,19 @@ export const userAuthService = {
     return {
       user,
       tenantName: row.tenant.name,
-      totpEnabled: Boolean(row.totpEnabled && row.totpSecretEnc),
+      // DEMO_SHARED_TOTP: also true when local shared bridge is active (no personal 2FA yet).
+      totpEnabled: clinicLoginRequires2fa(row),
     };
   },
 
   async authenticatePartner(
     email: string,
     password: string,
-  ): Promise<{ user: PartnerSessionUser; organisationName: string }> {
+  ): Promise<{
+    user: PartnerSessionUser;
+    organisationName: string;
+    totpEnabled: boolean;
+  }> {
     const normalized = email.trim().toLowerCase();
     const row = await prisma.user.findFirst({
       where: { email: normalized, accountKind: "partner" },
@@ -168,7 +174,12 @@ export const userAuthService = {
       organisationName: membership.organisation.name,
       appRole: membership.appRole,
     });
-    return { user, organisationName: membership.organisation.name };
+    return {
+      user,
+      organisationName: membership.organisation.name,
+      // DEMO_SHARED_TOTP: partner door also challenges when bridge is active.
+      totpEnabled: clinicLoginRequires2fa(row),
+    };
   },
 
   async getById(id: string): Promise<SessionUser | null> {

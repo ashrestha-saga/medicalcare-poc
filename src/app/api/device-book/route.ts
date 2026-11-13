@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { createBookEntrySchema } from "@/schemas/k10";
 import { deviceBookService } from "@/services/deviceBook/deviceBookService";
@@ -6,7 +6,7 @@ import { deviceBookService } from "@/services/deviceBook/deviceBookService";
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const url = new URL(req.url);
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const input = createBookEntrySchema.parse(await req.json().catch(() => ({})));

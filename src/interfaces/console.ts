@@ -1,4 +1,43 @@
+import type { PartnerTileZone } from "@/constants/partnerConsoleNav";
+
 export type OperatingModel = "provider_operated" | "institution_operated";
+
+export type PartnerBoardTile = {
+  id: string;
+  key: string;
+  labelKey: string;
+  detailKey: string;
+  ctaKey: string;
+  count: number;
+  /** Override shown instead of raw count (e.g. "18%"). */
+  display?: string;
+  href: string;
+  zone: PartnerTileZone;
+  /** stop | warn | ok | "" — for urgency sort / colour. */
+  tone: "stop" | "warn" | "ok" | "";
+  /** Optional sample lines under the detail (reference · customer). */
+  samples?: string[];
+  /** Hidden sample count when samples are truncated ("+5"). */
+  moreCount?: number;
+  /** Interpolation params for detailKey. */
+  detailParams?: Record<string, string | number>;
+};
+
+export type ServiceVisitDTO = {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  organisationId: string;
+  siteId: string | null;
+  siteName: string | null;
+  plannedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  technicianUserId: string | null;
+  technicianName: string | null;
+  note: string | null;
+  requestCount: number;
+};
 
 export type ConsoleActingScope = "managing_org" | "tenant" | "platform" | "other";
 
@@ -161,6 +200,17 @@ export interface ConsoleRequestRowDTO {
   /** D3 — set when this is a follow-up proposal from a partner org. */
   proposedByOrgId?: string | null;
   visitId?: string | null;
+  /** E77 — on_site | send_in */
+  fulfilment?: string | null;
+  /** E72 — none | proposed | confirmed | discarded */
+  proposalState?: string | null;
+  /** E71 — pending | approved | rejected | null when no quote */
+  quoteDecision?: string | null;
+  /** Fault snapshot for disposition / detail. */
+  faultDescription?: string | null;
+  /** E79 — training gate was overridden for this assignment. */
+  gateOverridden?: boolean;
+  gateOverrideReason?: string | null;
 }
 
 export interface ConsoleRequestListDTO {
@@ -172,6 +222,7 @@ export interface DispositionAssignInput {
   assigneeUserId?: string | null;
   scheduledAt?: string | null;
   visitId?: string | null;
+  gateOverrideReason?: string | null;
 }
 
 export interface ConsoleStaffQualificationDTO {

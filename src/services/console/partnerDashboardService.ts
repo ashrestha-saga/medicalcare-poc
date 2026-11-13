@@ -1,32 +1,14 @@
+import type { PartnerBoardTile } from "@/interfaces/console";
 import type { PartnerContext } from "@/interfaces/session";
 import type { PartnerAppRole } from "@/interfaces/management";
-import { todayTilesForRole, type PartnerTileZone } from "@/constants/partnerConsoleNav";
+import { todayTilesForRole } from "@/constants/partnerConsoleNav";
 import { runWithoutTenantAsync } from "@/lib/auth/tenantStore";
 import { prisma } from "@/lib/prisma";
 import { isLiveContract } from "@/services/access/partnerAccessService";
 import { getCachedPartnerConsolePermissions } from "@/services/roles/roleGrantsService";
 import { forbidden } from "@/lib/errors";
 
-export type PartnerBoardTile = {
-  id: string;
-  key: string;
-  labelKey: string;
-  detailKey: string;
-  ctaKey: string;
-  count: number;
-  /** Override shown instead of raw count (e.g. "18%"). */
-  display?: string;
-  href: string;
-  zone: PartnerTileZone;
-  /** stop | warn | ok | "" — for urgency sort / colour. */
-  tone: "stop" | "warn" | "ok" | "";
-  /** Optional sample lines under the detail (reference · customer). */
-  samples?: string[];
-  /** Hidden sample count when samples are truncated ("+5"). */
-  moreCount?: number;
-  /** Interpolation params for detailKey. */
-  detailParams?: Record<string, string | number>;
-};
+export type { PartnerBoardTile };
 
 type TileMetric = {
   count: number;
@@ -107,6 +89,9 @@ export const partnerDashboardService = {
         returnSamples,
         outOfContract,
         setupMeta,
+        quotesOpen,
+        proposedFollowUps,
+        openRepairs,
       ] = await Promise.all([
         liveTenantIds.length === 0
           ? 0
@@ -292,6 +277,32 @@ export const partnerDashboardService = {
                 mpsbByTenant,
               };
             })(),
+        prisma.quote.count({
+          where: {
+            decision: "open",
+            serviceRequest: {
+              executorOrg: { organisationId: ctx.organisationId },
+              transmittedAt: { not: null },
+              state: { notIn: ["completed", "rejected"] },
+            },
+          },
+        }),
+        prisma.serviceRequest.count({
+          where: {
+            executorOrg: { organisationId: ctx.organisationId },
+            transmittedAt: { not: null },
+            proposalState: "proposed",
+            state: { notIn: ["completed", "rejected"] },
+          },
+        }),
+        prisma.serviceRequest.count({
+          where: {
+            executorOrg: { organisationId: ctx.organisationId },
+            transmittedAt: { not: null },
+            serviceType: { in: ["repair", "REPAIR", "post_repair_check"] },
+            state: { notIn: ["completed", "rejected"] },
+          },
+        }),
       ]);
 
       const setupStuck = setupMeta.tenants.filter((t) => {
@@ -353,6 +364,9 @@ export const partnerDashboardService = {
           detailParams: { ready: externalsReady, total: externalsTotal },
         },
         pipeline: { count: setupStuck, tone: toneFor(setupStuck) },
+        kvOffen: { count: quotesOpen, tone: toneFor(quotesOpen, "stop") },
+        folgeVorgeschlagen: { count: proposedFollowUps, tone: toneFor(proposedFollowUps) },
+        instandsetzungen: { count: openRepairs, tone: toneFor(openRepairs) },
       };
 
       const role = roleOf(ctx);

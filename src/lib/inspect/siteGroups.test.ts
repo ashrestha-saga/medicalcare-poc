@@ -20,6 +20,7 @@ function row(partial: Partial<CataloguePreviewDTO> & { reference: string }): Cat
     visitStartedAt: null,
     overdue: false,
     serviceType: "STK",
+    fulfilment: "on_site",
     dueAt: null,
     inspectionTypeCode: "STK",
     sealed: false,
@@ -29,6 +30,7 @@ function row(partial: Partial<CataloguePreviewDTO> & { reference: string }): Cat
     eligibleEquipment: [],
     draftRunId: null,
     sealedRunId: null,
+    serviceRequestId: "sr-test",
     ...partial,
   };
 }
@@ -81,11 +83,38 @@ describe("buildDaySections", () => {
         scheduledAt: "2026-11-03T08:00:00.000Z",
       }),
     ];
-    // Freeze relative to 2026-10-30 via scheduled dates chosen above.
-    const sections = buildDaySections(open, "woche");
+    // Fixed “today” so buckets stay stable regardless of wall-clock date.
+    const today = new Date("2026-10-30T12:00:00.000Z");
+    const sections = buildDaySections(open, "woche", [], today);
     const morgen = sections.find((s) => s.key === "morgen");
     const woche = sections.find((s) => s.key === "woche");
     expect(morgen?.sites.map((s) => s.siteName)).toEqual(["Haus A"]);
     expect(woche?.sites.map((s) => s.siteName)).toEqual(["MVZ"]);
+  });
+
+  it("excludes send-in repairs from day-plan buckets", () => {
+    const today = new Date("2026-10-30T12:00:00.000Z");
+    const sections = buildDaySections(
+      [
+        row({
+          reference: "visit",
+          siteId: "s1",
+          siteName: "Haus A",
+          scheduledAt: "2026-10-30T08:00:00.000Z",
+          fulfilment: "on_site",
+        }),
+        row({
+          reference: "bench",
+          siteId: "s1",
+          siteName: "Haus A",
+          scheduledAt: "2026-10-30T08:00:00.000Z",
+          fulfilment: "send_in",
+        }),
+      ],
+      "heute",
+      [],
+      today,
+    );
+    expect(sections[0]!.rows.map((r) => r.reference)).toEqual(["visit"]);
   });
 });

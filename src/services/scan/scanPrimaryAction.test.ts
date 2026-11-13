@@ -155,6 +155,7 @@ describe("resolveFurtherActions", () => {
     expect(ctxs).toContain("charge");
     expect(ctxs).toContain("ifu");
     expect(further.find((a) => a.ctx === "routine")?.textKey).toBe("actions.routineDoneHint");
+    expect(further.find((a) => a.ctx === "routine")?.tone).toBe("ok");
   });
 
   it("hides reprocessing rows without permission", () => {

@@ -1,4 +1,5 @@
 import type { CartItemDTO, CreateOrderItemDTO, SparePartDTO } from "@/interfaces";
+import { formatEuro } from "@/lib/euro";
 
 /** Pure cart math — unit-tested (Section 38). */
 
@@ -53,5 +54,6 @@ export function toOrderItems(items: CartItemDTO[]): CreateOrderItemDTO[] {
 }
 
 export function formatMoney(amount: number, currency: string, locale = "de-DE"): string {
+  if (currency.toUpperCase() === "EUR") return formatEuro(amount, locale);
   return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount);
 }

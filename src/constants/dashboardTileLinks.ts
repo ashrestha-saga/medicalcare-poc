@@ -28,6 +28,10 @@ export const DASHBOARD_TILE_LINKS: Record<string, DashboardTileLink> = {
   bestandsverzeichnis: { path: "/devices", query: { tab: "released" } },
   "meine-geraete": { path: "/devices", query: { mineArea: "1" } },
   "gesperrte-geraete": { path: "/devices", query: { state: "not_released", mineArea: "1" } },
+  "geraete-gesperrt": {
+    path: "/devices",
+    query: { operationalState: "locked,under_repair" },
+  },
   "kopplung-historie": { path: "/devices" },
   auditfaehigkeit: { path: "/devices", query: { state: "released" } },
 
@@ -43,7 +47,7 @@ export const DASHBOARD_TILE_LINKS: Record<string, DashboardTileLink> = {
   "buch-stoerungen": { path: "/device-book" },
 
   "auftraege-termin": { path: "/requests", query: { state: "scheduled" } },
-  "stoerung-melden": { path: "/requests", query: { scope: "mine" } },
+  "stoerung-melden": { path: "/fault-report" },
 
   "routine-heute": {
     path: "/reprocessing",

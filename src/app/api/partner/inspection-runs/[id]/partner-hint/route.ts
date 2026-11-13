@@ -1,14 +1,9 @@
 import { requireActingContext, withTenantStore, requirePermission } from "@/lib/auth/tenantContext";
 import { errorResponse, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
-import { z } from "zod";
+import { inspectionPartnerHintSchema } from "@/schemas/pruefpartner";
 
 type Ctx = { params: Promise<{ id: string }> };
-
-const schema = z.object({
-  text: z.string().trim().min(1).max(4000),
-  stepLabel: z.string().trim().max(200).optional(),
-});
 
 /**
  * POST /api/partner/inspection-runs/[id]/partner-hint
@@ -22,7 +17,7 @@ export async function POST(req: Request, { params }: Ctx) {
       requirePermission(ctx, "inspections:perform");
       correlationId = ctx.correlationId;
       const { id } = await params;
-      const input = schema.parse(await req.json().catch(() => ({})));
+      const input = inspectionPartnerHintSchema.parse(await req.json().catch(() => ({})));
       if (ctx.user.accountKind !== "partner" || !ctx.user.organisationId) {
         throw unprocessable("Partner organisation required.");
       }

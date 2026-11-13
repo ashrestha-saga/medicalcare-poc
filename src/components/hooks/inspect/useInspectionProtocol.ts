@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type {
   CataloguePreviewDTO,
@@ -58,6 +59,7 @@ function institutionRoleLabel(
 /** Orchestrates resolve → start → visit → scan → steps → signatures → complete. */
 export function useInspectionProtocol(reference: string) {
   const t = useTranslations("pruefpartner");
+  const router = useRouter();
   const online = useOnlineStatus();
   const tenantId = useInspectQueueStore((s) => s.tenantId);
   const tenantName = useInspectQueueStore((s) => s.tenantName);
@@ -224,6 +226,37 @@ export function useInspectionProtocol(reference: string) {
       setBusy(false);
     }
   }, [preview?.sealed, reference, occasionCode, testEquipmentId, t, hydrateSignatures]);
+
+  const discardDraft = useCallback(async () => {
+    const runId = run?.id ?? preview?.draftRunId;
+    if (!runId || preview?.sealed || run?.sealed) {
+      toast.error(t("sealedTitle"));
+      return;
+    }
+    if (typeof window !== "undefined" && !window.confirm(t("startOverConfirm"))) {
+      return;
+    }
+    setBusy(true);
+    setFieldErrors({});
+    try {
+      await api(`/api/partner/inspection-runs/${encodeURIComponent(runId)}`, {
+        method: "DELETE",
+      });
+      setRun(null);
+      setStepDraft({});
+      setResult("passed");
+      setDefects("");
+      setScanCode("");
+      setOccasionCode("");
+      setTestEquipmentId("");
+      toast.success(t("startOverDone"));
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : t("startOverFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }, [run, preview?.draftRunId, preview?.sealed, t, refresh]);
 
   const startVisit = useCallback(async () => {
     if (!run) return;
@@ -457,6 +490,7 @@ export function useInspectionProtocol(reference: string) {
         });
         toast.info(t("offlineQueued"));
         markDone(reference);
+        router.push("/inspect/heute");
         return;
       }
       await saveSteps();
@@ -476,6 +510,7 @@ export function useInspectionProtocol(reference: string) {
       setRun(res.run);
       markDone(reference);
       toast.success(t("sealedTitle"));
+      router.push("/inspect/heute");
     } catch (e) {
       setFieldErrors(fieldFromApiError(e));
       toast.error(e instanceof ApiError ? e.message : t("completeFailed"));
@@ -501,6 +536,7 @@ export function useInspectionProtocol(reference: string) {
     markDone,
     saveSteps,
     submitPartnerHints,
+    router,
   ]);
 
   return {
@@ -559,7 +595,9 @@ export function useInspectionProtocol(reference: string) {
     blockedBaseline: Boolean(catalogue?.missingBaseline),
     noMatch: !catalogue,
     certificateOnly: Boolean(catalogue?.noCatalogue),
+    canDiscardDraft: Boolean((run || preview?.draftRunId) && !preview?.sealed && !run?.sealed),
     startRun,
+    discardDraft,
     startVisit,
     saveSignature,
     uploadStepPhoto,

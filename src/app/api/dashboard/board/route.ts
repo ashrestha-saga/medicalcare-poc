@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { dashboardBoardService } from "@/services/dashboard/dashboardBoardService";
 
@@ -6,7 +6,7 @@ import { dashboardBoardService } from "@/services/dashboard/dashboardBoardServic
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const board = await dashboardBoardService.getBoard(ctx);

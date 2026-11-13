@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { INSPECTION_TYPE_CODES, PRIORITIES } from "@/constants/inspectionTypes";
+import { REPAIR_SERVICE_TYPES } from "@/constants/repairs";
 
 const MAX_DATA_URL_BYTES = 1_500_000;
+
+const SERVICE_TYPE_CODES = [
+  ...INSPECTION_TYPE_CODES,
+  ...REPAIR_SERVICE_TYPES,
+] as unknown as [string, ...string[]];
 
 export const attachmentInputSchema = z.object({
   kind: z.enum(["nameplate", "fault_photo"]),
@@ -26,7 +32,9 @@ export const createServiceRequestSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
   subjectType: z.enum(["instance", "model", "captured"]),
   subjectId: z.string().trim().min(1).max(100),
-  serviceType: z.enum(INSPECTION_TYPE_CODES as [string, ...string[]]),
+  serviceType: z.enum(SERVICE_TYPE_CODES),
+  fulfilment: z.enum(["on_site", "send_in"]).optional(),
+  reason: z.enum(["faelligkeit", "befund", "rueckruf", "stoerung", "instandsetzung"]).optional(),
   priority: z.enum(PRIORITIES).optional(),
   note: z.string().trim().max(2000).optional(),
   site: z.string().trim().min(1, "Please choose a site.").max(100),

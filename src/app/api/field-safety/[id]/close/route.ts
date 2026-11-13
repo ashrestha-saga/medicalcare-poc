@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { fieldSafetyService } from "@/services/fieldSafety/fieldSafetyService";
 
@@ -8,7 +8,7 @@ export async function POST(req: Request, { params }: Ctx) {
   let correlationId: string | undefined;
   try {
     const { id } = await params;
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const action = await fieldSafetyService.close(ctx, id);

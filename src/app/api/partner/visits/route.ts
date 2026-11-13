@@ -4,19 +4,8 @@ import {
   requirePartnerPermission,
 } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
-import { z } from "zod";
+import { upsertServiceVisitSchema } from "@/schemas/console";
 import { serviceVisitService } from "@/services/console/serviceVisitService";
-
-const upsertSchema = z.object({
-  id: z.string().trim().min(1).optional(),
-  tenantId: z.string().trim().min(1),
-  siteId: z.string().trim().min(1).nullable().optional(),
-  plannedAt: z.string().trim().nullable().optional(),
-  startedAt: z.string().trim().nullable().optional(),
-  completedAt: z.string().trim().nullable().optional(),
-  technicianUserId: z.string().trim().min(1).nullable().optional(),
-  note: z.string().trim().max(2000).nullable().optional(),
-});
 
 /** GET /api/partner/visits */
 export async function GET(req: Request) {
@@ -42,7 +31,7 @@ export async function POST(req: Request) {
     return await withTenantBypass(async () => {
       requirePartnerPermission(ctx, "visits:manage");
       correlationId = ctx.correlationId;
-      const body = upsertSchema.parse(await req.json().catch(() => ({})));
+      const body = upsertServiceVisitSchema.parse(await req.json().catch(() => ({})));
       const visit = await serviceVisitService.upsert(ctx, body);
       return Response.json(
         { visit },

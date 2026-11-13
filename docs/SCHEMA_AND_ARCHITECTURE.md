@@ -1029,7 +1029,7 @@ Password for all demo clinic accounts: **`demo`**. Use the clinic login door. Pa
 
 In-repo pack: **4 tenants** (T-KLN, T-MVZ, T-HZF, T-RSG), **5 000** shared `DeviceModel` + open classification, **528** instances, **101** clinic users, plus a **process layer** (~115 release snapshots, ~155 duties, 12 service requests, MSR/RTS contracts, clarifications, training, incidents).
 
-**Still not seeded:** inspection runs / baselines, FSCA, reprocessing batches, constancy cadence, authority visits, OXID/SMTP. Classification remains **globally** open per model.
+**Still not seeded:** inspection runs / baselines, FSCA, reprocessing batches, constancy cadence, OXID/SMTP. Authority checklists + a demo visit/findings band are seeded (`seedK10Tiles`, `bandDemoDates`). Classification remains **globally** open per model.
 
 Details: **[`demo-seed-coverage.md`](./demo-seed-coverage.md)** · **[`seed/README.md`](../seed/README.md)**.
 

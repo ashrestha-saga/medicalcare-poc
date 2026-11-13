@@ -44,6 +44,16 @@ const includeAll = {
   dispatchRecords: true,
   executorOrg: true,
   assigneeUser: { select: { id: true, name: true } },
+  quote: {
+    select: {
+      scopeText: true,
+      amountText: true,
+      decision: true,
+      decidedBy: true,
+      decidedAt: true,
+      decisionNote: true,
+    },
+  },
   duty: {
     select: {
       id: true,

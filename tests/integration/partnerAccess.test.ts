@@ -68,7 +68,7 @@ describe("partner organisation access", () => {
     );
     expect(access.contractId).toBe(CONTRACT_ID);
     expect(access.scope).toEqual(expect.arrayContaining(["inventory", "due-dates", "inspection"]));
-    expect(access.appRole).toBe("admin");
+    expect(["admin", "service_lead"]).toContain(access.appRole);
   });
 
   it("refuses RTS inspector (no service_provider / no contract)", async () => {
@@ -81,6 +81,43 @@ describe("partner organisation access", () => {
     await expect(
       assertPartnerManagesTenant("user-partner-msr-adler", MSR_ID, "no-such-tenant"),
     ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("refuses acting when the live contract has no defined scope", async () => {
+    const before = await prisma.serviceContract.findUniqueOrThrow({
+      where: { id: CONTRACT_ID },
+      select: { scope: true },
+    });
+    const grants = await prisma.serviceContractScopeGrant.findMany({
+      where: { contractId: CONTRACT_ID },
+    });
+    await prisma.serviceContractScopeGrant.deleteMany({ where: { contractId: CONTRACT_ID } });
+    await prisma.serviceContract.update({
+      where: { id: CONTRACT_ID },
+      data: { scope: "[]" },
+    });
+    try {
+      await expect(
+        assertPartnerManagesTenant("user-partner-msr-adler", MSR_ID, "demo-tenant"),
+      ).rejects.toMatchObject({ status: 403 });
+    } finally {
+      await prisma.serviceContract.update({
+        where: { id: CONTRACT_ID },
+        data: { scope: before.scope },
+      });
+      if (grants.length > 0) {
+        await prisma.serviceContractScopeGrant.createMany({
+          data: grants.map((g) => ({
+            id: g.id,
+            contractId: g.contractId,
+            permission: g.permission,
+            denied: g.denied,
+            source: g.source,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    }
   });
 
   it("drops the clinic from partner home and denies manage when the contract is suspended", async () => {

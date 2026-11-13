@@ -7,6 +7,7 @@ export type ServiceRequestState =
   | "queued"
   | "transmitted"
   | "acknowledged"
+  | "scheduled"
   | "in_progress"
   | "completed"
   | "rejected"
@@ -90,6 +91,21 @@ export interface AssignmentCompletionOverviewDTO {
   status: string;
 }
 
+/** R10 Kostenvoranschlag on a clinic service request. */
+export type QuoteDecisionStatus = "open" | "approved" | "rejected";
+
+export interface ServiceRequestQuoteDTO {
+  scopeText: string;
+  amountText: string;
+  decision: QuoteDecisionStatus;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+}
+
+/** List/filter facet — `none` when no Quote row exists. */
+export type QuoteFilterStatus = "none" | QuoteDecisionStatus;
+
 export interface ServiceRequestDTO {
   id: string;
   reference: string;
@@ -126,6 +142,23 @@ export interface ServiceRequestDTO {
   duty: AssignmentDutyContextDTO | null;
   /** Present when an inspection was sealed / assignment completed. */
   completionOverview: AssignmentCompletionOverviewDTO | null;
+  /** Partner KV — null when none saved yet. */
+  quote: ServiceRequestQuoteDTO | null;
+  /** E77 — on_site | send_in */
+  fulfilment: "on_site" | "send_in" | string;
+  /** E77 — send-in shipment dates (read-only for clinic). */
+  sendIn: {
+    shippedAt: string | null;
+    trackingRef: string | null;
+    atWorkshopAt: string | null;
+    returnedAt: string | null;
+    arrivedAt: string | null;
+  };
+  /** E78 — post-repair check kind when set. */
+  checkType: string | null;
+  /** R15 / E72 — follow-up proposal state. */
+  proposalState: string;
+  mandatory: boolean;
   statusEvents: StatusEventDTO[];
   dispatchRecords: DispatchRecordDTO[];
   attachmentCount: number;

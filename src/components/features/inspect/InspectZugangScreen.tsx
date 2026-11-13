@@ -1,25 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { api, ApiError } from "@/lib/http/apiClient";
+import { useInspectZugang } from "@/components/hooks/inspect/useInspectZugang";
 import { Spinner } from "@/components/ui/Loading";
-
-type AccessPayload = {
-  name: string;
-  organisationName: string;
-  roleLabel: "technician" | "external";
-  subject: string;
-  warningCount: number;
-  rows: {
-    group: string;
-    title: string;
-    evidence: string | null;
-    validTo: string | null;
-    status: "ok" | "warn" | "stop";
-    daysLeft: number | null;
-  }[];
-};
 
 const GROUP_ORDER = [
   "qualification",
@@ -32,27 +15,7 @@ const GROUP_ORDER = [
 
 export function InspectZugangScreen() {
   const t = useTranslations("pruefpartner");
-  const [data, setData] = useState<AccessPayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await api<AccessPayload>("/api/partner/inspect/access");
-        if (!cancelled) setData(res);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof ApiError ? e.message : t("loadFailed"));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
+  const { data, error, loading } = useInspectZugang();
 
   if (loading) {
     return (

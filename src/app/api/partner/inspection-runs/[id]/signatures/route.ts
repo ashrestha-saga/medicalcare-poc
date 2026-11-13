@@ -1,21 +1,10 @@
 import { requireActingContext, withTenantStore, requirePermission } from "@/lib/auth/tenantContext";
 import { errorResponse, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { inspectionSignatureSchema } from "@/schemas/pruefpartner";
 import { createAttachmentFromDataUrl } from "@/services/storage/attachmentBlobService";
-import { z } from "zod";
 
 type Ctx = { params: Promise<{ id: string }> };
-
-const schema = z.object({
-  kind: z.enum(["inspector", "institution"]),
-  signerName: z.string().trim().max(200).nullable().optional(),
-  signerRole: z.string().trim().max(200).nullable().optional(),
-  signedAt: z.string().trim().nullable().optional(),
-  absent: z.boolean().optional(),
-  absentReason: z.string().trim().max(2000).nullable().optional(),
-  /** Optional canvas PNG data URL — stored as AttachmentBlob, linked via blobId. */
-  imageDataUrl: z.string().trim().max(2_000_000).nullable().optional(),
-});
 
 /** PUT /api/partner/inspection-runs/[id]/signatures — D10 seal signatures. */
 export async function PUT(req: Request, { params }: Ctx) {
@@ -26,7 +15,7 @@ export async function PUT(req: Request, { params }: Ctx) {
       requirePermission(ctx, "inspections:perform", "inspection:sign");
       correlationId = ctx.correlationId;
       const { id } = await params;
-      const input = schema.parse(await req.json().catch(() => ({})));
+      const input = inspectionSignatureSchema.parse(await req.json().catch(() => ({})));
       if (input.absent && !input.absentReason?.trim()) {
         throw unprocessable("Absence reason required.", { field: "absentReason" });
       }

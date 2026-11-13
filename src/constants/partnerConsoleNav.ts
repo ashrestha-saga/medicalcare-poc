@@ -14,6 +14,8 @@ export type ConsoleNavKey =
   | "organisation"
   | "protokoll"
   | "rueckrufe"
+  | "bestell"
+  | "pruefmittel"
   | "settings";
 
 export type ConsoleNavBand = "taeglich" | "regel" | "selten";
@@ -29,6 +31,8 @@ export const CONSOLE_NAV_KEY_TO_MODULE: Record<ConsoleNavKey, MenuModuleId> = {
   organisation: "console-organisation",
   protokoll: "console-activity",
   rueckrufe: "console-field-safety",
+  bestell: "console-parts-proposals",
+  pruefmittel: "console-test-equipment",
   settings: "console-settings",
 };
 
@@ -42,27 +46,27 @@ export const CONSOLE_NAV_PRESETS: Record<
 > = {
   admin: {
     taeglich: ["heute", "disposition", "faellig", "kunden"],
-    regel: ["meine", "mitarbeiter", "fremd"],
+    regel: ["meine", "mitarbeiter", "fremd", "bestell", "pruefmittel"],
     selten: ["rueckrufe", "organisation", "protokoll"],
   },
   management: {
     taeglich: ["heute", "kunden", "disposition"],
-    regel: ["meine", "mitarbeiter", "faellig"],
-    selten: ["rueckrufe", "fremd", "organisation", "protokoll"],
+    regel: ["meine", "mitarbeiter", "faellig", "bestell"],
+    selten: ["rueckrufe", "fremd", "organisation", "protokoll", "pruefmittel"],
   },
   service_lead: {
     taeglich: ["heute", "disposition", "faellig", "kunden"],
-    regel: ["meine", "mitarbeiter"],
+    regel: ["meine", "mitarbeiter", "bestell", "pruefmittel"],
     selten: ["rueckrufe", "fremd", "protokoll", "organisation"],
   },
   inspector: {
     taeglich: ["heute", "meine", "disposition"],
-    regel: [],
+    regel: ["pruefmittel"],
     selten: [],
   },
   order: {
     taeglich: ["heute", "disposition", "faellig", "kunden"],
-    regel: ["meine"],
+    regel: ["meine", "bestell"],
     selten: [],
   },
 };
@@ -138,6 +142,27 @@ export const PARTNER_TODAY_TILE_CATALOG: readonly PartnerTileDef[] = [
     labelKey: "tileOutOfContract",
     href: "/partner/orders?tab=disposition&focus=out_of_contract",
     roles: ["admin", "management", "service_lead"],
+  },
+  {
+    id: "kvOffen",
+    zone: "ent",
+    labelKey: "tileQuotesOpen",
+    href: "/partner/orders?tab=disposition&repair=quote_open",
+    roles: ["admin", "management", "service_lead"],
+  },
+  {
+    id: "folgeVorgeschlagen",
+    zone: "ent",
+    labelKey: "tileProposedFollowUps",
+    href: "/partner/orders?tab=disposition&repair=proposed",
+    roles: ["admin", "service_lead"],
+  },
+  {
+    id: "instandsetzungen",
+    zone: "vor",
+    labelKey: "tileOpenRepairs",
+    href: "/partner/orders?tab=disposition&repair=repair",
+    roles: ["admin", "service_lead", "order"],
   },
   {
     id: "zuterm",

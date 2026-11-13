@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { registrationPreviewSchema } from "@/schemas/registration";
 import { releaseService } from "@/services/registration/releaseService";
@@ -8,7 +8,7 @@ import type { RegistrationCharacteristics } from "@/services/registration/types"
 export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
-    const session = await requireTenantContext(req);
+    const session = await requireActingContext(req);
     return await withTenantStore(session, async () => {
       correlationId = session.correlationId;
       const input = registrationPreviewSchema.parse(await req.json());

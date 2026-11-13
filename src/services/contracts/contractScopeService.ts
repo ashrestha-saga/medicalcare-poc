@@ -27,8 +27,8 @@ export function expandScopeTokensToSlugs(tokens: readonly string[]): PermissionS
 export type ScopeGrantRow = { permission: string; denied: boolean };
 
 /**
- * Dual-read: prefer catalogue grant rows when any exist; else expand legacy JSON tokens.
- * Denied rows (“nie”) are subtracted after expansion.
+ * Dual-read: always expand JSON scope tokens, union positive catalogue grants.
+ * Denied rows (“nie”) are subtracted after the union.
  */
 export function resolveContractScopeSlugs(
   scopeJson: string,
@@ -37,16 +37,14 @@ export function resolveContractScopeSlugs(
   const denied = new Set(
     grantRows.filter((r) => r.denied).map((r) => r.permission),
   );
-  const positive = grantRows.filter((r) => !r.denied).map((r) => r.permission);
+  const fromTokens = expandScopeTokensToSlugs(parseContractScope(scopeJson));
+  const fromGrants = grantRows
+    .filter((r) => !r.denied)
+    .map((r) => r.permission)
+    .filter((p): p is PermissionSlug => !FORBIDDEN.has(p)) as PermissionSlug[];
 
-  let base: PermissionSlug[];
-  if (grantRows.length > 0) {
-    base = positive.filter((p): p is PermissionSlug => !FORBIDDEN.has(p)) as PermissionSlug[];
-  } else {
-    base = expandScopeTokensToSlugs(parseContractScope(scopeJson));
-  }
-
-  return base.filter((slug) => !denied.has(slug) && !FORBIDDEN.has(slug));
+  const base = new Set<PermissionSlug>([...fromTokens, ...fromGrants]);
+  return [...base].filter((slug) => !denied.has(slug) && !FORBIDDEN.has(slug));
 }
 
 /** Replace auto token-sourced grants; preserve manual/nie rows. */

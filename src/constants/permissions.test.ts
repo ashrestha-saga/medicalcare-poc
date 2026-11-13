@@ -129,6 +129,13 @@ describe("RBAC defaults & path guards", () => {
     expect(canAccessPath("/management", withNav)).toBe(false);
   });
 
+  it("allows /maintenance-events with inventory:update or requests:approve plus shell:nav", () => {
+    expect(canAccessPath("/maintenance-events/new", ["shell:nav", "inventory:update"])).toBe(true);
+    expect(canAccessPath("/maintenance-events/new", ["shell:nav", "requests:approve"])).toBe(true);
+    expect(canAccessPath("/maintenance-events/new", ["shell:nav"])).toBe(false);
+    expect(canAccessPath("/maintenance-events/new", ["inventory:update"])).toBe(false);
+  });
+
   it("blocks /users, /locations, /roles, and /settings without admin slugs", () => {
     const staff = permissionsForRole("device_admin");
     expect(canAccessPath("/users", staff)).toBe(false);

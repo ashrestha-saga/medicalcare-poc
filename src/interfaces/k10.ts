@@ -139,6 +139,21 @@ export interface ComposedBookDTO {
   trainings: ComposedBookTrainingDTO[];
   entries: DeviceBookEntryDTO[];
   incidents: DeviceIncidentDTO[];
+  /** A14 — Buch Nr. 4 / maintenance history (incl. external repairs). */
+  maintenanceEvents: ComposedBookMaintenanceEventDTO[];
+}
+
+export interface ComposedBookMaintenanceEventDTO {
+  id: string;
+  kind: string;
+  performedAt: string;
+  performedBy: string | null;
+  action: string | null;
+  result: string | null;
+  source: string | null;
+  externalPerformer: string | null;
+  serviceRequestReference: string | null;
+  postRepairCheck: string | null;
 }
 
 export interface FieldSafetyAffectedModelDTO {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -11,6 +11,7 @@ import {
   inspectNavKeyFromPath,
 } from "@/constants/inspectNav";
 import { useAssignmentQueue } from "@/components/hooks/inspect/useAssignmentQueue";
+import { useInspectAccessWarningCount } from "@/components/hooks/inspect/useInspectZugang";
 import { filterByBuckets } from "@/lib/inspect/dayBuckets";
 import { useOfflineQueueStore } from "@/store/offlineQueueStore";
 import { useSessionStore } from "@/store/sessionStore";
@@ -82,24 +83,7 @@ export function InspectNav({ collapsed, onToggleCollapse, seltenOpen, onToggleSe
 
   const q = useAssignmentQueue();
   const offlineN = useOfflineQueueStore((s) => s.inspectionQueue.length);
-  const [accessWarn, setAccessWarn] = useState<number | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const res = await fetch("/api/partner/inspect/access", { credentials: "include" });
-        if (!res.ok || cancelled) return;
-        const body = (await res.json()) as { warningCount?: number };
-        if (!cancelled) setAccessWarn(body.warningCount ?? 0);
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const accessWarn = useInspectAccessWarningCount();
 
   const counts = useMemo(() => {
     const heuteN = filterByBuckets(q.openRows, ["heute", "ohne"]).length;

@@ -13,6 +13,7 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "clarifications:view",
   "duties:view",
   "requests:create",
+  "requests:approve",
   "parts:request",
   "requests:view-mine",
   "requests:view-open",
@@ -109,16 +110,19 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
     "reprocessing:release",
     "authority:view",
     "authority:manage",
+    "requests:approve",
   ],
   security_officer: [
     ...SERVICE_STAFF,
     "inventory:export",
     "requests:view-all",
+    "requests:approve",
     "incidents:view",
     "incidents:manage",
     "fieldsafety:view",
     "fieldsafety:create",
     "devicebook:view",
+    "authority:view",
   ],
   // No shell:nav → Inventory-only chrome; /requests is blocked by RouteGuard.
   // /security and /device-book are allowed without shell:nav (see canAccessPath).
@@ -200,6 +204,10 @@ export const PERMISSION_GROUPS: readonly {
     label: "Requests and orders",
     items: [
       { slug: "requests:create", description: "Create service requests" },
+      {
+        slug: "requests:approve",
+        description: "Approve quotes, triage fault reports, and confirm follow-up proposals",
+      },
       { slug: "requests:view-mine", description: "View own requests" },
       { slug: "requests:view-open", description: "View open facility requests" },
       { slug: "requests:view-all", description: "View all requests, including closed" },
@@ -301,6 +309,8 @@ export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/catalog": "catalog:view",
   "/clarifications": "clarifications:view",
   "/requests": "requests:view-mine",
+  "/fault-report": "requests:create",
+  "/maintenance-events/new": "inventory:update",
   "/users": "users:view",
   "/locations": "locations:view",
   "/roles": "roles:view",
@@ -358,6 +368,8 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   if (pathname.startsWith("/catalog")) return "catalog:view";
   if (pathname.startsWith("/clarifications")) return "clarifications:view";
   if (pathname.startsWith("/requests")) return "requests:view-mine";
+  if (pathname.startsWith("/fault-report")) return "requests:create";
+  if (pathname.startsWith("/maintenance-events")) return "inventory:update";
   if (pathname.startsWith("/users")) return "users:view";
   if (pathname.startsWith("/locations")) return "locations:view";
   if (pathname.startsWith("/roles")) return "roles:view";
@@ -390,6 +402,12 @@ export function canAccessPath(
   const slugSet = granted instanceof Set ? granted : new Set(granted);
   const pathname = normalizeAppPath(path);
   if (isAlwaysAllowPath(pathname)) return true;
+
+  // E76 Fremdbericht — same OR as ExternalRepairScreen / API.
+  if (pathname.startsWith("/maintenance-events")) {
+    if (!slugSet.has("inventory:update") && !slugSet.has("requests:approve")) return false;
+    return slugSet.has("shell:nav");
+  }
 
   const required = resolvePathPermission(pathname);
   if (!required) return false;

@@ -67,10 +67,51 @@ export function assertLinkedVisitSealGates(input: {
   visitStartedAt: Date | string | null | undefined;
   signatures: SealSignatureInput[];
   failedSteps: SealFailedStepInput[];
+  /** E77 — send-in workshop reports skip the visit-started gate. */
+  skipVisit?: boolean;
 }): SealGateResult {
-  const visit = assertVisitStarted(input.visitStartedAt);
-  if (!visit.ok) return visit;
+  if (!input.skipVisit) {
+    const visit = assertVisitStarted(input.visitStartedAt);
+    if (!visit.ok) return visit;
+  }
   const sigs = assertSignaturesPresent(input.signatures);
   if (!sigs.ok) return sigs;
   return assertFailedStepsHaveEvidence(input.failedSteps);
+}
+
+/** R11 — extra validations for K-REP repair completion. */
+export function assertRepairReportGates(input: {
+  result: string | null | undefined;
+  action: string | null | undefined;
+  partCount: number;
+  hasPartPhotoOrReason: boolean;
+  functionTestPassed: boolean | null | undefined;
+}): SealGateResult {
+  if (!input.result) {
+    return { ok: false, message: "Repair result is required.", field: "result" };
+  }
+  if (input.action === "part_replaced") {
+    if (input.partCount < 1) {
+      return { ok: false, message: "Part replacement requires at least one part row.", field: "parts" };
+    }
+    if (!input.hasPartPhotoOrReason) {
+      return {
+        ok: false,
+        message: "Part replacement requires a photo or no-photo reason.",
+        field: "noPhotoReason",
+      };
+    }
+  }
+  if (
+    input.result !== "parts_ordered" &&
+    input.result !== "not_repairable" &&
+    input.functionTestPassed == null
+  ) {
+    return {
+      ok: false,
+      message: "Function test result is required unless parts are ordered or not repairable.",
+      field: "functionTestPassed",
+    };
+  }
+  return { ok: true };
 }

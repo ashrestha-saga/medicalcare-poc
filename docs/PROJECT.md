@@ -544,6 +544,7 @@ See `.env.example`. Important variables:
 | `AUTH_LOCKOUT_MINUTES` | Lockout duration (default 15) |
 | `TOTP_ENCRYPTION_KEY` | Encrypt TOTP / OXID secrets (optional; defaults to session secret) |
 | `TOTP_ISSUER` | Authenticator account label (default `DeviceCare`) |
+| `DEMO_SHARED_TOTP_*` | **Demo showcase** — shared authenticator bridge (opt-in; see [`DEMO_SHARED_TOTP.md`](./DEMO_SHARED_TOTP.md)) |
 | `OXID_*` | OAuth client, authorize/token URLs, API base, redirect, scope, adapter mode |
 | `BEUDAMED_*` | API base/key, cache TTL, timeout, rate limits, adapter mode |
 | `SMTP_*` | Optional platform mail fallback when owner `SmtpSettings` (and target auth) are unset |

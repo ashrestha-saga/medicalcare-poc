@@ -33,6 +33,7 @@ export const DASHBOARD_TILE_KIND: Record<string, DashboardTileKind> = {
   "freigabe-blockiert": "arbeit",
   "fristen-ohne-beleg": "uebersicht",
   "gesperrte-geraete": "arbeit",
+  "geraete-gesperrt": "arbeit",
   "implantat-doku": "arbeit",
   klaerliste: "arbeit",
   "konstanz-heute": "gemischt",

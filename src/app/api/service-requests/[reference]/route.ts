@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse, notFound } from "@/lib/errors";
 import { serviceRequestService } from "@/services/requests/serviceRequestService";
 
@@ -6,7 +6,7 @@ import { serviceRequestService } from "@/services/requests/serviceRequestService
 export async function GET(req: Request, { params }: { params: Promise<{ reference: string }> }) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const { reference } = await params;

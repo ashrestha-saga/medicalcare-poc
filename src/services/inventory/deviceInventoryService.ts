@@ -244,6 +244,17 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
       .map((d) => (d.dueAt ? new Date(d.dueAt) : null)),
   );
   const presented = overlayMaintenanceDue(base, maintenanceDue);
+  const openSendIn = await prisma.serviceRequest.findFirst({
+    where: {
+      tenantId: row.tenantId,
+      subjectType: "instance",
+      subjectId: row.id,
+      fulfilment: "send_in",
+      state: { notIn: ["completed", "rejected"] },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { reference: true, state: true },
+  });
   return {
     ...presented,
     inspectionTags,
@@ -255,6 +266,9 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
     course: await buildDeviceCourse(row),
     duties,
     nextObligationDueAt: nextObligationDueAt(duties),
+    openSendInRepair: openSendIn
+      ? { reference: openSendIn.reference, state: openSendIn.state }
+      : null,
   };
 }
 

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { SiteDTO } from "@/interfaces";
 import { DropdownFilter, FilterToolbar } from "@/components/features/shared/filters";
@@ -16,6 +18,7 @@ interface DevicesFilterToolbarProps {
   mineArea: boolean;
   onMineAreaChange: (value: boolean) => void;
   onClearAll: () => void;
+  canRegister?: boolean;
 }
 
 const STATE_OPTIONS: { value: string; labelKey: string }[] = [
@@ -35,13 +38,28 @@ export function DevicesFilterToolbar({
   mineArea,
   onMineAreaChange,
   onClearAll,
+  canRegister = false,
 }: DevicesFilterToolbarProps) {
   const t = useTranslations("filters");
+  const tInv = useTranslations("pages.inventory");
   const hasActiveFilters = Boolean(siteFilter || stateFilter || mineArea);
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
 
   return (
-    <FilterToolbar hasActiveFilters={hasActiveFilters} onClearAll={onClearAll}>
+    <FilterToolbar
+      hasActiveFilters={hasActiveFilters}
+      onClearAll={onClearAll}
+      trailing={
+        canRegister ? (
+          <Button type="button" size="sm" className="h-8" asChild data-testid="devices-erstanlage">
+            <Link href="/registration">
+              <Plus className="h-4 w-4" />
+              {tInv("registration")}
+            </Link>
+          </Button>
+        ) : null
+      }
+    >
       <DropdownFilter label={t("site")} value={siteFilter} options={siteOptions} onChange={onSiteChange} />
       <DropdownFilter
         label={t("status")}

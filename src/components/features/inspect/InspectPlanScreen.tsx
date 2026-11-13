@@ -7,7 +7,7 @@ import { useAssignmentQueue } from "@/components/hooks/inspect/useAssignmentQueu
 import { InspectSiteGroupCard } from "@/components/features/inspect/InspectSiteGroup";
 import { Spinner } from "@/components/ui/Loading";
 import { Button } from "@/components/ui/button";
-import { buildDaySections } from "@/lib/inspect/siteGroups";
+import { buildDaySections, isSendInRow } from "@/lib/inspect/siteGroups";
 import type { DayBucket } from "@/lib/inspect/dayBuckets";
 
 type Mode = "heute" | "woche" | "erledigt" | "queue";
@@ -30,6 +30,11 @@ export function InspectPlanScreen({ mode }: { mode: Mode }) {
     if (mode === "woche") return buildDaySections(q.openRows, "woche");
     return buildDaySections(q.openRows, "erledigt", q.doneRows);
   }, [mode, q.openRows, q.doneRows]);
+
+  const sendInRows = useMemo(
+    () => (mode === "heute" ? q.openRows.filter(isSendInRow) : []),
+    [mode, q.openRows],
+  );
 
   if (!q.tenantId || q.references.length === 0) {
     return (
@@ -83,6 +88,29 @@ export function InspectPlanScreen({ mode }: { mode: Mode }) {
         </div>
       ) : mode === "queue" ? null : (
         <>
+          {mode === "heute" && sendInRows.length > 0 ? (
+            <section className="pp-card" data-testid="inspect-heute-send-in">
+              <h4>{t("heuteSendInTitle")}</h4>
+              <div className="pp-card__body">
+                <p className="pp-hint">{t("heuteSendInHint")}</p>
+                <ul className="pp-queue-list">
+                  {sendInRows.map((row) => (
+                    <li key={row.reference}>
+                      <Link
+                        className="pp-link"
+                        href={`/inspect/${encodeURIComponent(row.reference)}`}
+                      >
+                        {row.deviceLabel || row.reference} · {t("heuteSendInOpen")}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <Link className="pp-btn" href="/inspect/nachbesuche">
+                  {t("heuteSendInFollowUps")}
+                </Link>
+              </div>
+            </section>
+          ) : null}
           {sections.map((sec) =>
             sec.rows.length === 0 ? null : (
               <section key={sec.key} className="pp-day" data-testid={`inspect-day-${sec.key}`}>
@@ -109,7 +137,7 @@ export function InspectPlanScreen({ mode }: { mode: Mode }) {
               </section>
             ),
           )}
-          {sections.every((s) => s.rows.length === 0) ? (
+          {sections.every((s) => s.rows.length === 0) && sendInRows.length === 0 ? (
             <div className="pp-note" data-t="ok">
               <b>{emptyFor(mode, t)}</b>
             </div>

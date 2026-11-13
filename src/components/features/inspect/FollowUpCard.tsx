@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { api, ApiError } from "@/lib/http/apiClient";
+import { useFollowUpPropose } from "@/components/hooks/inspect/useFollowUpPropose";
 import { Button } from "@/components/ui/button";
 
 /** N3 / E33 — propose a Nachbesuch to disposition after a defect. */
@@ -14,48 +13,13 @@ export function FollowUpCard({
   disabled?: boolean;
 }) {
   const t = useTranslations("pruefpartner");
-  const [open, setOpen] = useState(false);
-  const [needs, setNeeds] = useState("");
-  const [duration, setDuration] = useState("60");
-  const [urgency, setUrgency] = useState<"high" | "normal">("normal");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [savedRef, setSavedRef] = useState<string | null>(null);
+  const p = useFollowUpPropose(reference);
 
-  async function propose() {
-    const text = needs.trim();
-    if (!text) {
-      setErr(t("followUpNeedsRequired"));
-      return;
-    }
-    setBusy(true);
-    setErr(null);
-    try {
-      const res = await api<{ reference: string }>(
-        `/api/partner/disposition/${encodeURIComponent(reference)}/follow-up`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            followUpNeeds: `${text}\n(${t("followUpDuration")}: ${duration} min)`,
-            followUpUrgency: urgency,
-            reason: "instandsetzung",
-          }),
-        },
-      );
-      setSavedRef(res.reference);
-      setOpen(false);
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : t("followUpFailed"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (savedRef) {
+  if (p.savedRef) {
     return (
       <div className="pp-note" data-t="ok" data-testid="inspect-followup-done">
         <b>{t("followUpProposed")}</b>{" "}
-        <span className="mono">{savedRef}</span> · {t("followUpProposedHint")}
+        <span className="mono">{p.savedRef}</span> · {t("followUpProposedHint")}
       </div>
     );
   }
@@ -65,12 +29,12 @@ export function FollowUpCard({
       <h4>{t("followUpTitle")}</h4>
       <div className="pp-card__body">
         <p className="pp-hint">{t("followUpHint")}</p>
-        {!open ? (
+        {!p.open ? (
           <Button
             type="button"
             className="pp-btn"
             disabled={disabled}
-            onClick={() => setOpen(true)}
+            onClick={() => p.setOpen(true)}
           >
             {t("followUpOpen")}
           </Button>
@@ -82,18 +46,18 @@ export function FollowUpCard({
                 <textarea
                   className="pp-textarea"
                   rows={3}
-                  value={needs}
-                  onChange={(e) => setNeeds(e.target.value)}
+                  value={p.needs}
+                  onChange={(e) => p.setNeeds(e.target.value)}
                   placeholder={t("followUpPartsPh")}
-                  disabled={busy}
+                  disabled={p.busy}
                 />
               </div>
               <div className="pp-nb__fld">
                 <label>{t("followUpDuration")}</label>
                 <select
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  disabled={busy}
+                  value={p.duration}
+                  onChange={(e) => p.setDuration(e.target.value)}
+                  disabled={p.busy}
                 >
                   <option value="30">30 min</option>
                   <option value="60">60 min</option>
@@ -104,25 +68,30 @@ export function FollowUpCard({
               <div className="pp-nb__fld">
                 <label>{t("followUpUrgency")}</label>
                 <select
-                  value={urgency}
-                  onChange={(e) => setUrgency(e.target.value as "high" | "normal")}
-                  disabled={busy}
+                  value={p.urgency}
+                  onChange={(e) => p.setUrgency(e.target.value as "high" | "normal")}
+                  disabled={p.busy}
                 >
                   <option value="high">{t("followUpUrgencyHigh")}</option>
                   <option value="normal">{t("followUpUrgencyNormal")}</option>
                 </select>
               </div>
             </div>
-            {err ? <div className="pp-err">{err}</div> : null}
+            {p.err ? <div className="pp-err">{p.err}</div> : null}
             <div className="pp-actions">
-              <button type="button" className="pp-btn" disabled={busy} onClick={() => setOpen(false)}>
+              <button
+                type="button"
+                className="pp-btn"
+                disabled={p.busy}
+                onClick={() => p.setOpen(false)}
+              >
                 {t("followUpCancel")}
               </button>
               <button
                 type="button"
                 className="pp-btn pp-btn--primary"
-                disabled={busy}
-                onClick={() => void propose()}
+                disabled={p.busy}
+                onClick={() => void p.propose()}
               >
                 {t("followUpSubmit")}
               </button>

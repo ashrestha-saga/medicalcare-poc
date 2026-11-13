@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { releaseService } from "@/services/registration/releaseService";
 
@@ -8,7 +8,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   let correlationId: string | undefined;
   try {
-    const session = await requireTenantContext(req);
+    const session = await requireActingContext(req);
     return await withTenantStore(session, async () => {
       correlationId = session.correlationId;
       const { id } = await ctx.params;

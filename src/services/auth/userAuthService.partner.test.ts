@@ -82,6 +82,8 @@ describe("userAuthService partner door", () => {
     expect(result.user.accountKind).toBe("partner");
     expect(result.user.organisationId).toBe("org-msr");
     expect(result.organisationName).toBe("Medtech Service Rhein GmbH");
+    // Bridge is forced off in NODE_ENV=test.
+    expect(result.totpEnabled).toBe(false);
   });
 
   it("rejects clinic credentials on the partner door", async () => {

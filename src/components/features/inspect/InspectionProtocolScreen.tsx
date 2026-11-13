@@ -8,6 +8,11 @@ import { protocolChecklist, type ProtocolGateId } from "@/components/hooks/inspe
 import { useInspectionProtocol } from "@/components/hooks/inspect/useInspectionProtocol";
 import { BarcodeCapture } from "@/components/features/shared/barcode-capture";
 import { FollowUpCard } from "@/components/features/inspect/FollowUpCard";
+import {
+  PartsProposalHandoffCard,
+  parseLinesFromNote,
+} from "@/components/features/inspect/PartsProposalHandoffCard";
+import { K_REP_CATALOGUE_CODE, REPAIR_SERVICE_TYPE, canonicalServiceType } from "@/constants/repairs";
 import { SignaturePad } from "@/components/features/inspect/SignaturePad";
 import { Spinner } from "@/components/ui/Loading";
 import { Input } from "@/components/ui/input";
@@ -230,15 +235,42 @@ export function InspectionProtocolScreen({ reference }: { reference: string }) {
               </div>
             </section>
           ) : null}
+          <div className="pp-actions">
+            <button
+              type="button"
+              className="pp-btn pp-btn--primary"
+              disabled={!p.canStart || p.busy}
+              onClick={() => void p.startRun()}
+            >
+              {preview.draftRunId ? t("resumeRun") : t("startRun")}
+            </button>
+            {p.canDiscardDraft ? (
+              <button
+                type="button"
+                className="pp-btn"
+                disabled={p.busy}
+                data-testid="inspect-start-over"
+                onClick={() => void p.discardDraft()}
+              >
+                {t("startOver")}
+              </button>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+
+      {p.canDiscardDraft && (run || p.blockedQual || p.blockedBaseline) ? (
+        <div className="pp-actions">
           <button
             type="button"
-            className="pp-btn pp-btn--primary"
-            disabled={!p.canStart || p.busy}
-            onClick={() => void p.startRun()}
+            className="pp-btn"
+            disabled={p.busy}
+            data-testid="inspect-start-over"
+            onClick={() => void p.discardDraft()}
           >
-            {preview.draftRunId ? t("resumeRun") : t("startRun")}
+            {t("startOver")}
           </button>
-        </>
+        </div>
       ) : null}
 
       {run && !p.sealed ? (
@@ -510,7 +542,28 @@ function ProtocolCloseout({
 
       {p.missingEvidence.length > 0 ||
       Object.values(p.stepDraft).some((d) => d?.rating === "defect") ? (
-        <FollowUpCard reference={reference} disabled={p.busy || !p.visitStarted} />
+        <FollowUpCard
+          reference={reference}
+          disabled={
+            p.busy ||
+            (!p.visitStarted && p.preview?.fulfilment !== "send_in")
+          }
+        />
+      ) : null}
+
+      {p.preview?.serviceRequestId &&
+      (p.catalogue?.code === K_REP_CATALOGUE_CODE ||
+        canonicalServiceType(p.preview.serviceType) === REPAIR_SERVICE_TYPE) ? (
+        <PartsProposalHandoffCard
+          serviceRequestId={p.preview.serviceRequestId}
+          disabled={p.busy}
+          lines={(() => {
+            const partsStep = p.catalogueSteps.find((s) => s.inputKind === "parts");
+            if (!partsStep) return undefined;
+            const draft = p.stepDraft[partsStep.stepId];
+            return parseLinesFromNote(draft?.note ?? partsStep.note);
+          })()}
+        />
       ) : null}
 
       <section className="pp-card">
@@ -710,8 +763,10 @@ function StepRow({
   visitStarted: boolean;
 }) {
   const t = useTranslations("pruefpartner");
+  const tRep = useTranslations("repairs.protocol");
   const rating = draft?.rating ?? null;
-  const measurePlaceholder = t("stepMeasure");
+  const measurePlaceholder =
+    step.inputKind === "number" ? tRep("numberPlaceholder") : t("stepMeasure");
   const outsideLimit = step.withinLimit === false;
   const isDefect = rating === "defect" || step.confirmed === false;
   const failed = isDefect;
@@ -723,11 +778,26 @@ function StepRow({
   const overrideText = draft?.limitOverrideReason ?? "";
   const [noPhotoMode, setNoPhotoMode] = useState(() => Boolean(reasonText.trim()) && !hasPhoto);
   const okBlocked = outsideLimit && !overrideText.trim();
+  const selectOptions: string[] = (() => {
+    const raw = step.optionsJson;
+    if (Array.isArray(raw)) return raw.map((o) => String(o));
+    if (raw && typeof raw === "object" && Array.isArray((raw as { options?: unknown }).options)) {
+      return ((raw as { options: unknown[] }).options).map((o) => String(o));
+    }
+    return [];
+  })();
+  const richPlaceholder =
+    step.inputKind === "parts"
+      ? tRep("partsPlaceholder")
+      : step.inputKind === "result"
+        ? tRep("resultPlaceholder")
+        : tRep("textPlaceholder");
 
   return (
     <div
       className="pp-step"
       data-measure={step.isMeasurement ? "1" : "0"}
+      data-input-kind={step.inputKind ?? undefined}
       data-state={highlightFail ? "fail" : rating === "ok" ? "ok" : undefined}
       data-testid={failed ? "inspect-step-fail" : "inspect-step"}
     >
@@ -758,7 +828,7 @@ function StepRow({
         className="pp-step__measure"
         data-invalid={outsideLimit ? "1" : "0"}
       >
-        {step.isMeasurement ? (
+        {step.isMeasurement || step.inputKind === "measurement" || step.inputKind === "number" ? (
           <>
             <Input
               value={draft?.measuredValue ?? ""}
@@ -770,6 +840,34 @@ function StepRow({
             />
             {step.unit ? <span className="pp-unit">{step.unit}</span> : null}
           </>
+        ) : null}
+        {step.inputKind === "text" || step.inputKind === "parts" || step.inputKind === "result" ? (
+          <textarea
+            className="pp-mangel__textarea"
+            rows={2}
+            value={draft?.note ?? ""}
+            onChange={(e) => onChange({ note: e.target.value })}
+            placeholder={richPlaceholder}
+            disabled={!visitStarted}
+            data-testid={`inspect-step-${step.inputKind}`}
+          />
+        ) : null}
+        {step.inputKind === "select" ? (
+          <select
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            value={draft?.note ?? ""}
+            onChange={(e) => onChange({ note: e.target.value, confirmed: true, rating: "ok" })}
+            disabled={!visitStarted}
+            aria-label={step.label}
+            data-testid="inspect-step-select"
+          >
+            <option value="">{tRep("selectPlaceholder")}</option>
+            {selectOptions.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
         ) : null}
       </div>
 

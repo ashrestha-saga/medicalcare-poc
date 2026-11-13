@@ -21,6 +21,7 @@ import { seedStaffSkillsRefs } from "./seeds/staffSkillsRefs";
 import { seedPruefpartnerDemoEquipment, seedRefPruefpartner } from "./seeds/refPruefpartner";
 import { seedK1K10Ref } from "./seeds/seedK1K10Ref";
 import { seedK10Tiles } from "./seeds/seedK10Tiles";
+import { seedRepairs } from "./seeds/repairs";
 
 export const SEED = {
   tenantId: "demo-tenant",
@@ -507,6 +508,9 @@ export async function seed(prisma: PrismaClient) {
   // Today band: authority findings + field-safety actions with dueAt.
   const bandDemo = await seedBandDemoDates(prisma, tenant.id);
 
+  // E70–E80 repairs: flag, K-REP, training gate, tile, demo part (after partner/ref seeds).
+  const repairs = await seedRepairs(prisma);
+
   const dutiesBackfilled = await dutyService.backfillDueDates(prisma);
   const attributionBackfilled = await backfillDutyAndEvidenceAttribution(prisma);
   const contractScopeBackfilled = await backfillAllContractScopeGrants(prisma);
@@ -528,6 +532,7 @@ export async function seed(prisma: PrismaClient) {
     golden,
     handover,
     bandDemo,
+    repairs,
     dutiesBackfilled,
     attributionBackfilled,
     contractScopeBackfilled,

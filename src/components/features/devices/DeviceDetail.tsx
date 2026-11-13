@@ -13,6 +13,8 @@ import { formatDate } from "@/lib/format";
 import { toInventoryLabel } from "@/lib/inventory/label";
 import type { AppLocale } from "@/lib/locale";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
+import { UnlockDevicePanel } from "@/components/features/repairs/UnlockDevicePanel";
+import { LoanerAssignPanel } from "@/components/features/repairs/LoanerAssignPanel";
 import { DeviceDutiesPanel } from "./DeviceDutiesPanel";
 
 interface DeviceDetailProps {
@@ -126,6 +128,19 @@ export function DeviceDetail({
             {t("catalogPending")}
           </p>
         )}
+        {detail?.openSendInRepair ? (
+          <div className="mt-3" data-testid="device-send-in-chip">
+            <Link
+              href={`/requests/${encodeURIComponent(detail.openSendInRepair.reference)}`}
+              title={t("sendInChipHint")}
+              className="inline-flex"
+            >
+              <Badge variant="secondary">
+                {t("sendInChip", { reference: detail.openSendInRepair.reference })}
+              </Badge>
+            </Link>
+          </div>
+        ) : null}
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -137,6 +152,12 @@ export function DeviceDetail({
           <Row label={t("manufacturer")} value={device.manufacturer} />
           <Row label={t("udiDi")} value={detail?.udiDi} />
           <Row label={t("location")} value={device.location?.text} />
+          <Row
+            label={t("operationalState")}
+            value={device.operationalState ?? "in_service"}
+          />
+          <Row label={t("lockSource")} value={device.lockSource} />
+          <Row label={t("loanerLender")} value={device.loanerLender} />
           <Row label={t("responsible")} value={device.responsiblePerson} />
           <Row label={t("commissioned")} value={formatDate(device.commissionedAt, locale)} />
           <Row
@@ -221,6 +242,21 @@ export function DeviceDetail({
           onComplete={onCompleteDuty}
         />
       )}
+
+      {canEdit ? (
+        <UnlockDevicePanel
+          deviceId={device.id}
+          operationalState={device.operationalState}
+        />
+      ) : null}
+      {canEdit ? (
+        <LoanerAssignPanel
+          deviceId={device.id}
+          operationalState={device.operationalState}
+          replacedById={device.replacedById}
+          loanerLender={device.loanerLender}
+        />
+      ) : null}
     </div>
   );
 }

@@ -63,3 +63,49 @@ export const updateTestEquipmentSchema = z.object({
 });
 
 export type UpdateTestEquipmentInput = z.infer<typeof updateTestEquipmentSchema>;
+
+/** D3 — propose a Nachbesuch child ServiceRequest from a failed inspection. */
+export const proposeFollowUpSchema = z.object({
+  followUpNeeds: z.string().trim().min(1).max(2000),
+  followUpUrgency: z.enum(["low", "normal", "high"]).optional(),
+  reason: z.enum(["befund", "stoerung", "instandsetzung"]).default("befund"),
+});
+
+export type ProposeFollowUpInput = z.infer<typeof proposeFollowUpSchema>;
+
+/** D10 — inspector / institution seal signature. */
+export const inspectionSignatureSchema = z.object({
+  kind: z.enum(["inspector", "institution"]),
+  signerName: z.string().trim().max(200).nullable().optional(),
+  signerRole: z.string().trim().max(200).nullable().optional(),
+  signedAt: z.string().trim().nullable().optional(),
+  absent: z.boolean().optional(),
+  absentReason: z.string().trim().max(2000).nullable().optional(),
+  /** Optional canvas PNG data URL — stored as AttachmentBlob, linked via blobId. */
+  imageDataUrl: z.string().trim().max(2_000_000).nullable().optional(),
+});
+
+export type InspectionSignatureInput = z.infer<typeof inspectionSignatureSchema>;
+
+/** D11 — Mangelbild photo for a failed step. */
+export const inspectionStepPhotoSchema = z.object({
+  dataUrl: z.string().trim().min(32).max(8_000_000),
+});
+
+export type InspectionStepPhotoInput = z.infer<typeof inspectionStepPhotoSchema>;
+
+/** P3 — partner_hint clarification from a failed step. */
+export const inspectionPartnerHintSchema = z.object({
+  text: z.string().trim().min(1).max(4000),
+  stepLabel: z.string().trim().max(200).optional(),
+});
+
+export type InspectionPartnerHintInput = z.infer<typeof inspectionPartnerHintSchema>;
+
+/** Day-plan site card — start ServiceVisit for open job refs. */
+export const startSiteVisitSchema = z.object({
+  siteId: z.string().trim().min(1).nullable().optional(),
+  references: z.array(z.string().trim().min(1)).max(200).default([]),
+});
+
+export type StartSiteVisitInput = z.infer<typeof startSiteVisitSchema>;

@@ -18,4 +18,11 @@ describe("CONSOLE_NAV_PRESETS Phase 1 — Meine Einrichtungen for all roles", ()
     expect(CONSOLE_NAV_PRESETS.service_lead.regel).toContain("meine");
     expect(CONSOLE_NAV_PRESETS.order.regel).toContain("meine");
   });
+
+  it("exposes Bestellvorschläge (bestell) for ops roles, not inspector", () => {
+    expect(CONSOLE_NAV_PRESETS.admin.regel).toContain("bestell");
+    expect(CONSOLE_NAV_PRESETS.order.regel).toContain("bestell");
+    expect(CONSOLE_NAV_PRESETS.inspector.taeglich).not.toContain("bestell");
+    expect(CONSOLE_NAV_PRESETS.inspector.regel).not.toContain("bestell");
+  });
 });

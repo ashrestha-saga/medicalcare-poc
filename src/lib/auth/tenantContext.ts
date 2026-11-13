@@ -131,6 +131,20 @@ export function requirePartnerPermission(ctx: PartnerContext, ...slugs: Permissi
 }
 
 /**
+ * Console RBAC while on an acting-tenant request.
+ * Acting `ctx.permissions` are clinic-side grants and never include `console:*`;
+ * disposition/quote/send-in must check OrgMembership.appRole console grants instead.
+ */
+export function requireActingPartnerConsolePermission(
+  ctx: ActingContext,
+  ...slugs: PermissionSlug[]
+): void {
+  if (ctx.user.accountKind !== "partner") throw forbidden();
+  const granted = getCachedPartnerConsolePermissions(ctx.user.appRole);
+  if (!slugs.some((slug) => granted.includes(slug))) throw forbidden();
+}
+
+/**
  * Shared clinic APIs. Clinic tenant comes from the session.
  * Partner tenant comes only from X-Acting-Tenant-Id and is re-checked every request.
  */

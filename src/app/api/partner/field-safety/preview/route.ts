@@ -4,13 +4,8 @@ import {
   requirePartnerPermission,
 } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
-import { z } from "zod";
+import { fieldSafetyPreviewQuerySchema } from "@/schemas/console";
 import { fieldSafetyRolloutService } from "@/services/console/fieldSafetyRolloutService";
-
-const querySchema = z.object({
-  modelLabel: z.string().trim().min(1).max(200),
-  manufacturer: z.string().trim().max(200).optional(),
-});
 
 /** GET /api/partner/field-safety/preview?modelLabel=&manufacturer= — affected tenants. */
 export async function GET(req: Request) {
@@ -21,7 +16,7 @@ export async function GET(req: Request) {
       requirePartnerPermission(ctx, "fieldsafety:rollout");
       correlationId = ctx.correlationId;
       const url = new URL(req.url);
-      const input = querySchema.parse({
+      const input = fieldSafetyPreviewQuerySchema.parse({
         modelLabel: url.searchParams.get("modelLabel") ?? "",
         manufacturer: url.searchParams.get("manufacturer") || undefined,
       });

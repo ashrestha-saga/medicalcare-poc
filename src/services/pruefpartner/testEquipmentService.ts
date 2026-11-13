@@ -1,8 +1,19 @@
 import type { PartnerContext } from "@/interfaces/session";
-import type { TestEquipmentDTO } from "@/interfaces/pruefpartner";
+import type {
+  TestEquipmentAssigneeOptionDTO,
+  TestEquipmentClassDTO,
+  TestEquipmentDTO,
+  TestEquipmentListDTO,
+} from "@/interfaces/pruefpartner";
+import {
+  TEST_EQUIPMENT_CLASS_META_BY_CODE,
+  deriveTestEquipmentStatus,
+  type TestEquipmentClassGroup,
+} from "@/constants/testEquipmentClasses";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "@/lib/errors";
 import { requirePartnerPermission } from "@/lib/auth/tenantContext";
+import { partnerHasConsolePermission } from "@/constants/partnerPermissions";
 
 function toDto(row: {
   id: string;
@@ -12,29 +23,119 @@ function toDto(row: {
   calibratedUntil: Date | null;
   traceabilityRef: string | null;
   active: boolean;
+  assignedMembershipId: string | null;
+  equipmentClass?: { label: string } | null;
+  assignedMembership?: { user: { name: string } | null } | null;
 }): TestEquipmentDTO {
   return {
     id: row.id,
     classCode: row.classCode,
+    classLabel: row.equipmentClass?.label ?? null,
     label: row.label,
     serialNumber: row.serialNumber,
     calibratedUntil: row.calibratedUntil?.toISOString().slice(0, 10) ?? null,
     traceabilityRef: row.traceabilityRef,
     active: row.active,
+    assignedMembershipId: row.assignedMembershipId,
+    assigneeName: row.assignedMembership?.user?.name ?? null,
+    status: deriveTestEquipmentStatus(row.active, row.calibratedUntil),
   };
 }
 
+function classGroup(code: string): TestEquipmentClassGroup {
+  return TEST_EQUIPMENT_CLASS_META_BY_CODE.get(code)?.group ?? "general";
+}
+
+const listInclude = {
+  equipmentClass: { select: { label: true } },
+  assignedMembership: { select: { user: { select: { name: true } } } },
+} as const;
+
 export const testEquipmentService = {
-  async list(ctx: PartnerContext, classCode?: string): Promise<TestEquipmentDTO[]> {
-    requirePartnerPermission(ctx, "testequipment:manage", "console:organisation:view");
-    const rows = await prisma.testEquipment.findMany({
+  async listClasses(_ctx: PartnerContext): Promise<TestEquipmentClassDTO[]> {
+    const rows = await prisma.refTestEquipmentClass.findMany({
+      orderBy: { code: "asc" },
+      select: { code: true, label: true },
+    });
+    const rank = new Map(
+      [...TEST_EQUIPMENT_CLASS_META_BY_CODE.keys()].map((code, i) => [code, i]),
+    );
+    return rows
+      .map((r) => ({
+        code: r.code,
+        label: r.label,
+        group: classGroup(r.code),
+      }))
+      .sort((a, b) => {
+        const ra = rank.get(a.code) ?? 999;
+        const rb = rank.get(b.code) ?? 999;
+        if (ra !== rb) return ra - rb;
+        return a.label.localeCompare(b.label);
+      });
+  },
+
+  async listAssignees(ctx: PartnerContext): Promise<TestEquipmentAssigneeOptionDTO[]> {
+    const rows = await prisma.orgMembership.findMany({
       where: {
         organisationId: ctx.organisationId,
-        ...(classCode ? { classCode } : {}),
+        OR: [{ validTo: null }, { validTo: { gt: new Date() } }],
       },
-      orderBy: [{ classCode: "asc" }, { label: "asc" }],
+      select: {
+        id: true,
+        appRole: true,
+        user: { select: { name: true, active: true } },
+      },
+      orderBy: { user: { name: "asc" } },
     });
-    return rows.map(toDto);
+    return rows
+      .filter((r) => r.user.active)
+      .map((r) => ({
+        membershipId: r.id,
+        name: r.user.name,
+        appRole: r.appRole,
+      }));
+  },
+
+  async listBundle(ctx: PartnerContext, classCode?: string): Promise<TestEquipmentListDTO> {
+    requirePartnerPermission(ctx, "testequipment:manage", "console:organisation:view");
+    const canManage = partnerHasConsolePermission(ctx.user.appRole, "testequipment:manage");
+    const [rows, classes, assignees] = await Promise.all([
+      prisma.testEquipment.findMany({
+        where: {
+          organisationId: ctx.organisationId,
+          ...(classCode ? { classCode } : {}),
+        },
+        include: listInclude,
+        orderBy: [{ active: "desc" }, { classCode: "asc" }, { label: "asc" }],
+      }),
+      this.listClasses(ctx),
+      canManage ? this.listAssignees(ctx) : Promise.resolve([]),
+    ]);
+    const items = rows.map(toDto);
+    const summary = {
+      total: items.length,
+      active: items.filter((i) => i.active).length,
+      due: items.filter((i) => i.status === "due").length,
+      lapsed: items.filter((i) => i.status === "lapsed").length,
+      inactive: items.filter((i) => i.status === "inactive").length,
+    };
+    return { items, classes, assignees, summary, canManage };
+  },
+
+  /** @deprecated Prefer listBundle — kept for narrow callers. */
+  async list(ctx: PartnerContext, classCode?: string): Promise<TestEquipmentDTO[]> {
+    const bundle = await this.listBundle(ctx, classCode);
+    return bundle.items;
+  },
+
+  async get(ctx: PartnerContext, id: string): Promise<TestEquipmentDTO> {
+    requirePartnerPermission(ctx, "testequipment:manage", "console:organisation:view");
+    const row = await prisma.testEquipment.findFirst({
+      where: { id, organisationId: ctx.organisationId },
+      include: listInclude,
+    });
+    if (!row) throw notFound("Test equipment not found.");
+    return toDto(row);
   },
 
   async create(
@@ -48,6 +149,11 @@ export const testEquipmentService = {
     },
   ): Promise<TestEquipmentDTO> {
     requirePartnerPermission(ctx, "testequipment:manage");
+    const cls = await prisma.refTestEquipmentClass.findUnique({
+      where: { code: input.classCode },
+      select: { code: true },
+    });
+    if (!cls) throw notFound("Unknown equipment class.");
     const row = await prisma.testEquipment.create({
       data: {
         organisationId: ctx.organisationId,
@@ -59,6 +165,7 @@ export const testEquipmentService = {
           : null,
         traceabilityRef: input.traceabilityRef ?? null,
       },
+      include: listInclude,
     });
     return toDto(row);
   },
@@ -73,6 +180,7 @@ export const testEquipmentService = {
       traceabilityRef: string | null;
       active: boolean;
       assignedMembershipId: string | null;
+      classCode: string;
     }>,
   ): Promise<TestEquipmentDTO> {
     requirePartnerPermission(ctx, "testequipment:manage");
@@ -80,6 +188,13 @@ export const testEquipmentService = {
       where: { id, organisationId: ctx.organisationId },
     });
     if (!existing) throw notFound("Test equipment not found.");
+    if (input.classCode) {
+      const cls = await prisma.refTestEquipmentClass.findUnique({
+        where: { code: input.classCode },
+        select: { code: true },
+      });
+      if (!cls) throw notFound("Unknown equipment class.");
+    }
     if (input.assignedMembershipId) {
       const membership = await prisma.orgMembership.findFirst({
         where: { id: input.assignedMembershipId, organisationId: ctx.organisationId },
@@ -90,6 +205,7 @@ export const testEquipmentService = {
     const row = await prisma.testEquipment.update({
       where: { id },
       data: {
+        ...(input.classCode != null ? { classCode: input.classCode } : {}),
         ...(input.label != null ? { label: input.label } : {}),
         ...(input.serialNumber !== undefined ? { serialNumber: input.serialNumber } : {}),
         ...(input.calibratedUntil !== undefined
@@ -105,6 +221,7 @@ export const testEquipmentService = {
           ? { assignedMembershipId: input.assignedMembershipId }
           : {}),
       },
+      include: listInclude,
     });
     return toDto(row);
   },

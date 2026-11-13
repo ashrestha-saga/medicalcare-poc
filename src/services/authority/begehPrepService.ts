@@ -27,6 +27,8 @@ export async function listBegehGaps(ctx: TenantContext): Promise<BegehGapDTO[]> 
     unmatchedFs,
     missingCadence,
     draftDevices,
+    openClarifications,
+    missingDutyOverlap,
   ] = await Promise.all([
     reprocessingEvidenceService.countOpenDailyChecks(ctx),
     prisma.reprocessingBatch.count({ where: { releaseResult: null } }),
@@ -44,6 +46,8 @@ export async function listBegehGaps(ctx: TenantContext): Promise<BegehGapDTO[]> 
     }),
     constancyCadenceService.listMissing(ctx).then((r) => r.length),
     prisma.deviceInstance.count({ where: { state: "draft" } }),
+    prisma.deviceClarification.count({ where: { resolvedAt: null } }),
+    countMissingDutyOverlapDecisions(),
   ]);
 
   const gaps: BegehGapDTO[] = [];
@@ -61,8 +65,59 @@ export async function listBegehGaps(ctx: TenantContext): Promise<BegehGapDTO[]> 
   );
   add(missingCadence, "Constancy objects without a determined takt", "/constancy-cadence?section=missing");
   add(draftDevices, "Devices in inventory still in draft", "/devices?state=draft");
+  add(openClarifications, "Open clarifications still unresolved", "/clarifications");
+  add(
+    missingDutyOverlap,
+    "Overlap questions without an operator decision",
+    "/duty-overlap",
+  );
 
   return gaps.sort((a, b) => b.count - a.count);
+}
+
+/**
+ * R6 — devices that have a duty whose inspection type appears in
+ * RefInspectionTypeOverlap but lack an open DutyOverlapDecision for that pair.
+ */
+async function countMissingDutyOverlapDecisions(): Promise<number> {
+  const overlaps = await prisma.refInspectionTypeOverlap.findMany({
+    select: { inspectionTypeCode: true, satisfiedByCode: true },
+  });
+  if (overlaps.length === 0) return 0;
+
+  const typeCodes = [...new Set(overlaps.flatMap((o) => [o.inspectionTypeCode, o.satisfiedByCode]))];
+  const devicesWithBoth = await prisma.deviceDuty.findMany({
+    where: {
+      applicable: true,
+      suspendedAt: null,
+      inspectionTypeCode: { in: typeCodes },
+    },
+    select: { deviceInstanceId: true, inspectionTypeCode: true, dutyKey: true },
+  });
+
+  const byDevice = new Map<string, Set<string>>();
+  for (const d of devicesWithBoth) {
+    if (!d.inspectionTypeCode) continue;
+    const set = byDevice.get(d.deviceInstanceId) ?? new Set();
+    set.add(d.inspectionTypeCode);
+    byDevice.set(d.deviceInstanceId, set);
+  }
+
+  const candidateIds: string[] = [];
+  for (const [deviceId, types] of byDevice) {
+    const needs = overlaps.some(
+      (o) => types.has(o.inspectionTypeCode) && types.has(o.satisfiedByCode),
+    );
+    if (needs) candidateIds.push(deviceId);
+  }
+  if (candidateIds.length === 0) return 0;
+
+  const decided = await prisma.dutyOverlapDecision.findMany({
+    where: { deviceInstanceId: { in: candidateIds }, validTo: null },
+    select: { deviceInstanceId: true },
+  });
+  const decidedSet = new Set(decided.map((d) => d.deviceInstanceId));
+  return candidateIds.filter((id) => !decidedSet.has(id)).length;
 }
 
 /**

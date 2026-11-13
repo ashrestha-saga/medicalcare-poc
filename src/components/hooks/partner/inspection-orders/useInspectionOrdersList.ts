@@ -24,6 +24,43 @@ export type DispositionFocus =
   | "out_of_contract"
   | null;
 
+/** Additive repair chips (mockup v15 / v15-1). */
+export type RepairFacet =
+  | "repair"
+  | "stoerung"
+  | "quote_open"
+  | "proposed"
+  | "send_in"
+  | null;
+
+function parseRepairFacet(raw: string | null): RepairFacet {
+  if (
+    raw === "repair" ||
+    raw === "stoerung" ||
+    raw === "quote_open" ||
+    raw === "proposed" ||
+    raw === "send_in"
+  ) {
+    return raw;
+  }
+  return null;
+}
+
+function matchesRepairFacet(row: ConsoleRequestRowDTO, facet: RepairFacet): boolean {
+  if (!facet) return true;
+  if (facet === "repair") {
+    const st = (row.serviceType ?? "").toLowerCase();
+    return st === "repair" || st === "instandsetzung" || st === "post_repair_check";
+  }
+  if (facet === "stoerung") return (row.reason ?? "").toLowerCase() === "stoerung";
+  if (facet === "quote_open") {
+    return row.quoteDecision === "open";
+  }
+  if (facet === "proposed") return (row.proposalState ?? "") === "proposed";
+  if (facet === "send_in") return (row.fulfilment ?? "") === "send_in";
+  return true;
+}
+
 function pipelineBucket(row: ConsoleRequestRowDTO): DispatchPipelineFilter {
   if (row.displayState === "abgeschlossen" || row.displayState === "abgelehnt") return "done";
   if (row.displayState === "in_arbeit") return "in_progress";
@@ -65,6 +102,7 @@ export function useInspectionOrdersList() {
   const pipelineParam = useQueryParam("pipeline");
   const reasonParam = useQueryParam("reason");
   const focusParam = useQueryParam("focus");
+  const repairParam = useQueryParam("repair");
   const { sync } = useSyncQueryParams();
   const [rows, setRows] = useState<ConsoleRequestRowDTO[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +123,7 @@ export function useInspectionOrdersList() {
 
   const focus = parseFocus(focusParam);
   const reason = reasonParam?.trim() || null;
+  const repairFacet = parseRepairFacet(repairParam);
 
   useEffect(() => {
     const parsed = dispatchPipelineFilterSchema.safeParse(pipelineParam);
@@ -102,8 +141,15 @@ export function useInspectionOrdersList() {
   );
 
   const clearFocusFilters = useCallback(() => {
-    sync({ reason: null, focus: null });
+    sync({ reason: null, focus: null, repair: null });
   }, [sync]);
+
+  const setRepairFacet = useCallback(
+    (value: RepairFacet) => {
+      sync({ repair: value });
+    },
+    [sync],
+  );
 
   useEffect(() => {
     setKeywordState(qParam ?? "");
@@ -149,6 +195,24 @@ export function useInspectionOrdersList() {
     return next;
   }, [rows]);
 
+  const repairCounts = useMemo(() => {
+    const next = {
+      repair: 0,
+      stoerung: 0,
+      quote_open: 0,
+      proposed: 0,
+      send_in: 0,
+    };
+    for (const row of rows) {
+      if (matchesRepairFacet(row, "repair")) next.repair += 1;
+      if (matchesRepairFacet(row, "stoerung")) next.stoerung += 1;
+      if (matchesRepairFacet(row, "quote_open")) next.quote_open += 1;
+      if (matchesRepairFacet(row, "proposed")) next.proposed += 1;
+      if (matchesRepairFacet(row, "send_in")) next.send_in += 1;
+    }
+    return next;
+  }, [rows]);
+
   const filtered = useMemo(() => {
     let list =
       pipeline === "all" ? rows : rows.filter((row) => pipelineBucket(row) === pipeline);
@@ -157,6 +221,9 @@ export function useInspectionOrdersList() {
     }
     if (focus) {
       list = list.filter((row) => matchesFocus(row, focus));
+    }
+    if (repairFacet) {
+      list = list.filter((row) => matchesRepairFacet(row, repairFacet));
     }
     const q = keyword.trim().toLowerCase();
     if (!q) return list;
@@ -170,13 +237,14 @@ export function useInspectionOrdersList() {
         row.assigneeName ?? "",
         row.displayState,
         row.reason ?? "",
+        row.faultDescription ?? "",
         row.managed ? "managed" : "external",
       ]
         .join(" ")
         .toLowerCase()
         .includes(q),
     );
-  }, [rows, keyword, pipeline, reason, focus]);
+  }, [rows, keyword, pipeline, reason, focus, repairFacet]);
 
   const appointmentValue = useCallback(
     (row: ConsoleRequestRowDTO) =>
@@ -203,23 +271,70 @@ export function useInspectionOrdersList() {
     }
   }, []);
 
+  const [gatePending, setGatePending] = useState<{
+    reference: string;
+    manufacturer: string;
+    assigneeUserId: string;
+    assigneeName?: string | null;
+  } | null>(null);
+
   const onAssignHandler = useCallback(
-    async (row: ConsoleRequestRowDTO, assigneeUserId: string | null) => {
+    async (
+      row: ConsoleRequestRowDTO,
+      assigneeUserId: string | null,
+      gateOverrideReason?: string | null,
+    ) => {
       setBusyRef(row.reference);
       try {
         await api(`/api/partner/disposition/${encodeURIComponent(row.reference)}`, {
           method: "PATCH",
-          body: JSON.stringify({ assigneeUserId }),
+          body: JSON.stringify({
+            assigneeUserId,
+            ...(gateOverrideReason ? { gateOverrideReason } : {}),
+          }),
         });
+        setGatePending(null);
         toast.success(t("dispositionSaved"));
         await refresh();
       } catch (e) {
-        toast.error(e instanceof ApiError ? e.message : t("dispositionSaveFailed"));
+        if (
+          e instanceof ApiError &&
+          e.status === 423 &&
+          e.code === "TRAINING_GATE" &&
+          assigneeUserId
+        ) {
+          const details = e.details as { manufacturer?: string } | undefined;
+          const name =
+            assigneesByTenant[row.tenantId]?.find((a) => a.userId === assigneeUserId)?.name ??
+            null;
+          setGatePending({
+            reference: row.reference,
+            manufacturer: details?.manufacturer ?? "—",
+            assigneeUserId,
+            assigneeName: name,
+          });
+          toast.error(e.message);
+        } else {
+          toast.error(e instanceof ApiError ? e.message : t("dispositionSaveFailed"));
+        }
       } finally {
         setBusyRef(null);
       }
     },
-    [refresh, t],
+    [assigneesByTenant, refresh, t],
+  );
+
+  const confirmGateOverride = useCallback(
+    async (reason: string) => {
+      if (!gatePending) return;
+      const row = rows.find((r) => r.reference === gatePending.reference);
+      if (!row) {
+        setGatePending(null);
+        return;
+      }
+      await onAssignHandler(row, gatePending.assigneeUserId, reason);
+    },
+    [gatePending, onAssignHandler, rows],
   );
 
   const onAdvance = useCallback(
@@ -259,6 +374,9 @@ export function useInspectionOrdersList() {
     setPipeline,
     reason,
     focus,
+    repairFacet,
+    setRepairFacet,
+    repairCounts,
     clearFocusFilters,
     counts,
     appointmentValue,
@@ -269,5 +387,8 @@ export function useInspectionOrdersList() {
     assigneesByTenant,
     assigneesLoading,
     refresh,
+    gatePending,
+    setGatePending,
+    confirmGateOverride,
   };
 }

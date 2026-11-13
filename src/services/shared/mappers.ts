@@ -165,6 +165,10 @@ export function toDeviceInstanceDTO(row: DeviceInstanceWithRelations): DeviceIns
       state: instanceState,
       retainUntil: row.retainUntil,
     }),
+    operationalState: row.operationalState ?? null,
+    lockSource: row.lockSource ?? null,
+    replacedById: row.replacedById ?? null,
+    loanerLender: row.loanerLender ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -231,6 +235,14 @@ export type ServiceRequestWithRelations = ServiceRequest & {
     modelName: string | null;
     udiDi: string | null;
     manufacturer: string | null;
+  } | null;
+  quote?: {
+    scopeText: string;
+    amountText: string;
+    decision: string;
+    decidedBy: string | null;
+    decidedAt: Date | null;
+    decisionNote: string | null;
   } | null;
 };
 
@@ -343,6 +355,30 @@ export function toServiceRequestDTO(row: ServiceRequestWithRelations): ServiceRe
         status: row.state,
       };
     })(),
+    quote: row.quote
+      ? {
+          scopeText: row.quote.scopeText,
+          amountText: row.quote.amountText,
+          decision:
+            row.quote.decision === "approved" || row.quote.decision === "rejected"
+              ? row.quote.decision
+              : "open",
+          decidedBy: row.quote.decidedBy,
+          decidedAt: row.quote.decidedAt?.toISOString() ?? null,
+          decisionNote: row.quote.decisionNote,
+        }
+      : null,
+    fulfilment: row.fulfilment ?? "on_site",
+    sendIn: {
+      shippedAt: row.shippedAt ? row.shippedAt.toISOString().slice(0, 10) : null,
+      trackingRef: row.trackingRef ?? null,
+      atWorkshopAt: row.atWorkshopAt ? row.atWorkshopAt.toISOString().slice(0, 10) : null,
+      returnedAt: row.returnedAt ? row.returnedAt.toISOString().slice(0, 10) : null,
+      arrivedAt: row.arrivedAt ? row.arrivedAt.toISOString().slice(0, 10) : null,
+    },
+    checkType: row.checkType ?? null,
+    proposalState: row.proposalState ?? "none",
+    mandatory: Boolean(row.mandatory),
     statusEvents: [...row.statusEvents]
       .sort((a, b) => a.changedAt.getTime() - b.changedAt.getTime())
       .map((e) => ({

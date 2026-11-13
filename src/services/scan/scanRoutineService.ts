@@ -1,4 +1,5 @@
 import type {
+  ScanRoutineCompletedItemDTO,
   ScanRoutineOpenDTO,
   ScanRoutineResultDTO,
   ScanRoutineStepDTO,
@@ -132,7 +133,7 @@ export const scanRoutineService = {
       where: { cadence: "daily" },
       orderBy: { code: "asc" },
     });
-    const doneToday =
+    const doneTodayRows =
       dailyRefs.length === 0
         ? []
         : await prisma.reprocessingCheck.findMany({
@@ -143,20 +144,32 @@ export const scanRoutineService = {
                 ...(siteId ? [{ siteId }] : []),
               ],
             },
-            select: { checkCode: true, equipmentDeviceId: true, siteId: true },
+            select: {
+              checkCode: true,
+              equipmentDeviceId: true,
+              siteId: true,
+              passed: true,
+              measuredValue: true,
+              withinLimit: true,
+              note: true,
+              performedBy: true,
+              recordedAt: true,
+            },
+            orderBy: { recordedAt: "asc" },
           });
 
+    const deviceCtx = {
+      id: device.id,
+      productKindCode: device.productKindCode,
+      characteristicsJson: device.characteristicsJson,
+      siteId,
+    };
     const openCodes = new Set(
-      openDailyRefCodesForDevice(
-        {
-          id: device.id,
-          productKindCode: device.productKindCode,
-          characteristicsJson: device.characteristicsJson,
-          siteId,
-        },
-        dailyRefs,
-        doneToday,
-      ),
+      openDailyRefCodesForDevice(deviceCtx, dailyRefs, doneTodayRows),
+    );
+    // Applicable daily refs for this device (open + completed today).
+    const applicableCodes = new Set(
+      openDailyRefCodesForDevice(deviceCtx, dailyRefs, []),
     );
 
     const steps: ScanRoutineStepDTO[] = dailyRefs
@@ -169,6 +182,40 @@ export const scanRoutineService = {
         limitText: r.limitText,
         kind: r.unit ? "measure" : "pass_fail",
       }));
+
+    const refByCode = new Map(dailyRefs.map((r) => [r.code, r]));
+    const completedToday: ScanRoutineCompletedItemDTO[] = [];
+    const seen = new Set<string>();
+    for (const row of doneTodayRows) {
+      if (!applicableCodes.has(row.checkCode) || seen.has(row.checkCode)) continue;
+      const ref = refByCode.get(row.checkCode);
+      if (!ref) continue;
+      // Match openDailyRefCodesForDevice ownership rules.
+      if (ref.scope === "equipment" && row.equipmentDeviceId !== device.id) continue;
+      if (
+        (ref.scope === "water" ||
+          ref.scope === "chemistry" ||
+          ref.scope === "sterile_storage") &&
+        !(siteId && row.siteId === siteId)
+      ) {
+        continue;
+      }
+      seen.add(row.checkCode);
+      completedToday.push({
+        checkCode: row.checkCode,
+        label: ref.label,
+        scope: ref.scope,
+        kind: ref.unit ? "measure" : "pass_fail",
+        unit: ref.unit,
+        limitText: ref.limitText,
+        passed: row.passed,
+        measuredValue: row.measuredValue,
+        withinLimit: row.withinLimit,
+        note: row.note,
+        performedBy: row.performedBy,
+        recordedAt: row.recordedAt.toISOString(),
+      });
+    }
 
     const label =
       device.model?.tradeName?.trim() ||
@@ -184,6 +231,7 @@ export const scanRoutineService = {
       areaName: device.area?.name ?? null,
       isEquipment,
       steps,
+      completedToday,
       performedAt: isoDate(today),
     };
   },

@@ -9,6 +9,7 @@ import type {
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { actorFromTenant } from "@/lib/auth/actorContext";
 import { badRequest, notFound, unprocessable } from "@/lib/errors";
+import { isRepairsEnabled } from "@/lib/features/repairs";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
 import type {
@@ -22,6 +23,7 @@ import {
   isMpbetreibV34BookException,
   parseCharacteristicsJson,
 } from "@/services/registration/bookException";
+import { reportFault } from "@/services/repairs/faultReportService";
 import { evidenceService } from "@/services/registration/evidenceService";
 import {
   assertDeviceInWorkAreas,
@@ -168,6 +170,7 @@ export const deviceBookService = {
   /**
    * Scan Störung melden: DeviceBookEntry always; DeviceIncident (unassessed)
    * when harm ≠ no. Does not set suspectedSerious — MPSB assesses later.
+   * When Tenant.featureFlags.repairs is on, delegates book/lock/order to R9 reportFault.
    */
   async reportMalfunction(
     ctx: TenantContext,
@@ -194,6 +197,60 @@ export const deviceBookService = {
     }
 
     const outOfService = input.outOfService === "yes";
+    const tenantFlags = await prisma.tenant.findUnique({
+      where: { id: ctx.tenantId },
+      select: { featureFlags: true },
+    });
+
+    if (isRepairsEnabled(tenantFlags?.featureFlags)) {
+      const consequenceCode =
+        input.outOfService === "yes"
+          ? "out_of_service"
+          : input.consequence?.trim()
+            ? "restricted"
+            : "usable";
+
+      const fault = await reportFault(ctx, {
+        deviceInstanceId: device.id,
+        description: input.description,
+        occurredAt: input.occurredAt,
+        consequenceCode,
+        kind: input.kind,
+      });
+
+      let incidentId: string | null = null;
+      if (input.harm !== "no") {
+        const incident = await prisma.deviceIncident.create({
+          data: {
+            tenantId: ctx.tenantId,
+            deviceInstanceId: device.id,
+            deviceModelId: device.modelId,
+            occurredAt: new Date(`${input.occurredAt}T00:00:00.000Z`),
+            noticedAt: new Date(`${input.occurredAt}T00:00:00.000Z`),
+            description: input.description,
+            harmDescription: input.harm === "unknown" ? "Unklar — von Anwender gemeldet" : null,
+            measureTaken: input.consequence?.trim() || null,
+            suspectedSerious: null,
+            ...recordedByAttribution(ctx),
+          },
+        });
+        incidentId = incident.id;
+        await prisma.deviceBookEntry.update({
+          where: { id: fault.entryId },
+          data: { incidentId },
+        });
+      }
+
+      return {
+        entryId: fault.entryId,
+        incidentId,
+        inventoryNumber: device.inventoryNumber,
+        kind: input.kind,
+        outOfService,
+        harm: input.harm,
+      };
+    }
+
     const consequence = encodeOutOfServiceConsequence(input.consequence, outOfService);
 
     const result = await prisma.$transaction(async (tx) => {
@@ -370,7 +427,8 @@ export const deviceBookService = {
     const deviceLabel =
       device.model?.tradeName || device.model?.modelName || device.inventoryNumber;
 
-    const [duties, trainings, entries, incidents, evidenceRows, modelIfu] = await Promise.all([
+    const [duties, trainings, entries, incidents, evidenceRows, modelIfu, maintenanceEvents] =
+      await Promise.all([
       prisma.deviceDuty.findMany({
         where: { deviceInstanceId, applicable: true, suspendedAt: null },
         include: {
@@ -411,6 +469,14 @@ export const deviceBookService = {
         orderBy: { recordedAt: "desc" },
       }),
       modelDocumentService.currentIfuForModel(ctx, device.modelId),
+      prisma.maintenanceEvent.findMany({
+        where: { deviceInstanceId },
+        include: {
+          serviceRequest: { select: { reference: true } },
+        },
+        orderBy: { performedAt: "desc" },
+        take: 50,
+      }),
     ]);
 
     return {
@@ -448,6 +514,18 @@ export const deviceBookService = {
         participants: t.records.map((r) => r.person.name),
       })),
       entries,
+      maintenanceEvents: maintenanceEvents.map((ev) => ({
+        id: ev.id,
+        kind: ev.kind,
+        performedAt: ev.performedAt.toISOString(),
+        performedBy: ev.performedBy,
+        action: ev.action,
+        result: ev.result,
+        source: ev.source,
+        externalPerformer: ev.externalPerformer,
+        serviceRequestReference: ev.serviceRequest?.reference ?? null,
+        postRepairCheck: ev.postRepairCheck,
+      })),
       incidents: incidents
         .filter((row) => !shouldHideFromRegisterIncident(row))
         .map((row) => ({

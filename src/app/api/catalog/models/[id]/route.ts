@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { updateCatalogModelSchema } from "@/schemas/catalogModel";
 import { deviceModelCatalogService } from "@/services/catalog/deviceModelCatalogService";
@@ -9,7 +9,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 export async function GET(_req: Request, context: RouteContext) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(_req);
+    const ctx = await requireActingContext(_req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const { id } = await context.params;
@@ -25,7 +25,7 @@ export async function GET(_req: Request, context: RouteContext) {
 export async function PATCH(req: Request, context: RouteContext) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const { id } = await context.params;

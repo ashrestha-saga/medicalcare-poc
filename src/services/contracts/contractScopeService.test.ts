@@ -18,20 +18,28 @@ describe("contractScopeService", () => {
     expect(slugs).toContain("fieldsafety:create");
   });
 
-  it("dual-read: grant rows win over JSON", () => {
-    const slugs = resolveContractScopeSlugs(JSON.stringify(["inventory", "inspection"]), [
-      { permission: "inventory:view", denied: false },
+  it("dual-read: unions JSON tokens with positive grant rows", () => {
+    const slugs = resolveContractScopeSlugs(JSON.stringify(["inventory"]), [
+      { permission: "requests:create", denied: false },
     ]);
-    expect(slugs).toEqual(["inventory:view"]);
+    expect(slugs).toContain("inventory:view");
+    expect(slugs).toContain("requests:create");
   });
 
-  it("subtracts denied (nie) rows from positive grants", () => {
-    const slugs = resolveContractScopeSlugs(JSON.stringify(["inspection"]), [
+  it("subtracts denied (nie) rows from the token∪grant union", () => {
+    const slugs = resolveContractScopeSlugs(JSON.stringify(["inventory"]), [
       { permission: "inventory:view", denied: false },
-      { permission: "inventory:update", denied: false },
       { permission: "inventory:update", denied: true },
     ]);
-    expect(slugs).toEqual(["inventory:view"]);
+    expect(slugs).toContain("inventory:view");
+    expect(slugs).not.toContain("inventory:update");
+  });
+
+  it("expands training and reprocessing tokens to acting menu slugs", () => {
+    const slugs = expandScopeTokensToSlugs(["training", "reprocessing"]);
+    expect(slugs).toContain("training:view");
+    expect(slugs).toContain("reprocessing:view");
+    expect(slugs).not.toContain("reprocessing:release");
   });
 });
 

@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { reclassifyService } from "@/services/registration/reclassifyService";
 import { reclassifyCharacteristicsSchema } from "@/schemas/registration";
@@ -10,7 +10,7 @@ type Ctx = { params: Promise<{ modelId: string }> };
 export async function POST(req: Request, ctx: Ctx) {
   let correlationId: string | undefined;
   try {
-    const session = await requireTenantContext(req);
+    const session = await requireActingContext(req);
     return await withTenantStore(session, async () => {
       correlationId = session.correlationId;
       const { modelId } = await ctx.params;

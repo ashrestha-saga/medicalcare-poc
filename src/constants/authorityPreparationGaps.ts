@@ -10,7 +10,9 @@ export type PreparationGapCode =
   | "unassessed_incidents"
   | "unreported_incidents"
   | "missing_constancy_cadence"
-  | "field_safety_unmatched";
+  | "field_safety_unmatched"
+  | "open_clarifications"
+  | "missing_duty_overlap";
 
 export type PreparationGapDef = {
   code: PreparationGapCode;
@@ -55,5 +57,13 @@ export const UNMAPPED_PREPARATION_GAPS: PreparationGapDef[] = [
   {
     code: "field_safety_unmatched",
     target: "/field-safety?view=unmatched",
+  },
+  {
+    code: "open_clarifications",
+    target: "/clarifications",
+  },
+  {
+    code: "missing_duty_overlap",
+    target: "/duty-overlap",
   },
 ];

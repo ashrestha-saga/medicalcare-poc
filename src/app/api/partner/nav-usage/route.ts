@@ -5,12 +5,7 @@ import {
 } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
-import { z } from "zod";
-
-const schema = z.object({
-  surface: z.enum(["console", "inspect"]),
-  navKey: z.string().trim().min(1).max(80),
-});
+import { partnerNavUsageSchema } from "@/schemas/console";
 
 /** POST /api/partner/nav-usage — D7 increment. */
 export async function POST(req: Request) {
@@ -20,7 +15,7 @@ export async function POST(req: Request) {
     return await withTenantBypass(async () => {
       requirePartnerPermission(ctx, "console:nav");
       correlationId = ctx.correlationId;
-      const input = schema.parse(await req.json().catch(() => ({})));
+      const input = partnerNavUsageSchema.parse(await req.json().catch(() => ({})));
       const existing = await prisma.navUsage.findUnique({
         where: {
           userId_surface_navKey: {

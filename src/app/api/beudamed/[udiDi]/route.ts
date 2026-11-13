@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse, notFound } from "@/lib/errors";
 import { parseIdentifier } from "@/lib/gs1";
 import { errorMessage, logger } from "@/lib/logger";
@@ -12,7 +12,7 @@ import { beudamedService } from "@/services/beudamed/beudamedService";
 export async function GET(req: Request, { params }: { params: Promise<{ udiDi: string }> }) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const { udiDi } = await params;

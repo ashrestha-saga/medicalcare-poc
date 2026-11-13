@@ -33,7 +33,10 @@ function SummaryTile({
 }) {
   return (
     <Card
-      className={cn("shadow-none", onClick && "cursor-pointer transition-colors hover:bg-muted/40")}
+      className={cn(
+        "border-border shadow-none",
+        onClick && "cursor-pointer transition-colors hover:bg-muted/40",
+      )}
       data-testid={testId}
       {...(onClick
         ? {
@@ -49,19 +52,19 @@ function SummaryTile({
           }
         : {})}
     >
-      <CardContent className="px-4 py-3">
+      <CardContent className="px-3 py-3 sm:px-4">
         <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           {label}
         </p>
         <p
           className={cn(
-            "mt-1 text-3xl font-semibold tabular-nums",
+            "mt-1 text-2xl font-semibold tabular-nums sm:text-3xl",
             tone === "warning" ? "text-amber-700 dark:text-amber-400" : "text-foreground",
           )}
         >
           {value}
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
+        <p className="mt-1 text-xs leading-snug text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
   );
@@ -78,28 +81,27 @@ function EventDetail({
   const tCommon = useTranslations("common");
   const modeLabel = event.mode === "group" ? t("modeGroup") : t("modeIndividual");
   return (
-    <div className="px-4 pb-6 pt-4 sm:px-[18px]" data-testid="training-event-detail">
-      <button
-        type="button"
-        className="mb-3 text-sm font-semibold text-primary hover:underline"
-        onClick={onBack}
-        data-testid="training-back-overview"
-      >
-        {t("backToOverview")}
-      </button>
-      <div className="mb-4">
-        <h2 className="text-2xl font-semibold tracking-tight">{eventTitle(event)}</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          {event.trainingTypeLabel} · {event.legalBasis} · {event.heldOn}
-        </p>
-      </div>
-
+    <ListPageShell
+      title={eventTitle(event)}
+      description={`${event.trainingTypeLabel} · ${event.legalBasis} · ${event.heldOn}`}
+      testId="training-event-detail"
+      headerExtra={
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-8"
+          onClick={onBack}
+          data-testid="training-back-overview"
+        >
+          {t("backToOverview")}
+        </Button>
+      }
+    >
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-        <Card className="border-border/80 bg-card/60" data-testid="training-records-card">
+        <Card className="border-border shadow-none" data-testid="training-records-card">
           <CardHeader>
-            <CardTitle className="text-base uppercase tracking-[0.08em] text-muted-foreground">
-              {t("individualRecords")}
-            </CardTitle>
+            <CardTitle className="text-base">{t("individualRecords")}</CardTitle>
             <CardDescription>
               {t("recordsFromSession", { count: event.recordCount, mode: modeLabel })}
             </CardDescription>
@@ -123,11 +125,9 @@ function EventDetail({
           </CardContent>
         </Card>
 
-        <Card className="border-border/80 bg-card/60" data-testid="training-context-card">
+        <Card className="border-border shadow-none" data-testid="training-context-card">
           <CardHeader>
-            <CardTitle className="text-base uppercase tracking-[0.08em] text-muted-foreground">
-              {t("context")}
-            </CardTitle>
+            <CardTitle className="text-base">{t("context")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="p-train__context !p-0">
@@ -160,7 +160,7 @@ function EventDetail({
           </CardContent>
         </Card>
       </div>
-    </div>
+    </ListPageShell>
   );
 }
 
@@ -249,90 +249,99 @@ export function TrainingScreen() {
               title={t("title")}
               description={t("description")}
               headerExtra={
-                <div className="space-y-4">
-                  <div className="p-train__kpis !px-0 !pt-0" data-testid="training-summary">
-                    <SummaryTile
-                      label={tCards("events")}
-                      value={data.summary.events}
-                      hint={tCards("eventsHint")}
-                      testId="training-kpi-events"
-                    />
-                    <SummaryTile
-                      label={tCards("records")}
-                      value={data.summary.records}
-                      hint={tCards("recordsHint")}
-                      testId="training-kpi-records"
-                    />
-                    <SummaryTile
-                      label={tCards("overdue")}
-                      value={data.summary.overdue}
-                      hint={tCards("overdueHint")}
-                      tone={data.summary.overdue > 0 ? "warning" : undefined}
-                      testId="training-kpi-overdue"
-                    />
-                    <SummaryTile
-                      label={tCards("withoutRecord")}
-                      value={data.summary.withoutRecord}
-                      hint={tCards("withoutRecordHint")}
-                      tone={data.summary.withoutRecord > 0 ? "warning" : undefined}
-                      testId="training-kpi-without-record"
-                      onClick={() => setWithoutRecord(true)}
-                    />
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={mine ? "default" : "outline"}
-                        onClick={() => setMine(!mine)}
-                        data-testid="training-filter-mine"
-                      >
-                        {tFilters("mineOnly")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={expiringDays === 365 ? "default" : "outline"}
-                        onClick={() => setExpiring(expiringDays === 365 ? null : 365)}
-                        data-testid="training-filter-expiring"
-                      >
-                        {tFilters("expiring")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={withoutRecord ? "default" : "outline"}
-                        onClick={() => setWithoutRecord(!withoutRecord)}
-                        data-testid="training-filter-without-record"
-                      >
-                        {tFilters("withoutRecord")}
-                      </Button>
-                    </div>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={openMatrix}
-                        data-testid="training-open-matrix"
-                      >
-                        {t("matrix")}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={openRecord}
-                        data-testid="training-open-record"
-                      >
-                        {t("record")}
-                      </Button>
-                    </div>
-                  </div>
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={openMatrix}
+                    data-testid="training-open-matrix"
+                  >
+                    {t("matrix")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8"
+                    onClick={openRecord}
+                    data-testid="training-open-record"
+                  >
+                    {t("record")}
+                  </Button>
                 </div>
               }
             >
               <div className="space-y-4">
+                <div
+                  className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+                  data-testid="training-summary"
+                >
+                  <SummaryTile
+                    label={tCards("events")}
+                    value={data.summary.events}
+                    hint={tCards("eventsHint")}
+                    testId="training-kpi-events"
+                  />
+                  <SummaryTile
+                    label={tCards("records")}
+                    value={data.summary.records}
+                    hint={tCards("recordsHint")}
+                    testId="training-kpi-records"
+                  />
+                  <SummaryTile
+                    label={tCards("overdue")}
+                    value={data.summary.overdue}
+                    hint={tCards("overdueHint")}
+                    tone={data.summary.overdue > 0 ? "warning" : undefined}
+                    testId="training-kpi-overdue"
+                  />
+                  <SummaryTile
+                    label={tCards("withoutRecord")}
+                    value={data.summary.withoutRecord}
+                    hint={tCards("withoutRecordHint")}
+                    tone={data.summary.withoutRecord > 0 ? "warning" : undefined}
+                    testId="training-kpi-without-record"
+                    onClick={() => setWithoutRecord(true)}
+                  />
+                </div>
+
+                <div
+                  className="flex flex-wrap items-center gap-2"
+                  data-testid="training-filters"
+                >
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={mine ? "default" : "outline"}
+                    className="h-8"
+                    onClick={() => setMine(!mine)}
+                    data-testid="training-filter-mine"
+                  >
+                    {tFilters("mineOnly")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={expiringDays === 365 ? "default" : "outline"}
+                    className="h-8"
+                    onClick={() => setExpiring(expiringDays === 365 ? null : 365)}
+                    data-testid="training-filter-expiring"
+                  >
+                    {tFilters("expiring")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={withoutRecord ? "default" : "outline"}
+                    className="h-8"
+                    onClick={() => setWithoutRecord(!withoutRecord)}
+                    data-testid="training-filter-without-record"
+                  >
+                    {tFilters("withoutRecord")}
+                  </Button>
+                </div>
+
                 {withoutRecord ? (
                   <div
                     className="rounded-md border border-border bg-card/40"
@@ -380,28 +389,40 @@ export function TrainingScreen() {
           ) : null}
 
           {!loading && data && view === "matrix" ? (
-            <div>
-              <div className="px-4 pt-4 sm:px-[18px]">
-                <button
-                  type="button"
-                  className="text-sm font-semibold text-primary hover:underline"
-                  onClick={goOverview}
-                  data-testid="training-back-overview"
-                >
-                  {tDetail("backToOverview")}
-                </button>
-              </div>
-              <ListPageShell
-                title={tDetail("matrixTitle")}
-                description={tDetail("matrixDescription")}
-                className="!pt-2"
-              >
+            <ListPageShell
+              title={tDetail("matrixTitle")}
+              description={tDetail("matrixDescription")}
+              headerExtra={
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={goOverview}
+                    data-testid="training-back-overview"
+                  >
+                    {tDetail("backToOverview")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8"
+                    onClick={openRecord}
+                    data-testid="training-matrix-open-record"
+                  >
+                    {t("record")}
+                  </Button>
+                </div>
+              }
+            >
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
                     size="sm"
                     variant={withoutRecord ? "default" : "outline"}
+                    className="h-8"
                     onClick={() => setWithoutRecord(!withoutRecord)}
                     data-testid="training-matrix-filter-without-record"
                   >
@@ -413,9 +434,7 @@ export function TrainingScreen() {
                   data-testid="training-matrix"
                 >
                   {matrixPeople.length === 0 || matrixModels.length === 0 ? (
-                    <p className="p-train__empty">
-                      {tDetail("matrixEmpty")}
-                    </p>
+                    <p className="p-train__empty px-4 py-6">{tDetail("matrixEmpty")}</p>
                   ) : (
                     <div className="p-train__table-wrap">
                       <table className="p-train__matrix-table">
@@ -463,7 +482,6 @@ export function TrainingScreen() {
                 </aside>
               </div>
             </ListPageShell>
-            </div>
           ) : null}
         </div>
       </main>

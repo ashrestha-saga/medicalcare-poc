@@ -1,13 +1,13 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { createTrainingEventSchema } from "@/schemas/training";
 import { trainingService } from "@/services/training/trainingService";
 
-/** GET /api/training — clinic-only training overview (training:view). Partners forbidden. */
+/** GET /api/training — training overview (training:view). Partners need contract training scope. */
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const overview = await trainingService.getOverview(ctx);
@@ -22,7 +22,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const body = await req.json().catch(() => ({}));

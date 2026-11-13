@@ -178,6 +178,12 @@ function mapRow(
     reason?: string | null;
     proposedByOrgId?: string | null;
     visitId?: string | null;
+    fulfilment?: string | null;
+    proposalState?: string | null;
+    faultDescription?: string | null;
+    gateOverriddenAt?: Date | null;
+    gateOverrideReason?: string | null;
+    quote?: { decision: string } | null;
     executorOrg: { name: string; code?: string; organisationId?: string | null } | null;
     assigneeUser: { name: string } | null;
   },
@@ -212,6 +218,12 @@ function mapRow(
     reason: r.reason ?? null,
     proposedByOrgId: r.proposedByOrgId ?? null,
     visitId: r.visitId ?? null,
+    fulfilment: r.fulfilment ?? null,
+    proposalState: r.proposalState ?? null,
+    quoteDecision: r.quote?.decision ?? null,
+    faultDescription: r.faultDescription ?? null,
+    gateOverridden: Boolean(r.gateOverriddenAt),
+    gateOverrideReason: r.gateOverrideReason ?? null,
   };
 }
 
@@ -275,6 +287,7 @@ export const dispositionService = {
           executorOrg: { select: { name: true, code: true, organisationId: true } },
           assigneeUser: { select: { name: true } },
           tenant: { select: { id: true, name: true, code: true } },
+          quote: { select: { decision: true } },
         },
         orderBy: { createdAt: "desc" },
         take: 300,
@@ -318,6 +331,7 @@ export const dispositionService = {
           executorOrg: { select: { name: true, code: true, organisationId: true } },
           assigneeUser: { select: { name: true } },
           tenant: { select: { id: true, name: true, code: true } },
+          quote: { select: { decision: true } },
         },
         orderBy: { createdAt: "desc" },
         take: 300,
@@ -949,6 +963,29 @@ export const dispositionService = {
           }
           nextAssignee = input.assigneeUserId;
         }
+      }
+
+      if (nextAssignee && nextAssignee !== row.assigneeUserId) {
+        const { assertTrainingGate } = await import("@/services/repairs/trainingGateService");
+        const device = await prisma.deviceInstance.findFirst({
+          where: { id: row.subjectId },
+          select: { model: { select: { manufacturer: true } } },
+        });
+        await assertTrainingGate({
+          organisationId: ctx.organisationId,
+          manufacturer: device?.model?.manufacturer ?? "",
+          assigneeUserId: nextAssignee,
+          serviceRequestId: row.id,
+          serviceType: row.serviceType,
+          overrideReason: input.gateOverrideReason ?? null,
+          overrideBy: input.gateOverrideReason
+            ? {
+                userId: ctx.user.id,
+                name: ctx.user.name,
+                appRole: String(ctx.user.appRole),
+              }
+            : undefined,
+        });
       }
 
       let nextScheduled = row.scheduledAt;

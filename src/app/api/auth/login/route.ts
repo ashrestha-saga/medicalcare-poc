@@ -7,17 +7,32 @@ import { loginSchema } from "@/schemas/auth";
 import { totpService } from "@/services/auth/totpService";
 import { userAuthService } from "@/services/auth/userAuthService";
 
-/** POST /api/auth/login — email/password; clinic door may require TOTP before session. */
+/** POST /api/auth/login — email/password; may require TOTP before session (clinic + DEMO_SHARED_TOTP partner). */
 export async function POST(req: Request) {
   try {
     const body = loginSchema.parse(await req.json());
     const door = body.door ?? "clinic";
 
     if (door === "partner") {
-      const { user, organisationName } = await userAuthService.authenticatePartner(
+      const { user, organisationName, totpEnabled } = await userAuthService.authenticatePartner(
         body.email,
         body.password,
       );
+      // DEMO_SHARED_TOTP: partner door challenges when bridge is active (or personal 2FA).
+      if (totpEnabled) {
+        const { challengeId } = await totpService.createLoginChallenge(user.id);
+        await setTotpChallengeCookie(user.id, user.organisationId, challengeId);
+        logger.info("auth.login.requires_2fa", {
+          userId: user.id,
+          organisationId: user.organisationId,
+          appRole: user.appRole,
+          door: "partner",
+        });
+        return Response.json({
+          requires2fa: true,
+          message: "Enter the code from your authenticator app.",
+        });
+      }
       await createSession(user);
       logger.info("auth.login.partner", {
         userId: user.id,
@@ -37,6 +52,7 @@ export async function POST(req: Request) {
       body.password,
     );
 
+    // totpEnabled also covers DEMO_SHARED_TOTP bridge (users without personal 2FA).
     if (totpEnabled) {
       const { challengeId } = await totpService.createLoginChallenge(user.id);
       await setTotpChallengeCookie(user.id, user.tenantId, challengeId);

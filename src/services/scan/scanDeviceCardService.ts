@@ -172,6 +172,7 @@ function toFurtherDto(list: ReturnType<typeof resolveFurtherActions>): ScanFurth
     textKey: a.textKey,
     batchId: a.batchId,
     ref: a.ref,
+    tone: a.tone,
   }));
 }
 

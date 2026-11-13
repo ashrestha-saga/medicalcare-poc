@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { setReadinessSchema } from "@/schemas/k10";
 import { authorityPreparationService } from "@/services/authority/authorityPreparationService";
@@ -11,7 +11,7 @@ export async function PUT(
   let correlationId: string | undefined;
   try {
     const { itemId } = await ctxParams.params;
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const body = setReadinessSchema.parse(await req.json());

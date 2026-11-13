@@ -4,7 +4,7 @@ import type {
   DashboardTileDTO,
   DashboardTileSegmentDTO,
   DashboardTileUrgency,
-  TenantContext,
+  TenantWorkContext,
 } from "@/interfaces";
 import { hrefForDashboardTile } from "@/constants/dashboardTileLinks";
 import {
@@ -358,6 +358,30 @@ async function valueForTile(ctx: TenantContext, key: string): Promise<TileValue>
       return W(
         count,
         count ? "nicht freigegeben" : "keine Sperre",
+        count > 0 ? "due" : "ok",
+        total,
+        "Gerät|Geräten",
+      );
+    }
+    case "geraete-gesperrt": {
+      const scope = await getEffectiveAreaScope(ctx);
+      if (scope.mode === "none") {
+        return W(0, "keine Sperre", "ok", 0, "Gerät|Geräten");
+      }
+      const areaFilter =
+        scope.mode === "areas" ? { areaId: { in: scope.areaIds } } : {};
+      const [count, total] = await Promise.all([
+        prisma.deviceInstance.count({
+          where: {
+            operationalState: { in: ["locked", "under_repair"] },
+            ...areaFilter,
+          },
+        }),
+        prisma.deviceInstance.count({ where: areaFilter }),
+      ]);
+      return W(
+        count,
+        count ? "gesperrt / in Instandsetzung" : "keine Sperre",
         count > 0 ? "due" : "ok",
         total,
         "Gerät|Geräten",
@@ -806,8 +830,14 @@ async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T) => P
 }
 
 export const dashboardBoardService = {
-  async getBoard(ctx: TenantContext): Promise<DashboardBoardDTO> {
-    const role = (ctx.user.role ?? "user") as UserRole;
+  async getBoard(ctx: TenantWorkContext): Promise<DashboardBoardDTO> {
+    const role = (
+      ctx.user.accountKind === "partner"
+        ? ctx.user.appRole === "inspector" || ctx.user.appRole === "order"
+          ? "user"
+          : "device_admin"
+        : (ctx.user.role ?? "user")
+    ) as UserRole;
     const resolved = await dashboardTileService.resolveForUser(ctx);
     const enriched = await mapPool(resolved, 8, async (tile) => {
       const value = await valueForTile(ctx, tile.key);

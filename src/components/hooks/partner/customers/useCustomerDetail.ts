@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import type { ConsoleClinicDetailDTO, OperatingModel } from "@/interfaces/console";
+import { normalizeContractScope } from "@/constants/partnerPermissions";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { useActingTenantStore } from "@/store/actingTenantStore";
 import { toast } from "@/store/toastStore";
@@ -111,8 +112,12 @@ export function useCustomerDetail(contractId: string) {
     }
   }
 
-  function openBackoffice(href = "/") {
+  function openBackoffice(href = "/today") {
     if (!clinic?.live) return;
+    if (normalizeContractScope(clinic.scope).length === 0) {
+      toast.error(t("backofficeScopeRequired"));
+      return;
+    }
     setActingTenant({
       tenantId: clinic.tenantId,
       tenantName: clinic.tenantName,
@@ -121,6 +126,9 @@ export function useCustomerDetail(contractId: string) {
     });
     router.push(href);
   }
+
+  const canOpenBackoffice =
+    Boolean(clinic?.live) && normalizeContractScope(clinic?.scope ?? []).length > 0;
 
   return {
     clinic,
@@ -143,5 +151,6 @@ export function useCustomerDetail(contractId: string) {
     lifecycle,
     setStaffAssigned,
     openBackoffice,
+    canOpenBackoffice,
   };
 }

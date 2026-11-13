@@ -62,15 +62,16 @@ const INSPECTION_SCOPE: readonly PermissionSlug[] = [
   "fieldsafety:create",
 ];
 
-/** Reprocessing scope: inventory + clarifications visibility (no clinic training). */
+/** Reprocessing scope: view routine checks/batches (+ inventory context). Release stays forbidden. */
 const REPROCESSING_SCOPE: readonly PermissionSlug[] = [
+  "reprocessing:view",
   "inventory:view",
   "clarifications:view",
   "locations:view",
 ];
 
-/** Training scope is commercial only — acting still strips training:view. */
-const TRAINING_SCOPE: readonly PermissionSlug[] = [];
+/** Training scope: view § 4 instruction records while acting (writes still need role ∩ grants). */
+const TRAINING_SCOPE: readonly PermissionSlug[] = ["training:view"];
 
 export const SCOPE_PERMISSIONS: Record<ContractScopeToken, readonly PermissionSlug[]> = {
   inventory: INVENTORY_SCOPE,
@@ -83,6 +84,7 @@ export const SCOPE_PERMISSIONS: Record<ContractScopeToken, readonly PermissionSl
 /**
  * Clinic-admin / clinic-only slugs stripped from partner acting capabilities.
  * Keep in sync when adding new clinic-admin APIs (see docs/security-api.md).
+ * training:view / reprocessing:view are scope-gated (not globally forbidden).
  */
 export const PARTNER_FORBIDDEN_PERMISSIONS: readonly PermissionSlug[] = [
   "users:view",
@@ -92,7 +94,6 @@ export const PARTNER_FORBIDDEN_PERMISSIONS: readonly PermissionSlug[] = [
   "users:resetpassword",
   "roles:view",
   "roles:update",
-  "training:view",
   "settings:view",
   "settings:oxid",
   "settings:smtp",
@@ -126,6 +127,8 @@ const ADMIN_BASE: readonly PermissionSlug[] = [
   "qualifications:view",
   "fieldsafety:view",
   "fieldsafety:create",
+  "reprocessing:view",
+  "training:view",
   "audit:view",
   "audit:export",
 ];
@@ -142,6 +145,8 @@ const INSPECTOR_BASE: readonly PermissionSlug[] = [
   "qualifications:view",
   "fieldsafety:view",
   "fieldsafety:create",
+  "reprocessing:view",
+  "training:view",
   "audit:view",
 ];
 
@@ -171,6 +176,8 @@ const MANAGEMENT_BASE: readonly PermissionSlug[] = [
   "catalogues:view",
   "qualifications:view",
   "fieldsafety:view",
+  "reprocessing:view",
+  "training:view",
   "audit:view",
   "audit:export",
 ];
@@ -283,6 +290,7 @@ export const CONSOLE_ROLE_PERMISSIONS: Record<PartnerAppRole, readonly Permissio
     "inspections:view",
     "qualifications:view",
     "fieldsafety:rollout",
+    "testequipment:manage",
   ],
 };
 
@@ -362,6 +370,20 @@ export const CONSOLE_MENU_MODULES: readonly MenuModule[] = [
     group: "org",
   },
   {
+    id: "console-parts-proposals",
+    label: "Parts proposals",
+    href: "/partner/parts-proposals",
+    slug: "console:disposition:view",
+    group: "ops",
+  },
+  {
+    id: "console-test-equipment",
+    label: "Test equipment",
+    href: "/partner/test-equipment",
+    slug: "testequipment:manage",
+    group: "org",
+  },
+  {
     id: "console-settings",
     label: "Settings",
     href: "/partner/settings",
@@ -388,6 +410,9 @@ export const CONSOLE_PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/partner/external-inspectors": "console:external:view",
   "/partner/organisation": "console:organisation:view",
   "/partner/activity": "console:audit:view",
+  "/partner/parts-proposals": "console:disposition:view",
+  "/partner/training-gates": "console:staff:view",
+  "/partner/test-equipment": "testequipment:manage",
   "/partner/settings": "console:settings:view",
 };
 
@@ -469,6 +494,7 @@ export function resolveConsolePathPermission(path: string): PermissionSlug | nul
   if (CONSOLE_PATH_PERMISSION_MAP[pathname]) return CONSOLE_PATH_PERMISSION_MAP[pathname];
   if (pathname.startsWith("/partner/customers/")) return "console:customers:view";
   if (pathname.startsWith("/partner/my-sites/")) return "console:disposition:view";
+  if (pathname.startsWith("/partner/orders/")) return "console:disposition:view";
   if (pathname.startsWith("/partner/test-equipment")) return "testequipment:manage";
   if (pathname.startsWith("/partner/staff/")) return "console:staff:view";
   if (pathname.startsWith("/partner/external-inspectors/")) return "console:external:view";

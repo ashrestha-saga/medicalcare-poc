@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import type { RequestDetailProps } from "@/interfaces";
+import type { RequestDetailProps, ServiceRequestDTO } from "@/interfaces";
 import { Spinner } from "@/components/ui/Loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,9 @@ import {
 } from "@/components/hooks/requests";
 import { formatDate, formatDateTime } from "@/lib/format";
 import type { AppLocale } from "@/lib/locale";
+import { api } from "@/lib/apiClient";
+import { usePermissions } from "@/lib/providers/PermissionProvider";
+import { QuoteDecidePanel } from "@/components/features/repairs/QuoteDecidePanel";
 import { WithdrawAssignmentDialog } from "./WithdrawAssignmentDialog";
 
 function MetaRow({ label, children }: { label: string; children: ReactNode }) {
@@ -45,6 +48,19 @@ export function RequestDetail({
   const tStatus = useTranslations("status");
   const tCommon = useTranslations("common");
   const locale = useLocale() as AppLocale;
+  const { checkPermission } = usePermissions();
+  const canDecideQuote = checkPermission("requests:approve");
+
+  async function refreshAfterQuoteDecide() {
+    try {
+      const next = await api<ServiceRequestDTO>(
+        `/api/service-requests/${encodeURIComponent(request.reference)}`,
+      );
+      onUpdated(next);
+    } catch {
+      /* toast already from panel */
+    }
+  }
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const {
     busy,
@@ -218,6 +234,58 @@ export function RequestDetail({
               </Button>
             </div>
           </section>
+
+          {canDecideQuote ? (
+            <section
+              className="rounded-lg border border-border bg-card p-4 sm:p-5"
+              data-testid="quote-decide-section"
+            >
+              <QuoteDecidePanel
+                requestId={request.reference}
+                quote={request.quote}
+                embed
+                onDecided={() => void refreshAfterQuoteDecide()}
+              />
+            </section>
+          ) : null}
+
+          {request.fulfilment === "send_in" ? (
+            <section
+              className="rounded-lg border border-border bg-card p-4 sm:p-5"
+              data-testid="clinic-send-in-timeline"
+            >
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                {t("sendInTitle")}
+              </p>
+              <p className="mb-4 text-sm text-muted-foreground">{t("sendInHint")}</p>
+              <dl>
+                {(
+                  [
+                    ["shippedAt", "sendInShipped"],
+                    ["atWorkshopAt", "sendInAtWorkshop"],
+                    ["returnedAt", "sendInReturned"],
+                    ["arrivedAt", "sendInArrived"],
+                  ] as const
+                ).map(([key, labelKey]) => {
+                  const value = request.sendIn?.[key] ?? null;
+                  return (
+                    <MetaRow key={key} label={t(labelKey)}>
+                      {value ? formatDate(value, locale) : t("sendInPending")}
+                    </MetaRow>
+                  );
+                })}
+                <MetaRow label={t("sendInTracking")}>
+                  {request.sendIn?.trackingRef?.trim() || tCommon("dash")}
+                </MetaRow>
+                {request.checkType ? (
+                  <MetaRow label={t("checkType")}>{request.checkType}</MetaRow>
+                ) : null}
+                {request.mandatory ? (
+                  <MetaRow label={t("mandatory")}>{t("mandatory")}</MetaRow>
+                ) : null}
+              </dl>
+            </section>
+          ) : null}
 
           {overview ? (
             <section

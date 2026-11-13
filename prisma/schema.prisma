@@ -204,6 +204,78 @@ enum LimitSource {
   operator
 }
 
+// ---------------------------------------------------------------------------
+// Repairs E70–E80 enums (RD1–RD11)
+// ---------------------------------------------------------------------------
+
+enum FaultConsequence {
+  out_of_service
+  restricted
+  usable
+}
+
+enum ProposalState {
+  none
+  proposed
+  confirmed
+  discarded
+}
+
+enum OperationalState {
+  in_service
+  locked
+  under_repair
+  replaced
+  loaner
+}
+
+enum LockSource {
+  inspection
+  mpsb
+  user
+  recall
+}
+
+enum QuoteDecision {
+  open
+  approved
+  rejected
+}
+
+enum RepairResult {
+  repaired
+  provisional
+  not_repairable
+  parts_ordered
+}
+
+enum PostRepairCheck {
+  mandatory
+  proposed
+  not_needed
+}
+
+enum StepInputKind {
+  check
+  text
+  select
+  parts
+  number
+  measurement
+  result
+}
+
+enum Fulfilment {
+  on_site
+  send_in
+}
+
+enum PostRepairCheckType {
+  stk
+  mtk
+  requalification
+  acceptance_constancy
+}
 
 // ---------------------------------------------------------------------------
 // K1–K10 enums
@@ -358,6 +430,8 @@ model Tenant {
    * when a computed criterion reopens.
    */
   setupDismissedAt    DateTime?
+  /** Feature toggles e.g. `{ "repairs": true }` (E70–E80 package). */
+  featureFlags        Json?
   createdAt           DateTime                 @default(now())
   users               User[]
   sites               Site[]
@@ -376,6 +450,9 @@ model Tenant {
   externalCalls       ExternalCallLog[]
   oxidConnection      TenantOxidConnection?
   maintenanceEvents   MaintenanceEvent[]
+  maintenanceParts    MaintenancePart[]
+  quotes              Quote[]
+  partsOrderProposals PartsOrderProposal[]
   releaseSnapshots    DeviceReleaseSnapshot[]
   deviceDuties        DeviceDuty[]
   deviceUnitEvents    DeviceUnitEvent[]
@@ -796,6 +873,19 @@ model DeviceInstance {
   lockedAt               DateTime?
   lockReason             String?                  @db.Text
   lockedByRunId          String?
+  /// E73 — operational state separate from inventory `state`.
+  operationalState       OperationalState         @default(in_service)
+  lockSource             LockSource?
+  lockClearedAt          DateTime?
+  lockClearedBy          String?
+  lockClearedNote        String?                  @db.Text
+  /// E74 — defective device points at the loaner in use.
+  replacedById           String?
+  replacedBy             DeviceInstance?          @relation("Replacement", fields: [replacedById], references: [id])
+  replacementFor         DeviceInstance[]         @relation("Replacement")
+  /// On the loaner instance: owner / lender as free text.
+  loanerLender           String?
+  replacementRequests    ServiceRequest[]         @relation("RequestReplacement")
 
   @@unique([tenantId, inventoryNumber])
   /** SCH-01 — same serial under the same model is rejected (NULLs allowed). */
@@ -806,25 +896,88 @@ model DeviceInstance {
   @@index([responsibleUserId])
   @@index([tenantId, retainUntil])
   @@index([lockedAt])
+  @@index([tenantId, operationalState])
 }
 
 model MaintenanceEvent {
-  id               String         @id @default(cuid())
-  tenantId         String
-  tenant           Tenant         @relation(fields: [tenantId], references: [id])
-  deviceInstanceId String
-  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
-  kind             String
-  performedAt      DateTime
-  previousDueAt    DateTime?
-  nextDueAt        DateTime?
-  cycleMonths      Int?
-  note             String?        @db.Text
-  actorUserId      String?
-  createdAt        DateTime       @default(now())
+  id                 String            @id @default(cuid())
+  tenantId           String
+  tenant             Tenant            @relation(fields: [tenantId], references: [id])
+  deviceInstanceId   String
+  deviceInstance     DeviceInstance    @relation(fields: [deviceInstanceId], references: [id])
+  kind               String
+  performedAt        DateTime
+  previousDueAt      DateTime?
+  nextDueAt          DateTime?
+  cycleMonths        Int?
+  note               String?           @db.Text
+  actorUserId        String?
+  createdAt          DateTime          @default(now())
+  /// E70/D21 — link to the repair order and K-REP run.
+  serviceRequestId   String?
+  serviceRequest     ServiceRequest?   @relation(fields: [serviceRequestId], references: [id])
+  inspectionRunId    String?           @unique
+  performedBy        String?
+  performedByOrgId   String?
+  faultConfirmed     Boolean?
+  cause              String?           @db.Text
+  action             String?
+  laborMinutes       Int?
+  softwareBefore     String?
+  softwareAfter      String?
+  functionTestPassed Boolean?
+  safetyRelevant     Boolean           @default(false)
+  result             RepairResult?
+  resultText         String?           @db.Text
+  postRepairCheck    PostRepairCheck?
+  parts              MaintenancePart[]
+  /// E76 — internal | partner | external
+  source             String            @default("internal")
+  externalPerformer  String?
+  reportBlobId       String?
+  reportBlob         AttachmentBlob?   @relation("MaintenanceReport", fields: [reportBlobId], references: [id])
+  followUpSkippedReason String?        @db.Text
 
   @@index([tenantId, deviceInstanceId, performedAt])
   @@index([tenantId, performedAt])
+  @@index([tenantId, serviceRequestId])
+  @@index([reportBlobId])
+}
+
+model MaintenancePart {
+  id                 String           @id @default(cuid())
+  tenantId           String
+  tenant             Tenant           @relation(fields: [tenantId], references: [id])
+  maintenanceEventId String
+  maintenanceEvent   MaintenanceEvent @relation(fields: [maintenanceEventId], references: [id], onDelete: Cascade)
+  description        String
+  partNo             String?
+  serialNo           String?
+  qty                Int              @default(1)
+
+  @@index([maintenanceEventId])
+  @@index([tenantId])
+}
+
+/// E71 — quote with amount as free text (never numeric).
+model Quote {
+  id               String        @id @default(cuid())
+  tenantId         String
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  serviceRequestId String        @unique
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  scopeText        String        @db.Text
+  amountText       String
+  createdBy        String
+  createdByUserId  String?
+  createdAt        DateTime      @default(now())
+  decision         QuoteDecision @default(open)
+  decidedBy        String?
+  decidedByUserId  String?
+  decidedAt        DateTime?
+  decisionNote     String?       @db.Text
+
+  @@index([tenantId, decision])
 }
 
 model CapturedArticle {
@@ -1178,8 +1331,59 @@ model Organisation {
   serviceVisits     ServiceVisit[]
   followUpProposals ServiceRequest[] @relation("FollowUpProposedBy")
   fieldSafetySources FieldSafetyAction[] @relation("FieldSafetySourceOrg")
+  manufacturerTrainingGates ManufacturerTrainingGate[]
+  partsOrderProposals PartsOrderProposal[]
 
   @@index([activeTo])
+}
+
+/// E79 — per-manufacturer training gate (hint | block) for a service org.
+model ManufacturerTrainingGate {
+  id             String       @id @default(cuid())
+  organisationId String
+  organisation   Organisation @relation(fields: [organisationId], references: [id])
+  manufacturer   String
+  gate           String       @default("hint")
+  setBy          String
+  setAt          DateTime     @default(now())
+
+  @@unique([organisationId, manufacturer])
+}
+
+/// E80 — parts-order proposal handed to plusorder (E52 attribution).
+model PartsOrderProposal {
+  id               String                   @id @default(cuid())
+  organisationId   String
+  organisation     Organisation             @relation(fields: [organisationId], references: [id])
+  tenantId         String?
+  tenant           Tenant?                  @relation(fields: [tenantId], references: [id])
+  serviceRequestId String
+  serviceRequest   ServiceRequest           @relation(fields: [serviceRequestId], references: [id])
+  status           String                   @default("open")
+  channel          String                   @default("plusorder")
+  triggeredVia     String                   @default("devicecare")
+  createdBy        String
+  createdAt        DateTime                 @default(now())
+  orderedAt        DateTime?
+  orderRef         String?
+  discardReason    String?                  @db.Text
+  lines            PartsOrderProposalLine[]
+
+  @@index([organisationId, status])
+  @@index([serviceRequestId])
+  @@index([tenantId])
+}
+
+model PartsOrderProposalLine {
+  id          String             @id @default(cuid())
+  proposalId  String
+  proposal    PartsOrderProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  description String
+  partNo      String?
+  serialNo    String?
+  qty         Int                @default(1)
+
+  @@index([proposalId])
 }
 
 /** Outbound SMTP for a clinic tenant or partner organisation (exactly one owner). */
@@ -1528,6 +1732,34 @@ model ServiceRequest {
   proposedByOrg   Organisation?       @relation("FollowUpProposedBy", fields: [proposedByOrgId], references: [id])
   followUpNeeds   String?             @db.Text
   followUpUrgency String?
+  /// E70/D17 — fault report snapshot and repair proposal fields.
+  faultDescription      String?           @db.Text
+  faultSince            DateTime?         @db.Date
+  faultConsequence      FaultConsequence?
+  faultReportedBy       String?
+  bookEntryId           String?
+  bookEntry             DeviceBookEntry?  @relation("BookEntryOrder", fields: [bookEntryId], references: [id])
+  replacementInstanceId String?
+  replacementInstance   DeviceInstance?   @relation("RequestReplacement", fields: [replacementInstanceId], references: [id])
+  proposalState         ProposalState     @default(none)
+  mandatory             Boolean           @default(false)
+  /// E78 — class-specific follow-up check kind.
+  checkType             PostRepairCheckType?
+  /// E77 — on-site vs send-in fulfilment.
+  fulfilment            Fulfilment        @default(on_site)
+  shippedAt             DateTime?         @db.Date
+  trackingRef           String?
+  atWorkshopAt          DateTime?         @db.Date
+  returnedAt            DateTime?         @db.Date
+  arrivedAt             DateTime?         @db.Date
+  /// E79 — training-gate override on this request.
+  gateOverriddenBy      String?
+  gateOverriddenByUserId String?
+  gateOverriddenAt      DateTime?
+  gateOverrideReason    String?           @db.Text
+  quote                 Quote?
+  maintenanceEvents     MaintenanceEvent[]
+  partsOrderProposals   PartsOrderProposal[]
   statusEvents    StatusEvent[]
   attachments     Attachment[]
   dispatchRecords DispatchRecord[]
@@ -1544,6 +1776,8 @@ model ServiceRequest {
   @@index([tenantId, visitId])
   @@index([parentRequestId])
   @@index([proposedByOrgId])
+  @@index([tenantId, serviceType, state])
+  @@index([bookEntryId])
 }
 
 /// D2 — one site visit that can carry multiple ServiceRequests / InspectionRuns.
@@ -1563,9 +1797,17 @@ model ServiceVisit {
   note             String?        @db.Text
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  /// E34 / RD0 — visit discipline.
+  date              DateTime?     @db.Date
+  sequence          Int           @default(1)
+  secondVisitReason String?       @db.Text
+  startRecordedLate Boolean       @default(false)
+  setupMinutes      Int?
+  idempotencyKey    String?       @unique
   requests         ServiceRequest[]
   inspectionRuns   InspectionRun[]
 
+  @@unique([tenantId, siteId, technicianUserId, date, sequence])
   @@index([tenantId, organisationId])
   @@index([organisationId, plannedAt])
   @@index([technicianUserId])
@@ -1622,6 +1864,7 @@ model AttachmentBlob {
   bookEntries       DeviceBookEntry[]
   notificationDocuments NotificationDocument[]
   modelDocuments    ModelDocument[]
+  maintenanceReports MaintenanceEvent[] @relation("MaintenanceReport")
 
   @@index([tenantId])
   @@index([tenantId, sha256])
@@ -2020,6 +2263,9 @@ model RefInspectionStep {
   comparedToBaseline   Boolean                @default(false)
   targetValue          Float?
   triggerNote          String?                @db.Text
+  /// E70/D22 — form input kind for K-REP and richer catalogues.
+  inputKind            StepInputKind          @default(check)
+  optionsJson          Json?
   results              InspectionStepResult[]
 
   @@unique([catalogueId, position])
@@ -2194,6 +2440,8 @@ model InspectionStepResult {
   /** D11 — set server-side on first write of confirmed/measuredValue. */
   recordedAt    DateTime?
   noPhotoReason String?           @db.Text
+  /// E70/D22 — structured value for parts / measurement / select / result steps.
+  valueJson     Json?
   attachments   InspectionStepAttachment[]
 
   @@unique([runId, stepId])
@@ -2292,6 +2540,9 @@ model DeviceBookEntry {
   /// Optional photo of the malfunction / nameplate.
   attachmentBlobId String?
   attachmentBlob   AttachmentBlob? @relation(fields: [attachmentBlobId], references: [id])
+  /// E75/D18 — structured consequence next to free-text `consequence`.
+  consequenceCode  FaultConsequence?
+  serviceRequests  ServiceRequest[] @relation("BookEntryOrder")
   /// Frozen display name at write time (survives user rename/delete).
   recordedBy       String
   recordedByUserId String?

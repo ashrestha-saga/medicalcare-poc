@@ -2,11 +2,48 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import type { ScanRoutineOpenDTO, ScanRoutineResultDTO, ScanRoutineStepDTO } from "@/interfaces";
+import type {
+  ScanRoutineCompletedItemDTO,
+  ScanRoutineOpenDTO,
+  ScanRoutineResultDTO,
+  ScanRoutineStepDTO,
+} from "@/interfaces";
 import { api, ApiError } from "@/lib/http/apiClient";
 import { toast } from "@/store/toastStore";
 
 type Answer = { passed: boolean | null; measuredValue: string };
+
+function formatCompletedValue(
+  item: ScanRoutineCompletedItemDTO,
+  t: (key: string) => string,
+): string {
+  if (item.kind === "measure") {
+    const raw = item.measuredValue?.trim() || "—";
+    const withUnit = item.unit ? `${raw} ${item.unit}` : raw;
+    if (item.withinLimit === true) return `${withUnit} · ${t("withinLimit")}`;
+    if (item.withinLimit === false) return `${withUnit} · ${t("outsideLimit")}`;
+    return withUnit;
+  }
+  if (item.passed === true) return t("ok");
+  if (item.passed === false) return t("defect");
+  return "—";
+}
+
+function formatRecordedAt(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso.slice(0, 16);
+    return d.toLocaleString(undefined, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso.slice(0, 16);
+  }
+}
 
 export function TageskontrolleForm({
   deviceId,
@@ -175,6 +212,18 @@ export function TageskontrolleForm({
   }
 
   if (steps.length === 0) {
+    const completed = open.completedToday ?? [];
+    const performers = [
+      ...new Set(completed.map((c) => c.performedBy?.trim()).filter(Boolean) as string[]),
+    ];
+    const latestAt = completed.reduce<string | null>((acc, c) => {
+      if (!acc || c.recordedAt > acc) return c.recordedAt;
+      return acc;
+    }, null);
+    const hasMangelDone = completed.some(
+      (c) => c.passed === false || c.withinLimit === false,
+    );
+
     return (
       <section className="p-routine" data-testid="tageskontrolle-form">
         <header className="p-routine__head">
@@ -187,8 +236,62 @@ export function TageskontrolleForm({
           </p>
         </header>
         <p className="p-heute__empty">{t("allDone")}</p>
+        {completed.length > 0 ? (
+          <div className="p-routine__done" data-testid="routine-completed-today">
+            <p className="p-routine__done-meta">
+              {t("completedMeta", {
+                date: open.performedAt,
+                by: performers.length ? performers.join(", ") : t("completedByUnknown"),
+                when: latestAt ? formatRecordedAt(latestAt) : "—",
+              })}
+            </p>
+            <dl className="p-routine__done-list">
+              {completed.map((item) => {
+                const tone =
+                  item.passed === false || item.withinLimit === false ? "stop" : "ok";
+                const scopeLabel =
+                  item.scope === "equipment"
+                    ? null
+                    : open.siteName
+                      ? t("siteScope", { site: open.siteName })
+                      : item.scope === "water"
+                        ? t("scope.water")
+                        : item.scope === "chemistry"
+                          ? t("scope.chemistry")
+                          : item.scope === "sterile_storage"
+                            ? t("scope.sterile_storage")
+                            : null;
+                return (
+                  <div
+                    key={item.checkCode}
+                    className="p-routine__done-row"
+                    data-t={tone}
+                    data-testid={`routine-completed-${item.checkCode}`}
+                  >
+                    <dt>
+                      {item.label}
+                      {scopeLabel ? (
+                        <span className="p-routine__done-scope">{scopeLabel}</span>
+                      ) : null}
+                    </dt>
+                    <dd>{formatCompletedValue(item, t)}</dd>
+                    {item.note?.trim() ? (
+                      <p className="p-routine__done-note">{item.note.trim()}</p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </dl>
+            {hasMangelDone ? <p className="p-routine__warn">{t("hintMangel")}</p> : null}
+          </div>
+        ) : null}
         <footer className="p-routine__foot">
-          <button type="button" className="p-routine__save" onClick={onCancel}>
+          <button
+            type="button"
+            className="p-routine__back"
+            onClick={onCancel}
+            data-testid="routine-completed-back"
+          >
             {t("back")}
           </button>
         </footer>

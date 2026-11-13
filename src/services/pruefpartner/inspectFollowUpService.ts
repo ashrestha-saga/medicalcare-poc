@@ -3,9 +3,14 @@ import type {
   InspectFollowUpListDTO,
   InspectFollowUpStatus,
 } from "@/interfaces/pruefpartner";
-import { forbidden } from "@/lib/errors";
+import type { ProposeFollowUpInput } from "@/schemas/pruefpartner";
+import { actorFromPartnerOnTenant } from "@/lib/auth/actorContext";
+import { newReference } from "@/lib/crypto";
+import { forbidden, notFound, unprocessable } from "@/lib/errors";
 import { prismaSystem } from "@/lib/prisma";
+import { recordAudit } from "@/services/audit/auditService";
 import { getCachedPartnerConsolePermissions } from "@/services/roles/roleGrantsService";
+import { requirePartnerPermission } from "@/lib/auth/tenantContext";
 
 /** Prisma where for the inspect Nachbesuche list — own proposals only. */
 export function inspectFollowUpListWhere(userId: string, organisationId: string) {
@@ -104,5 +109,63 @@ export const inspectFollowUpService = {
         createdAt: r.createdAt.toISOString(),
       })),
     };
+  },
+
+  /** Create a child follow-up proposal for a transmitted parent assignment. */
+  async propose(
+    ctx: PartnerContext,
+    parentReference: string,
+    input: ProposeFollowUpInput,
+  ): Promise<{ reference: string; id: string }> {
+    requirePartnerPermission(ctx, "console:disposition:assign", "inspection:propose");
+
+    const parent = await prismaSystem.serviceRequest.findFirst({
+      where: { reference: parentReference },
+      include: { executorOrg: true },
+    });
+    if (!parent) throw notFound("Assignment not found.");
+    if (parent.executorOrg?.organisationId !== ctx.organisationId) throw forbidden();
+    if (!parent.transmittedAt) {
+      throw unprocessable("Parent order is not transmitted.", { field: "transmittedAt" });
+    }
+
+    const child = await prismaSystem.serviceRequest.create({
+      data: {
+        reference: newReference("SR"),
+        idempotencyKey: `follow-up:${parent.id}:${Date.now()}`,
+        fingerprint: `follow-up:${parent.id}:${Date.now()}`,
+        tenantId: parent.tenantId,
+        subjectType: parent.subjectType,
+        subjectId: parent.subjectId,
+        serviceType: parent.serviceType,
+        note: input.followUpNeeds,
+        raisedBy: ctx.user.name,
+        raisedById: ctx.user.id,
+        siteId: parent.siteId,
+        locationText: parent.locationText,
+        deliveryAddress: parent.deliveryAddress,
+        state: "handed_off",
+        source: "app",
+        reason: input.reason,
+        parentRequestId: parent.id,
+        proposedByOrgId: ctx.organisationId,
+        followUpNeeds: input.followUpNeeds,
+        followUpUrgency: input.followUpUrgency ?? "normal",
+        executorOrgId: parent.executorOrgId,
+        allocatedAt: new Date(),
+        allocatedBy: ctx.user.name,
+        transmittedAt: new Date(),
+      },
+    });
+
+    await recordAudit({
+      actor: actorFromPartnerOnTenant(ctx, parent.tenantId, null),
+      resource: "service_request",
+      resourceId: child.id,
+      action: "create",
+      summary: `Follow-up proposal ${child.reference} from ${parent.reference}`,
+    });
+
+    return { reference: child.reference, id: child.id };
   },
 };

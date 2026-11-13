@@ -4135,6 +4135,10 @@
   {
    "code": "eingriff",
    "label": "Nach Eingriff in prozessrelevante Teile"
+  },
+  {
+   "code": "repair",
+   "label": "Instandsetzung / Reparatur"
   }
  ],
  "RefAttachmentKind": [

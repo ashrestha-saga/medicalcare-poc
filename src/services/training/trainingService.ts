@@ -1,6 +1,6 @@
 import type {
   CreateTrainingEventResultDTO,
-  TenantContext,
+  TenantWorkContext,
   TrainingEventDTO,
   TrainingEventStatusKind,
   TrainingFormOptionsDTO,
@@ -17,6 +17,7 @@ import { recordAudit } from "@/services/audit/auditService";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import type { CreateTrainingEventInput } from "@/schemas/training";
+import { isPartnerSession } from "@/interfaces/session";
 
 /** Activity subjects for activity-based training types (mockup TAETIGKEITEN). */
 export const TRAINING_ACTIVITY_OPTIONS = [
@@ -226,7 +227,7 @@ const eventInclude = {
 };
 
 export const trainingService = {
-  async getOverview(ctx: TenantContext): Promise<TrainingOverviewDTO> {
+  async getOverview(ctx: TenantWorkContext): Promise<TrainingOverviewDTO> {
     requirePermission(ctx, "training:view");
 
     const [events, staffRows, releasedModels, instructedRows, typeRows] = await Promise.all([
@@ -346,7 +347,7 @@ export const trainingService = {
    * validUntil is derived from the training type's validityMonths.
    */
   async createEvent(
-    ctx: TenantContext,
+    ctx: TenantWorkContext,
     input: CreateTrainingEventInput,
   ): Promise<CreateTrainingEventResultDTO> {
     requirePermission(ctx, "training:view");
@@ -431,8 +432,19 @@ export const trainingService = {
       return event;
     });
 
+    const actor =
+      ctx.actor ??
+      (isPartnerSession(ctx.user)
+        ? null
+        : actorFromTenant({
+            tenantId: ctx.tenantId,
+            user: ctx.user,
+            correlationId: ctx.correlationId,
+            requestMeta: ctx.requestMeta,
+          }));
+    if (!actor) throw badRequest("Missing actor context for audit.");
     await recordAudit({
-      actor: actorFromTenant(ctx),
+      actor,
       resource: "training",
       resourceId: created.id,
       action: "create",

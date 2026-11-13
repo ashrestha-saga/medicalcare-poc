@@ -22,6 +22,10 @@ export interface InspectionStepResultDTO {
   photoCount?: number;
   /** Result row id when a draft/sealed run exists (for photo upload). */
   resultId?: string | null;
+  /** E70 — K-REP step input kind (check/text/select/parts/…). */
+  inputKind?: string | null;
+  optionsJson?: unknown;
+  valueJson?: unknown;
 }
 
 export interface ResolvedCataloguePreviewDTO {
@@ -51,6 +55,8 @@ export interface ResolvedCataloguePreviewDTO {
 
 export interface CataloguePreviewDTO {
   reference: string;
+  /** ServiceRequest.id for partner repair APIs (parts proposal, etc.). */
+  serviceRequestId: string;
   tenantId: string;
   deviceInstanceId: string;
   inventoryNumber: string;
@@ -69,6 +75,8 @@ export interface CataloguePreviewDTO {
   visitStartedAt: string | null;
   overdue: boolean;
   serviceType: string;
+  /** E77 — on_site | send_in */
+  fulfilment: string;
   dueAt: string | null;
   inspectionTypeCode: string;
   sealed: boolean;
@@ -135,14 +143,46 @@ export interface InspectionRunDTO {
   }[];
 }
 
+export type TestEquipmentStatus = "ok" | "due" | "lapsed" | "inactive";
+
 export interface TestEquipmentDTO {
   id: string;
   classCode: string;
+  classLabel: string | null;
   label: string;
   serialNumber: string | null;
   calibratedUntil: string | null;
   traceabilityRef: string | null;
   active: boolean;
+  assignedMembershipId: string | null;
+  assigneeName: string | null;
+  status: TestEquipmentStatus;
+}
+
+export interface TestEquipmentClassDTO {
+  code: string;
+  label: string;
+  group: "electrical" | "vitals" | "imaging" | "specialty" | "general";
+}
+
+export interface TestEquipmentAssigneeOptionDTO {
+  membershipId: string;
+  name: string;
+  appRole: string;
+}
+
+export interface TestEquipmentListDTO {
+  items: TestEquipmentDTO[];
+  classes: TestEquipmentClassDTO[];
+  assignees: TestEquipmentAssigneeOptionDTO[];
+  summary: {
+    total: number;
+    active: number;
+    due: number;
+    lapsed: number;
+    inactive: number;
+  };
+  canManage: boolean;
 }
 
 export type InspectionResultCode = "passed" | "passed_with_conditions" | "failed";
@@ -184,6 +224,9 @@ export type InspectionStepDraft = Record<
     noPhotoReason?: string | null;
     /** Justification when rating OK despite outside limit. */
     limitOverrideReason?: string | null;
+    /** Free-text / select / parts note for K-REP inputKind steps. */
+    note?: string | null;
+    valueJson?: unknown;
     /** P3 — possible patient relevance → partner_hint clarification. */
     mpsbHint?: boolean;
     mpsbText?: string | null;

@@ -1,4 +1,6 @@
 export * from "./auth";
+export * from "./catalogModel";
+export * from "./console";
 export * from "./formErrors";
 export * from "./dueDates";
 export * from "./forms";
@@ -7,4 +9,5 @@ export * from "./pruefpartner";
 export * from "./registration";
 export * from "./resolve";
 export * from "./serviceRequest";
+export * from "./settings";
 export * from "./training";

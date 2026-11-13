@@ -1,20 +1,19 @@
-import { requirePartnerContext, requirePartnerPermission, withTenantBypass } from "@/lib/auth/tenantContext";
+import { requirePartnerContext, withTenantBypass } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { createTestEquipmentSchema } from "@/schemas/pruefpartner";
 import { testEquipmentService } from "@/services/pruefpartner/testEquipmentService";
 
-/** GET /api/partner/test-equipment */
+/** GET /api/partner/test-equipment — inventory bundle (items, classes, assignees, summary). */
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
     const ctx = await requirePartnerContext(req);
     return await withTenantBypass(async () => {
-      requirePartnerPermission(ctx, "testequipment:manage", "console:organisation:view");
       correlationId = ctx.correlationId;
       const url = new URL(req.url);
       const classCode = url.searchParams.get("classCode") ?? undefined;
-      const items = await testEquipmentService.list(ctx, classCode);
-      return Response.json({ items }, { headers: { "x-correlation-id": ctx.correlationId } });
+      const data = await testEquipmentService.listBundle(ctx, classCode);
+      return Response.json(data, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {
     return errorResponse(error, correlationId);

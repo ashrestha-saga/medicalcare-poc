@@ -1,4 +1,4 @@
-import { clinicHomePath } from "@/constants/authRoutes";
+import { clinicHomePath, PARTNER_HOME } from "@/constants/authRoutes";
 import { createSession } from "@/lib/auth/session";
 import {
   clearTotpChallengeCookie,
@@ -8,7 +8,7 @@ import { errorResponse, unauthorized } from "@/lib/errors";
 import { totpVerifySchema } from "@/schemas/auth";
 import { totpService } from "@/services/auth/totpService";
 
-/** POST /api/auth/2fa/verify — complete login after password + TOTP. */
+/** POST /api/auth/2fa/verify — complete login after password + TOTP (clinic or partner). */
 export async function POST(req: Request) {
   try {
     const challenge = await readTotpChallengeCookie();
@@ -23,6 +23,16 @@ export async function POST(req: Request) {
 
     await clearTotpChallengeCookie();
     await createSession(user);
+
+    if (user.accountKind === "partner") {
+      const { organisationId: _orgId, ...publicUser } = user;
+      return Response.json({
+        user: publicUser,
+        tenantName,
+        homePath: PARTNER_HOME,
+      });
+    }
+
     const { tenantId: _tenantId, ...publicUser } = user;
     return Response.json({
       user: publicUser,

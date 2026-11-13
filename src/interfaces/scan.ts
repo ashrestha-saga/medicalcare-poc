@@ -54,6 +54,8 @@ export interface ScanFurtherActionDTO {
   batchId?: string;
   /** Optional i18n param (e.g. IFU document name). */
   ref?: string;
+  /** Visual tone for done / due rows in MORE. */
+  tone?: "ok" | "warn" | "stop";
 }
 
 export interface ScanDeviceCardDTO {
@@ -101,6 +103,22 @@ export interface ScanRoutineStepDTO {
   kind: ScanRoutineStepKind;
 }
 
+/** Today's already-recorded daily evidence for the device / its site. */
+export interface ScanRoutineCompletedItemDTO {
+  checkCode: string;
+  label: string;
+  scope: string;
+  kind: ScanRoutineStepKind;
+  unit: string | null;
+  limitText: string | null;
+  passed: boolean | null;
+  measuredValue: string | null;
+  withinLimit: boolean | null;
+  note: string | null;
+  performedBy: string | null;
+  recordedAt: string;
+}
+
 export interface ScanRoutineOpenDTO {
   deviceId: string;
   inventoryNumber: string;
@@ -110,6 +128,8 @@ export interface ScanRoutineOpenDTO {
   areaName: string | null;
   isEquipment: boolean;
   steps: ScanRoutineStepDTO[];
+  /** Filled when steps are empty — today's completed checks for this device/site. */
+  completedToday: ScanRoutineCompletedItemDTO[];
   performedAt: string;
 }
 

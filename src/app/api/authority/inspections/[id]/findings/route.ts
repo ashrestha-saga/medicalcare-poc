@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { createAuthorityFindingSchema } from "@/schemas/k10";
 import { authorityService } from "@/services/authority/authorityService";
@@ -9,7 +9,7 @@ export async function GET(req: Request, { params }: Ctx) {
   let correlationId: string | undefined;
   try {
     const { id } = await params;
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const findings = await authorityService.listFindings(ctx, { inspectionId: id });
@@ -24,7 +24,7 @@ export async function POST(req: Request, { params }: Ctx) {
   let correlationId: string | undefined;
   try {
     const { id } = await params;
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const input = createAuthorityFindingSchema.parse(await req.json().catch(() => ({})));

@@ -34,6 +34,8 @@ export type ScanFurtherAction = {
   batchId?: string;
   /** Optional param for i18n (e.g. IFU file name). */
   ref?: string;
+  /** Visual tone when the row is informational / already done. */
+  tone?: "ok" | "warn" | "stop";
 };
 
 export type DeviceActionInput = {
@@ -200,6 +202,7 @@ export function resolveFurtherActions(
         ctx: "routine",
         titleKey: "actions.routine",
         textKey: input.openDailyChecks ? "actions.routineHint" : "actions.routineDoneHint",
+        tone: input.openDailyChecks ? "warn" : "ok",
       });
     }
     // Keep Batches in MORE even when NOW is “Neue Charge”.
@@ -221,6 +224,7 @@ export function resolveFurtherActions(
       ctx: "konstanz",
       titleKey: "actions.konstanz",
       textKey: input.openKonstanzChecks ? "actions.konstanzHint" : "actions.konstanzDoneHint",
+      tone: input.openKonstanzChecks ? "warn" : "ok",
     });
   }
   out.push({

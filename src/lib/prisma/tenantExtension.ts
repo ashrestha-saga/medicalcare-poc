@@ -160,12 +160,15 @@ export function withTenantGuard(client: PrismaClient) {
           const tenantId = requireTenantId();
 
           // v26.1 R2 — block clinic writes while a disclosure session is open.
-          // Whitelist: session row, readiness ticks, ExportLog (Mappe PDF during visit).
+          // Whitelist: session row, readiness ticks, ExportLog (Mappe PDF during visit),
+          // MaintenanceEvent (E76 Fremdbericht during disclosure).
           if (
             WRITE_OPS.has(operation) &&
             model !== "DisclosureSession" &&
             model !== "ChecklistItemReadiness" &&
-            model !== "ExportLog"
+            model !== "ExportLog" &&
+            model !== "MaintenanceEvent" &&
+            model !== "MaintenancePart"
           ) {
             const { assertClinicWritable } = await import(
               "@/services/authority/disclosureLockService"

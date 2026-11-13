@@ -48,3 +48,18 @@ export const updateCatalogModelSchema = createCatalogModelSchema.partial().exten
 
 export type CreateCatalogModelInput = z.infer<typeof createCatalogModelSchema>;
 export type UpdateCatalogModelInput = z.infer<typeof updateCatalogModelSchema>;
+
+/** POST /api/catalog/models/[id]/documents — publish IFU / manual / notice. */
+export const publishModelDocumentSchema = z.object({
+  kind: z
+    .enum(["ifu", "service_manual", "safety_notice", "work_instruction", "other"])
+    .optional(),
+  revisionLabel: z.string().trim().min(1),
+  language: z.string().trim().min(1).optional(),
+  validFrom: z.string().optional().nullable(),
+  dataUrl: z.string().trim().max(8_000_000).optional().nullable(),
+  externalUrl: z.string().trim().optional().nullable(),
+  fieldSafetyActionId: z.string().optional().nullable(),
+});
+
+export type PublishModelDocumentInput = z.infer<typeof publishModelDocumentSchema>;

@@ -1,15 +1,18 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 
 interface FilterToolbarProps {
-  children: React.ReactNode;
+  children: ReactNode;
   hasActiveFilters: boolean;
   onClearAll: () => void;
+  /** Primary/secondary actions pinned to the right of the filter row. */
+  trailing?: ReactNode;
 }
 
-export function FilterToolbar({ children, hasActiveFilters, onClearAll }: FilterToolbarProps) {
+export function FilterToolbar({ children, hasActiveFilters, onClearAll, trailing }: FilterToolbarProps) {
   const t = useTranslations("filters");
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="filter-toolbar">
@@ -19,6 +22,7 @@ export function FilterToolbar({ children, hasActiveFilters, onClearAll }: Filter
           {t("clearAll")}
         </Button>
       )}
+      {trailing ? <div className="ml-auto flex flex-wrap items-center gap-2">{trailing}</div> : null}
     </div>
   );
 }

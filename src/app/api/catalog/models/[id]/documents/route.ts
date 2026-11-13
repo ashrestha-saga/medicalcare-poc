@@ -1,24 +1,12 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
+import { publishModelDocumentSchema } from "@/schemas/catalogModel";
 import { modelDocumentService } from "@/services/catalog/modelDocumentService";
-import { z } from "zod";
-
-const publishSchema = z.object({
-  kind: z
-    .enum(["ifu", "service_manual", "safety_notice", "work_instruction", "other"])
-    .optional(),
-  revisionLabel: z.string().trim().min(1),
-  language: z.string().trim().min(1).optional(),
-  validFrom: z.string().optional().nullable(),
-  dataUrl: z.string().trim().max(8_000_000).optional().nullable(),
-  externalUrl: z.string().trim().optional().nullable(),
-  fieldSafetyActionId: z.string().optional().nullable(),
-});
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const { id } = await params;
@@ -36,11 +24,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const { id } = await params;
-      const input = publishSchema.parse(await req.json().catch(() => ({})));
+      const input = publishModelDocumentSchema.parse(await req.json().catch(() => ({})));
       const document = await modelDocumentService.publish(ctx, {
         deviceModelId: id,
         kind: input.kind,

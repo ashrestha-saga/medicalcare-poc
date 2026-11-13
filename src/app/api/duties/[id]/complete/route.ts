@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { completeDutySchema } from "@/schemas/registration";
 import { dutyService } from "@/services/registration/dutyService";
@@ -10,7 +10,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 export async function POST(req: Request, ctx: RouteContext) {
   let correlationId: string | undefined;
   try {
-    const auth = await requireTenantContext(req);
+    const auth = await requireActingContext(req);
     return await withTenantStore(auth, async () => {
       correlationId = auth.correlationId;
       const { id } = await ctx.params;

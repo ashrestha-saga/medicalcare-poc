@@ -9,6 +9,7 @@ import { formatWhen, serviceRequestStateBadge } from "@/components/hooks/request
 import { OpenButton } from "@/components/features/shared/OpenButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { displayEuroText } from "@/lib/euro";
 import type { AppLocale } from "@/lib/locale";
 
 function SortHeader({
@@ -31,11 +32,18 @@ function SortHeader({
   );
 }
 
+function quoteFacet(row: ServiceRequestDTO): "none" | "open" | "approved" | "rejected" {
+  const d = row.quote?.decision;
+  if (d === "open" || d === "approved" || d === "rejected") return d;
+  return "none";
+}
+
 export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void): ColumnDef<ServiceRequestDTO>[] {
   const locale = useLocale() as AppLocale;
   const t = useTranslations("table.requests");
   const tTable = useTranslations("table");
   const tStatus = useTranslations("status");
+  const tQuote = useTranslations("repairs.quote");
 
   return useMemo(
     () => [
@@ -96,6 +104,7 @@ export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void)
             state === "transmitted" ||
             state === "handed_off" ||
             state === "acknowledged" ||
+            state === "scheduled" ||
             state === "in_progress" ||
             state === "completed" ||
             state === "rejected";
@@ -113,6 +122,43 @@ export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void)
         filterFn: (row, _id, value: string[]) => {
           if (!value?.length) return true;
           return value.includes(row.original.state);
+        },
+      },
+      {
+        id: "quote",
+        accessorFn: (row) => quoteFacet(row),
+        header: ({ column }) => <SortHeader label={t("quote")} column={column} />,
+        cell: ({ row }) => {
+          const status = quoteFacet(row.original);
+          const amount = row.original.quote?.amountText?.trim();
+          const amountLabel = amount ? displayEuroText(amount) : null;
+          return (
+            <div>
+              <Badge
+                variant={
+                  status === "open"
+                    ? "default"
+                    : status === "approved"
+                      ? "secondary"
+                      : status === "rejected"
+                        ? "destructive"
+                        : "outline"
+                }
+                data-testid="request-quote-status"
+              >
+                {tQuote(`status_${status}`)}
+              </Badge>
+              {amountLabel ? (
+                <p className="mt-1 text-xs text-muted-foreground" title={amountLabel}>
+                  {amountLabel}
+                </p>
+              ) : null}
+            </div>
+          );
+        },
+        filterFn: (row, _id, value: string[]) => {
+          if (!value?.length) return true;
+          return value.includes(quoteFacet(row.original));
         },
       },
       {
@@ -159,6 +205,6 @@ export function useRequestsColumns(onOpen: (request: ServiceRequestDTO) => void)
         },
       },
     ],
-    [locale, onOpen, t, tTable, tStatus],
+    [locale, onOpen, t, tTable, tStatus, tQuote],
   );
 }

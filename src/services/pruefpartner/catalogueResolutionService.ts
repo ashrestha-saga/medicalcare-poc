@@ -20,6 +20,9 @@ export interface ResolvedStepDTO {
   baselineValue: string | null;
   source: "catalogue" | "family";
   familyCode?: string;
+  /** E70 — K-REP / rich catalogue input kind. */
+  inputKind?: string | null;
+  optionsJson?: unknown;
 }
 
 export interface ResolvedCatalogueDTO {
@@ -178,6 +181,8 @@ export async function resolveCatalogueForAssignment(args: {
       resolvedLimitText,
       baselineValue,
       source: "catalogue",
+      inputKind: step.inputKind ?? "check",
+      optionsJson: step.optionsJson ?? null,
     });
   }
 

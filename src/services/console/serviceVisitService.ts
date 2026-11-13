@@ -7,21 +7,9 @@ import { assertPartnerManagesTenant } from "@/services/access/partnerAccessServi
 import { recordAudit } from "@/services/audit/auditService";
 import { getCachedPartnerConsolePermissions } from "@/services/roles/roleGrantsService";
 
-export type ServiceVisitDTO = {
-  id: string;
-  tenantId: string;
-  tenantName: string;
-  organisationId: string;
-  siteId: string | null;
-  siteName: string | null;
-  plannedAt: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  technicianUserId: string | null;
-  technicianName: string | null;
-  note: string | null;
-  requestCount: number;
-};
+import type { ServiceVisitDTO } from "@/interfaces/console";
+
+export type { ServiceVisitDTO };
 
 export type UpsertVisitInput = {
   id?: string;

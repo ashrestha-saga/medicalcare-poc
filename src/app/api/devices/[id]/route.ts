@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { updateDeviceSchema } from "@/schemas/device";
 import { deviceInventoryService } from "@/services/inventory/deviceInventoryService";
@@ -9,7 +9,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 export async function GET(req: Request, ctx: RouteContext) {
   let correlationId: string | undefined;
   try {
-    const auth = await requireTenantContext(req);
+    const auth = await requireActingContext(req);
     return await withTenantStore(auth, async () => {
       correlationId = auth.correlationId;
       const { id } = await ctx.params;
@@ -25,7 +25,7 @@ export async function GET(req: Request, ctx: RouteContext) {
 export async function PATCH(req: Request, ctx: RouteContext) {
   let correlationId: string | undefined;
   try {
-    const auth = await requireTenantContext(req);
+    const auth = await requireActingContext(req);
     return await withTenantStore(auth, async () => {
       correlationId = auth.correlationId;
       const { id } = await ctx.params;
@@ -42,7 +42,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 export async function DELETE(req: Request, ctx: RouteContext) {
   let correlationId: string | undefined;
   try {
-    const auth = await requireTenantContext(req);
+    const auth = await requireActingContext(req);
     return await withTenantStore(auth, async () => {
       correlationId = auth.correlationId;
       const { id } = await ctx.params;

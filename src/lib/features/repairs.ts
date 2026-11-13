@@ -1,0 +1,27 @@
+/**
+ * Tenant feature flag for the E70–E80 repairs package.
+ * Schema: Tenant.featureFlags JSON `{ "repairs": true }`.
+ */
+import { forbidden } from "@/lib/errors";
+
+export type TenantFeatureFlags = {
+  repairs?: boolean;
+};
+
+export function parseFeatureFlags(raw: unknown): TenantFeatureFlags {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const obj = raw as Record<string, unknown>;
+  return {
+    repairs: obj.repairs === true,
+  };
+}
+
+export function isRepairsEnabled(featureFlags: unknown): boolean {
+  return parseFeatureFlags(featureFlags).repairs === true;
+}
+
+export function requireRepairsEnabled(featureFlags: unknown): void {
+  if (!isRepairsEnabled(featureFlags)) {
+    throw forbidden("Repairs feature is not enabled for this tenant");
+  }
+}

@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense } from "react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
@@ -28,6 +27,7 @@ function MySitesBody() {
     data,
     error,
     loading,
+    starting,
     distance,
     setDistance,
     due,
@@ -37,6 +37,7 @@ function MySitesBody() {
     filtered,
     summaryCount,
     openTenant,
+    startInspection,
   } = useMySitesList();
   const columns = useMySitesColumns(openTenant);
 
@@ -48,8 +49,13 @@ function MySitesBody() {
           description={t("mySitesIntro")}
           headerExtra={
             <div className="flex flex-wrap items-center gap-2">
-              <Button asChild data-testid="my-sites-start-inspection">
-                <Link href="/inspect/heute">{t("mySitesStartInspection")}</Link>
+              <Button
+                type="button"
+                data-testid="my-sites-start-inspection"
+                disabled={loading || starting || summaryCount === 0}
+                onClick={() => void startInspection()}
+              >
+                {starting ? t("mySitesStarting") : t("mySitesStartInspection")}
               </Button>
             </div>
           }

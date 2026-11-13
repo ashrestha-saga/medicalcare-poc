@@ -198,6 +198,8 @@ export const dispositionAssignSchema = z.object({
   scheduledAt: appointmentInputSchema,
   /** D2 — attach order to an existing ServiceVisit. */
   visitId: z.string().trim().min(1).nullable().optional(),
+  /** E79 — Serviceleitung/GF override when manufacturer training gate blocks. */
+  gateOverrideReason: z.string().trim().min(1).max(2000).optional().nullable(),
 });
 
 export type DispositionAssignParsed = z.infer<typeof dispositionAssignSchema>;
@@ -285,3 +287,54 @@ export const consoleExternalUpdateSchema = z.object({
 });
 
 export type ConsoleExternalUpdateParsed = z.infer<typeof consoleExternalUpdateSchema>;
+
+/** POST /api/partner/visits — create or update a ServiceVisit. */
+export const upsertServiceVisitSchema = z.object({
+  id: z.string().trim().min(1).optional(),
+  tenantId: z.string().trim().min(1),
+  siteId: z.string().trim().min(1).nullable().optional(),
+  plannedAt: z.string().trim().nullable().optional(),
+  startedAt: z.string().trim().nullable().optional(),
+  completedAt: z.string().trim().nullable().optional(),
+  technicianUserId: z.string().trim().min(1).nullable().optional(),
+  note: z.string().trim().max(2000).nullable().optional(),
+});
+
+export type UpsertServiceVisitInput = z.infer<typeof upsertServiceVisitSchema>;
+
+/** GET /api/partner/field-safety/preview */
+export const fieldSafetyPreviewQuerySchema = z.object({
+  modelLabel: z.string().trim().min(1).max(200),
+  manufacturer: z.string().trim().max(200).optional(),
+});
+
+export type FieldSafetyPreviewQuery = z.infer<typeof fieldSafetyPreviewQuerySchema>;
+
+/** POST /api/partner/field-safety/rollout */
+export const fieldSafetyRolloutBodySchema = z.object({
+  reference: z.string().trim().min(1).max(200),
+  title: z.string().trim().min(1).max(500),
+  manufacturer: z.string().trim().min(1).max(200),
+  requiredAction: z.string().trim().min(1).max(2000),
+  affectedScope: z.string().trim().max(2000).optional(),
+  modelLabel: z.string().trim().max(200).optional(),
+  dueAt: z.string().trim().nullable().optional(),
+  tenantIds: z.array(z.string().trim().min(1)).min(1),
+});
+
+export type FieldSafetyRolloutBody = z.infer<typeof fieldSafetyRolloutBodySchema>;
+
+/** POST /api/partner/nav-usage — D7 increment. */
+export const partnerNavUsageSchema = z.object({
+  surface: z.enum(["console", "inspect"]),
+  navKey: z.string().trim().min(1).max(80),
+});
+
+export type PartnerNavUsageInput = z.infer<typeof partnerNavUsageSchema>;
+
+/** POST /api/partner/due-dates/[dutyId]/assign */
+export const partnerDueDateAssignSchema = z.object({
+  note: z.string().trim().max(2000).optional(),
+});
+
+export type PartnerDueDateAssignInput = z.infer<typeof partnerDueDateAssignSchema>;

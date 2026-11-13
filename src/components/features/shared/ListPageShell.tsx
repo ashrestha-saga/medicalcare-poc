@@ -36,14 +36,20 @@ export function ListPageShell({
   return (
     <div className={cn("px-4 pb-6 pt-4 sm:px-[18px]", className)} data-testid={testId}>
       <Card className="border-border bg-card">
-        <CardHeader className={cn("gap-4", variant === "compose" && "pb-3")}>
-          <div>
+        <CardHeader
+          className={cn(
+            "gap-4",
+            variant === "compose" && "pb-3",
+            headerExtra && "sm:flex-row sm:items-start sm:justify-between",
+          )}
+        >
+          <div className="min-w-0">
             <CardTitle className={titleClass}>{title}</CardTitle>
             {description ? (
               <CardDescription className="mt-1.5 max-w-[78ch]">{description}</CardDescription>
             ) : null}
           </div>
-          {headerExtra}
+          {headerExtra ? <div className="shrink-0 sm:ml-auto">{headerExtra}</div> : null}
         </CardHeader>
         <CardContent className={cn(contentClassName)}>{children}</CardContent>
       </Card>

@@ -97,6 +97,11 @@ export interface DeviceInstanceDTO {
   retainUntil: string | null;
   /** Derived: none | under_retention | purge_allowed */
   retentionStatus: "none" | "under_retention" | "purge_allowed";
+  /** E73 — operational lock / loaner state (repairs package). */
+  operationalState?: string | null;
+  lockSource?: string | null;
+  replacedById?: string | null;
+  loanerLender?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -134,6 +139,8 @@ export interface DeviceInstanceDetailDTO extends DeviceInstanceDTO {
   duties: DeviceDutyDTO[];
   /** Earliest applicable duty dueAt — not the Wartung-only nextMaintenanceDueAt. */
   nextObligationDueAt: string | null;
+  /** E77 — open send-in repair on this device (clinic chip), if any. */
+  openSendInRepair: { reference: string; state: string } | null;
 }
 
 export type CapturedNumberType = "gtin" | "pzn" | "manufacturer" | "none";

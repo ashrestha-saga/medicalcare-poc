@@ -13,8 +13,58 @@ import { resolveCatalogueForAssignment } from "./catalogueResolutionService";
 import { checkQualificationGate } from "./qualificationGateService";
 import { checkTestEquipmentGate, listEligibleEquipment } from "./testEquipmentGateService";
 import { evaluateMeasurement } from "./limitEvaluationService";
-import { assertLinkedVisitSealGates } from "./sealGates";
+import { assertLinkedVisitSealGates, assertRepairReportGates } from "./sealGates";
+import { assertCanStartRepairRun } from "@/services/repairs/trainingGateService";
+import { completeRepairFromRun } from "@/services/repairs/repairCompleteService";
+import {
+  deriveRepairCompleteFromKRepSteps,
+  repairGateInputFromDerived,
+} from "@/services/repairs/kRepCompleteDerive";
+import {
+  K_REP_CATALOGUE_CODE,
+  REPAIR_SERVICE_TYPE,
+  inspectionTypeCodeForServiceRequest,
+} from "@/constants/repairs";
+import { requireRepairsEnabled } from "@/lib/features/repairs";
 import { createAttachmentFromDataUrl } from "@/services/storage/attachmentBlobService";
+
+function isKRepRun(run: {
+  catalogue: { code: string };
+  serviceRequest?: { serviceType: string } | null;
+}): boolean {
+  const st = run.serviceRequest?.serviceType;
+  return (
+    run.catalogue.code === K_REP_CATALOGUE_CODE ||
+    st === REPAIR_SERVICE_TYPE ||
+    st === "REPAIR"
+  );
+}
+
+/** Idempotent fold of a sealed K-REP run into MaintenanceEvent (retry / re-seal path). */
+async function ensureKRepMaintenanceEvent(
+  ctx: ActingContext,
+  run: {
+    id: string;
+    catalogue: { steps: { id: string; inputKind: string | null }[] };
+    stepResults: {
+      id: string;
+      stepId: string;
+      note: string | null;
+      confirmed: boolean | null;
+      measuredValue: string | null;
+      withinLimit: boolean | null;
+      noPhotoReason: string | null;
+    }[];
+  },
+) {
+  const derived = deriveRepairCompleteFromKRepSteps({
+    inspectionRunId: run.id,
+    steps: run.catalogue.steps,
+    stepResults: run.stepResults,
+  });
+  if (!derived) return;
+  await completeRepairFromRun(ctx, { inspectionRunId: run.id, ...derived });
+}
 
 function isoDate(d: Date | null | undefined): string | null {
   if (!d) return null;
@@ -172,6 +222,9 @@ async function buildStepResults(runId: string, resolved: Awaited<ReturnType<type
         noPhotoReason: r?.noPhotoReason ?? null,
         photoCount: r?._count.attachments ?? 0,
         resultId: r?.id ?? null,
+        inputKind: s.inputKind ?? null,
+        optionsJson: s.optionsJson ?? null,
+        valueJson: r?.valueJson ?? null,
       };
     });
 }
@@ -204,14 +257,28 @@ export const inspectionRunService = {
       assertAssignedToCaller(req, ctx.user.id);
       const device = await loadDevice(ctx.tenantId, req.subjectId);
       const duty = req.duty;
-      const inspectionTypeCode = duty?.inspectionTypeCode ?? "STK";
+      let inspectionTypeCode = inspectionTypeCodeForServiceRequest({
+        serviceType: req.serviceType,
+        dutyInspectionTypeCode: duty?.inspectionTypeCode,
+        checkType: req.checkType,
+      });
 
-      const resolved = await resolveCatalogueForAssignment({
+      let resolved = await resolveCatalogueForAssignment({
         tenantId: ctx.tenantId,
         deviceInstanceId: req.subjectId,
         inspectionTypeCode,
         constancyObjectCode: duty?.constancyObjectCode,
       });
+      // E78 — constancy miss → ACCEPT generic (K-ABN).
+      if (!resolved && inspectionTypeCode === "CONSTANCY") {
+        inspectionTypeCode = "ACCEPT";
+        resolved = await resolveCatalogueForAssignment({
+          tenantId: ctx.tenantId,
+          deviceInstanceId: req.subjectId,
+          inspectionTypeCode,
+          constancyObjectCode: duty?.constancyObjectCode,
+        });
+      }
 
       const performanceDate = new Date();
       const qualGate = resolved
@@ -271,6 +338,9 @@ export const inspectionRunService = {
               baselineFlag: false,
               note: null,
               source: s.source,
+              inputKind: s.inputKind ?? null,
+              optionsJson: s.optionsJson ?? null,
+              valueJson: null,
             })),
           }
         : null;
@@ -297,6 +367,7 @@ export const inspectionRunService = {
 
       return {
         reference,
+        serviceRequestId: req.id,
         tenantId: ctx.tenantId,
         deviceInstanceId: req.subjectId,
         inventoryNumber: device.inventoryNumber,
@@ -313,6 +384,7 @@ export const inspectionRunService = {
         visitStartedAt,
         overdue,
         serviceType: req.serviceType,
+        fulfilment: req.fulfilment ?? "on_site",
         dueAt,
         inspectionTypeCode,
         sealed: assignmentCompleted,
@@ -343,6 +415,17 @@ export const inspectionRunService = {
     return withTenantStore(ctx, async () => {
       const req = await loadAssignment(body.reference, ctx.tenantId);
       assertAssignedToCaller(req, ctx.user.id);
+      if (
+        req.serviceType === REPAIR_SERVICE_TYPE ||
+        req.serviceType === "REPAIR"
+      ) {
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: ctx.tenantId },
+          select: { featureFlags: true },
+        });
+        requireRepairsEnabled(tenant?.featureFlags);
+      }
+      await assertCanStartRepairRun(ctx, req.id);
       if (req.state === "completed" || req.state === "rejected") {
         throw unprocessable("This assignment is already completed and cannot be started again.");
       }
@@ -356,14 +439,27 @@ export const inspectionRunService = {
 
       const device = await loadDevice(ctx.tenantId, req.subjectId);
       const duty = req.duty;
-      const inspectionTypeCode = duty?.inspectionTypeCode ?? "STK";
+      let inspectionTypeCode = inspectionTypeCodeForServiceRequest({
+        serviceType: req.serviceType,
+        dutyInspectionTypeCode: duty?.inspectionTypeCode,
+        checkType: req.checkType,
+      });
 
-      const resolved = await resolveCatalogueForAssignment({
+      let resolved = await resolveCatalogueForAssignment({
         tenantId: ctx.tenantId,
         deviceInstanceId: req.subjectId,
         inspectionTypeCode,
         constancyObjectCode: duty?.constancyObjectCode,
       });
+      if (!resolved && inspectionTypeCode === "CONSTANCY") {
+        inspectionTypeCode = "ACCEPT";
+        resolved = await resolveCatalogueForAssignment({
+          tenantId: ctx.tenantId,
+          deviceInstanceId: req.subjectId,
+          inspectionTypeCode,
+          constancyObjectCode: duty?.constancyObjectCode,
+        });
+      }
       if (!resolved) throw unprocessable("No inspection catalogue found for this assignment.");
 
       const performanceDate = body.performedAt
@@ -504,6 +600,48 @@ export const inspectionRunService = {
         run.serviceRequest?.reference ?? run.id,
         extras,
       );
+    });
+  },
+
+  /**
+   * Discard an unsealed draft protocol so the assignment can be started fresh
+   * (e.g. after catalogue mapping changes). Sealed runs are immutable.
+   */
+  async discardDraftRun(
+    ctx: ActingContext,
+    runId: string,
+  ): Promise<{ ok: true; reference: string | null }> {
+    requirePermission(ctx, "inspections:perform");
+    return withTenantStore(ctx, async () => {
+      const run = await prisma.inspectionRun.findFirst({
+        where: { id: runId, tenantId: ctx.tenantId },
+        include: {
+          serviceRequest: {
+            select: { reference: true, assigneeUserId: true },
+          },
+        },
+      });
+      if (!run) throw notFound("Inspection run not found.");
+      if (run.dutyPerformanceId) {
+        throw unprocessable("Sealed protocols cannot be discarded.");
+      }
+      if (run.serviceRequest) {
+        assertAssignedToCaller(run.serviceRequest, ctx.user.id);
+      } else if (run.performedByUserId && run.performedByUserId !== ctx.user.id) {
+        throw forbidden("This inspection is not assigned to you.");
+      }
+
+      await prisma.deviceClarification.updateMany({
+        where: { inspectionRunId: run.id },
+        data: { inspectionRunId: null },
+      });
+      await prisma.baselineMeasurement.updateMany({
+        where: { runId: run.id },
+        data: { runId: null },
+      });
+      await prisma.inspectionRun.delete({ where: { id: run.id } });
+
+      return { ok: true, reference: run.serviceRequest?.reference ?? null };
     });
   },
 
@@ -861,9 +999,16 @@ export const inspectionRunService = {
       if (body.idempotencyKey) {
         const prior = await prisma.inspectionRun.findFirst({
           where: { idempotencyKey: body.idempotencyKey, tenantId: ctx.tenantId },
-          include: { catalogue: true, serviceRequest: { select: { reference: true } } },
+          include: {
+            catalogue: { include: { steps: true } },
+            serviceRequest: { select: { reference: true, serviceType: true } },
+            stepResults: true,
+          },
         });
         if (prior?.dutyPerformanceId) {
+          if (isKRepRun(prior)) {
+            await ensureKRepMaintenanceEvent(ctx, prior);
+          }
           const device = await loadDevice(ctx.tenantId, prior.deviceInstanceId);
           const resolved = await resolveCatalogueForAssignment({
             tenantId: ctx.tenantId,
@@ -898,17 +1043,21 @@ export const inspectionRunService = {
         throw unprocessable("Device must be confirmed before completing.");
       }
 
-      // D2 / D10 / D11 — Phase 1 always links a visit before seal (visit/start).
+      // D2 / D10 / D11 — visit required for on-site; send-in (E77) skips visit gate.
+      const fulfilment = run.serviceRequest?.fulfilment ?? "on_site";
+      const skipVisit = fulfilment === "send_in";
       const visitId = run.visitId ?? run.serviceRequest?.visitId ?? null;
-      if (!visitId) {
+      if (!visitId && !skipVisit) {
         throw unprocessable("Start the site visit before sealing the protocol.", {
           field: "visitId",
         });
       }
-      const linkedVisit = await prisma.serviceVisit.findFirst({
-        where: { id: visitId },
-        select: { startedAt: true },
-      });
+      const linkedVisit = visitId
+        ? await prisma.serviceVisit.findFirst({
+            where: { id: visitId },
+            select: { startedAt: true },
+          })
+        : null;
       const signatures = await prisma.inspectionSignature.findMany({
         where: { runId: run.id },
       });
@@ -928,9 +1077,52 @@ export const inspectionRunService = {
         visitStartedAt: linkedVisit?.startedAt ?? null,
         signatures,
         failedSteps: failedWithEvidence,
+        skipVisit,
       });
       if (!gate.ok) {
         throw unprocessable(gate.message, { field: gate.field });
+      }
+
+      // A6/A7 — K-REP repair report gates before seal; MaintenanceEvent after seal.
+      let kRepComplete: Parameters<typeof completeRepairFromRun>[1] | null = null;
+      if (isKRepRun(run)) {
+        const tenant = await prisma.tenant.findUnique({
+          where: { id: ctx.tenantId },
+          select: { featureFlags: true },
+        });
+        requireRepairsEnabled(tenant?.featureFlags);
+
+        const derived = deriveRepairCompleteFromKRepSteps({
+          inspectionRunId: run.id,
+          steps: run.catalogue.steps,
+          stepResults: run.stepResults,
+        });
+        if (!derived) {
+          throw unprocessable("K-REP Maßnahme (action) is required before sealing.", {
+            field: "action",
+          });
+        }
+
+        const partsStep = run.catalogue.steps.find((s) => s.inputKind === "parts");
+        const partsResult = partsStep
+          ? run.stepResults.find((r) => r.stepId === partsStep.id)
+          : null;
+        const partsPhotoCount = partsResult
+          ? await prisma.inspectionStepAttachment.count({
+              where: { resultId: partsResult.id },
+            })
+          : 0;
+
+        const repairGate = assertRepairReportGates(
+          repairGateInputFromDerived(derived, {
+            photoCount: partsPhotoCount,
+            noPhotoReason: partsResult?.noPhotoReason,
+          }),
+        );
+        if (!repairGate.ok) {
+          throw unprocessable(repairGate.message, { field: repairGate.field });
+        }
+        kRepComplete = { inspectionRunId: run.id, ...derived };
       }
 
       if (run.catalogue.traceabilityRequired && run.testEquipmentId) {
@@ -1079,6 +1271,10 @@ export const inspectionRunService = {
           }
         }
       });
+
+      if (kRepComplete) {
+        await completeRepairFromRun(ctx, kRepComplete);
+      }
 
       return this.getRun(ctx, runId);
     });

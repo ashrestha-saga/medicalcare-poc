@@ -1019,7 +1019,7 @@ body {
 }
 
 .p-heute__row[data-band="done"] {
-  opacity: 0.55;
+  opacity: 0.85;
 }
 
 .p-heute__row-main {
@@ -1084,6 +1084,11 @@ body {
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.p-heute__chip[data-band="done"] {
+  background: rgba(34, 160, 90, 0.28);
+  color: #b8f0d0;
 }
 
 .p-scan-device {
@@ -1222,12 +1227,27 @@ body {
   gap: 12px;
   min-height: 56px;
   padding: 10px 12px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.04);
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+.p-scan-device__rowbtn[data-t="ok"] {
+  background: rgba(34, 160, 90, 0.14);
+  border-color: rgba(34, 160, 90, 0.35);
+}
+
+.p-scan-device__rowbtn[data-t="warn"] {
+  background: rgba(220, 160, 40, 0.14);
+  border-color: rgba(220, 160, 40, 0.35);
+}
+
+.p-scan-device__rowbtn[data-t="stop"] {
+  background: rgba(220, 80, 80, 0.14);
+  border-color: rgba(220, 80, 80, 0.4);
 }
 
 .p-scan-device__rowbtn .g {
@@ -1552,17 +1572,104 @@ body {
   font-size: 16px;
 }
 
+.p-routine__done {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.p-routine__done-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted, #9aa4b2);
+}
+
+.p-routine__done-list {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.p-routine__done-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.p-routine__done-row[data-t="stop"] {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.p-routine__done-row dt {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-dark, #f3f4f6);
+}
+
+.p-routine__done-scope {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted, #9aa4b2);
+}
+
+.p-routine__done-row dd {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #c5d0de;
+}
+
+.p-routine__done-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted, #9aa4b2);
+}
+
 .p-routine__foot {
   position: sticky;
   bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
   padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
 }
 
-.p-routine__save {
+.p-routine__foot > .p-stoerung__progress {
+  margin-bottom: 0;
+}
+
+.p-routine__foot > .p-stoerung__foot-actions,
+.p-routine__foot > .p-routine__back,
+.p-routine__foot > .p-routine__save {
+  width: 100%;
+}
+
+.p-routine__foot .p-stoerung__foot-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.p-routine__foot .p-stoerung__cancel,
+.p-routine__foot .p-routine__save,
+.p-routine__foot .p-routine__back {
   flex: 1 1 0;
+  min-width: 0;
+}
+
+.p-routine__save,
+.p-routine__back {
   min-height: 48px;
   border-radius: 12px;
   border: 0;
@@ -6494,6 +6601,59 @@ button.pp-nav .nv-band,
   padding: 0 10px;
   font: inherit;
   font-size: 13px;
+}
+
+/* Partner create-order — handling segmented control (mockup) */
+.p-create-order__seg {
+  display: inline-flex;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--navy-2, transparent) 40%, transparent);
+}
+
+.p-create-order__seg-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--on-dark, inherit);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.p-create-order__seg-btn:last-child {
+  border-right: 0;
+}
+
+.p-create-order__seg-btn:hover:not(.is-on) {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.p-create-order__seg-btn.is-on {
+  background: var(--accent);
+  color: #fff;
+}
+
+[data-theme="light"] .p-create-order__seg {
+  background: #fff;
+}
+
+[data-theme="light"] .p-create-order__seg-btn {
+  color: hsl(var(--foreground));
+}
+
+[data-theme="light"] .p-create-order__seg-btn.is-on {
+  background: var(--accent);
+  color: #fff;
 }
 
 .p-train__model-search {

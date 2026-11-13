@@ -20,6 +20,7 @@ export * from "./resolve";
 export * from "./scan";
 export * from "./serviceDispatch";
 export * from "./serviceRequest";
+export * from "./setup";
 export * from "./session";
 export * from "./theme";
 export * from "./training";

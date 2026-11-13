@@ -1,5 +1,20 @@
 import type { InspectionStepDraft, InspectionStepResultDTO } from "@/interfaces/pruefpartner";
 
+function noteFromValueJson(valueJson: unknown): string | null {
+  if (valueJson == null) return null;
+  if (typeof valueJson === "string") return valueJson;
+  if (typeof valueJson === "number" || typeof valueJson === "boolean") return String(valueJson);
+  if (typeof valueJson === "object" && valueJson !== null && "value" in valueJson) {
+    const v = (valueJson as { value: unknown }).value;
+    return v == null ? null : String(v);
+  }
+  try {
+    return JSON.stringify(valueJson);
+  } catch {
+    return null;
+  }
+}
+
 export function seedStepDraft(steps: InspectionStepResultDTO[]): InspectionStepDraft {
   const next: InspectionStepDraft = {};
   for (const s of steps) {
@@ -8,16 +23,25 @@ export function seedStepDraft(steps: InspectionStepResultDTO[]): InspectionStepD
       measuredValue: s.measuredValue,
       rating: s.confirmed === true ? "ok" : s.confirmed === false ? "defect" : null,
       noPhotoReason: s.noPhotoReason ?? null,
+      note: s.note ?? noteFromValueJson(s.valueJson) ?? null,
+      valueJson: s.valueJson ?? null,
     };
   }
   return next;
 }
 
+const RICH_KINDS = new Set(["text", "select", "parts", "result"]);
+
 export function ratedStepCount(draft: InspectionStepDraft, steps: InspectionStepResultDTO[]): number {
   return steps.filter((s) => {
     const d = draft[s.stepId];
     if (!d) return false;
-    if (s.isMeasurement) return Boolean(d.measuredValue?.trim()) && Boolean(d.rating);
+    if (s.isMeasurement || s.inputKind === "measurement" || s.inputKind === "number") {
+      return Boolean(d.measuredValue?.trim()) && Boolean(d.rating);
+    }
+    if (s.inputKind && RICH_KINDS.has(s.inputKind)) {
+      return Boolean(d.note?.trim()) && Boolean(d.rating);
+    }
     return Boolean(d.rating);
   }).length;
 }
@@ -44,13 +68,17 @@ export function buildSealNote(args: {
 export function stepsPayloadFromDraft(stepDraft: InspectionStepDraft) {
   return Object.entries(stepDraft)
     .filter(([id]) => !id.startsWith("family-"))
-    .map(([stepId, v]) => ({
-      stepId,
-      confirmed: v.rating === "ok" ? true : v.rating === "defect" ? false : (v.confirmed ?? null),
-      measuredValue: v.measuredValue ?? null,
-      note: v.rating === "defect" ? "Mangel" : null,
-      noPhotoReason: v.rating === "defect" ? (v.noPhotoReason?.trim() || null) : null,
-    }));
+    .map(([stepId, v]) => {
+      const defectNote = v.rating === "defect" ? "Mangel" : null;
+      const richNote = v.note?.trim() || null;
+      return {
+        stepId,
+        confirmed: v.rating === "ok" ? true : v.rating === "defect" ? false : (v.confirmed ?? null),
+        measuredValue: v.measuredValue ?? null,
+        note: richNote ?? defectNote,
+        noPhotoReason: v.rating === "defect" ? (v.noPhotoReason?.trim() || null) : null,
+      };
+    });
 }
 
 export type ProtocolGateId =

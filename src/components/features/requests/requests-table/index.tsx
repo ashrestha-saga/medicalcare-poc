@@ -24,6 +24,10 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
     const q = keyword.trim().toLowerCase();
     return list.requests.filter((r) => {
       if (list.stateFilter?.length && !list.stateFilter.includes(r.state)) return false;
+      if (list.quoteFilter?.length) {
+        const facet = r.quote?.decision ?? "none";
+        if (!list.quoteFilter.includes(facet)) return false;
+      }
       if (!q) return true;
       const haystack = [
         r.reference,
@@ -34,6 +38,8 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
         r.executorOrg?.name ?? "",
         r.executorOrg?.code ?? "",
         r.state,
+        r.quote?.decision ?? "",
+        r.quote?.amountText ?? "",
         r.raisedBy ?? "",
         r.locationText,
       ]
@@ -41,7 +47,7 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [list.requests, list.stateFilter, keyword]);
+  }, [list.requests, list.stateFilter, list.quoteFilter, keyword]);
 
   return (
     <div className="space-y-3" data-testid="requests-list">
@@ -53,7 +59,14 @@ export function RequestsTable({ list, onSelect }: RequestsTableProps) {
         onStateChange={(value) =>
           list.setStateFilter(Array.isArray(value) ? value : value ? [value] : null)
         }
-        onClearAll={() => list.setStateFilter(null)}
+        quoteFilter={list.quoteFilter}
+        onQuoteChange={(value) =>
+          list.setQuoteFilter(Array.isArray(value) ? value : value ? [value] : null)
+        }
+        onClearAll={() => {
+          list.setStateFilter(null);
+          list.setQuoteFilter(null);
+        }}
       />
 
       <DataTable

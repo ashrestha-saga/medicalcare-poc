@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { captureRequestSchema } from "@/schemas/resolve";
 import { captureService } from "@/services/capture/captureService";
@@ -7,7 +7,7 @@ import { captureService } from "@/services/capture/captureService";
 export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const input = captureRequestSchema.parse(await req.json());

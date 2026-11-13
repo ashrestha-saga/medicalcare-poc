@@ -180,6 +180,8 @@ export function ScanDeviceCard({
             <button
               type="button"
               className="p-scan-device__rowbtn"
+              data-t={a.tone ?? undefined}
+              data-testid={a.ctx === "routine" ? "scan-further-routine" : undefined}
               onClick={() => runAction(a.ctx, undefined, a.batchId, a.ref)}
             >
               <div className="g">

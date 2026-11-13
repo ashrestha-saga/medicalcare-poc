@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { readBlobBytes } from "@/lib/storage/blobStore";
@@ -7,7 +7,7 @@ import { readBlobBytes } from "@/lib/storage/blobStore";
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const { id } = await params;

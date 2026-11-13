@@ -12,7 +12,7 @@ import { toast } from "@/store/toastStore";
 type Door = "clinic" | "partner";
 
 /**
- * Email/password sign-in → optional TOTP (clinic) → hard navigate to home.
+ * Email/password sign-in → optional TOTP (clinic, or partner when DEMO_SHARED_TOTP) → home.
  */
 export function useSignIn(door: Door = "clinic") {
   const [email, setEmail] = useState(door === "partner" ? "k.adler@msr.example" : "anna@demo.local");

@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { api, ApiError } from "@/lib/http/apiClient";
-import type { InspectFollowUpListDTO, InspectFollowUpStatus } from "@/interfaces/pruefpartner";
+import type { InspectFollowUpStatus } from "@/interfaces/pruefpartner";
+import { useInspectNachbesuche } from "@/components/hooks/inspect/useInspectNachbesuche";
 import { Spinner } from "@/components/ui/Loading";
 
 const STATUS_KEY: Record<InspectFollowUpStatus, string> = {
@@ -18,27 +17,7 @@ const STATUS_KEY: Record<InspectFollowUpStatus, string> = {
 /** Follow-up proposals created from failed inspection steps — status only; scheduling in disposition. */
 export function InspectNachbesucheScreen() {
   const t = useTranslations("pruefpartner");
-  const [data, setData] = useState<InspectFollowUpListDTO | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await api<InspectFollowUpListDTO>("/api/partner/inspect/follow-ups");
-        if (!cancelled) setData(res);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof ApiError ? e.message : t("loadFailed"));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
+  const { rows, error, loading } = useInspectNachbesuche();
 
   if (loading) {
     return (
@@ -47,8 +26,6 @@ export function InspectNachbesucheScreen() {
       </div>
     );
   }
-
-  const rows = data?.rows ?? [];
 
   return (
     <div className="pp-page" data-testid="inspect-view-nachbesuche">

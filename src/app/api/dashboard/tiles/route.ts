@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse } from "@/lib/errors";
 import { setRoleDashboardTilesSchema } from "@/schemas/k10";
 import { dashboardTileService } from "@/services/dashboard/dashboardTileService";
@@ -9,7 +9,7 @@ import { badRequest } from "@/lib/errors";
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const url = new URL(req.url);
@@ -30,7 +30,7 @@ export async function GET(req: Request) {
 export async function PUT(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const input = setRoleDashboardTilesSchema.parse(await req.json().catch(() => ({})));

@@ -1,24 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
+import { usePartnerTodayBoard } from "@/components/hooks/partner/today/usePartnerTodayBoard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { api, ApiError } from "@/lib/http/apiClient";
-import type { PartnerBoardTile } from "@/services/console/partnerDashboardService";
+import type { PartnerBoardTile } from "@/interfaces/console";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { useSessionStore } from "@/store/sessionStore";
 import { cn } from "@/lib/utils";
-
-type BoardPayload = {
-  zones: {
-    ent: PartnerBoardTile[];
-    vor: PartnerBoardTile[];
-    beob: PartnerBoardTile[];
-  };
-};
 
 const WORK_VISIBLE = 6;
 
@@ -130,30 +122,8 @@ export function TodayScreen() {
   const user = useSessionStore((s) => s.user);
   const { checkPermission } = usePermissions();
   const canAssignTiles = checkPermission("console:settings:view");
-  const [zones, setZones] = useState<BoardPayload["zones"] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { zones, error, loading } = usePartnerTodayBoard();
   const [workExpanded, setWorkExpanded] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const data = await api<BoardPayload>("/api/partner/dashboard/board");
-        if (!cancelled) setZones(data.zones);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof ApiError ? e.message : t("todayLoadFailed"));
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
 
   const findings =
     zones?.ent.filter((x) => x.count > 0 && x.tone !== "ok").length ?? 0;

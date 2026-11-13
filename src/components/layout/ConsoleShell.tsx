@@ -27,6 +27,7 @@ import {
   NavCollapseIcon,
   NavExpandIcon,
   SettingsIcon,
+  TestEquipmentIcon,
   UsersIcon,
 } from "@/components/layout/navIcons";
 import {
@@ -50,6 +51,8 @@ const MENU_I18N: Partial<
     | "external"
     | "organisation"
     | "activity"
+    | "partsProposals"
+    | "testEquipment"
     | "settings"
   >
 > = {
@@ -63,6 +66,8 @@ const MENU_I18N: Partial<
   "console-external": "external",
   "console-organisation": "organisation",
   "console-activity": "activity",
+  "console-parts-proposals": "partsProposals",
+  "console-test-equipment": "testEquipment",
   "console-settings": "settings",
 };
 
@@ -77,6 +82,8 @@ function ConsoleNavIcon({ id }: { id: MenuModuleId }) {
   if (id === "console-external") return <ExternalInspectorsIcon />;
   if (id === "console-organisation") return <ManagementIcon />;
   if (id === "console-activity") return <ActivityIcon />;
+  if (id === "console-parts-proposals") return <DispositionIcon />;
+  if (id === "console-test-equipment") return <TestEquipmentIcon />;
   if (id === "console-settings") return <SettingsIcon />;
   return <AssignmentsIcon />;
 }

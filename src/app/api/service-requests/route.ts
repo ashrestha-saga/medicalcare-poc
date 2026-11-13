@@ -1,4 +1,4 @@
-import { requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
+import { requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { badRequest, errorResponse } from "@/lib/errors";
 import {
   createServiceRequestSchema,
@@ -9,7 +9,7 @@ import { serviceRequestService } from "@/services/requests/serviceRequestService
 export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const input = createServiceRequestSchema.parse(await req.json());
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
-    const ctx = await requireTenantContext(req);
+    const ctx = await requireActingContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       const url = new URL(req.url);
