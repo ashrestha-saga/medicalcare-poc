@@ -27,6 +27,8 @@ export function issue(
 }
 
 export interface ClarificationEvalInput {
+  /** E86 — non-medical Betriebsmittel skip MP catalog / classification / UDI rules. */
+  kind?: "mp" | "equipment" | null;
   responsibleUserId: string | null;
   responsiblePerson: string | null;
   maintenanceCycleMonths: number | null;
@@ -46,6 +48,7 @@ export interface ClarificationEvalInput {
 /** Pure rules — keep in sync with Klärliste product rules. */
 export function evaluateClarificationIssues(input: ClarificationEvalInput): ClarificationIssue[] {
   const issues: ClarificationIssue[] = [];
+  const isEquipment = input.kind === "equipment";
 
   const state = input.state?.trim().toLowerCase() ?? "";
   if (state && state !== "released" && state !== "retired") {
@@ -62,22 +65,29 @@ export function evaluateClarificationIssues(input: ClarificationEvalInput): Clar
     issues.push(issue("missing_responsible", "Responsible person missing", "low"));
   }
 
-  if (input.maintenanceCycleMonths == null || input.maintenanceCycleMonths <= 0) {
+  // Wartung cycle is MP; Betriebsmittel use DGUV Festlegung interval instead.
+  if (
+    !isEquipment &&
+    (input.maintenanceCycleMonths == null || input.maintenanceCycleMonths <= 0)
+  ) {
     issues.push(issue("missing_maintenance_cycle", "Maintenance cycle missing", "medium"));
   }
 
-  if (!input.hasModelClassification) {
-    issues.push(issue("missing_classification", "No classification on model", "medium"));
-  } else {
-    const conf = input.classificationConfidence?.toLowerCase() ?? "";
-    if (conf === "derived" || conf === "guess") {
-      issues.push(
-        issue(
-          "derived_classification",
-          "Classification only derived",
-          "medium",
-        ),
-      );
+  // Model classification / UDI / BEUDAMED apply to MP only.
+  if (!isEquipment) {
+    if (!input.hasModelClassification) {
+      issues.push(issue("missing_classification", "No classification on model", "medium"));
+    } else {
+      const conf = input.classificationConfidence?.toLowerCase() ?? "";
+      if (conf === "derived" || conf === "guess") {
+        issues.push(
+          issue(
+            "derived_classification",
+            "Classification only derived",
+            "medium",
+          ),
+        );
+      }
     }
   }
 
@@ -86,7 +96,13 @@ export function evaluateClarificationIssues(input: ClarificationEvalInput): Clar
   }
 
   if (!input.modelName?.trim() && !input.tradeName?.trim()) {
-    issues.push(issue("missing_model_name", "Type / model name missing", "medium"));
+    issues.push(
+      issue(
+        "missing_model_name",
+        isEquipment ? "Device label / type missing" : "Type / model name missing",
+        "medium",
+      ),
+    );
   }
 
   if (!input.serialNumber?.trim()) {

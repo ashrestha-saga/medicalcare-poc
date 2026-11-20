@@ -22,6 +22,8 @@ import { seedPruefpartnerDemoEquipment, seedRefPruefpartner } from "./seeds/refP
 import { seedK1K10Ref } from "./seeds/seedK1K10Ref";
 import { seedK10Tiles } from "./seeds/seedK10Tiles";
 import { seedRepairs } from "./seeds/repairs";
+import { seedImportDictionary } from "./seeds/importDictionary";
+import { seedRadiationDguv } from "./seeds/radiationDguv";
 
 export const SEED = {
   tenantId: "demo-tenant",
@@ -81,6 +83,7 @@ export async function seed(prisma: PrismaClient) {
   await seedK1K10Ref(prisma);
   await seedK10Tiles(prisma);
   await seedRefPruefpartner(prisma);
+  await seedImportDictionary(prisma);
 
   const tenant = await prisma.tenant.upsert({
     where: { id: SEED.tenantId },
@@ -511,6 +514,9 @@ export async function seed(prisma: PrismaClient) {
   // E70–E80 repairs: flag, K-REP, training gate, tile, demo part (after partner/ref seeds).
   const repairs = await seedRepairs(prisma);
 
+  // Nachtrag 4 — radiation / DGUV flag, K-DGUV, Betriebsmittel demo (after DGUV RefInspectionType).
+  const radiationDguv = await seedRadiationDguv(prisma);
+
   const dutiesBackfilled = await dutyService.backfillDueDates(prisma);
   const attributionBackfilled = await backfillDutyAndEvidenceAttribution(prisma);
   const contractScopeBackfilled = await backfillAllContractScopeGrants(prisma);
@@ -533,6 +539,7 @@ export async function seed(prisma: PrismaClient) {
     handover,
     bandDemo,
     repairs,
+    radiationDguv,
     dutiesBackfilled,
     attributionBackfilled,
     contractScopeBackfilled,

@@ -6,12 +6,14 @@ import { useTranslations } from "next-intl";
 import type { ConsoleStaffMemberDTO } from "@/interfaces/console";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
+import { ServiceTypeGatesPanel } from "@/components/features/partner/service-type-gates/ServiceTypeGatesPanel";
 import { useStaffColumns } from "@/components/hooks/partner/staff/useStaffColumns";
 import { useStaffList } from "@/components/hooks/partner/staff/useStaffList";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { staffSkillLevelMessageKey } from "@/lib/console/staffLabels";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
+
 
 function StaffBody() {
   const t = useTranslations("console");
@@ -85,6 +87,7 @@ function StaffBody() {
             emptyMessage={t("staffEmpty")}
           />
           <p className="mt-4 text-xs text-muted-foreground">{t("staffNote")}</p>
+          <ServiceTypeGatesPanel variant="embedded" />
         </ListPageShell>
       </main>
     </div>

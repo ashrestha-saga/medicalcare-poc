@@ -43,6 +43,9 @@ function HeuteDeviceRow({
           {item.openKonstanzChecks ? (
             <span className="p-heute__chip p-heute__chip--warn">{t("openKonstanz")}</span>
           ) : null}
+          {item.openDguvOwnCheck ? (
+            <span className="p-heute__chip p-heute__chip--warn">{t("openDguv")}</span>
+          ) : null}
         </div>
       </button>
     </li>

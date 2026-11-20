@@ -44,6 +44,17 @@ export function RequestsScreen() {
                     <Link href="/maintenance-events/new">{t("recordExternal")}</Link>
                   </Button>
                 ) : null}
+                {checkPermission("requests:approve") ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    asChild
+                    data-testid="requests-sv-certificate"
+                  >
+                    <Link href="/requests/sv-certificate">{t("svCertificate")}</Link>
+                  </Button>
+                ) : null}
               </div>
             ) : undefined
           }

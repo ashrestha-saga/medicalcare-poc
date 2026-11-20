@@ -241,26 +241,101 @@ export const createConstancyCadenceSchema = z.object({
   intervalUnit: z.enum(["months", "years", "working_days"]),
   basisText: z.string().min(1),
   determinedAt: dateOnly,
+  /** E87 — A device_protocol | B manual_measurement | C visual */
+  captureMode: z
+    .enum(["device_protocol", "manual_measurement", "visual"])
+    .optional()
+    .default("device_protocol"),
+  protocolSource: z.string().trim().max(200).optional().nullable(),
+  referenceValuesJson: z
+    .union([
+      z.array(
+        z.object({
+          name: z.string(),
+          value: z.number(),
+          unit: z.string(),
+          tolerancePct: z.number().optional().nullable(),
+          toleranceAbs: z.number().optional().nullable(),
+          source: z.string().optional().nullable(),
+          asOf: z.string().optional().nullable(),
+        }),
+      ),
+      z.object({ visualCheckpoints: z.array(z.string().min(1)).min(1) }),
+    ])
+    .optional()
+    .nullable(),
 });
 export type CreateConstancyCadenceInput = z.infer<typeof createConstancyCadenceSchema>;
 
 /** Scan-App Konstanzprüfung — pass / conditions / fail on one open duty. */
 export const submitScanKonstanzSchema = z.object({
   dutyId: z.string().min(1),
-  result: z.enum(["passed", "passed_with_conditions", "failed"]),
+  result: z.enum(["passed", "passed_with_conditions", "failed", "deviation"]),
   note: z.string().optional().nullable(),
   performedAt: dateOnly.optional().nullable(),
+  captureMode: z
+    .enum(["device_protocol", "manual_measurement", "visual"])
+    .optional()
+    .nullable(),
+  measurements: z
+    .array(
+      z.object({
+        name: z.string(),
+        value: z.number(),
+        unit: z.string(),
+        withinLimit: z.boolean().optional(),
+      }),
+    )
+    .optional()
+    .nullable(),
+  visualFindings: z
+    .array(
+      z.object({
+        point: z.string(),
+        ok: z.boolean(),
+        finding: z.string().optional().nullable(),
+      }),
+    )
+    .optional()
+    .nullable(),
 });
 export type SubmitScanKonstanzInput = z.infer<typeof submitScanKonstanzSchema>;
 
-export const createDutyOverlapSchema = z.object({
-  deviceInstanceId: z.string().min(1),
-  coveredDutyKey: z.enum(["dguv", "stk"]),
-  satisfiedByDutyKey: z.enum(["dguv", "stk"]),
-  reasonText: z.string().min(1),
-  decidedAt: dateOnly,
+/** E87 / R34 — clinic constancy routine capture (source=routine). */
+export const constancyRoutineCompleteSchema = z.object({
+  dutyId: z.string().min(1),
+  captureMode: z.enum(["device_protocol", "manual_measurement", "visual"]),
+  result: z.enum(["passed", "failed", "deviation"]),
+  performedAt: dateOnly.optional().nullable(),
+  note: z.string().optional().nullable(),
+  attachmentBlobId: z.string().optional().nullable(),
+  /** Mode A: protocol PDF/image as data URL when blob id not provided. */
+  dataUrl: z.string().trim().max(8_000_000).optional().nullable(),
+  measurements: z
+    .array(
+      z.object({
+        name: z.string(),
+        value: z.number(),
+        unit: z.string(),
+        withinLimit: z.boolean().optional(),
+      }),
+    )
+    .optional()
+    .nullable(),
+  /** Mode C: unchecked points need finding text. */
+  visualFindings: z
+    .array(z.object({ point: z.string(), ok: z.boolean(), finding: z.string().optional().nullable() }))
+    .optional()
+    .nullable(),
 });
-export type CreateDutyOverlapInput = z.infer<typeof createDutyOverlapSchema>;
+export type ConstancyRoutineCompleteInput = z.infer<typeof constancyRoutineCompleteSchema>;
+
+export const resolveConstancyDeviationSchema = z.object({
+  action: z.enum(["lock", "continue"]),
+  reason: z.string().trim().max(2000).optional().nullable(),
+  note: z.string().trim().max(2000).optional().nullable(),
+});
+export type ResolveConstancyDeviationInput = z.infer<typeof resolveConstancyDeviationSchema>;
 
 export const createAuthorityInspectionSchema = z.object({
   siteId: z.string().optional().nullable(),

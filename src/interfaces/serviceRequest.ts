@@ -79,16 +79,35 @@ export interface AssignmentDutyContextDTO {
   inspectionTypeCode: string;
 }
 
+/** One protocol step for clinic read-only overview / modal. */
+export interface AssignmentProtocolStepDTO {
+  position: number;
+  label: string;
+  inputKind: string;
+  unit: string | null;
+  measuredValue: string | null;
+  withinLimit: boolean | null;
+  confirmed: boolean | null;
+  note: string | null;
+}
+
 /** Sealed inspection / completion summary for clinic request detail. */
 export interface AssignmentCompletionOverviewDTO {
   result: "passed" | "passed_with_conditions" | "failed" | string;
   note: string | null;
+  /** Calendar performance date (legacy performedAt). */
   completedAt: string | null;
+  /** Wall-clock when the inspector started the protocol. */
+  startedAt: string | null;
+  /** Wall-clock when the protocol was sealed. */
+  finishedAt: string | null;
   completedBy: string | null;
   catalogueCode: string | null;
   catalogueLabel: string | null;
   nextDueAt: string | null;
   status: string;
+  /** Sealed / completed protocol steps (measurements, checks, notes). */
+  protocolSteps: AssignmentProtocolStepDTO[];
 }
 
 /** R10 Kostenvoranschlag on a clinic service request. */
@@ -144,8 +163,18 @@ export interface ServiceRequestDTO {
   completionOverview: AssignmentCompletionOverviewDTO | null;
   /** Partner KV — null when none saved yet. */
   quote: ServiceRequestQuoteDTO | null;
-  /** E77 — on_site | send_in */
-  fulfilment: "on_site" | "send_in" | string;
+  /** E77 / RD25 — on_site | send_in | external */
+  fulfilment: "on_site" | "send_in" | "external" | string;
+  /** RD25 — SV Fremdleistung / certificate (when fulfilment=external). */
+  external: {
+    orgName: string | null;
+    commissionedAt: string | null;
+    certificateRef: string | null;
+    certificateDate: string | null;
+    certificateBlobId: string | null;
+    result: string | null;
+    defectsText: string | null;
+  };
   /** E77 — send-in shipment dates (read-only for clinic). */
   sendIn: {
     shippedAt: string | null;

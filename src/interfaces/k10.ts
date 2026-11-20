@@ -154,6 +154,8 @@ export interface ComposedBookMaintenanceEventDTO {
   externalPerformer: string | null;
   serviceRequestReference: string | null;
   postRepairCheck: string | null;
+  /** Attached third-party report (PDF/image blob). */
+  reportBlobId: string | null;
 }
 
 export interface FieldSafetyAffectedModelDTO {
@@ -315,6 +317,10 @@ export interface ConstancyCadenceDTO {
   determinedAt: string;
   validFrom: string;
   validTo: string | null;
+  /** E87 — A | B | C */
+  captureMode?: "device_protocol" | "manual_measurement" | "visual" | null;
+  protocolSource?: string | null;
+  referenceValuesJson?: unknown;
 }
 
 export interface MissingConstancyCadenceDTO {
@@ -326,18 +332,6 @@ export interface MissingConstancyCadenceDTO {
   /** QS-RL suggestion text — never a frozen dueAt. */
   defaultCadence: string | null;
   dutyId: string;
-}
-
-export interface DutyOverlapDecisionDTO {
-  id: string;
-  deviceInstanceId: string;
-  inventoryNumber: string | null;
-  coveredDutyKey: string;
-  satisfiedByDutyKey: string;
-  reasonText: string;
-  decidedBy: string;
-  decidedAt: string;
-  validTo: string | null;
 }
 
 export interface AuthorityInspectionDTO {

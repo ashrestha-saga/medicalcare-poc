@@ -1,0 +1,52 @@
+{
+ "praxis-1": {
+  "blaetter": 1,
+  "zeilen": 28,
+  "geraetezeilen": 28,
+  "gruen": 21,
+  "gelb": 7,
+  "rot": 0,
+  "exakt": 11,
+  "unscharf": 11,
+  "neu": 6,
+  "dubletten": 0
+ },
+ "praxis-2": {
+  "blaetter": 3,
+  "zeilen": 66,
+  "geraetezeilen": 60,
+  "gruen": 47,
+  "gelb": 11,
+  "rot": 2,
+  "exakt": 24,
+  "unscharf": 24,
+  "neu": 10,
+  "dubletten": 3,
+  "ohne_sn": 6
+ },
+ "praxis-3": {
+  "blaetter": 1,
+  "zeilen": 35,
+  "geraetezeilen": 35,
+  "gruen": 30,
+  "gelb": 2,
+  "rot": 3,
+  "exakt": 12,
+  "unscharf": 13,
+  "neu": 7,
+  "dubletten": 0,
+  "gtin_treffer": 6
+ },
+ "kundenexport": {
+  "zeilen": 153,
+  "kunden_gesamt": 143,
+  "praxen": 120,
+  "dubletten": 8,
+  "privatkunden": 15,
+  "inaktiv": 4,
+  "kunden_mit_lieferadressen": 6,
+  "lieferadresszeilen": 10,
+  "erwartete_mandanten": 116,
+  "erwartete_standorte": 126
+ }
+}

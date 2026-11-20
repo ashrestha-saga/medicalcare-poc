@@ -36,6 +36,7 @@ export function useMySitesList() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [pickOpen, setPickOpen] = useState(false);
   const [distance, setDistance] = useState<MySitesDistanceFilter>("alle");
   const [due, setDueState] = useState<MySitesDueFilter>(() => parseDue(dueParam));
   const [keyword, setKeyword] = useState("");
@@ -117,65 +118,83 @@ export function useMySitesList() {
 
   const summaryCount = filtered.reduce((n, r) => n + r.inspectionCount, 0);
 
+  const institutionsWithWork = useMemo(
+    () => filtered.filter((row) => row.inspectionCount > 0),
+    [filtered],
+  );
+
   /**
-   * Hand off open own jobs into /inspect/heute.
-   * Inspect queue is single-tenant — if several institutions have work, open one first
-   * (same as Select all on the institution portal).
+   * Hand off open own jobs for one institution into /inspect/heute
+   * (grouped there by day bucket + site).
    */
-  const startInspection = useCallback(async () => {
+  const handOffInstitution = useCallback(
+    async (target: MySitesInstitutionDTO) => {
+      if (!sessionUser || starting) return;
+      setStarting(true);
+      try {
+        const portal = await api<SitePortalDTO>(
+          `/api/partner/my-sites/${encodeURIComponent(target.tenantId)}`,
+        );
+        const refs = portal.assignments
+          .filter(
+            (a) =>
+              a.isMine &&
+              a.displayState !== "abgeschlossen" &&
+              a.displayState !== "abgelehnt",
+          )
+          .map((a) => a.reference);
+        if (refs.length === 0) {
+          toast.error(t("mySitesStartNoWork"));
+          return;
+        }
+        useInspectQueueStore.getState().setQueue({
+          userId: sessionUser.id,
+          tenantId: portal.tenantId,
+          tenantName: portal.tenantName,
+          references: refs,
+        });
+        useActingTenantStore.getState().setActingTenant({
+          tenantId: portal.tenantId,
+          tenantName: portal.tenantName,
+          tenantCode: portal.tenantCode,
+          contractId: portal.contractId,
+        });
+        setPickOpen(false);
+        router.push("/inspect/heute");
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : t("sitePortalLoadFailed"));
+      } finally {
+        setStarting(false);
+      }
+    },
+    [sessionUser, starting, t, router],
+  );
+
+  /** Start inspection — one institution immediately; several → pick dialog. */
+  const startInspection = useCallback(() => {
     if (!sessionUser || starting) return;
-    const withWork = filtered.filter((row) => row.inspectionCount > 0);
-    if (withWork.length === 0) {
+    if (institutionsWithWork.length === 0) {
       toast.error(t("mySitesStartNoWork"));
       return;
     }
-    if (withWork.length > 1) {
-      toast.info(t("mySitesStartPickInstitution"));
+    if (institutionsWithWork.length === 1) {
+      void handOffInstitution(institutionsWithWork[0]!);
       return;
     }
-    const target = withWork[0]!;
-    setStarting(true);
-    try {
-      const portal = await api<SitePortalDTO>(
-        `/api/partner/my-sites/${encodeURIComponent(target.tenantId)}`,
-      );
-      const refs = portal.assignments
-        .filter(
-          (a) =>
-            a.isMine &&
-            a.displayState !== "abgeschlossen" &&
-            a.displayState !== "abgelehnt",
-        )
-        .map((a) => a.reference);
-      if (refs.length === 0) {
-        toast.error(t("mySitesStartNoWork"));
-        return;
-      }
-      useInspectQueueStore.getState().setQueue({
-        userId: sessionUser.id,
-        tenantId: portal.tenantId,
-        tenantName: portal.tenantName,
-        references: refs,
-      });
-      useActingTenantStore.getState().setActingTenant({
-        tenantId: portal.tenantId,
-        tenantName: portal.tenantName,
-        tenantCode: portal.tenantCode,
-        contractId: portal.contractId,
-      });
-      router.push("/inspect/heute");
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : t("sitePortalLoadFailed"));
-    } finally {
-      setStarting(false);
-    }
-  }, [sessionUser, starting, filtered, t, router]);
+    setPickOpen(true);
+  }, [sessionUser, starting, institutionsWithWork, handOffInstitution, t]);
+
+  const closePickInstitution = useCallback(() => {
+    if (!starting) setPickOpen(false);
+  }, [starting]);
 
   return {
     data,
     error,
     loading,
     starting,
+    pickOpen,
+    institutionsWithWork,
     distance,
     setDistance,
     due,
@@ -186,6 +205,8 @@ export function useMySitesList() {
     summaryCount,
     openTenant,
     startInspection,
+    handOffInstitution,
+    closePickInstitution,
     refresh,
   };
 }

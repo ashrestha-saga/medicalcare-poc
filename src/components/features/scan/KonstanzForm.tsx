@@ -39,6 +39,12 @@ function resultTone(result: ScanKonstanzCompletedItemDTO["result"]): "ok" | "war
   return "ok";
 }
 
+function modeLetter(mode: ScanKonstanzItemDTO["captureMode"]): string {
+  if (mode === "manual_measurement") return "B";
+  if (mode === "visual") return "C";
+  return "A";
+}
+
 export function KonstanzForm({
   deviceId,
   onCancel,
@@ -56,6 +62,10 @@ export function KonstanzForm({
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [measurements, setMeasurements] = useState<Record<string, string>>({});
+  const [visualChecks, setVisualChecks] = useState<
+    Record<string, { ok: boolean; finding: string }>
+  >({});
 
   useEffect(() => {
     let alive = true;
@@ -81,15 +91,75 @@ export function KonstanzForm({
   const blocked = (open?.items ?? []).filter((i) => !i.canComplete);
   const item: ScanKonstanzItemDTO | undefined = actionable[stepIndex];
 
+  useEffect(() => {
+    if (!item) return;
+    const next: Record<string, string> = {};
+    for (const r of item.referenceValues) next[r.name] = "";
+    setMeasurements(next);
+    const checks: Record<string, { ok: boolean; finding: string }> = {};
+    for (const p of item.visualCheckpoints) checks[p] = { ok: true, finding: "" };
+    setVisualChecks(checks);
+    setResult(null);
+    setNote("");
+    setError(null);
+  }, [item?.dutyId]);
+
   const submit = async () => {
-    if (!open || !item || !result) {
+    if (!open || !item) {
       setError(t("errResult"));
       return;
     }
-    if ((result === "failed" || result === "passed_with_conditions") && !note.trim()) {
-      setError(t("errNote"));
-      return;
+
+    const mode = item.captureMode;
+    let body: Record<string, unknown> = {
+      dutyId: item.dutyId,
+      performedAt: open.performedAt,
+      note: note.trim() || null,
+      captureMode: mode,
+    };
+
+    if (mode === "manual_measurement") {
+      const rows: { name: string; value: number; unit: string }[] = [];
+      for (const ref of item.referenceValues) {
+        const raw = measurements[ref.name]?.trim() ?? "";
+        const value = Number(raw);
+        if (!raw || Number.isNaN(value)) {
+          setError(t("errMeasurement", { name: ref.name }));
+          return;
+        }
+        rows.push({ name: ref.name, value, unit: ref.unit });
+      }
+      body.measurements = rows;
+      body.result = "passed";
+    } else if (mode === "visual") {
+      const findings = item.visualCheckpoints.map((point) => {
+        const row = visualChecks[point] ?? { ok: true, finding: "" };
+        return {
+          point,
+          ok: row.ok,
+          finding: row.ok ? null : row.finding.trim() || null,
+        };
+      });
+      for (const f of findings) {
+        if (!f.ok && !f.finding) {
+          setError(t("errVisualFinding"));
+          return;
+        }
+      }
+      body.visualFindings = findings;
+      body.result = findings.some((f) => !f.ok) ? "failed" : "passed";
+    } else {
+      if (!result) {
+        setError(t("errResult"));
+        return;
+      }
+      if ((result === "failed" || result === "passed_with_conditions") && !note.trim()) {
+        setError(t("errNote"));
+        return;
+      }
+      body.result = result;
     }
+
     setSaving(true);
     setError(null);
     try {
@@ -97,12 +167,7 @@ export function KonstanzForm({
         `/api/scan/devices/${deviceId}/konstanz`,
         {
           method: "POST",
-          body: JSON.stringify({
-            dutyId: item.dutyId,
-            result,
-            note: note.trim() || null,
-            performedAt: open.performedAt,
-          }),
+          body: JSON.stringify(body),
         },
       );
       onSaved(res.result);
@@ -168,9 +233,7 @@ export function KonstanzForm({
           <div className="p-done__banner" data-t={summaryTone} data-testid="konstanz-status-banner">
             <span className="p-done__banner-dot" aria-hidden />
             <div className="p-done__banner-text">
-              <strong>
-                {completed.length > 0 ? t("allDoneToday") : t("allDone")}
-              </strong>
+              <strong>{completed.length > 0 ? t("allDoneToday") : t("allDone")}</strong>
               {completed.length > 0 ? (
                 <span>
                   {t("completedCount", { count: completed.length })} · {formatDay(open.performedAt)}
@@ -182,46 +245,48 @@ export function KonstanzForm({
 
         {completed.length > 0 ? (
           <div className="p-done__list" data-testid="konstanz-completed-today">
-            {completed.map((item: ScanKonstanzCompletedItemDTO) => {
-              const tone = resultTone(item.result);
+            {completed.map((done: ScanKonstanzCompletedItemDTO) => {
+              const tone = resultTone(done.result);
               return (
                 <article
-                  key={item.dutyId}
+                  key={done.dutyId}
                   className="p-done__card"
                   data-t={tone}
-                  data-testid={`konstanz-completed-${item.dutyId}`}
+                  data-testid={`konstanz-completed-${done.dutyId}`}
                 >
                   <div className="p-done__card-top">
                     <div className="p-done__card-titles">
-                      <h3>{item.title}</h3>
-                      {item.constancyObjectLabel ? (
-                        <p className="p-done__object">{item.constancyObjectLabel}</p>
+                      <h3>{done.title}</h3>
+                      {done.constancyObjectLabel ? (
+                        <p className="p-done__object">{done.constancyObjectLabel}</p>
                       ) : null}
                     </div>
                     <span className="p-done__pill" data-t={tone}>
-                      {t(`result.${item.result}`)}
+                      {t(`result.${done.result}`)}
                     </span>
                   </div>
 
                   <div className="p-done__meta">
                     <div className="p-done__meta-item">
                       <span className="p-done__meta-k">{t("performedAt")}</span>
-                      <span className="p-done__meta-v">{formatRecordedAt(item.recordedAt)}</span>
+                      <span className="p-done__meta-v">{formatRecordedAt(done.recordedAt)}</span>
                     </div>
                     <div className="p-done__meta-item">
                       <span className="p-done__meta-k">{t("performedBy")}</span>
-                      <span className="p-done__meta-v">{item.performedBy || t("completedByUnknown")}</span>
+                      <span className="p-done__meta-v">
+                        {done.performedBy || t("completedByUnknown")}
+                      </span>
                     </div>
-                    {item.nextDueAt ? (
+                    {done.nextDueAt ? (
                       <div className="p-done__meta-item">
                         <span className="p-done__meta-k">{t("nextDue")}</span>
-                        <span className="p-done__meta-v">{formatDay(item.nextDueAt)}</span>
+                        <span className="p-done__meta-v">{formatDay(done.nextDueAt)}</span>
                       </div>
                     ) : null}
                   </div>
 
-                  {item.note?.trim() ? (
-                    <p className="p-done__note">{item.note.trim()}</p>
+                  {done.note?.trim() ? (
+                    <p className="p-done__note">{done.note.trim()}</p>
                   ) : null}
                 </article>
               );
@@ -244,6 +309,11 @@ export function KonstanzForm({
     );
   }
 
+  const canSubmit =
+    item?.captureMode === "manual_measurement" ||
+    item?.captureMode === "visual" ||
+    Boolean(result);
+
   return (
     <section className="p-routine" data-testid="konstanz-form">
       <header className="p-routine__head">
@@ -263,40 +333,116 @@ export function KonstanzForm({
         <div className="p-routine__step" key={item.dutyId}>
           <p className="p-routine__question">{item.title}</p>
           <p className="p-routine__scope">
+            {t(`mode.${modeLetter(item.captureMode)}`)}
+            {" · "}
             {t(`status.${item.status}`)}
             {item.dueAt ? ` · ${t("dueAt", { date: item.dueAt })}` : ""}
           </p>
           {item.constancyObjectLabel ? (
             <p className="p-heute__empty">{item.constancyObjectLabel}</p>
           ) : null}
+          {item.captureMode === "device_protocol" && item.protocolSource ? (
+            <p className="p-heute__empty">{t("protocolSource", { source: item.protocolSource })}</p>
+          ) : null}
 
-          <div className="p-stoerung__drei">
-            {(
-              [
-                ["passed", "ok"],
-                ["passed_with_conditions", "warn"],
-                ["failed", "stop"],
-              ] as const
-            ).map(([val, tone]) => (
-              <button
-                key={val}
-                type="button"
-                className={["p-stoerung__drei-b", result === val ? "is-on" : ""].join(" ")}
-                data-tone={tone}
-                aria-pressed={result === val}
-                onClick={() => {
-                  setResult(val);
-                  setError(null);
-                }}
-                data-testid={`konstanz-result-${val}`}
-              >
-                {t(`result.${val}`)}
-              </button>
-            ))}
-          </div>
+          {item.captureMode === "device_protocol" ? (
+            <div className="p-stoerung__drei">
+              {(
+                [
+                  ["passed", "ok"],
+                  ["passed_with_conditions", "warn"],
+                  ["failed", "stop"],
+                ] as const
+              ).map(([val, tone]) => (
+                <button
+                  key={val}
+                  type="button"
+                  className={["p-stoerung__drei-b", result === val ? "is-on" : ""].join(" ")}
+                  data-tone={tone}
+                  aria-pressed={result === val}
+                  onClick={() => {
+                    setResult(val);
+                    setError(null);
+                  }}
+                  data-testid={`konstanz-result-${val}`}
+                >
+                  {t(`result.${val}`)}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {item.captureMode === "manual_measurement" ? (
+            <div className="space-y-3" data-testid="konstanz-measurements">
+              <p className="p-routine__measure">{t("measurements")}</p>
+              {item.referenceValues.map((ref) => (
+                <label key={ref.name} className="p-routine__measure block">
+                  <span>
+                    {ref.name}
+                    <span className="p-heute__empty">
+                      {" "}
+                      ({t("refValue")}: {ref.value} {ref.unit}
+                      {ref.tolerancePct != null ? ` ±${ref.tolerancePct}%` : ""})
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    step="any"
+                    inputMode="decimal"
+                    value={measurements[ref.name] ?? ""}
+                    onChange={(e) =>
+                      setMeasurements((prev) => ({ ...prev, [ref.name]: e.target.value }))
+                    }
+                    data-testid={`konstanz-measurement-${ref.name}`}
+                  />
+                </label>
+              ))}
+            </div>
+          ) : null}
+
+          {item.captureMode === "visual" ? (
+            <div className="space-y-3" data-testid="konstanz-visual">
+              <p className="p-routine__measure">{t("visualPoints")}</p>
+              {item.visualCheckpoints.map((point, idx) => {
+                const row = visualChecks[point] ?? { ok: true, finding: "" };
+                return (
+                  <div key={point} className="rounded-md border p-3" data-testid={`konstanz-visual-${idx}`}>
+                    <label className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={row.ok}
+                        onChange={(e) =>
+                          setVisualChecks((prev) => ({
+                            ...prev,
+                            [point]: { ok: e.target.checked, finding: prev[point]?.finding ?? "" },
+                          }))
+                        }
+                      />
+                      <span>{point}</span>
+                    </label>
+                    {!row.ok ? (
+                      <textarea
+                        rows={2}
+                        className="mt-2 w-full"
+                        value={row.finding}
+                        onChange={(e) =>
+                          setVisualChecks((prev) => ({
+                            ...prev,
+                            [point]: { ok: false, finding: e.target.value },
+                          }))
+                        }
+                        placeholder={t("visualFinding")}
+                      />
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
 
           <label htmlFor="kz-note" className="p-routine__measure">
-            {result === "failed" || result === "passed_with_conditions"
+            {item.captureMode === "device_protocol" &&
+            (result === "failed" || result === "passed_with_conditions")
               ? t("noteRequired")
               : t("noteOptional")}
           </label>
@@ -321,7 +467,7 @@ export function KonstanzForm({
             type="button"
             className="p-routine__save"
             onClick={() => void submit()}
-            disabled={saving || !result}
+            disabled={saving || !canSubmit}
             data-testid="konstanz-submit"
           >
             {saving ? t("saving") : t("submit")}

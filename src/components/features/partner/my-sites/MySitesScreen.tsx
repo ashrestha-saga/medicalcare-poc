@@ -13,6 +13,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/Modal";
 import {
   Select,
   SelectContent,
@@ -28,6 +29,8 @@ function MySitesBody() {
     error,
     loading,
     starting,
+    pickOpen,
+    institutionsWithWork,
     distance,
     setDistance,
     due,
@@ -38,6 +41,8 @@ function MySitesBody() {
     summaryCount,
     openTenant,
     startInspection,
+    handOffInstitution,
+    closePickInstitution,
   } = useMySitesList();
   const columns = useMySitesColumns(openTenant);
 
@@ -53,7 +58,7 @@ function MySitesBody() {
                 type="button"
                 data-testid="my-sites-start-inspection"
                 disabled={loading || starting || summaryCount === 0}
-                onClick={() => void startInspection()}
+                onClick={() => startInspection()}
               >
                 {starting ? t("mySitesStarting") : t("mySitesStartInspection")}
               </Button>
@@ -135,6 +140,47 @@ function MySitesBody() {
           ) : null}
         </ListPageShell>
       </main>
+
+      <Modal
+        open={pickOpen}
+        title={t("mySitesPickInstitutionTitle")}
+        onClose={closePickInstitution}
+        footer={
+          <Button
+            type="button"
+            variant="outline"
+            disabled={starting}
+            onClick={closePickInstitution}
+          >
+            {t("mySitesPickInstitutionCancel")}
+          </Button>
+        }
+      >
+        <p className="mb-3 text-muted-foreground">{t("mySitesPickInstitutionHint")}</p>
+        <ul className="divide-y divide-border rounded-md border border-border" data-testid="my-sites-pick-list">
+          {institutionsWithWork.map((row) => (
+            <li key={row.tenantId}>
+              <button
+                type="button"
+                className="flex w-full items-start justify-between gap-3 px-3 py-3 text-left hover:bg-muted/50 disabled:opacity-60"
+                disabled={starting}
+                data-testid={`my-sites-pick-${row.tenantId}`}
+                onClick={() => void handOffInstitution(row)}
+              >
+                <span className="min-w-0">
+                  <span className="block font-medium text-foreground">{row.tenantName}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {[row.tenantCode, row.location].filter(Boolean).join(" · ") || "—"}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                  {t("mySitesPickInstitutionCount", { count: row.inspectionCount })}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Modal>
     </div>
   );
 }

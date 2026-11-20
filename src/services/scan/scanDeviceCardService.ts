@@ -21,6 +21,10 @@ import {
   deriveKonstanzSperr,
   deviceHasOpenKonstanz,
 } from "./scanKonstanzService";
+import {
+  deviceHasDguvOwnCheckDuty,
+  deviceHasOpenDguvOwnCheck,
+} from "./scanDguvService";
 import { isReprocessingEquipmentDevice } from "@/services/registration/reprocessingLinkService";
 import { openDailyRefCodesForDevice } from "./scanRoutineService";
 
@@ -190,59 +194,72 @@ export const scanDeviceCardService = {
     await assertDeviceInWorkAreas(ctx, device.areaId);
 
     const isEquipment = isReprocessingEquipmentDevice(device);
+    const isBetriebsmittel = device.kind === "equipment";
 
-    const [sperr, openBatchRows, openDailyChecks, openKonstanzChecks, konstanzDuty, openReq, ifuEv, modelIfu] =
-      await Promise.all([
-        deriveSperrLage(deviceId),
-        prisma.reprocessingBatch.findMany({
-          where: { equipmentDeviceId: deviceId, releaseResult: null },
-          orderBy: { startedAt: "desc" },
-          select: { id: true },
-          take: 20,
-        }),
-        deviceHasOpenDailyChecks(device),
-        deviceHasOpenKonstanz(deviceId),
-        prisma.deviceDuty.findFirst({
-          where: {
-            deviceInstanceId: deviceId,
-            dutyKey: "konstanz",
-            applicable: true,
-            suspendedAt: null,
-          },
-          select: { id: true },
-        }),
-        prisma.serviceRequest.findFirst({
-          where: {
-            subjectType: "instance",
-            subjectId: deviceId,
-            state: { notIn: ["completed", "rejected"] },
-          },
-          orderBy: { createdAt: "desc" },
-          select: { reference: true },
-        }),
-        prisma.deviceEvidence.findFirst({
-          where: {
-            deviceInstanceId: deviceId,
-            prerequisiteCode: { in: ["ga", "ifu", "gebrauchsanweisung"] },
-          },
-          select: {
-            externalRecordRef: true,
-            prerequisiteCode: true,
-            attachmentBlobId: true,
-          },
-        }),
-        device.modelId
-          ? prisma.modelDocument.findFirst({
-              where: { deviceModelId: device.modelId, kind: "ifu", supersededAt: null },
-              orderBy: { validFrom: "desc" },
-              select: {
-                revisionLabel: true,
-                blobId: true,
-                externalUrl: true,
-              },
-            })
-          : Promise.resolve(null),
-      ]);
+    const [
+      sperr,
+      openBatchRows,
+      openDailyChecks,
+      openKonstanzChecks,
+      konstanzDuty,
+      openDguvOwnCheck,
+      hasDguvOwnCheck,
+      openReq,
+      ifuEv,
+      modelIfu,
+    ] = await Promise.all([
+      deriveSperrLage(deviceId),
+      prisma.reprocessingBatch.findMany({
+        where: { equipmentDeviceId: deviceId, releaseResult: null },
+        orderBy: { startedAt: "desc" },
+        select: { id: true },
+        take: 20,
+      }),
+      deviceHasOpenDailyChecks(device),
+      deviceHasOpenKonstanz(deviceId),
+      prisma.deviceDuty.findFirst({
+        where: {
+          deviceInstanceId: deviceId,
+          dutyKey: "konstanz",
+          applicable: true,
+          suspendedAt: null,
+        },
+        select: { id: true },
+      }),
+      deviceHasOpenDguvOwnCheck(deviceId),
+      deviceHasDguvOwnCheckDuty(deviceId),
+      prisma.serviceRequest.findFirst({
+        where: {
+          subjectType: "instance",
+          subjectId: deviceId,
+          state: { notIn: ["completed", "rejected"] },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { reference: true },
+      }),
+      prisma.deviceEvidence.findFirst({
+        where: {
+          deviceInstanceId: deviceId,
+          prerequisiteCode: { in: ["ga", "ifu", "gebrauchsanweisung"] },
+        },
+        select: {
+          externalRecordRef: true,
+          prerequisiteCode: true,
+          attachmentBlobId: true,
+        },
+      }),
+      device.modelId
+        ? prisma.modelDocument.findFirst({
+            where: { deviceModelId: device.modelId, kind: "ifu", supersededAt: null },
+            orderBy: { validFrom: "desc" },
+            select: {
+              revisionLabel: true,
+              blobId: true,
+              externalUrl: true,
+            },
+          })
+        : Promise.resolve(null),
+    ]);
     const openBatches = openBatchRows.length;
     const latestOpenBatchId = openBatchRows[0]?.id;
     const ifuOpenUrl =
@@ -261,10 +278,13 @@ export const scanDeviceCardService = {
     const actionInput = {
       state: device.state as ScanDeviceCardDTO["state"],
       isEquipment,
+      isBetriebsmittel,
       openBatchCount: openBatches,
       openDailyChecks,
       openKonstanzChecks,
       hasKonstanzDuties: Boolean(konstanzDuty),
+      openDguvOwnCheck,
+      hasDguvOwnCheck,
       ifuLabel,
       ifuOpenUrl,
       lage: sperr.lage,
@@ -304,6 +324,8 @@ export const scanDeviceCardService = {
       openBatchCount: openBatches,
       openDailyChecks,
       openKonstanzChecks,
+      openDguvOwnCheck,
+      isBetriebsmittel,
       openRequestRef: openReq?.reference ?? null,
       ifuLabel,
       ifuOpenUrl,

@@ -16,6 +16,8 @@ export interface ScanHeuteItemDTO {
   openDailyChecks: boolean;
   /** True when a constancy duty is due/overdue or last check failed. */
   openKonstanzChecks: boolean;
+  /** True when DGUV own_check is due/overdue. */
+  openDguvOwnCheck: boolean;
 }
 
 /** Site / Haus daily work — independent of any inventory device. */
@@ -45,6 +47,7 @@ export type ScanActionCtx =
   | "charge"
   | "charge-neu"
   | "konstanz"
+  | "dguv"
   | "anfragen"
   | "ersatz"
   | "info"
@@ -55,7 +58,7 @@ export interface ScanPrimaryActionDTO {
   titleKey: string;
   textKey: string;
   tone: "ok" | "warn" | "stop";
-  servicePrefill?: "reparatur";
+  servicePrefill?: "reparatur" | "dguv";
   infoOnly?: boolean;
   batchId?: string;
 }
@@ -87,6 +90,10 @@ export interface ScanDeviceCardDTO {
   openBatchCount: number;
   openDailyChecks: boolean;
   openKonstanzChecks: boolean;
+  /** Due DGUV own_check (Betriebsmittel / clinic path). */
+  openDguvOwnCheck: boolean;
+  /** DeviceInstance.kind === equipment (non-MP Betriebsmittel). */
+  isBetriebsmittel: boolean;
   openRequestRef: string | null;
   /** Gebrauchsanweisung label when § 4 evidence / model IFU exists. */
   ifuLabel: string | null;
@@ -94,6 +101,46 @@ export interface ScanDeviceCardDTO {
   ifuOpenUrl: string | null;
   primary: ScanPrimaryActionDTO;
   further: ScanFurtherActionDTO[];
+}
+
+export interface ScanDguvMeasurementTemplateDTO {
+  name: string;
+  unit: string;
+  limit: number | null;
+  limitText: string | null;
+}
+
+export interface ScanDguvOpenDTO {
+  deviceId: string;
+  inventoryNumber: string;
+  label: string;
+  protectionClass: string | null;
+  dutyId: string;
+  title: string;
+  dueAt: string | null;
+  status: "due" | "overdue" | "ok";
+  intervalMonths: number | null;
+  gbuRef: string | null;
+  performedAt: string;
+  measurements: ScanDguvMeasurementTemplateDTO[];
+  completedToday: {
+    result: "passed" | "failed";
+    labelNumber: string | null;
+    performedBy: string;
+    performedAt: string;
+    nextDueAt: string | null;
+  } | null;
+}
+
+export interface ScanDguvResultDTO {
+  deviceId: string;
+  inventoryNumber: string;
+  dutyId: string;
+  result: "passed" | "failed";
+  labelNumber: string | null;
+  labelNextDue: string | null;
+  dueAt: string | null;
+  performedAt: string;
 }
 
 export interface ScanStoerungResultDTO {
@@ -225,6 +272,14 @@ export type ScanKonstanzItemStatus =
   | "baseline_missing"
   | "ok";
 
+export interface ScanKonstanzRefValueDTO {
+  name: string;
+  value: number;
+  unit: string;
+  tolerancePct?: number | null;
+  toleranceAbs?: number | null;
+}
+
 export interface ScanKonstanzItemDTO {
   dutyId: string;
   title: string;
@@ -237,6 +292,11 @@ export interface ScanKonstanzItemDTO {
   lastResult: string | null;
   lastPerformedAt: string | null;
   basisText: string;
+  /** E87 — from open ConstancyCadence */
+  captureMode: "device_protocol" | "manual_measurement" | "visual";
+  protocolSource: string | null;
+  referenceValues: ScanKonstanzRefValueDTO[];
+  visualCheckpoints: string[];
 }
 
 /** Today's already-recorded constancy performances for the device. */

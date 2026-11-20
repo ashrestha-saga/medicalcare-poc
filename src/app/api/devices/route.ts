@@ -21,8 +21,18 @@ export async function GET(req: Request) {
       const siteId = params.get("siteId") ?? undefined;
       const room = params.get("room") ?? undefined;
       const state = params.get("state") ?? undefined;
+      const kindRaw = params.get("kind");
+      const kind =
+        kindRaw === "mp" || kindRaw === "equipment" ? kindRaw : undefined;
       const mineArea = params.get("mineArea") === "1";
-      const devices = await deviceInventoryService.list(ctx, { q, siteId, room, state, mineArea });
+      const devices = await deviceInventoryService.list(ctx, {
+        q,
+        siteId,
+        room,
+        state,
+        kind,
+        mineArea,
+      });
       return Response.json({ devices }, { headers: { "x-correlation-id": ctx.correlationId } });
     });
   } catch (error) {

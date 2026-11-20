@@ -1,0 +1,36 @@
+﻿Nr.;Gerätebezeichnung;Hersteller, Typ;Seriennummer;Baujahr;Standort;UDI/GTIN;Letzte Prüfung;Bemerkungen
+1;Autoklav;Sterimed GmbH, SteriLine 23 B;SN-43505;2023;Labor;4260117050015;MTK 2023-07;nach OP-Umbau 2023 versetzt
+2;Sterilisator;Sterimed GmbH, Autoclave 80;SN-69208;2018;Labor;;;
+3;Absauggerät;Medivac, Vac30;SN-75320;;Labor;;STK 08/2024;
+4;Sterilisator;Sterimed GmbH, Autoclave 80;SN-86528;2022;Aufwachraum;;MTK 2025-07;
+5;Infusionspumpe;Vitamed, Volumat X210;SN-11692;2020;OP 2;;STK 12/2025;
+6;Autoklav;Sterimed, Steriline 23B;;2020;OP 2;;STK 03/2025;nach OP-Umbau 2023 versetzt
+7;Ultraschall-Vernebler;Aerotec, Aerosan 12;SN-38516;2020;OP 2;;STK 11/2024;Wartungsvertrag Hersteller
+8;Defibrillator;Pulsar Medical, LifeLine 300;SN-59087;2016;Aufwachraum;;;nach OP-Umbau 2023 versetzt
+9;Blutdruckmessgerät;Cardiotech, TensioCheck 2;SN-34514;2023;Sprechzimmer;4031678011513;STK 01.07.2025;Wartungsvertrag Hersteller
+10;Ultraschall-Vernebler;Aerotec Medical GmbH, AeroSan12;SN-44628;2017;Sterilisation;;STK 03/2025;nach OP-Umbau 2023 versetzt
+11;Ultraschall-Vernebler;Aerotec Medical, AeroSan 12;SN-91004;2019;Labor;4012345678904;MTK 2024-05;Wartungsvertrag Hersteller
+12;Blutdruckmessgerät;Cardiotech, TensioCheck 2;SN-80075;2025;Aufwachraum;4031678011513;MTK 2024-02;
+13;Ultraschall-Vernebler;Aerotec, Aerosan 12;SN-42391;;OP 2;;STK 01.12.2024;
+14;Inhalationsgerät;Aerotec Medical, AeroJet 5;SN-32661;2022;OP 1;;STK 08/2025;
+15;Ultraschall-Vernebler;Aerotec Medical GmbH, AeroSan12;SN-45688;2015;Sprechzimmer;;STK 01.11.2024;
+16;Sterilisator;Sterimed, AutoClave 80;SN-39273;2015;Aufwachraum;4042809118889;MTK 2024-12;Wartungsvertrag Hersteller
+17;Pulsoximeter;Oxilink, OX-20;SN-17834;2019;OP 2;;MTK 2025-05;
+18;Infusionspumpe;Vitamed Systems, VOLUMAT X-210 Plus;SN-60896;2025;Labor;;;Wartungsvertrag Hersteller
+19;Absauggerät;Medivac, Vac 30;SN-64825;2012;Aufwachraum;;MTK 2023-04;
+20;Absauggerät;Medivac, Vac 30;;2023;Sprechzimmer;;STK 01.02.2024;Wartungsvertrag Hersteller
+21;Sterilisator;Sterimed, AutoClave 80;SN-60765;2017;Sprechzimmer;4042809118889;;Wartungsvertrag Hersteller
+22;Thermodesinfektor;SteriTech GmbH, CleanLine-60;SN-29718;2016;Aufwachraum;;MTK 2024-06;Wartungsvertrag Hersteller
+23;Infusionspumpe;Vitamed Systems, VOLUMAT X-200;SN-45609;2017;Aufwachraum;;MTK 2023-02;nach OP-Umbau 2023 versetzt
+24;Thermodesinfektor;SteriTech GmbH, CleanLine-60;SN-51985;2019;Sterilisation;;MTK 2024-05;Wartungsvertrag Hersteller
+25;Thermodesinfektor;SteriTech, CleanLine 60;SN-17480;2018;Sterilisation;;MTK 2023-12;
+26;Infusionspumpe;Vitamed Systems, VOLUMAT X-210;SN-81784;2020;Aufwachraum;;MTK 2023-02;Wartungsvertrag Hersteller
+27;Waage;Libra Medical, Scale 200;SN-98234;2024;Sprechzimmer;;STK 01.09.2025;nach OP-Umbau 2023 versetzt
+28;Infusionspumpe;Vitamed Systems, VOLUMAT X-210;;2017;Sterilisation;;;
+29;Infusionspumpe;Vitamed Systems, VOLUMAT X-200;SN-62709;2015;Sprechzimmer;;STK 01.10.2024;
+30;Waage;Libra Medical, Scale 200;SN-23038;2017;Aufwachraum;;MTK 2025-06;
+31;Zentrifuge;LabRota, Spin 6;SN-77825;2018;Labor;;STK 01.09.2025;
+32;Inhalationsgerät;Aerotec Medical, AeroJet 5;SN-65255;2014;Aufwachraum;;STK 01.05.2025;
+33;Blutdruckmessgerät;Cardiotech GmbH, Tensio Check II;SN-67431;2018;Sprechzimmer;;STK 01.02.2025;Wartungsvertrag Hersteller
+34;Sterilisator;Sterimed GmbH, Autoclave 80;SN-39571;2019;Labor;;STK 01.04.2025;
+35;Sterilisator;Sterimed, AutoClave 80;SN-70037;2012;OP 1;;STK 01.12.2024;

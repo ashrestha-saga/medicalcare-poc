@@ -1,0 +1,204 @@
+{
+ "version": "v1 (04.11.2026)",
+ "felder": {
+  "bezeichnung": [
+   "gerät",
+   "geraet",
+   "bezeichnung",
+   "gerätebezeichnung",
+   "geraetebezeichnung",
+   "artikel",
+   "name",
+   "handelsname",
+   "trade name",
+   "prüfling",
+   "pruefling",
+   "produkt"
+  ],
+  "typ": [
+   "typ",
+   "modell",
+   "model",
+   "typ/modell",
+   "art/typ",
+   "type",
+   "ausführung",
+   "ausfuehrung"
+  ],
+  "hersteller": [
+   "hersteller",
+   "fabrikat",
+   "marke",
+   "manufacturer",
+   "hersteller/typ",
+   "hersteller, typ"
+  ],
+  "seriennummer": [
+   "seriennummer",
+   "serien-nr",
+   "serien nr",
+   "serien-nr.",
+   "sn",
+   "s/n",
+   "serial",
+   "serial number",
+   "ser.-nr"
+  ],
+  "inventarnummer": [
+   "inventarnummer",
+   "inventar-nr",
+   "inventar-nr.",
+   "inv",
+   "inv.",
+   "inv.-nr",
+   "inv-nr",
+   "identnummer",
+   "betriebliche identifikationsnummer",
+   "gerätenummer",
+   "geraetenummer",
+   "asset number",
+   "asset no",
+   "asset#"
+  ],
+  "loskennung": [
+   "loskennung",
+   "los",
+   "lot",
+   "lot number",
+   "chargennummer",
+   "charge"
+  ],
+  "anschaffung": [
+   "anschaffung",
+   "anschaffungsjahr",
+   "kaufdatum",
+   "baujahr",
+   "inbetriebnahme",
+   "beschafft",
+   "commissioning",
+   "commissioned"
+  ],
+  "standort": [
+   "standort",
+   "raum",
+   "room",
+   "site",
+   "standort/raum",
+   "ort",
+   "gebäude",
+   "gebaeude",
+   "station",
+   "abteilung",
+   "betriebliche zuordnung"
+  ],
+  "verantwortlich": [
+   "verantwortlich",
+   "zuständig",
+   "zustaendig",
+   "verantwortliche person",
+   "betreuer",
+   "responsible",
+   "owner"
+  ],
+  "letzte_stk": [
+   "letzte stk",
+   "stk letzte",
+   "stk",
+   "letzte prüfung",
+   "letzte pruefung",
+   "letzte sicherheitstechnische kontrolle"
+  ],
+  "letzte_mtk": [
+   "letzte mtk",
+   "mtk letzte",
+   "mtk"
+  ],
+  "naechste_pruefung": [
+   "nächste stk",
+   "naechste stk",
+   "nächste prüfung",
+   "naechste pruefung",
+   "fällig",
+   "faellig",
+   "nächste mtk",
+   "naechste mtk"
+  ],
+  "gtin": [
+   "gtin",
+   "udi",
+   "udi-di",
+   "udi/gtin",
+   "ean",
+   "barcode"
+  ],
+  "bemerkung": [
+   "bemerkung",
+   "bemerkungen",
+   "notiz",
+   "hinweis",
+   "kommentar"
+  ],
+  "ignorieren": [
+   "nr.",
+   "nr",
+   "lfd.",
+   "lfd",
+   "pos.",
+   "pos",
+   "anschrift hersteller/bevollmächtigter",
+   "area",
+   "bereich",
+   "status",
+   "device kind",
+   "device type",
+   "geräteart",
+   "geraeteart",
+   "klassifikation",
+   "produktart",
+   "product type",
+   "product kind"
+  ]
+ },
+ "regeln": [
+  {
+   "regel": "split_hersteller_typ",
+   "wenn": "Spalte 'Hersteller, Typ' oder 'Hersteller/Typ'",
+   "dann": "am ersten Komma bzw. Schrägstrich trennen: links Hersteller, rechts Typ"
+  },
+  {
+   "regel": "split_standort_raum",
+   "wenn": "Spalte 'Standort/Raum'",
+   "dann": "enthält der Wert einen bekannten Standortnamen (SITE_LIST), ist dies der Standort und der Rest der Raum; sonst alles Raum, Standort aus Blattzuordnung"
+  },
+  {
+   "regel": "datum",
+   "wenn": "Anschaffung/Kaufdatum/Baujahr",
+   "dann": "dd.mm.yyyy, yyyy-mm, mm/yyyy, yyyy akzeptieren; 'ca. 2019' -> 2019 mit Hinweis 'geschätzt'; leer -> Pflichtangabe fehlt (Gelb)"
+  },
+  {
+   "regel": "freitext_pruefung",
+   "wenn": "Letzte Prüfung als Text",
+   "dann": "'STK 03/2025', 'MTK 2024-11', 'STK 14.09.2024' -> Prüfart + Monat/Datum; Fälligkeit = Datum + Intervall des Modells (E63)"
+  },
+  {
+   "regel": "naechste_pruefung_hinweis",
+   "wenn": "Spalte nächste STK/MTK/Prüfung",
+   "dann": "nur als Hinweis speichern, nie als Fälligkeit (E63)"
+  },
+  {
+   "regel": "kopfzeile",
+   "wenn": "erste Zeile mit >= 3 Wörterbuch-Treffern",
+   "dann": "ist die Kopfzeile; Zeilen davor werden als Titelzeilen übersprungen; Leerzeilen ignoriert"
+  },
+  {
+   "regel": "blatt_standort",
+   "wenn": "mehrere Blätter",
+   "dann": "Blattname gegen SITE_LIST (Namensähnlichkeit) -> Standortvorschlag, sonst 'neuer Standort'"
+  },
+  {
+   "regel": "normalisierung",
+   "wenn": "Vergleich von Kopfzeilen, Herstellern, Typen",
+   "dann": "kleinschreiben, Umlaute auflösen, Sonderzeichen/Leerzeichen/Bindestriche entfernen ('VOLUMAT X-200' == 'Volumat X200'), 'GmbH'/'Medical'/'Systems' am Ende ignorieren"
+  }
+ ]
+}

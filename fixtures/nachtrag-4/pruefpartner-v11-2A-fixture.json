@@ -1,0 +1,530 @@
+{
+ "auftraege": [],
+ "berichte": [],
+ "folgeauftraege": [],
+ "bestellvorschlaege": [
+  {
+   "id": "BV-2026-001",
+   "auftragId": "SR-2026-4471",
+   "geraet": "Ultraschallsystem SonoLine 9",
+   "inv": "INV-MVZ-2021-0240",
+   "einrichtung": "MVZ Rheinbogen",
+   "teile": [
+    {
+     "bez": "Schallkopf C5-2",
+     "teilNr": "MS-C52-11",
+     "sn": "",
+     "menge": 1
+    }
+   ],
+   "status": "offen",
+   "erstelltVon": "J. Reinhardt",
+   "erstelltAm": "2026-09-22",
+   "kanal": "plusorder",
+   "bestelltAm": null,
+   "bestellRef": null,
+   "ausgeloestUeber": "devicecare"
+  }
+ ],
+ "einsendungen": [],
+ "uebersteuerungen": [],
+ "schulungsGate": {
+  "Medisens": "sperre"
+ },
+ "betriebsmittel": [
+  {
+   "id": "BM-0001",
+   "art": "betriebsmittel",
+   "bezeichnung": "Medikamentenkühlschrank",
+   "hersteller": "FrigoMed",
+   "typ": "MedCool 280",
+   "sn": "FM280-11873",
+   "schutzklasse": "I",
+   "ortsveraenderlich": true,
+   "standort": "Haus A",
+   "raum": "Station 3B · Stationszimmer 3.04",
+   "jahr": 2021,
+   "verantwortlich": "Stationsleitung 3B",
+   "tenant": "T-KLN",
+   "status": "geprueft",
+   "plakette": {
+    "nr": "DG-2026-0144",
+    "naechste": "09/2028"
+   }
+  },
+  {
+   "id": "BM-0002",
+   "art": "betriebsmittel",
+   "bezeichnung": "Arbeitsplatz-PC Anmeldung",
+   "hersteller": "Novatech",
+   "typ": "OfficeBox M75",
+   "sn": "NT-M75-30921",
+   "schutzklasse": "I",
+   "ortsveraenderlich": false,
+   "standort": "Haus A",
+   "raum": "Anmeldung · Tresen EG",
+   "jahr": 2023,
+   "verantwortlich": "Patientenaufnahme",
+   "tenant": "T-KLN",
+   "status": "geprueft",
+   "plakette": {
+    "nr": "DG-2026-0145",
+    "naechste": "09/2028"
+   }
+  },
+  {
+   "id": "BM-0003",
+   "art": "betriebsmittel",
+   "bezeichnung": "Laborzentrifuge",
+   "hersteller": "LabSpin",
+   "typ": "Centri 4K",
+   "sn": "LS4K-00771",
+   "schutzklasse": "I",
+   "ortsveraenderlich": true,
+   "standort": "Haus A",
+   "raum": "Labor 1.12",
+   "jahr": 2019,
+   "verantwortlich": "Laborleitung",
+   "tenant": "T-KLN",
+   "status": "geprueft",
+   "plakette": {
+    "nr": "DG-2026-0146",
+    "naechste": "09/2028"
+   }
+  },
+  {
+   "id": "BM-0004",
+   "art": "betriebsmittel",
+   "bezeichnung": "Mehrfachsteckdose",
+   "hersteller": "ElektroPlus",
+   "typ": "5-fach · 1,5 m · Schalter",
+   "sn": "EP5-2211-087",
+   "schutzklasse": "I",
+   "ortsveraenderlich": true,
+   "standort": "Haus A",
+   "raum": "Behandlung 2",
+   "jahr": 2022,
+   "verantwortlich": "Haustechnik",
+   "tenant": "T-KLN",
+   "status": "geprueft",
+   "plakette": {
+    "nr": "DG-2026-0147",
+    "naechste": "11/2028"
+   }
+  },
+  {
+   "id": "BM-0005",
+   "art": "betriebsmittel",
+   "bezeichnung": "Kaffeemaschine",
+   "hersteller": "HomeLine",
+   "typ": "Aroma 12",
+   "sn": "HL-A12-55930",
+   "schutzklasse": "I",
+   "ortsveraenderlich": true,
+   "standort": "Haus A",
+   "raum": "Sozialraum 3B",
+   "jahr": 2020,
+   "verantwortlich": "Stationsleitung 3B",
+   "tenant": "T-KLN",
+   "status": "geprueft",
+   "plakette": null
+  }
+ ],
+ "dguvFestlegungen": [
+  {
+   "ref": "SR-2026-4476",
+   "tenant": "T-KLN",
+   "intervallMonate": 24,
+   "fristQuelle": "Gefährdungsbeurteilung GBU-KLN-2025 — Richtwert DGUV Information 203-071 (Referenz)",
+   "fristVertrauen": "festlegung",
+   "referenz": "DGUV Information 203-071 — Referenz, gegen aktuelle Fassung prüfen"
+  }
+ ],
+ "sammelauftraege": [
+  {
+   "ref": "SR-2026-4476",
+   "tenant": "T-KLN",
+   "leistung": "dguv",
+   "bearbeiter": "M-7",
+   "geraete": 6,
+   "geprueft": 5,
+   "fortschritt": "5 von 6",
+   "gegenzeichnungJeEinsatz": {
+    "name": "M. Ortmann",
+    "rolle": "verantwortlich",
+    "rolleLabel": "Geräteverantwortliche",
+    "am": "14.11.2026 21:24",
+    "sigRef": "ATT-FAF4BB-t3pr",
+    "sha256": "faf4bbdb9f30f3f1",
+    "geraet": "BM-0004"
+   },
+   "geraeteListe": [
+    {
+     "inv": "BM-0001",
+     "art": "betriebsmittel",
+     "schutzklasse": "I",
+     "status": "geprueft",
+     "plakette": {
+      "nr": "DG-2026-0144",
+      "naechste": "09/2028"
+     },
+     "dguvErgebnis": "bestanden"
+    },
+    {
+     "inv": "BM-0002",
+     "art": "betriebsmittel",
+     "schutzklasse": "I",
+     "status": "geprueft",
+     "plakette": {
+      "nr": "DG-2026-0145",
+      "naechste": "09/2028"
+     },
+     "dguvErgebnis": "bestanden"
+    },
+    {
+     "inv": "BM-0003",
+     "art": "betriebsmittel",
+     "schutzklasse": "I",
+     "status": "geprueft",
+     "plakette": {
+      "nr": "DG-2026-0146",
+      "naechste": "09/2028"
+     },
+     "dguvErgebnis": "bestanden"
+    },
+    {
+     "inv": "BM-0004",
+     "art": "betriebsmittel",
+     "schutzklasse": "I",
+     "status": "geprueft",
+     "plakette": {
+      "nr": "DG-2026-0147",
+      "naechste": "11/2028"
+     },
+     "dguvErgebnis": "bestanden"
+    },
+    {
+     "inv": "BM-0005",
+     "art": "betriebsmittel",
+     "schutzklasse": "I",
+     "status": "geprueft",
+     "plakette": null,
+     "dguvErgebnis": "nicht_bestanden"
+    },
+    {
+     "inv": "INV-KLN-2023-0155",
+     "art": "mp",
+     "schutzklasse": "II",
+     "status": "offen",
+     "plakette": null,
+     "dguvErgebnis": null
+    }
+   ]
+  }
+ ],
+ "konstanzRoutine": [
+  {
+   "ref": "SR-2026-4477",
+   "inv": "INV-KLN-2019-0071",
+   "gegenstand": "monitor",
+   "intervallMonate": 3,
+   "fristQuelle": "QS-RL — Takt je Prüfgegenstand",
+   "weg": null
+  }
+ ],
+ "konstanzObjekte": [
+  {
+   "inv": "INV-KLN-2019-0071",
+   "gegenstaende": [
+    {
+     "scopeValue": "aufnahme",
+     "bezugswerte": {
+      "Dosisindikator am Prüfkörper": "2,4 µGy",
+      "Dosisflächenprodukt je Referenzeinstellung": "12,5 cGy·cm²",
+      "Strahlenqualität (Halbwertschicht)": "2,9 mm Al",
+      "Ortsauflösung": "3,2 Lp/mm",
+      "Kontrast (erkennbare Prüfkörper-Stufen)": "7 Stufen"
+     },
+     "toleranzen": [
+      {
+       "name": "Dosisindikator am Prüfkörper",
+       "toleranz": "±20 %",
+       "referenz": true
+      },
+      {
+       "name": "Dosisflächenprodukt je Referenzeinstellung",
+       "toleranz": "±25 %",
+       "referenz": true
+      },
+      {
+       "name": "Strahlenqualität (Halbwertschicht)",
+       "toleranz": "±10 %",
+       "referenz": true
+      },
+      {
+       "name": "Ortsauflösung",
+       "toleranz": "±0,5",
+       "referenz": true
+      },
+      {
+       "name": "Kontrast (erkennbare Prüfkörper-Stufen)",
+       "toleranz": "±1",
+       "referenz": true
+      }
+     ]
+    },
+    {
+     "scopeValue": "monitor",
+     "bezugswerte": {
+      "Leuchtdichte weiß": "350 cd/m²",
+      "Leuchtdichte schwarz (Lmin)": "1,0 cd/m²"
+     },
+     "toleranzen": [
+      {
+       "name": "Leuchtdichte weiß",
+       "toleranz": "±10 %",
+       "referenz": true
+      },
+      {
+       "name": "Leuchtdichte schwarz (Lmin)",
+       "toleranz": "±30 %",
+       "referenz": true
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "konstanzErgebnisse": [],
+ "leistungsGates": [
+  {
+   "leistung": "sachverstaendigenpruefung",
+   "art": "sv",
+   "skill": "sachverstaendiger_roentgen",
+   "qualHier": "sachverstaendiger",
+   "gate": "sperre",
+   "uebersteuerbar": false,
+   "hinweis": "Nur behördlich bestimmte Sachverständige (§ 88 StrlSchV); der Prüfdienst koordiniert, prüft nicht"
+  },
+  {
+   "leistung": "konstanz",
+   "art": "konstanz",
+   "skill": "fachkunde_strahlenschutz",
+   "qualHier": "fachkunde_strlsch",
+   "gate": "sperre",
+   "uebersteuerbar": "serviceleitung",
+   "hinweis": "Fachkunde im Strahlenschutz (§ 116 StrlSchV) erforderlich"
+  },
+  {
+   "leistung": "dguv",
+   "art": "dguv",
+   "skill": "befaehigte_person_elektro",
+   "qualHier": "befaehigte_person_elektro",
+   "gate": "sperre",
+   "uebersteuerbar": "gf",
+   "hinweis": "Befähigte Person für Prüfungen elektrischer Betriebsmittel (DGUV Vorschrift 3, TRBS 1203) erforderlich"
+  }
+ ],
+ "gateEntscheidungen": [
+  {
+   "ref": "SR-2026-4476",
+   "leistung": "dguv",
+   "bearbeiter": "M-7",
+   "startbar": true,
+   "grund": null,
+   "uebersteuerung": null,
+   "fremdleistung": null
+  },
+  {
+   "ref": "SR-2026-4477",
+   "leistung": "konstanz",
+   "bearbeiter": "M-7",
+   "startbar": false,
+   "grund": "skill",
+   "uebersteuerung": null,
+   "fremdleistung": null
+  }
+ ],
+ "plaketten": [
+  {
+   "ref": "SR-2026-4476",
+   "inv": "BM-0001",
+   "nr": "DG-2026-0144",
+   "naechste": "09/2028"
+  },
+  {
+   "ref": "SR-2026-4476",
+   "inv": "BM-0002",
+   "nr": "DG-2026-0145",
+   "naechste": "09/2028"
+  },
+  {
+   "ref": "SR-2026-4476",
+   "inv": "BM-0003",
+   "nr": "DG-2026-0146",
+   "naechste": "09/2028"
+  },
+  {
+   "ref": "SR-2026-4476",
+   "inv": "BM-0004",
+   "nr": "DG-2026-0147",
+   "naechste": "11/2028"
+  }
+ ],
+ "referenzHinweis": "Alle Grenz- und Toleranzwerte in K-DGUV und K-KONST sind Referenzwerte (DIN VDE 0701-0702, QS-RL, DIN 6868) — vor Produktivbetrieb gegen die aktuelle Normfassung prüfen.",
+ "instandhaltung": [],
+ "personaM5": {
+  "konstanzRoutine": [
+   {
+    "ref": "SR-2026-4262",
+    "inv": "INV-KLN-2019-0071",
+    "gegenstand": "aufnahme",
+    "intervallMonate": 1,
+    "fristQuelle": "QS-RL — Takt je Prüfgegenstand (Konstanzroutine des Betreibers)",
+    "weg": "B"
+   },
+   {
+    "ref": "SR-2026-4240",
+    "inv": "INV-KLN-2019-0071",
+    "gegenstand": "monitor",
+    "intervallMonate": 3,
+    "fristQuelle": "QS-RL — Takt je Prüfgegenstand",
+    "weg": null
+   },
+   {
+    "ref": "SR-2026-4244",
+    "inv": "INV-KLN-2026-0501",
+    "gegenstand": "aufnahme",
+    "intervallMonate": 12,
+    "fristQuelle": "QS-RL — Takt je Prüfgegenstand",
+    "weg": "A"
+   }
+  ],
+  "konstanzErgebnisse": [
+   {
+    "ref": "SR-2026-4262",
+    "inv": "INV-KLN-2019-0071",
+    "weg": "B",
+    "ergebnis": "abweichung",
+    "messwerte": [
+     {
+      "name": "Dosisindikator am Prüfkörper",
+      "wert": "3,1",
+      "bezug": "2,4 µGy",
+      "toleranz": "±20 %",
+      "imRahmen": false
+     },
+     {
+      "name": "Dosisflächenprodukt je Referenzeinstellung",
+      "wert": "12,0",
+      "bezug": "12,5 cGy·cm²",
+      "toleranz": "±25 %",
+      "imRahmen": true
+     },
+     {
+      "name": "Strahlenqualität (Halbwertschicht)",
+      "wert": "2,8",
+      "bezug": "2,9 mm Al",
+      "toleranz": "±10 %",
+      "imRahmen": true
+     },
+     {
+      "name": "Homogenität der Aufnahme",
+      "wert": "6",
+      "bezug": null,
+      "toleranz": null,
+      "imRahmen": true
+     },
+     {
+      "name": "Ortsauflösung",
+      "wert": "3,0",
+      "bezug": "3,2 Lp/mm",
+      "toleranz": "±0,5",
+      "imRahmen": true
+     },
+     {
+      "name": "Kontrast (erkennbare Prüfkörper-Stufen)",
+      "wert": "7",
+      "bezug": "7 Stufen",
+      "toleranz": "±1",
+      "imRahmen": true
+     }
+    ],
+    "anhang": null,
+    "sperrvorschlag": {
+     "text": "Konstanzprüfung aufnahme außerhalb der Toleranz: Dosisindikator am Prüfkörper 3,1 (Bezug 2,4 µGy, ±20 %). Vorschlag: Betrieb aussetzen, bis der Strahlenschutzbeauftragte bewertet hat.",
+     "von": "H. Brandt",
+     "am": "14.11.2026 21:23"
+    },
+    "klaerfall": {
+     "model": "DeviceClarification",
+     "kind": "konstanz_abweichung",
+     "tenantId": "T-KLN",
+     "deviceInventoryNumber": "INV-KLN-2019-0071",
+     "serviceRequest": "SR-2026-4262",
+     "createdByOrganisationId": "O-MSR",
+     "sperrvorschlag": true
+    }
+   },
+   {
+    "ref": "SR-2026-4244",
+    "inv": "INV-KLN-2026-0501",
+    "weg": "A",
+    "ergebnis": "bestanden",
+    "messwerte": [],
+    "anhang": "RX-120-konstanz-geraeteprotokoll-2026-09-26.pdf",
+    "sperrvorschlag": null,
+    "klaerfall": null
+   }
+  ],
+  "gateEntscheidungen": [
+   {
+    "ref": "SR-2026-4262",
+    "leistung": "konstanz",
+    "bearbeiter": "M-5",
+    "startbar": true,
+    "grund": null,
+    "uebersteuerung": null,
+    "fremdleistung": null
+   },
+   {
+    "ref": "SR-2026-4240",
+    "leistung": "konstanz",
+    "bearbeiter": "M-5",
+    "startbar": true,
+    "grund": null,
+    "uebersteuerung": null,
+    "fremdleistung": null
+   },
+   {
+    "ref": "SR-2026-4244",
+    "leistung": "konstanz",
+    "bearbeiter": "M-5",
+    "startbar": true,
+    "grund": null,
+    "uebersteuerung": null,
+    "fremdleistung": null
+   },
+   {
+    "ref": "SR-2026-4250",
+    "leistung": "sachverstaendigenpruefung",
+    "bearbeiter": "M-5",
+    "startbar": false,
+    "grund": "fremd",
+    "uebersteuerung": null,
+    "fremdleistung": {
+     "buero": "Sachverständigenbüro Vogel",
+     "status": "beauftragt",
+     "seit": "2026-09-15",
+     "hinweis": "Fremdleistung — Sachverständigenbüro beauftragt; der Prüfdienst koordiniert Termin und Zugang, prüft nicht."
+    }
+   }
+  ]
+ },
+ "_meta": {
+  "version": "pruefpartner-v11-2-A",
+  "vertrag": "ux/CONTRACT-strahlenschutz-dguv-e85-e91.md",
+  "persona": "M-7 (Teil 1), M-5 (personaM5)",
+  "stand": "2026-09-26"
+ }
+}

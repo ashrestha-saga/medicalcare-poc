@@ -986,6 +986,25 @@ export const dispositionService = {
               }
             : undefined,
         });
+        // E89 / R37 — after E79 manufacturer gate
+        const { assertServiceTypeGate } = await import(
+          "@/services/gates/serviceTypeGateService"
+        );
+        await assertServiceTypeGate({
+          tenantId: row.tenantId,
+          organisationId: ctx.organisationId,
+          serviceType: row.serviceType,
+          assigneeUserId: nextAssignee,
+          serviceRequestId: row.id,
+          overrideReason: input.gateOverrideReason ?? null,
+          overrideBy: input.gateOverrideReason
+            ? {
+                userId: ctx.user.id,
+                name: ctx.user.name,
+                appRole: String(ctx.user.appRole),
+              }
+            : undefined,
+        });
       }
 
       let nextScheduled = row.scheduledAt;

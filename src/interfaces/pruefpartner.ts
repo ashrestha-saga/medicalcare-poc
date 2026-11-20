@@ -45,6 +45,8 @@ export interface ResolvedCataloguePreviewDTO {
   traceabilityRequired: boolean;
   setsBaseline: boolean;
   requiresBaseline: boolean;
+  /** E90 — Prüfplakette required on pass for this inspection type. */
+  requiresLabel: boolean;
   occasions: string[];
   appliedPartCode: string | null;
   appliedPartLabel: string | null;
@@ -53,12 +55,27 @@ export interface ResolvedCataloguePreviewDTO {
   missingBaseline: boolean;
 }
 
+export interface CollectivePreviewItemDTO {
+  id: string;
+  position: number;
+  status: string;
+  deviceInstanceId: string;
+  inventoryNumber: string;
+  kind: string | null;
+  deviceLabel: string;
+  inspectionRunId: string | null;
+  skippedReason: string | null;
+}
+
 export interface CataloguePreviewDTO {
   reference: string;
   /** ServiceRequest.id for partner repair APIs (parts proposal, etc.). */
   serviceRequestId: string;
   tenantId: string;
-  deviceInstanceId: string;
+  /** instance | group (RD26). */
+  subjectType: string;
+  /** Null on group list view until a device is selected. */
+  deviceInstanceId: string | null;
   inventoryNumber: string;
   serialNumber: string | null;
   deviceLabel: string;
@@ -101,6 +118,12 @@ export interface CataloguePreviewDTO {
   draftRunId: string | null;
   /** Sealed protocol run id when assignment is already completed. */
   sealedRunId: string | null;
+  /** RD26 — present when subjectType=group. */
+  collective?: {
+    done: number;
+    total: number;
+    items: CollectivePreviewItemDTO[];
+  } | null;
 }
 
 export interface InspectionRunDTO {
@@ -118,6 +141,10 @@ export interface InspectionRunDTO {
   deviceConfirmCode: string | null;
   occasionCode: string | null;
   performedAt: string;
+  /** Wall-clock when the inspector started this protocol. */
+  startedAt: string | null;
+  /** Wall-clock when the protocol was sealed. */
+  completedAt: string | null;
   performedByName: string;
   result: string;
   note: string | null;

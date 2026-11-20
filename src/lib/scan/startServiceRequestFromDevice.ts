@@ -9,6 +9,8 @@ import { useScanStore } from "@/store/scanStore";
  */
 export async function startServiceRequestFromDevice(input: {
   inventoryNumber: string;
+  /** Prefill service-type select (e.g. DGUV / REPAIR from Scan card). */
+  serviceType?: string | null;
 }): Promise<void> {
   const raw = input.inventoryNumber.trim();
   if (!raw) throw new Error("Inventory number is required.");
@@ -32,6 +34,9 @@ export async function startServiceRequestFromDevice(input: {
         areaId: result.device.location.areaId,
         room: result.device.location.room,
       });
+    }
+    if (input.serviceType?.trim()) {
+      request.patch({ serviceType: input.serviceType.trim() });
     }
 
     scan.resolved(result);

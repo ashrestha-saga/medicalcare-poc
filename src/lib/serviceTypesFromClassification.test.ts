@@ -20,13 +20,23 @@ describe("serviceTypesForClassification", () => {
     expect(codes).toEqual(["STK", "MTK", ...ALWAYS_AVAILABLE_SERVICE_TYPES]);
   });
 
-  it("does not include DGUV", () => {
+  it("always includes DGUV for partner / ward service requests", () => {
     const codes = serviceTypesForClassification({
       annex1: true,
       annex2: true,
       softwareClass: "IIb",
       radiation: true,
     }).map((t) => t.code);
-    expect(codes).not.toContain("DGUV");
+    expect(codes).toContain("DGUV");
+    expect(codes[0]).toBe("STK");
+    expect(codes).toEqual([
+      "STK",
+      "MTK",
+      "DGUV",
+      "REPAIR",
+      "SOFTWARE",
+      "RADIATION",
+      "OTHER",
+    ]);
   });
 });

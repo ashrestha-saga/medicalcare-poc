@@ -10,6 +10,7 @@ import {
   dispatchPipelineFilterSchema,
   type DispatchPipelineFilter,
 } from "@/schemas/console";
+import type { GateOverridePending } from "@/components/features/partner/inspection-orders/TrainingGateOverrideDialog";
 import { toast } from "@/store/toastStore";
 
 export type DispatchAssignee = {
@@ -271,12 +272,7 @@ export function useInspectionOrdersList() {
     }
   }, []);
 
-  const [gatePending, setGatePending] = useState<{
-    reference: string;
-    manufacturer: string;
-    assigneeUserId: string;
-    assigneeName?: string | null;
-  } | null>(null);
+  const [gatePending, setGatePending] = useState<GateOverridePending | null>(null);
 
   const onAssignHandler = useCallback(
     async (
@@ -297,23 +293,50 @@ export function useInspectionOrdersList() {
         toast.success(t("dispositionSaved"));
         await refresh();
       } catch (e) {
-        if (
-          e instanceof ApiError &&
-          e.status === 423 &&
-          e.code === "TRAINING_GATE" &&
-          assigneeUserId
-        ) {
-          const details = e.details as { manufacturer?: string } | undefined;
+        if (e instanceof ApiError && e.status === 423 && assigneeUserId) {
           const name =
             assigneesByTenant[row.tenantId]?.find((a) => a.userId === assigneeUserId)?.name ??
             null;
-          setGatePending({
-            reference: row.reference,
-            manufacturer: details?.manufacturer ?? "—",
-            assigneeUserId,
-            assigneeName: name,
-          });
-          toast.error(e.message);
+          if (e.code === "TRAINING_GATE") {
+            const details = e.details as { manufacturer?: string } | undefined;
+            setGatePending({
+              kind: "training",
+              reference: row.reference,
+              manufacturer: details?.manufacturer ?? "—",
+              assigneeUserId,
+              assigneeName: name,
+            });
+            toast.error(e.message);
+          } else if (e.code === "SERVICE_TYPE_GATE") {
+            const details = e.details as {
+              serviceType?: string;
+              qualificationCode?: string;
+              overridableBy?: string;
+              locked?: boolean;
+            } | undefined;
+            const overridableBy = details?.overridableBy ?? "none";
+            if (
+              overridableBy === "none" ||
+              details?.locked ||
+              (overridableBy !== "service_lead" && overridableBy !== "management")
+            ) {
+              setGatePending(null);
+              toast.error(e.message);
+            } else {
+              setGatePending({
+                kind: "service_type",
+                reference: row.reference,
+                serviceType: details?.serviceType ?? "—",
+                qualificationCode: details?.qualificationCode ?? "—",
+                overridableBy,
+                assigneeUserId,
+                assigneeName: name,
+              });
+              toast.error(e.message);
+            }
+          } else {
+            toast.error(e.message);
+          }
         } else {
           toast.error(e instanceof ApiError ? e.message : t("dispositionSaveFailed"));
         }

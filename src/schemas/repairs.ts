@@ -92,6 +92,8 @@ export const externalRepairSchema = z.object({
     .optional()
     .nullable(),
   reportBlobId: z.string().optional().nullable(),
+  /** PDF (or image) data URL — stored as AttachmentBlob when reportBlobId not set. */
+  reportDataUrl: z.string().trim().min(32).max(12_000_000).optional().nullable(),
   partsText: z.string().max(4000).optional().nullable(),
   laborMinutes: z.number().int().nonnegative().optional().nullable(),
   createFollowUp: z.boolean().optional(),
@@ -155,7 +157,7 @@ export const partnerCreateOrderSchema = z
     deviceInstanceId: z.string().trim().min(1).max(100),
     serviceType: z.enum(partnerCreateOrderServiceTypes),
     reason: z.enum(["faelligkeit", "befund", "rueckruf", "stoerung", "instandsetzung"]),
-    fulfilment: z.enum(["on_site", "send_in"]).default("on_site"),
+    fulfilment: z.enum(["on_site", "send_in", "external"]).default("on_site"),
     urgency: z.enum(["immediate", "with_next_due", "at_appointment"]).default("immediate"),
     faultDescription: z.string().trim().max(4000).optional().nullable(),
     faultSince: dateOnly.optional().nullable(),
@@ -163,6 +165,8 @@ export const partnerCreateOrderSchema = z
     faultReportedBy: z.string().trim().max(200).optional().nullable(),
     photoDataUrl: z.string().trim().min(32).max(8_000_000).optional().nullable(),
     workshopName: z.string().trim().max(300).optional().nullable(),
+    externalOrgName: z.string().trim().max(300).optional().nullable(),
+    externalCommissionedAt: dateOnly.optional().nullable(),
     appointmentAt: z.string().datetime({ offset: true }).optional().nullable(),
     assigneeUserId: z.string().trim().min(1).max(100).optional().nullable(),
     note: z.string().trim().max(2000).optional().nullable(),
@@ -197,6 +201,22 @@ export const partnerCreateOrderSchema = z
         path: ["workshopName"],
         message: "Workshop required for send-in",
       });
+    }
+    if (v.fulfilment === "external") {
+      if (!v.externalOrgName?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["externalOrgName"],
+          message: "External office required",
+        });
+      }
+      if (!v.externalCommissionedAt) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["externalCommissionedAt"],
+          message: "Commission date required",
+        });
+      }
     }
     if (v.fulfilment === "on_site" && v.urgency === "at_appointment" && !v.appointmentAt) {
       ctx.addIssue({

@@ -71,9 +71,27 @@ const includeAll = {
       result: true,
       note: true,
       performedAt: true,
+      startedAt: true,
+      completedAt: true,
       performedByName: true,
       dutyPerformanceId: true,
       catalogue: { select: { code: true, label: true } },
+      stepResults: {
+        select: {
+          measuredValue: true,
+          withinLimit: true,
+          confirmed: true,
+          note: true,
+          step: {
+            select: {
+              position: true,
+              label: true,
+              inputKind: true,
+              unit: true,
+            },
+          },
+        },
+      },
     },
   },
   performances: {
@@ -84,6 +102,19 @@ const includeAll = {
       note: true,
       performedAt: true,
       performedBy: true,
+    },
+  },
+  /** K-REP / repair fold — used when seal has no DutyPerformance (no linked duty). */
+  maintenanceEvents: {
+    orderBy: { performedAt: "desc" as const },
+    take: 1,
+    select: {
+      result: true,
+      resultText: true,
+      note: true,
+      performedAt: true,
+      performedBy: true,
+      kind: true,
     },
   },
   _count: { select: { attachments: true } },

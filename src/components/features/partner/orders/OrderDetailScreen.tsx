@@ -364,7 +364,9 @@ export function OrderDetailScreen({ reference }: Props) {
                   </h3>
                   <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                     {order.device?.inventoryNumber ?? order.locationText}
-                    {order.device?.manufacturer ? ` · ${order.device.manufacturer}` : ""}
+                    {order.device?.manufacturer
+                      ? ` · ${order.device.manufacturer}`
+                      : ""}
                   </p>
                 </div>
                 <Badge variant={stateTone(order.state)} className="shrink-0">
@@ -399,7 +401,16 @@ export function OrderDetailScreen({ reference }: Props) {
 
               {order.gateOverride ? (
                 <div className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-sm">
-                  <span className="font-medium">{t("overridden")}</span>
+                  <span className="inline-flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{t("overridden")}</span>
+                    {order.gateOverride.kind ? (
+                      <Badge variant="outline" className="text-[10px] font-normal">
+                        {order.gateOverride.kind === "service_type"
+                          ? t("gateKindServiceType")
+                          : t("gateKindTraining")}
+                      </Badge>
+                    ) : null}
+                  </span>
                   <span className="text-muted-foreground">
                     {" · "}
                     {[order.gateOverride.by, order.gateOverride.reason].filter(Boolean).join(" · ")}
@@ -651,6 +662,18 @@ export function OrderDetailScreen({ reference }: Props) {
                     <Row
                       label={t("performedAt")}
                       value={new Date(ev.performedAt).toLocaleString()}
+                    />
+                    <Row
+                      label={t("startedAt")}
+                      value={
+                        ev.startedAt ? new Date(ev.startedAt).toLocaleString() : null
+                      }
+                    />
+                    <Row
+                      label={t("completedAt")}
+                      value={
+                        ev.completedAt ? new Date(ev.completedAt).toLocaleString() : null
+                      }
                     />
                     <Row label={t("performedBy")} value={ev.performedBy} />
                     <Row label={t("action")} value={ev.action} />

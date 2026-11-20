@@ -23,7 +23,7 @@ type Props = {
   embed?: boolean;
 };
 
-/** R10 clinic quote decide — POST /api/requests/:id/quote/decide. */
+/** R10 clinic quote decide — POST /api/requests/:reference/quote/decide. */
 export function QuoteDecidePanel({
   requestId: requestIdProp,
   quote: quoteProp,

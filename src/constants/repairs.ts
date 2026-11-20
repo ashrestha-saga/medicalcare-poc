@@ -90,6 +90,7 @@ export function inspectionTypeCodeForCheckType(
  * Inspection type used when starting/previewing a protocol for a service request.
  * Duty wins when present; repair SRs without a duty map to REPAIR (K-REP), not STK.
  * Post-repair SRs use checkType (E78) when no duty type is set.
+ * Radiation/DGUV service types map to their own inspection types (E85) — never default to STK.
  */
 export function inspectionTypeCodeForServiceRequest(input: {
   serviceType: string;
@@ -102,5 +103,23 @@ export function inspectionTypeCodeForServiceRequest(input: {
   if (st === POST_REPAIR_CHECK_SERVICE_TYPE) {
     return inspectionTypeCodeForCheckType(input.checkType);
   }
+  const key = st.trim().toLowerCase();
+  if (key === "dguv" || key.includes("dguv")) return "DGUV";
+  if (
+    key === "konstanz" ||
+    key === "constancy" ||
+    key === "radiation" ||
+    key.includes("konstanz") ||
+    key.includes("constancy")
+  ) {
+    return "CONSTANCY";
+  }
+  if (key === "sv" || key === "expert" || key === "sachverstaendiger" || key.includes("expert")) {
+    return "SV";
+  }
+  if (key === "mtk") return "MTK";
+  if (key === "stk") return "STK";
+  // Unknown non-repair types: preserve uppercase service type when it looks like a code.
+  if (/^[A-Z][A-Z0-9_-]*$/.test(st.trim())) return st.trim();
   return "STK";
 }

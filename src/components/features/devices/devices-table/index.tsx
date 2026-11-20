@@ -218,6 +218,11 @@ export function DevicesTable({ list, onSelect, onEdit }: DevicesTableProps) {
               : null,
           );
         }}
+        kindFilter={list.kindFilter}
+        onKindChange={(value) => {
+          const next = typeof value === "string" ? value : Array.isArray(value) ? value[0] : null;
+          list.setKindFilter(next === "mp" || next === "equipment" ? next : null);
+        }}
         mineArea={list.mineArea}
         onMineAreaChange={list.setMineArea}
         onClearAll={() => list.clearListFilters()}

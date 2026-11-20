@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { ListPageShell } from "@/components/features/shared/ListPageShell";
 import { DataTable } from "@/components/features/shared/shadcn/DataTable";
@@ -22,8 +23,6 @@ function InspectionOrdersBody({ embedded }: { embedded: boolean }) {
   const { checkPermission } = usePermissions();
   const canDispatch = checkPermission("console:disposition:assign");
   const appRole = useSessionStore((s) => s.user?.appRole);
-  const canOverrideGate =
-    appRole === "service_lead" || appRole === "management" || appRole === "admin";
   const {
     filtered,
     error,
@@ -51,6 +50,21 @@ function InspectionOrdersBody({ embedded }: { embedded: boolean }) {
     setGatePending,
     confirmGateOverride,
   } = useInspectionOrdersList();
+
+  const canOverrideGate = useMemo(() => {
+    if (!gatePending) {
+      return (
+        appRole === "service_lead" || appRole === "management" || appRole === "admin" || appRole === "gf"
+      );
+    }
+    if (gatePending.kind === "training") {
+      return appRole === "service_lead" || appRole === "management" || appRole === "admin" || appRole === "gf";
+    }
+    if (gatePending.overridableBy === "management") {
+      return appRole === "management" || appRole === "admin" || appRole === "gf";
+    }
+    return appRole === "service_lead" || appRole === "management" || appRole === "admin" || appRole === "gf";
+  }, [appRole, gatePending]);
 
   const focusLabel =
     reason === "befund"

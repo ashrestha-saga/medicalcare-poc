@@ -182,7 +182,8 @@ export async function partnerCreateOrder(
         raisedBy: ctx.user.name,
         source: "app",
         deferDispatch: true,
-        fulfilment: input.fulfilment,
+        // Initial create accepts on_site|send_in; external is applied in the update below.
+        fulfilment: input.fulfilment === "external" ? "on_site" : input.fulfilment,
       },
       actingCtx,
     );
@@ -212,11 +213,21 @@ export async function partnerCreateOrder(
         executorOrgId: executor.id,
         allocatedAt: row.allocatedAt ?? new Date(),
         allocatedBy: row.allocatedBy ?? ctx.user.name,
-        assigneeUserId: input.assigneeUserId ?? null,
+        assigneeUserId:
+          input.fulfilment === "external" ? null : (input.assigneeUserId ?? null),
+        visitId: input.fulfilment === "external" ? null : undefined,
         scheduledAt:
           input.fulfilment === "on_site" && input.appointmentAt
             ? new Date(input.appointmentAt)
             : null,
+        ...(input.fulfilment === "external"
+          ? {
+              externalOrgName: input.externalOrgName?.trim() || null,
+              externalCommissionedAt: input.externalCommissionedAt
+                ? new Date(`${input.externalCommissionedAt}T00:00:00.000Z`)
+                : null,
+            }
+          : {}),
       };
 
       if (input.reason === "stoerung") {
@@ -468,7 +479,6 @@ export async function listPartnerClinicDevices(
           }
         : {}),
     },
-    take: 80,
     orderBy: { inventoryNumber: "asc" },
     include: {
       model: {

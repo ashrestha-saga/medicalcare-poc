@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { api } from "@/lib/apiClient";
@@ -9,11 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/store/toastStore";
 
+type LinkedLoaner = {
+  id: string;
+  inventoryNumber: string;
+  loanerLender: string | null;
+  operationalState: string;
+};
+
 type Props = {
   deviceId: string;
   operationalState?: string | null;
   replacedById?: string | null;
-  loanerLender?: string | null;
+  replacedBy?: LinkedLoaner | null;
   onAssigned?: () => void;
 };
 
@@ -22,7 +30,7 @@ export function LoanerAssignPanel({
   deviceId,
   operationalState,
   replacedById,
-  loanerLender,
+  replacedBy,
   onAssigned,
 }: Props) {
   const t = useTranslations("repairs.loaner");
@@ -46,8 +54,23 @@ export function LoanerAssignPanel({
         data-testid="loaner-assigned"
       >
         <p className="font-medium">{t("assignedTitle")}</p>
-        <p className="mt-1 text-muted-foreground">
-          {t("assignedBody", { lender: loanerLender ?? "—" })}
+        <p className="mt-1 text-muted-foreground" data-testid="loaner-assigned-body">
+          {replacedBy ? (
+            <>
+              {t("assignedDevice")}{" "}
+              <Link
+                href={`/devices?q=${encodeURIComponent(replacedBy.inventoryNumber)}`}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {replacedBy.inventoryNumber}
+              </Link>
+              {replacedBy.loanerLender
+                ? ` · ${t("assignedLender", { lender: replacedBy.loanerLender })}`
+                : null}
+            </>
+          ) : (
+            t("assignedBody", { lender: "—" })
+          )}
         </p>
       </div>
     );

@@ -6,6 +6,8 @@ import { forbidden } from "@/lib/errors";
 
 export type TenantFeatureFlags = {
   repairs?: boolean;
+  /** Nachtrag 4 — Strahlenschutz / DGUV (E85–E91). */
+  radiation_dguv?: boolean;
 };
 
 export function parseFeatureFlags(raw: unknown): TenantFeatureFlags {
@@ -13,6 +15,7 @@ export function parseFeatureFlags(raw: unknown): TenantFeatureFlags {
   const obj = raw as Record<string, unknown>;
   return {
     repairs: obj.repairs === true,
+    radiation_dguv: obj.radiation_dguv === true,
   };
 }
 

@@ -29,6 +29,8 @@ type FieldErrors = {
   visitId?: string;
   signatures?: string;
   noPhotoReason?: string;
+  labelNumber?: string;
+  labelNextDue?: string;
   general?: string;
 };
 
@@ -39,6 +41,8 @@ function fieldFromApiError(e: unknown): FieldErrors {
   if (field === "visitId") return { visitId: e.message };
   if (field === "signatures") return { signatures: e.message };
   if (field === "noPhotoReason") return { noPhotoReason: e.message };
+  if (field === "labelNumber") return { labelNumber: e.message };
+  if (field === "labelNextDue") return { labelNextDue: e.message };
   return { general: e.message };
 }
 
@@ -78,6 +82,8 @@ export function useInspectionProtocol(reference: string) {
   const [testEquipmentId, setTestEquipmentId] = useState("");
   const [result, setResult] = useState<InspectionResultCode>("passed");
   const [defects, setDefects] = useState("");
+  const [labelNumber, setLabelNumber] = useState("");
+  const [labelNextDue, setLabelNextDue] = useState("");
   const [stepDraft, setStepDraft] = useState<InspectionStepDraft>({});
   const [attachmentHintAck, setAttachmentHintAck] = useState(false);
 
@@ -193,11 +199,17 @@ export function useInspectionProtocol(reference: string) {
     catalogueSteps.length === 0 ||
     catalogueRatedCount >= catalogueSteps.length;
 
+  const labelOk =
+    !catalogue?.requiresLabel ||
+    result === "failed" ||
+    (/^[A-Z]{2}-\d{4}-\d{4}$/.test(labelNumber.trim()) && Boolean(labelNextDue.trim()));
+
   const canComplete =
     stepsComplete &&
     visitStarted &&
     signaturesOk &&
     missingEvidence.length === 0 &&
+    labelOk &&
     Boolean(run?.deviceConfirmed || run?.deviceConfirmSkipped);
 
   const startRun = useCallback(async () => {
@@ -499,12 +511,22 @@ export function useInspectionProtocol(reference: string) {
       } catch {
         /* hint is advisory — do not block seal if clarification write fails */
       }
+      const needsLabel = Boolean(catalogue?.requiresLabel) && result !== "failed";
       const res = await api<{ run: InspectionRunDTO }>(
         `/api/partner/inspection-runs/${run.id}/complete`,
         {
           method: "POST",
           headers: { "Idempotency-Key": idempotencyKey },
-          body: JSON.stringify({ result, note }),
+          body: JSON.stringify({
+            result,
+            note,
+            ...(needsLabel
+              ? {
+                  labelNumber: labelNumber.trim() || null,
+                  labelNextDue: labelNextDue.trim() || null,
+                }
+              : {}),
+          }),
         },
       );
       setRun(res.run);
@@ -533,6 +555,8 @@ export function useInspectionProtocol(reference: string) {
     defects,
     familySteps,
     stepDraft,
+    labelNumber,
+    labelNextDue,
     markDone,
     saveSteps,
     submitPartnerHints,
@@ -563,6 +587,10 @@ export function useInspectionProtocol(reference: string) {
     setResult,
     defects,
     setDefects,
+    labelNumber,
+    setLabelNumber,
+    labelNextDue,
+    setLabelNextDue,
     stepDraft,
     updateStepDraft,
     attachmentHintAck,

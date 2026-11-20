@@ -13,8 +13,11 @@ export async function GET(req: Request) {
     if (!reference) {
       return Response.json({ error: { message: "reference required" } }, { status: 400 });
     }
+    const deviceInstanceId = url.searchParams.get("deviceInstanceId");
     const data = await withTenantStore(ctx, () =>
-      inspectionRunService.resolvePreview(ctx, decodeURIComponent(reference)),
+      inspectionRunService.resolvePreview(ctx, decodeURIComponent(reference), {
+        deviceInstanceId: deviceInstanceId ? decodeURIComponent(deviceInstanceId) : null,
+      }),
     );
     return Response.json(data, { headers: { "x-correlation-id": ctx.correlationId } });
   } catch (error) {

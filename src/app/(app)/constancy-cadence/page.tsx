@@ -1,11 +1,11 @@
 import { Suspense } from "react";
-import { ConstancyCadenceScreen } from "@/components/features/constancy/ConstancyCadenceScreen";
+import { ConstancyHubScreen } from "@/components/features/constancy/ConstancyHubScreen";
 
-/** /constancy-cadence — open takt / missing cadence (duties:view). */
+/** /constancy-cadence — Strahlenschutz: takt + routine tabs (duties:view). */
 export default function ConstancyCadencePage() {
   return (
     <Suspense fallback={null}>
-      <ConstancyCadenceScreen />
+      <ConstancyHubScreen />
     </Suspense>
   );
 }

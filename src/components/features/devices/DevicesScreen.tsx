@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useDevicesList } from "@/components/hooks/devices/useDevicesList";
 import { useDeviceEditor } from "@/components/hooks/devices/useDeviceEditor";
@@ -19,15 +18,48 @@ import { DeviceDetail } from "./DeviceDetail";
 import { DeviceEditForm } from "./DeviceEditForm";
 import { DevicesTable } from "./devices-table";
 
-function RegistrationButton({ className }: { className?: string }) {
+function ImportButton({ className }: { className?: string }) {
   const t = useTranslations("pages.inventory");
   return (
-    <Button type="button" size="sm" className={cn("h-8", className)} asChild data-testid="devices-erstanlage">
-      <Link href="/registration">
-        <Plus className="h-4 w-4" />
-        {t("registration")}
-      </Link>
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className={cn("h-8", className)}
+      asChild
+      data-testid="devices-import"
+    >
+      <Link href="/devices/import">{t("importInventory")}</Link>
     </Button>
+  );
+}
+
+function EmptyInventoryTrio() {
+  const t = useTranslations("pages.inventoryImport");
+  return (
+    <div className="grid gap-3 sm:grid-cols-3" data-testid="devices-empty-trio">
+      <div className="rounded-lg border p-4">
+        <b>{t("emptyImport")}</b>
+        <p className="mt-1 text-sm text-muted-foreground">{t("subtitle")}</p>
+        <Button type="button" size="sm" className="mt-3" asChild>
+          <Link href="/devices/import">{t("emptyImport")}</Link>
+        </Button>
+      </div>
+      <div className="rounded-lg border p-4">
+        <b>{t("emptySingle")}</b>
+        <p className="mt-1 text-sm text-muted-foreground">{t("emptySingle")}</p>
+        <Button type="button" size="sm" className="mt-3" asChild>
+          <Link href="/registration">{t("emptySingle")}</Link>
+        </Button>
+      </div>
+      <div className="rounded-lg border p-4">
+        <b>{t("emptyLater")}</b>
+        <p className="mt-1 text-sm text-muted-foreground">{t("emptyLater")}</p>
+        <Button type="button" size="sm" variant="outline" className="mt-3" asChild>
+          <Link href="/devices/import/jobs">{t("jobsTitle")}</Link>
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -41,6 +73,7 @@ function parseTab(raw: string | null): DevicesTab {
 /** Tenant device inventory list — gated by inventory:view; edit by inventory:update. */
 export function DevicesScreen() {
   const t = useTranslations("pages.inventory");
+  const tImport = useTranslations("pages.inventoryImport");
   const tKlar = useTranslations("pages.clarifications");
   const tCommon = useTranslations("common");
   const { checkPermission } = usePermissions();
@@ -100,6 +133,7 @@ export function DevicesScreen() {
             canEdit={list.canUpdate && !list.selected.catalogPending}
             onBack={list.clearSelection}
             onEdit={() => void editor.openEdit(list.selected!)}
+            onRefresh={() => void list.selectDevice(list.selected!)}
             completingDutyId={list.completingDutyId}
             onCompleteDuty={(id, input) => void list.completeDuty(id, input)}
           />
@@ -159,7 +193,7 @@ export function DevicesScreen() {
                       );
                     })}
                 </div>
-                {showKlar && list.canUpdate ? <RegistrationButton /> : null}
+                {list.canUpdate ? <ImportButton /> : null}
               </div>
             }
           >
@@ -191,6 +225,11 @@ export function DevicesScreen() {
                       modelName: null,
                       tradeName: item.title,
                       modelId: item.modelId,
+                      kind: "mp",
+                      protectionClass: null,
+                      portable: null,
+                      electrical: true,
+                      productKindCode: null,
                       state: "draft",
                       modelState: null,
                       location: item.locationText
@@ -242,11 +281,24 @@ export function DevicesScreen() {
                     </Button>
                   </div>
                 ) : null}
-                <DevicesTable
-                  list={list}
-                  onSelect={(device) => void list.selectDevice(device)}
-                  onEdit={(device) => void editor.openEdit(device)}
-                />
+                {!list.loading &&
+                list.devices.length === 0 &&
+                list.canUpdate &&
+                !list.q.trim() &&
+                !list.siteFilter &&
+                !list.stateFilter &&
+                !list.mineArea ? (
+                  <div className="mb-4 space-y-2">
+                    <h2 className="text-lg font-medium">{tImport("emptyTitle")}</h2>
+                    <EmptyInventoryTrio />
+                  </div>
+                ) : (
+                  <DevicesTable
+                    list={list}
+                    onSelect={(device) => void list.selectDevice(device)}
+                    onEdit={(device) => void editor.openEdit(device)}
+                  />
+                )}
               </>
             )}
           </ListPageShell>

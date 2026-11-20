@@ -16,6 +16,7 @@ export function ScanDeviceCard({
   onStoerung,
   onRoutine,
   onKonstanz,
+  onDguv,
   onChargeNeu,
   onChargeFreigabe,
   onService,
@@ -29,6 +30,7 @@ export function ScanDeviceCard({
   onStoerung: (card: ScanDeviceCardDTO) => void;
   onRoutine: (card: ScanDeviceCardDTO) => void;
   onKonstanz: (card: ScanDeviceCardDTO) => void;
+  onDguv: (card: ScanDeviceCardDTO) => void;
   onChargeNeu: (card: ScanDeviceCardDTO) => void;
   onChargeFreigabe: (card: ScanDeviceCardDTO, batchId: string) => void;
   onService: (card: ScanDeviceCardDTO) => void;
@@ -120,6 +122,9 @@ export function ScanDeviceCard({
         return;
       case "konstanz":
         onKonstanz(card);
+        return;
+      case "dguv":
+        onDguv(card);
         return;
       case "ifu":
         if (card.ifuOpenUrl) {

@@ -53,6 +53,8 @@ export const inventoryExportService = {
     const rows = await prisma.deviceInstance.findMany({
       where: {
         state: "released",
+        // E86 — § 14 Bestandsverzeichnis is medical devices only.
+        kind: "mp",
         ...(scopedToIds
           ? { id: { in: ids } }
           : filters.areaId

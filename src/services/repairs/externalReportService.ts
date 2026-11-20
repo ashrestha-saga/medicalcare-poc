@@ -13,6 +13,7 @@ import {
 } from "@/constants/repairs";
 import { recordAudit } from "@/services/audit/auditService";
 import { loadClassHints } from "@/services/repairs/repairOutcomeService";
+import { createAttachmentFromDataUrl } from "@/services/storage/attachmentBlobService";
 
 async function assertRepairs(ctx: TenantWorkContext) {
   const tenant = await prisma.tenant.findUnique({
@@ -47,6 +48,7 @@ export async function createExternalRepairReport(
     externalPerformer: string;
     result?: RepairResult | null;
     reportBlobId?: string | null;
+    reportDataUrl?: string | null;
     partsText?: string | null;
     laborMinutes?: number | null;
     createFollowUp?: boolean;
@@ -76,6 +78,24 @@ export async function createExternalRepairReport(
   });
   if (!device) throw notFound("Device not found");
 
+  let reportBlobId = input.reportBlobId?.trim() || null;
+  if (!reportBlobId && input.reportDataUrl?.trim()) {
+    const dataUrl = input.reportDataUrl.trim();
+    if (!dataUrl.startsWith("data:")) {
+      throw unprocessable("reportDataUrl must be a data URL", { field: "reportDataUrl" });
+    }
+    const mime = /^data:([^;,]+)/i.exec(dataUrl)?.[1]?.toLowerCase() ?? "";
+    if (mime && mime !== "application/pdf" && !mime.startsWith("image/")) {
+      throw unprocessable("Report must be a PDF or image", { field: "reportDataUrl" });
+    }
+    const blob = await createAttachmentFromDataUrl(prisma, {
+      tenantId: ctx.tenantId,
+      kind: "external_repair_report",
+      dataUrl,
+    });
+    reportBlobId = blob.id;
+  }
+
   const { hints } = await loadClassHints(device.id);
   const checkType = postRepairCheckByClass(hints);
   const performedAt = new Date(`${input.performedAt}T00:00:00.000Z`);
@@ -97,7 +117,7 @@ export async function createExternalRepairReport(
         laborMinutes: input.laborMinutes ?? null,
         source: "external",
         externalPerformer: input.externalPerformer.trim(),
-        reportBlobId: input.reportBlobId ?? null,
+        reportBlobId,
         followUpSkippedReason: createFollowUp ? null : input.followUpSkippedReason!.trim(),
         postRepairCheck: createFollowUp ? "proposed" : "not_needed",
       },

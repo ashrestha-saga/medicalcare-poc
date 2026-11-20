@@ -13,6 +13,7 @@ export type ClassificationServiceFlags = {
 
 /** Always offered on a service request, regardless of model classification. */
 export const ALWAYS_AVAILABLE_SERVICE_TYPES = [
+  "DGUV",
   "REPAIR",
   "SOFTWARE",
   "RADIATION",
@@ -24,8 +25,7 @@ const ALWAYS = new Set<string>(ALWAYS_AVAILABLE_SERVICE_TYPES);
 /**
  * Service types for the scan-flow dropdown:
  * - STK / MTK when catalog classification asserts annex1 / annex2
- * - REPAIR, SOFTWARE, RADIATION, OTHER always
- * - DGUV only if we later add a dedicated flag (not today)
+ * - DGUV, REPAIR, SOFTWARE, RADIATION, OTHER always (Ben can request partner DGUV)
  */
 export function serviceTypesForClassification(flags: ClassificationServiceFlags) {
   return INSPECTION_TYPES.filter((t) => {

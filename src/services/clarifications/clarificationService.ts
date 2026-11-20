@@ -9,6 +9,25 @@ import { evaluateClarificationIssues, maxSeverity } from "@/lib/clarifications/r
 import { notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 
+/** Label / type from Betriebsmittel characteristics when no catalog model exists. */
+function equipmentLabelFromCharacteristics(json: string | null | undefined): {
+  tradeName: string | null;
+  modelName: string | null;
+} {
+  if (!json?.trim()) return { tradeName: null, modelName: null };
+  try {
+    const c = JSON.parse(json) as { tradeName?: unknown; modelName?: unknown; label?: unknown };
+    const trade =
+      (typeof c.tradeName === "string" && c.tradeName.trim()) ||
+      (typeof c.label === "string" && c.label.trim()) ||
+      null;
+    const model = typeof c.modelName === "string" && c.modelName.trim() ? c.modelName.trim() : null;
+    return { tradeName: trade, modelName: model };
+  } catch {
+    return { tradeName: null, modelName: null };
+  }
+}
+
 function buildSummary(items: ClarificationItemDTO[]): ClarificationSummaryDTO {
   return {
     openCases: items.length,
@@ -61,14 +80,19 @@ async function collectOpenItems(): Promise<ClarificationItemDTO[]> {
       serial && bucket.length > 1 ? bucket.filter((inv) => inv !== row.inventoryNumber) : [];
 
     const cls = row.model?.classifications[0] ?? null;
+    const isEquipment = row.kind === "equipment";
+    const equipNames = isEquipment
+      ? equipmentLabelFromCharacteristics(row.characteristicsJson)
+      : { tradeName: null, modelName: null };
     const issues = evaluateClarificationIssues({
+      kind: row.kind === "equipment" ? "equipment" : "mp",
       responsibleUserId: row.responsibleUserId,
       responsiblePerson: row.responsibleUser?.name ?? row.responsiblePerson,
       maintenanceCycleMonths: row.maintenanceCycleMonths,
       room: row.room,
       serialNumber: row.serialNumber,
-      modelName: row.model?.modelName ?? null,
-      tradeName: row.model?.tradeName ?? null,
+      modelName: row.model?.modelName ?? equipNames.modelName,
+      tradeName: row.model?.tradeName ?? equipNames.tradeName,
       state: row.state,
       classificationConfidence: cls?.confidence ?? null,
       hasModelClassification: Boolean(cls),
@@ -76,6 +100,8 @@ async function collectOpenItems(): Promise<ClarificationItemDTO[]> {
     });
 
     for (const c of row.clarifications) {
+      // Deferred MP classification / UDI clarifications do not apply to Betriebsmittel.
+      if (isEquipment && c.kind !== "duplicate") continue;
       issues.push({
         code: c.kind === "duplicate" ? "duplicate_serial" : "derived_classification",
         label: `${c.label} (deferred by ${c.deferredBy})`,
@@ -87,7 +113,11 @@ async function collectOpenItems(): Promise<ClarificationItemDTO[]> {
 
     const locationParts = [row.area?.site?.name, row.area?.name, row.room].filter(Boolean);
     const title =
-      row.model?.tradeName?.trim() || row.model?.modelName?.trim() || row.inventoryNumber;
+      row.model?.tradeName?.trim() ||
+      row.model?.modelName?.trim() ||
+      equipNames.tradeName ||
+      equipNames.modelName ||
+      row.inventoryNumber;
 
     items.push({
       deviceId: row.id,

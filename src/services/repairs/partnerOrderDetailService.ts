@@ -38,6 +38,7 @@ export type PartnerOrderDetailDTO = {
     by: string | null;
     at: string | null;
     reason: string | null;
+    kind: string | null;
   } | null;
   sendIn: {
     shippedAt: string | null;
@@ -71,6 +72,10 @@ export type PartnerOrderDetailDTO = {
     id: string;
     kind: string;
     performedAt: string;
+    /** Protocol wall-clock start (from linked InspectionRun). */
+    startedAt: string | null;
+    /** Protocol wall-clock finish (from linked InspectionRun). */
+    completedAt: string | null;
     performedBy: string | null;
     action: string | null;
     cause: string | null;
@@ -136,6 +141,7 @@ export async function getPartnerOrderDetail(
             id: true,
             kind: true,
             performedAt: true,
+            inspectionRunId: true,
             performedBy: true,
             action: true,
             cause: true,
@@ -173,7 +179,7 @@ export async function getPartnerOrderDetail(
           replacedById: true,
           loanerLender: true,
           model: { select: { tradeName: true, modelName: true, manufacturer: true } },
-          replacedBy: { select: { inventoryNumber: true } },
+          replacedBy: { select: { inventoryNumber: true, loanerLender: true } },
         },
       });
       if (inst) {
@@ -187,7 +193,7 @@ export async function getPartnerOrderDetail(
           lockSource: inst.lockSource,
           replacedById: inst.replacedById,
           loanerInventoryNumber: inst.replacedBy?.inventoryNumber ?? null,
-          loanerLender: inst.loanerLender ?? null,
+          loanerLender: inst.replacedBy?.loanerLender ?? inst.loanerLender ?? null,
         };
       }
     }
@@ -226,6 +232,7 @@ export async function getPartnerOrderDetail(
             by: sr.gateOverriddenBy,
             at: isoDateTime(sr.gateOverriddenAt),
             reason: sr.gateOverrideReason,
+            kind: sr.gateKind ?? null,
           }
         : null,
       sendIn: {
@@ -247,17 +254,35 @@ export async function getPartnerOrderDetail(
             decisionNote: sr.quote.decisionNote,
           }
         : null,
-      maintenanceEvents: sr.maintenanceEvents.map((e) => ({
-        id: e.id,
-        kind: e.kind,
-        performedAt: e.performedAt.toISOString(),
-        performedBy: e.performedBy,
-        action: e.action,
-        cause: e.cause,
-        result: e.result,
-        postRepairCheck: e.postRepairCheck,
-        laborMinutes: e.laborMinutes,
-      })),
+      maintenanceEvents: await (async () => {
+        const runIds = sr.maintenanceEvents
+          .map((e) => e.inspectionRunId)
+          .filter((id): id is string => Boolean(id));
+        const runs =
+          runIds.length > 0
+            ? await prisma.inspectionRun.findMany({
+                where: { id: { in: runIds } },
+                select: { id: true, startedAt: true, completedAt: true },
+              })
+            : [];
+        const byRun = new Map(runs.map((r) => [r.id, r]));
+        return sr.maintenanceEvents.map((e) => {
+          const run = e.inspectionRunId ? byRun.get(e.inspectionRunId) : undefined;
+          return {
+            id: e.id,
+            kind: e.kind,
+            performedAt: e.performedAt.toISOString(),
+            startedAt: isoDateTime(run?.startedAt ?? null),
+            completedAt: isoDateTime(run?.completedAt ?? null),
+            performedBy: e.performedBy,
+            action: e.action,
+            cause: e.cause,
+            result: e.result,
+            postRepairCheck: e.postRepairCheck,
+            laborMinutes: e.laborMinutes,
+          };
+        });
+      })(),
       partsProposals: sr.partsOrderProposals.map((p) => ({
         id: p.id,
         status: p.status,

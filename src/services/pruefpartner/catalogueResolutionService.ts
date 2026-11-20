@@ -42,6 +42,7 @@ export interface ResolvedCatalogueDTO {
   traceabilityRequired: boolean;
   setsBaseline: boolean;
   requiresBaseline: boolean;
+  requiresLabel: boolean;
   occasions: string[];
   appliedPartCode: string | null;
   appliedPartLabel: string | null;
@@ -231,6 +232,11 @@ export async function resolveCatalogueForAssignment(args: {
     testEquipmentClassLabel = cls?.label ?? null;
   }
 
+  const inspType = await prisma.refInspectionType.findUnique({
+    where: { code: catalogue.inspectionTypeCode },
+    select: { requiresLabel: true },
+  });
+
   return {
     catalogueId: catalogue.id,
     code: catalogue.code,
@@ -248,6 +254,7 @@ export async function resolveCatalogueForAssignment(args: {
     traceabilityRequired: catalogue.traceabilityRequired,
     setsBaseline: catalogue.setsBaseline,
     requiresBaseline: catalogue.requiresBaseline,
+    requiresLabel: Boolean(inspType?.requiresLabel),
     occasions,
     appliedPartCode,
     appliedPartLabel: classification?.appliedPart?.label ?? null,

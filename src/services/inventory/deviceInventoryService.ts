@@ -11,7 +11,7 @@ import { changedFields, recordAudit } from "@/services/audit/auditService";
 import { conflict, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { toDeviceInstanceDTO } from "@/services/shared/mappers";
-import { readableCourseLabel } from "@/lib/inventory/courseLabel";
+import { courseLabelFromUnitEvent, readableCourseLabel } from "@/lib/inventory/courseLabel";
 import { inspectionTagsFromFlags } from "@/lib/inspectionTags";
 import {
   computeNextMaintenanceDueAt,
@@ -95,6 +95,22 @@ const include = {
   model: { include: { classifications: { where: { validTo: null }, take: 1, orderBy: { validFrom: "desc" as const } } } },
   area: { include: { site: true } },
   responsibleUser: { select: { id: true, name: true, email: true } },
+  importJob: { select: { id: true, fileName: true, createdAt: true } },
+  replacedBy: {
+    select: {
+      id: true,
+      inventoryNumber: true,
+      loanerLender: true,
+      operationalState: true,
+    },
+  },
+  replacementFor: {
+    select: {
+      id: true,
+      inventoryNumber: true,
+      operationalState: true,
+    },
+  },
 } as const;
 
 export interface DeviceListQuery {
@@ -104,6 +120,8 @@ export interface DeviceListQuery {
   room?: string;
   /** draft | review | released | retired | not_released */
   state?: string;
+  /** E86 — mp | equipment */
+  kind?: "mp" | "equipment";
   /**
    * When true, restrict to the caller's assigned work areas
    * (home ∪ UserAreaAssignment), even for unscoped admin roles.
@@ -199,7 +217,7 @@ async function buildDeviceCourse(
   ]);
 
   const course: DeviceInstanceDetailDTO["course"] = unitEvents.map((e) => ({
-    label: readableCourseLabel(e.note?.trim() || e.action),
+    label: courseLabelFromUnitEvent(e.action, e.note),
     at: e.occurredAt.toISOString(),
     actor: e.actor || null,
     actorKind: null,
@@ -255,6 +273,26 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
     orderBy: { createdAt: "desc" },
     select: { reference: true, state: true },
   });
+  const labelRows = await prisma.dutyPerformance.findMany({
+    where: {
+      tenantId: row.tenantId,
+      labelNumber: { not: null },
+      deviceDuty: { deviceInstanceId: row.id, dutyKey: { in: ["stk", "dguv"] } },
+    },
+    orderBy: { performedAt: "desc" },
+    select: {
+      labelNumber: true,
+      labelNextDue: true,
+      performedAt: true,
+      deviceDuty: { select: { dutyKey: true } },
+    },
+    take: 20,
+  });
+  const latestByKey = new Map<string, (typeof labelRows)[number]>();
+  for (const r of labelRows) {
+    const key = r.deviceDuty.dutyKey;
+    if (!latestByKey.has(key)) latestByKey.set(key, r);
+  }
   return {
     ...presented,
     inspectionTags,
@@ -269,6 +307,12 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
     openSendInRepair: openSendIn
       ? { reference: openSendIn.reference, state: openSendIn.state }
       : null,
+    latestLabels: [...latestByKey.entries()].map(([dutyKey, r]) => ({
+      dutyKey,
+      labelNumber: r.labelNumber!,
+      labelNextDue: r.labelNextDue ? r.labelNextDue.toISOString().slice(0, 10) : null,
+      performedAt: r.performedAt.toISOString(),
+    })),
   };
 }
 
@@ -380,12 +424,16 @@ export const deviceInventoryService: InventoryResolver & {
           ? { state }
           : undefined;
 
+    const kind =
+      query.kind === "mp" || query.kind === "equipment" ? query.kind : undefined;
+
     const where: Prisma.DeviceInstanceWhereInput = {
       tenantId: ctx.tenantId,
       ...(query.siteId ? { area: { siteId: query.siteId } } : {}),
       ...(areaClause ?? {}),
       ...(room ? { room } : {}),
       ...(stateWhere ?? {}),
+      ...(kind ? { kind } : {}),
       ...(q
         ? {
             OR: [
@@ -942,7 +990,6 @@ export const deviceInventoryService: InventoryResolver & {
       await tx.deviceEvidence.deleteMany({ where: { deviceInstanceId: id } });
       await tx.fieldSafetyDeviceAction.deleteMany({ where: { deviceInstanceId: id } });
       await tx.constancyCadence.deleteMany({ where: { deviceInstanceId: id } });
-      await tx.dutyOverlapDecision.deleteMany({ where: { deviceInstanceId: id } });
       await tx.deviceIncident.deleteMany({ where: { deviceInstanceId: id } });
       await tx.reprocessingBatchItem.deleteMany({ where: { deviceInstanceId: id } });
       await tx.reprocessingCheck.deleteMany({ where: { equipmentDeviceId: id } });

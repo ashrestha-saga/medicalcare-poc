@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type { InspectionStepDraft, InspectionStepResultDTO } from "@/interfaces/pruefpartner";
 import { protocolChecklist, type ProtocolGateId } from "@/components/hooks/inspect/inspectionProtocolHelpers";
 import { useInspectionProtocol } from "@/components/hooks/inspect/useInspectionProtocol";
@@ -16,9 +16,12 @@ import { K_REP_CATALOGUE_CODE, REPAIR_SERVICE_TYPE, canonicalServiceType } from 
 import { SignaturePad } from "@/components/features/inspect/SignaturePad";
 import { Spinner } from "@/components/ui/Loading";
 import { Input } from "@/components/ui/input";
+import { formatDate, formatDateTime } from "@/lib/format";
+import type { AppLocale } from "@/lib/locale";
 
 export function InspectionProtocolScreen({ reference }: { reference: string }) {
   const t = useTranslations("pruefpartner");
+  const locale = useLocale() as AppLocale;
   const p = useInspectionProtocol(reference);
 
   if (!p.tenantId) {
@@ -443,9 +446,29 @@ export function InspectionProtocolScreen({ reference }: { reference: string }) {
             </div>
             <p>{t("sealedHint")}</p>
             {run ? (
-              <p className="mono pp-hint">
-                {t("idempotencyKey")}: {run.idempotencyKey ?? "—"}
-              </p>
+              <dl className="pp-hint space-y-1" data-testid="inspect-sealed-timing">
+                <div>
+                  <span className="text-muted-foreground">{t("performedAt")}: </span>
+                  <span className="mono">
+                    {run.performedAt ? formatDate(run.performedAt, locale) : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("protocolStartedAt")}: </span>
+                  <span className="mono">
+                    {run.startedAt ? formatDateTime(run.startedAt, locale) : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{t("protocolCompletedAt")}: </span>
+                  <span className="mono">
+                    {run.completedAt ? formatDateTime(run.completedAt, locale) : "—"}
+                  </span>
+                </div>
+                <p className="mono">
+                  {t("idempotencyKey")}: {run.idempotencyKey ?? "—"}
+                </p>
+              </dl>
             ) : null}
             {catalogue?.draft ? <p className="pp-hint">{t("draftSealedNote")}</p> : null}
             <Link className="pp-btn pp-btn--primary" href="/inspect/heute">
@@ -592,6 +615,40 @@ function ProtocolCloseout({
           ))}
         </div>
       </section>
+
+      {p.catalogue?.requiresLabel && p.result !== "failed" ? (
+        <section className="pp-card" data-testid="inspect-label-fields">
+          <h4>{t("labelTitle")}</h4>
+          <div className="pp-card__body" style={{ display: "grid", gap: "0.75rem" }}>
+            <p className="pp-hint">{t("labelHint")}</p>
+            <label className="pp-field">
+              <span>{t("labelNumber")}</span>
+              <input
+                type="text"
+                value={p.labelNumber}
+                onChange={(e) => p.setLabelNumber(e.target.value.toUpperCase())}
+                placeholder="DG-2026-0144"
+                data-testid="inspect-label-number"
+              />
+              {p.fieldErrors.labelNumber ? (
+                <span className="pp-err">{p.fieldErrors.labelNumber}</span>
+              ) : null}
+            </label>
+            <label className="pp-field">
+              <span>{t("labelNextDue")}</span>
+              <input
+                type="month"
+                value={p.labelNextDue.slice(0, 7)}
+                onChange={(e) => p.setLabelNextDue(e.target.value)}
+                data-testid="inspect-label-next-due"
+              />
+              {p.fieldErrors.labelNextDue ? (
+                <span className="pp-err">{p.fieldErrors.labelNextDue}</span>
+              ) : null}
+            </label>
+          </div>
+        </section>
+      ) : null}
 
       <section className="pp-card">
         <h4>{t("attachmentsTitle")}</h4>

@@ -14,6 +14,7 @@ import {
   openDailyRefCodesForSite,
 } from "./scanRoutineService";
 import { consequenceMeansOutOfService } from "./scanPrimaryAction";
+import { openDguvOwnCheckDeviceIds } from "./scanDguvService";
 
 const BAND_ORDER: Record<ScanHeuteBand, number> = {
   blocked: 0,
@@ -30,9 +31,9 @@ function startOfTodayUtc(): Date {
 /**
  * Area-scoped “Heute” worklist for Scan v3.
  *
- * Always includes devices with open Konstanz (dueAt ≤ today) or Sperrlage.
- * With `reprocessing:view`, also lists Aufbereitungsgeräte (daily checks /
- * open batches / done-today) — mixed users see both workstreams.
+ * Always includes devices with open Konstanz / DGUV own_check (dueAt ≤ today)
+ * or Sperrlage. With `reprocessing:view`, also lists Aufbereitungsgeräte
+ * (daily checks / open batches / done-today) — mixed users see both workstreams.
  */
 export const scanHeuteService = {
   async list(ctx: TenantWorkContext): Promise<ScanHeuteDTO> {
@@ -74,73 +75,75 @@ export const scanHeuteService = {
 
     const deviceIds = devices.map((d) => d.id);
 
-    const [openBatches, dailyRefs, doneToday, openKonstanzDuties, bookStops] = await Promise.all([
-      deviceIds.length === 0
-        ? Promise.resolve([] as { equipmentDeviceId: string }[])
-        : prisma.reprocessingBatch.findMany({
-            where: { releaseResult: null, equipmentDeviceId: { in: deviceIds } },
-            select: { equipmentDeviceId: true },
-          }),
-      canReproc
-        ? prisma.refReprocessingCheck.findMany({
-            where: { cadence: "daily" },
-            select: { code: true, scope: true, equipmentTypeCode: true },
-          })
-        : Promise.resolve([]),
-      canReproc
-        ? (async () => {
-            const fromDevices = [
-              ...new Set(
-                devices.map((d) => d.area?.siteId).filter((id): id is string => Boolean(id)),
-              ),
-            ];
-            const effective = await getEffectiveSiteIds(ctx);
-            const siteIds =
-              effective === null
-                ? fromDevices.length
-                  ? fromDevices
-                  : (
-                      await prisma.site.findMany({
-                        where: { tenantId: ctx.tenantId },
-                        select: { id: true },
-                        take: 200,
-                      })
-                    ).map((s) => s.id)
-                : [...new Set([...fromDevices, ...effective])];
-            if (deviceIds.length === 0 && siteIds.length === 0) return [];
-            return prisma.reprocessingCheck.findMany({
+    const [openBatches, dailyRefs, doneToday, openKonstanzDuties, openDguvSet, bookStops] =
+      await Promise.all([
+        deviceIds.length === 0
+          ? Promise.resolve([] as { equipmentDeviceId: string }[])
+          : prisma.reprocessingBatch.findMany({
+              where: { releaseResult: null, equipmentDeviceId: { in: deviceIds } },
+              select: { equipmentDeviceId: true },
+            }),
+        canReproc
+          ? prisma.refReprocessingCheck.findMany({
+              where: { cadence: "daily" },
+              select: { code: true, scope: true, equipmentTypeCode: true },
+            })
+          : Promise.resolve([]),
+        canReproc
+          ? (async () => {
+              const fromDevices = [
+                ...new Set(
+                  devices.map((d) => d.area?.siteId).filter((id): id is string => Boolean(id)),
+                ),
+              ];
+              const effective = await getEffectiveSiteIds(ctx);
+              const siteIds =
+                effective === null
+                  ? fromDevices.length
+                    ? fromDevices
+                    : (
+                        await prisma.site.findMany({
+                          where: { tenantId: ctx.tenantId },
+                          select: { id: true },
+                          take: 200,
+                        })
+                      ).map((s) => s.id)
+                  : [...new Set([...fromDevices, ...effective])];
+              if (deviceIds.length === 0 && siteIds.length === 0) return [];
+              return prisma.reprocessingCheck.findMany({
+                where: {
+                  performedAt: today,
+                  OR: [
+                    ...(deviceIds.length ? [{ equipmentDeviceId: { in: deviceIds } }] : []),
+                    ...(siteIds.length ? [{ siteId: { in: siteIds } }] : []),
+                  ],
+                },
+                select: { checkCode: true, equipmentDeviceId: true, siteId: true },
+              });
+            })()
+          : Promise.resolve([]),
+        deviceIds.length > 0
+          ? prisma.deviceDuty.findMany({
               where: {
-                performedAt: today,
-                OR: [
-                  ...(deviceIds.length ? [{ equipmentDeviceId: { in: deviceIds } }] : []),
-                  ...(siteIds.length ? [{ siteId: { in: siteIds } }] : []),
-                ],
+                deviceInstanceId: { in: deviceIds },
+                dutyKey: "konstanz",
+                applicable: true,
+                suspendedAt: null,
+                dueAt: { lte: today },
               },
-              select: { checkCode: true, equipmentDeviceId: true, siteId: true },
-            });
-          })()
-        : Promise.resolve([]),
-      deviceIds.length > 0
-        ? prisma.deviceDuty.findMany({
-            where: {
-              deviceInstanceId: { in: deviceIds },
-              dutyKey: "konstanz",
-              applicable: true,
-              suspendedAt: null,
-              dueAt: { lte: today },
-            },
-            select: { deviceInstanceId: true },
-          })
-        : Promise.resolve([]),
-      deviceIds.length === 0
-        ? Promise.resolve([] as { deviceInstanceId: string; consequence: string | null }[])
-        : prisma.deviceBookEntry.findMany({
-            where: { deviceInstanceId: { in: deviceIds } },
-            orderBy: [{ occurredAt: "desc" }, { recordedAt: "desc" }],
-            select: { deviceInstanceId: true, consequence: true },
-            take: 2000,
-          }),
-    ]);
+              select: { deviceInstanceId: true },
+            })
+          : Promise.resolve([]),
+        openDguvOwnCheckDeviceIds(ctx.tenantId, deviceIds),
+        deviceIds.length === 0
+          ? Promise.resolve([] as { deviceInstanceId: string; consequence: string | null }[])
+          : prisma.deviceBookEntry.findMany({
+              where: { deviceInstanceId: { in: deviceIds } },
+              orderBy: [{ occurredAt: "desc" }, { recordedAt: "desc" }],
+              select: { deviceInstanceId: true, consequence: true },
+              take: 2000,
+            }),
+      ]);
 
     const openBatchByDevice = new Map<string, number>();
     for (const b of openBatches) {
@@ -176,21 +179,35 @@ export const scanHeuteService = {
           : [];
       const openDailyChecks = openDailyCodes.length > 0;
       const openKonstanzChecks = openKonstanzSet.has(d.id);
+      const openDguvOwnCheck = openDguvSet.has(d.id);
       const bookBlocked = blockedByBook.has(d.id);
       const hasOpenReprocWork = openDailyChecks || openBatchCount > 0 || bookBlocked;
-      const hasKonstanzOrBlock = openKonstanzChecks || bookBlocked;
+      const hasDutyOrBlock = openKonstanzChecks || openDguvOwnCheck || bookBlocked;
 
-      // Union: due Konstanz / Sperre for everyone; equipment list when reprocessing.
+      // Union: due Konstanz / DGUV / Sperre for everyone; equipment list when reprocessing.
       if (canReproc) {
-        if (!isEquipment && !hasKonstanzOrBlock) continue;
-      } else if (!hasKonstanzOrBlock) {
+        if (!isEquipment && !hasDutyOrBlock) continue;
+      } else if (!hasDutyOrBlock) {
         continue;
       }
 
       let band: ScanHeuteBand = "open";
       if (bookBlocked || d.state !== "released") band = "blocked";
-      else if (canReproc && isEquipment && !hasOpenReprocWork && !openKonstanzChecks) band = "done";
-      else if (openKonstanzChecks && !openDailyChecks && openBatchCount === 0) band = "notice";
+      else if (
+        canReproc &&
+        isEquipment &&
+        !hasOpenReprocWork &&
+        !openKonstanzChecks &&
+        !openDguvOwnCheck
+      ) {
+        band = "done";
+      } else if (
+        (openKonstanzChecks || openDguvOwnCheck) &&
+        !openDailyChecks &&
+        openBatchCount === 0
+      ) {
+        band = "notice";
+      }
 
       const label =
         d.model?.tradeName?.trim() ||
@@ -210,6 +227,7 @@ export const scanHeuteService = {
         openBatchCount,
         openDailyChecks,
         openKonstanzChecks,
+        openDguvOwnCheck,
       });
     }
 

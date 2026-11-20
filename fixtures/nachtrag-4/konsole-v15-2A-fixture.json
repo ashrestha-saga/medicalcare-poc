@@ -1,0 +1,1743 @@
+{
+ "version": "konsole-v15.2A",
+ "exportedAt": "2026-11-14T20:07:49.770Z",
+ "auftraege": [
+  {
+   "ref": "SR-2026-4211",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2022-0089",
+   "serviceType": "inspection",
+   "art": "stk",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "abgeschlossen",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": {
+    "nr": "MSR-2026-0388",
+    "am": "2026-09-24"
+   },
+   "externalService": null,
+   "scheduledAt": null,
+   "assigneeUserId": "M-2",
+   "executorOrgId": "O-MSR",
+   "source": null,
+   "history": []
+  },
+  {
+   "ref": "SR-2026-4240",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2019-0071",
+   "serviceType": "inspection",
+   "art": "konstanz",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "terminiert",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": "2026-09-28",
+   "assigneeUserId": "M-5",
+   "executorOrgId": "O-MSR",
+   "source": null,
+   "history": []
+  },
+  {
+   "ref": "SR-2026-4244",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2026-0501",
+   "serviceType": "inspection",
+   "art": "konstanz",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "zugewiesen",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": {
+    "typ": "leistung",
+    "leistung": "konstanz",
+    "qual": "fachkunde_strlsch",
+    "von": "L. Timm (Serviceleitung)",
+    "am": "2026-09-26",
+    "begruendung": "Messung unter Anleitung von H. Brandt (Fachkunde), Protokoll gegengezeichnet"
+   },
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": null,
+   "assigneeUserId": "M-6",
+   "executorOrgId": "O-MSR",
+   "source": null,
+   "history": [
+    {
+     "t": "2026-09-26 21:07",
+     "wer": "L. Timm",
+     "was": "Leistungs-Gate Konstanzprüfung übersteuert · R. Yilmaz zugewiesen ohne Fachkunde Strahlenschutz · Messung unter Anleitung von H. Brandt (Fachkunde), Protokoll gegengezeichnet (E89)"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4256",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2017-0009",
+   "serviceType": "inspection",
+   "art": "pruefung_nach_instandsetzung",
+   "reason": "instandsetzung",
+   "reasonDueDate": null,
+   "state": "zugewiesen",
+   "proposed": false,
+   "mandatory": true,
+   "parentRequestId": "SR-2026-4249",
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": "gesperrt",
+   "lock": {
+    "grund": "Vakuumtest nicht bestanden (Routinekontrolle 24.09.)",
+    "seit": "2026-09-24",
+    "quelle": "pruefpartner"
+   },
+   "replacement": null,
+   "postRepairCheckKind": "requalifizierung",
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": null,
+   "assigneeUserId": "M-2",
+   "executorOrgId": "O-MSR",
+   "source": "Regel § 7 Abs. 2",
+   "history": [
+    {
+     "t": "2026-09-24 14:10",
+     "wer": "System",
+     "was": "Pflichtprüfung nach Instandsetzung angelegt aus SR-2026-4249 (E72: sicherheitsrelevanter Eingriff)"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4471",
+   "tenant": "T-MVZ",
+   "inv": "INV-MVZ-2021-0240",
+   "serviceType": "repair",
+   "art": "instandsetzung",
+   "reason": "stoerung",
+   "reasonDueDate": null,
+   "state": "abgeschlossen",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": {
+    "id": "ST-2026-0003",
+    "was": "Bildausfall am Schallkopf C5-2, Artefakte im B-Bild",
+    "seit": "2026-09-10",
+    "folge": "eingeschraenkt",
+    "gemeldetVon": "Dr. Hesse (Kardiologie)",
+    "am": "2026-09-10T08:40",
+    "foto": true,
+    "buchId": "B-MVZ-7"
+   },
+   "quote": {
+    "betragText": "ca. 240 EUR netto",
+    "umfang": "Diagnose vor Ort, Prüfung Schallkopf und Anschluss",
+    "erstelltAm": "2026-09-11",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-12",
+    "entschiedenVon": "Dr. Hesse (MPSB MVZ Rheinbogen)"
+   },
+   "report": {
+    "fehlerbildBestaetigt": true,
+    "ursache": "Kabelbruch im Schallkopf C5-2, Kristallausfall in zwei Elementen",
+    "massnahme": "teile_bestellt",
+    "teile": [
+     {
+      "bez": "Schallkopf C5-2",
+      "teilNr": "MS-C52-01",
+      "sn": "",
+      "menge": 1
+     }
+    ],
+    "arbeitsminuten": 45,
+    "softwareVor": "3.8.1",
+    "softwareNach": "3.8.1",
+    "funktionspruefung": {
+     "bestanden": false,
+     "messwerte": []
+    },
+    "sicherheitsrelevanterEingriff": false,
+    "ergebnis": "teile_bestellt",
+    "pruefungNachInstandsetzung": "nicht_noetig",
+    "foto": true,
+    "bemerkung": "Gerät mit zweitem Schallkopf eingeschränkt nutzbar; Austausch nach Lieferung."
+   },
+   "operationalState": "in_instandsetzung",
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": "2026-09-22",
+   "assigneeUserId": "M-3",
+   "executorOrgId": "O-MSR",
+   "source": "Störungsmeldung",
+   "history": [
+    {
+     "t": "2026-09-10 08:40",
+     "wer": "Dr. Hesse (Kardiologie)",
+     "was": "Störung gemeldet · eingeschränkt nutzbar · Eintrag Medizinproduktebuch B-MVZ-7"
+    },
+    {
+     "t": "2026-09-10 09:15",
+     "wer": "System",
+     "was": "Auftrag aus Störungsmeldung angelegt · Anlass Störung · Leistung Instandsetzung"
+    },
+    {
+     "t": "2026-09-11 10:02",
+     "wer": "T. Lorenz",
+     "was": "Kostenvoranschlag erstellt · ca. 240 EUR netto"
+    },
+    {
+     "t": "2026-09-12 07:50",
+     "wer": "Dr. Hesse (MPSB)",
+     "was": "Kostenvoranschlag freigegeben"
+    },
+    {
+     "t": "2026-09-22 15:40",
+     "wer": "P. Serrano",
+     "was": "Bericht abgeschlossen · Teile bestellt · Nachbesuch vorgeschlagen"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4250",
+   "tenant": "T-MVZ",
+   "inv": "INV-MVZ-2019-0091",
+   "serviceType": "inspection",
+   "art": "sv",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "zugewiesen",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": {
+    "org": "O-SVX",
+    "beauftragtAm": "2026-09-08",
+    "bescheinigung": "Fremdbericht im Backoffice (E76)"
+   },
+   "scheduledAt": null,
+   "assigneeUserId": null,
+   "executorOrgId": "O-SVX",
+   "source": null,
+   "history": [
+    {
+     "t": "2026-09-08 11:20",
+     "wer": "L. Timm",
+     "was": "Zuweisung an H. Brandt entfernt — Sachverständigenprüfung nach § 88 StrlSchV darf nur ein behördlich bestimmter Sachverständiger durchführen (E89, nicht übersteuerbar)"
+    },
+    {
+     "t": "2026-09-08 11:25",
+     "wer": "L. Timm",
+     "was": "Fremdleistung: Sachverständigenbüro Vogel (Koblenz) beauftragt · Bescheinigung kommt als Fremdbericht ins Backoffice (E76)"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4502",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2026-0501",
+   "serviceType": "inspection",
+   "art": "sv",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "zugewiesen",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": null,
+   "assigneeUserId": "F-2",
+   "executorOrgId": "O-SVX",
+   "source": null,
+   "history": []
+  },
+  {
+   "ref": "SR-2026-3980",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2024-0418",
+   "serviceType": "inspection",
+   "art": "stk",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "abgeschlossen",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": {
+    "nr": "MSR-2026-0291",
+    "am": "2026-06-12"
+   },
+   "externalService": null,
+   "scheduledAt": "2026-06-12",
+   "assigneeUserId": "M-2",
+   "executorOrgId": "O-MSR",
+   "source": null,
+   "history": []
+  },
+  {
+   "ref": "SR-2026-4472",
+   "tenant": "T-MVZ",
+   "inv": "INV-MVZ-2021-0240",
+   "serviceType": "repair",
+   "art": "instandsetzung",
+   "reason": "stoerung",
+   "reasonDueDate": null,
+   "state": "erfasst",
+   "proposed": true,
+   "mandatory": false,
+   "parentRequestId": "SR-2026-4471",
+   "followUpNeeds": {
+    "partsOrWork": "Schallkopf C5-2 (Teil-Nr. MS-C52-01) einbauen, Bildkalibrierung, Funktionsprüfung",
+    "estimatedMinutes": 60,
+    "urgency": "faelligkeit"
+   },
+   "fault": {
+    "id": "ST-2026-0003",
+    "was": "Bildausfall am Schallkopf C5-2, Artefakte im B-Bild",
+    "seit": "2026-09-10",
+    "folge": "eingeschraenkt",
+    "gemeldetVon": "Dr. Hesse (Kardiologie)",
+    "am": "2026-09-10T08:40",
+    "foto": true,
+    "buchId": "B-MVZ-7"
+   },
+   "quote": {
+    "betragText": "ca. 1.900 EUR netto",
+    "umfang": "Schallkopf C5-2 Austausch inkl. Einbau und Kalibrierung",
+    "erstelltAm": "2026-09-23",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "offen"
+   },
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": null,
+   "assigneeUserId": null,
+   "executorOrgId": "O-MSR",
+   "source": "Prüfpartner-Zugang",
+   "history": [
+    {
+     "t": "2026-09-22 15:41",
+     "wer": "P. Serrano",
+     "was": "Nachbesuch vorgeschlagen aus SR-2026-4471 · Teile/Arbeiten: Schallkopf C5-2 · ca. 60 min"
+    },
+    {
+     "t": "2026-09-23 09:10",
+     "wer": "T. Lorenz",
+     "was": "Kostenvoranschlag erstellt · ca. 1.900 EUR netto · beim Betreiber zur Freigabe"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4260",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2024-0417",
+   "serviceType": "repair",
+   "art": "instandsetzung",
+   "reason": "stoerung",
+   "reasonDueDate": "2026-09-19",
+   "state": "terminiert",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": {
+    "id": "ST-2026-0001",
+    "was": "Förderung ohne Alarm gestoppt",
+    "seit": "2026-09-18",
+    "folge": "ausser_betrieb",
+    "gemeldetVon": "S. Berger (Anwenderin, Intensiv)",
+    "am": "2026-09-18T11:20",
+    "foto": true,
+    "buchId": "B-1"
+   },
+   "quote": {
+    "betragText": "ca. 480 EUR netto",
+    "umfang": "Pumpenkopf tauschen, Kalibrierung, Funktionsprüfung",
+    "erstelltAm": "2026-09-19",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-20",
+    "entschiedenVon": "M. Ortmann (Gerätebeauftragter)"
+   },
+   "report": null,
+   "operationalState": "gesperrt",
+   "lock": {
+    "grund": "Störung: Förderung ohne Alarm gestoppt",
+    "seit": "2026-09-18",
+    "quelle": "anwender"
+   },
+   "replacement": {
+    "inv": "INV-2026-0901",
+    "geraet": "Infusionspumpe VOLUMAT X-200 (Leihgerät)",
+    "leihgeber": "Vitamed Systems GmbH",
+    "seit": "2026-09-19"
+   },
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": "2026-09-28",
+   "assigneeUserId": "M-2",
+   "executorOrgId": "O-MSR",
+   "source": "Störungsmeldung",
+   "history": [
+    {
+     "t": "2026-09-18 11:20",
+     "wer": "S. Berger (Anwenderin)",
+     "was": "Störung gemeldet · außer Betrieb · Gerät gesperrt · Eintrag Medizinproduktebuch B-1"
+    },
+    {
+     "t": "2026-09-18 11:20",
+     "wer": "System",
+     "was": "Auftrag sofort angelegt (Folge außer Betrieb, E75) · Anlass Störung · Leistung Instandsetzung"
+    },
+    {
+     "t": "2026-09-19 08:30",
+     "wer": "T. Lorenz",
+     "was": "Kostenvoranschlag erstellt · ca. 480 EUR netto"
+    },
+    {
+     "t": "2026-09-19 09:00",
+     "wer": "M. Ortmann",
+     "was": "Ersatzgerät INV-2026-0901 zugeordnet (Leihgerät Vitamed Systems)"
+    },
+    {
+     "t": "2026-09-20 10:12",
+     "wer": "M. Ortmann (Gerätebeauftragter)",
+     "was": "Kostenvoranschlag freigegeben"
+    },
+    {
+     "t": "2026-09-20 10:30",
+     "wer": "T. Lorenz",
+     "was": "Zugewiesen an J. Reinhardt · Termin 2026-09-28 · Einsatz E-2026-0928"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4249",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2017-0009",
+   "serviceType": "repair",
+   "art": "instandsetzung",
+   "reason": "stoerung",
+   "reasonDueDate": null,
+   "state": "abgeschlossen",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": {
+    "id": "ST-2026-0002b",
+    "was": "Vakuumtest nicht bestanden, Kammer hält Unterdruck nicht",
+    "seit": "2026-09-24",
+    "folge": "ausser_betrieb",
+    "gemeldetVon": "K. Nowak (Aufbereitung)",
+    "am": "2026-09-24T07:05",
+    "foto": false,
+    "buchId": "B-9"
+   },
+   "quote": {
+    "betragText": "ca. 390 EUR netto",
+    "umfang": "Vakuumventil tauschen, Dichtheitsprüfung",
+    "erstelltAm": "2026-09-24",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-24",
+    "entschiedenVon": "M. Ortmann (Gerätebeauftragter)"
+   },
+   "report": {
+    "fehlerbildBestaetigt": true,
+    "ursache": "Vakuumventil undicht (Membran gerissen)",
+    "massnahme": "teil_getauscht",
+    "teile": [
+     {
+      "bez": "Vakuumventil VV-80",
+      "teilNr": "ST-VV80-2",
+      "sn": "VV80-77213",
+      "menge": 1
+     }
+    ],
+    "arbeitsminuten": 75,
+    "softwareVor": "2.4",
+    "softwareNach": "2.4",
+    "funktionspruefung": {
+     "bestanden": true,
+     "messwerte": [
+      {
+       "name": "Vakuumtest Leckrate",
+       "wert": "0,8",
+       "einheit": "mbar/min",
+       "grenz": "≤ 1,3"
+      },
+      {
+       "name": "Kammerdruck Haltezeit",
+       "wert": "3,05",
+       "einheit": "bar",
+       "grenz": "3,0–3,2"
+      }
+     ]
+    },
+    "sicherheitsrelevanterEingriff": true,
+    "ergebnis": "instand_gesetzt",
+    "pruefungNachInstandsetzung": "pflicht",
+    "foto": true,
+    "bemerkung": "Eingriff in den Druck-/Vakuumkreis — Prüfung nach § 7 Abs. 2 als Pflicht angelegt; Sperre bleibt bis zum Bestehen."
+   },
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": "2026-09-24",
+   "assigneeUserId": "M-2",
+   "executorOrgId": "O-MSR",
+   "source": "Störungsmeldung",
+   "history": [
+    {
+     "t": "2026-09-24 07:05",
+     "wer": "K. Nowak (Aufbereitung)",
+     "was": "Störung gemeldet · außer Betrieb · Gerät gesperrt"
+    },
+    {
+     "t": "2026-09-24 07:30",
+     "wer": "T. Lorenz",
+     "was": "Kostenvoranschlag erstellt und vom Betreiber freigegeben (ca. 390 EUR netto)"
+    },
+    {
+     "t": "2026-09-24 14:10",
+     "wer": "J. Reinhardt",
+     "was": "Bericht abgeschlossen · instand gesetzt · sicherheitsrelevanter Eingriff → Prüfung § 7 Abs. 2 als Pflicht (SR-2026-4256)"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4470",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2024-0418",
+   "serviceType": "repair",
+   "art": "instandsetzung",
+   "reason": "stoerung",
+   "reasonDueDate": null,
+   "state": "abgeschlossen",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": {
+    "id": "ST-2026-0004",
+    "was": "Akkulaufzeit unter 30 Minuten, Alarm „Akku schwach“ im Netzbetrieb",
+    "seit": "2026-09-22",
+    "folge": "weiter_nutzbar",
+    "gemeldetVon": "Pflege Station 3B",
+    "am": "2026-09-22T14:00",
+    "foto": false,
+    "buchId": "B-11"
+   },
+   "quote": {
+    "betragText": "ca. 160 EUR netto",
+    "umfang": "Akkupack tauschen",
+    "erstelltAm": "2026-09-23",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-23",
+    "entschiedenVon": "M. Ortmann (Gerätebeauftragter)"
+   },
+   "report": {
+    "fehlerbildBestaetigt": true,
+    "ursache": "Akkupack am Ende der Lebensdauer (Kapazität 38 %)",
+    "massnahme": "teil_getauscht",
+    "teile": [
+     {
+      "bez": "Akkupack Li-Ion 7,2 V",
+      "teilNr": "FR-AKK-X200",
+      "sn": "AK-2026-5581",
+      "menge": 1
+     }
+    ],
+    "arbeitsminuten": 30,
+    "softwareVor": "4.1.2",
+    "softwareNach": "4.1.2",
+    "funktionspruefung": {
+     "bestanden": true,
+     "messwerte": [
+      {
+       "name": "Akkulaufzeit",
+       "wert": "> 240",
+       "einheit": "min",
+       "grenz": "≥ 180"
+      },
+      {
+       "name": "Förderrate 100 ml/h",
+       "wert": "99,6",
+       "einheit": "ml/h",
+       "grenz": "± 5 %"
+      }
+     ]
+    },
+    "sicherheitsrelevanterEingriff": false,
+    "ergebnis": "instand_gesetzt",
+    "pruefungNachInstandsetzung": "vorgeschlagen",
+    "foto": true,
+    "bemerkung": "Anlage-1-Gerät, kein Eingriff in sicherheitsrelevante Baugruppen — Prüfung nach § 7 Abs. 2 vorgeschlagen."
+   },
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": "2026-09-25",
+   "assigneeUserId": "M-2",
+   "executorOrgId": "O-MSR",
+   "source": "Störungsmeldung",
+   "history": [
+    {
+     "t": "2026-09-22 14:00",
+     "wer": "Pflege Station 3B",
+     "was": "Störung gemeldet · weiter nutzbar · Sichtung durch MPSB → Auftrag"
+    },
+    {
+     "t": "2026-09-25 16:20",
+     "wer": "J. Reinhardt",
+     "was": "Bericht abgeschlossen · instand gesetzt · Prüfung § 7 Abs. 2 vorgeschlagen (SR-2026-4473)"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4473",
+   "tenant": "T-KLN",
+   "inv": "INV-KLN-2024-0418",
+   "serviceType": "inspection",
+   "art": "pruefung_nach_instandsetzung",
+   "reason": "instandsetzung",
+   "reasonDueDate": null,
+   "state": "erfasst",
+   "proposed": true,
+   "mandatory": false,
+   "parentRequestId": "SR-2026-4470",
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": "stk",
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": null,
+   "assigneeUserId": null,
+   "executorOrgId": "O-MSR",
+   "source": "Regel § 7 Abs. 2",
+   "history": [
+    {
+     "t": "2026-09-25 16:20",
+     "wer": "System",
+     "was": "Prüfung nach Instandsetzung vorgeschlagen aus SR-2026-4470 (E72: Anlage-1-Gerät)"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4474",
+   "tenant": "T-MVZ",
+   "inv": "INV-MVZ-2021-0240",
+   "serviceType": "repair",
+   "art": "instandsetzung",
+   "reason": "stoerung",
+   "reasonDueDate": null,
+   "state": "in_arbeit",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": {
+    "id": "ST-2026-0005",
+    "was": "Schallkopf C5-2: Elementausfälle nach Sturz, Bild streifig",
+    "seit": "2026-09-21",
+    "folge": "eingeschraenkt",
+    "gemeldetVon": "Dr. Hesse (Kardiologie)",
+    "am": "2026-09-21T09:12",
+    "foto": true,
+    "buchId": "B-MVZ-9"
+   },
+   "quote": {
+    "betragText": "ca. 1.450 EUR netto",
+    "umfang": "Werkstattinstandsetzung Schallkopf C5-2 bei Sono Repair, inkl. Rückversand",
+    "erstelltAm": "2026-09-22",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "offen"
+   },
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "einsendung",
+   "sendIn": {
+    "werkstatt": "Sono Repair GmbH",
+    "versandtAm": "2026-09-23",
+    "tracking": "DHL 0034 5521 7789",
+    "inWerkstattAm": "2026-09-25",
+    "rueckversandtAm": null,
+    "eingetroffenAm": null
+   },
+   "trainingGateOverride": {
+    "von": "K. Adler (Geschäftsführung)",
+    "am": "2026-09-22",
+    "begruendung": "Schallkopftausch nach Herstelleranleitung SR-SK-12, keine Öffnung des Geräts"
+   },
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": null,
+   "assigneeUserId": "M-2",
+   "executorOrgId": "O-MSR",
+   "source": "Störungsmeldung",
+   "history": [
+    {
+     "t": "2026-09-21 09:12",
+     "wer": "Dr. Hesse (Kardiologie)",
+     "was": "Störung gemeldet · eingeschränkt nutzbar · Eintrag Medizinproduktebuch B-MVZ-9"
+    },
+    {
+     "t": "2026-09-21 10:05",
+     "wer": "T. Lorenz",
+     "was": "Auftrag angelegt · Abwicklung Einsendung an Sono Repair GmbH (E77) · kein Einsatz"
+    },
+    {
+     "t": "2026-09-22 08:40",
+     "wer": "K. Adler (Geschäftsführung)",
+     "was": "Schulungs-Gate Medisens übersteuert · J. Reinhardt begleitet die Werkstattinstandsetzung · Schallkopftausch nach Herstelleranleitung SR-SK-12, keine Öffnung des Geräts"
+    },
+    {
+     "t": "2026-09-22 09:10",
+     "wer": "T. Lorenz",
+     "was": "Kostenvoranschlag erstellt · ca. 1.450 EUR netto · beim Betreiber zur Freigabe"
+    },
+    {
+     "t": "2026-09-23 07:55",
+     "wer": "T. Lorenz",
+     "was": "Einsendung: versandt erfasst · DHL 0034 5521 7789"
+    },
+    {
+     "t": "2026-09-25 11:20",
+     "wer": "Sono Repair GmbH",
+     "was": "Einsendung: in Werkstatt erfasst · Eingangsprüfung läuft"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4476",
+   "tenant": "T-KLN",
+   "inv": "BM-0001",
+   "serviceType": "inspection",
+   "art": "dguv",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "in_arbeit",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "betriebsmittel",
+   "collective": {
+    "devices": [
+     {
+      "inv": "BM-0001",
+      "name": "Medikamentenkühlschrank",
+      "kind": "betriebsmittel",
+      "protectionClass": "I",
+      "location": "Station 3B",
+      "sticker": "DG-2026-0144",
+      "result": "bestanden",
+      "at": "2026-09-25"
+     },
+     {
+      "inv": "BM-0002",
+      "name": "Arbeitsplatz-PC Anmeldung",
+      "kind": "betriebsmittel",
+      "protectionClass": "I",
+      "location": "Anmeldung",
+      "sticker": "DG-2026-0145",
+      "result": "bestanden",
+      "at": "2026-09-25"
+     },
+     {
+      "inv": "BM-0003",
+      "name": "Laborzentrifuge",
+      "kind": "betriebsmittel",
+      "protectionClass": "I",
+      "location": "Labor",
+      "sticker": null,
+      "result": null,
+      "at": null
+     },
+     {
+      "inv": "BM-0004",
+      "name": "Mehrfachsteckdose",
+      "kind": "betriebsmittel",
+      "protectionClass": "I",
+      "location": "Behandlung 2",
+      "sticker": null,
+      "result": null,
+      "at": null
+     },
+     {
+      "inv": "BM-0005",
+      "name": "Kaffeemaschine",
+      "kind": "betriebsmittel",
+      "protectionClass": "I",
+      "location": "Sozialraum",
+      "sticker": null,
+      "result": null,
+      "at": null
+     },
+     {
+      "inv": "INV-2023-0155",
+      "name": "Blutdruckmessgerät TensioCheck 2",
+      "kind": "mp",
+      "protectionClass": "II",
+      "location": "Station 3B",
+      "sticker": null,
+      "result": null,
+      "at": null
+     }
+    ]
+   },
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": "2026-09-30",
+   "assigneeUserId": "M-7",
+   "executorOrgId": "O-MSR",
+   "source": "Fälligkeit",
+   "history": [
+    {
+     "t": "2026-09-12 09:40",
+     "wer": "L. Timm",
+     "was": "Sammelauftrag angelegt · Leistung Prüfung elektrischer Betriebsmittel nach DGUV Vorschrift 3 · 6 Geräte Haus A (5 Betriebsmittel, 1 Medizinprodukt) · Intervall aus der Gefährdungsbeurteilung (E85)"
+    },
+    {
+     "t": "2026-09-12 09:42",
+     "wer": "L. Timm",
+     "was": "T. Novak zugewiesen · Leistungs-Gate DGUV erfüllt: befähigte Person nach DGUV V3 (E89)"
+    },
+    {
+     "t": "2026-09-25 14:10",
+     "wer": "T. Novak",
+     "was": "Einsatz begonnen · BM-0001 und BM-0002 geprüft, bestanden · Plaketten DG-2026-0144, DG-2026-0145 angebracht (E90) · Abbruch: Notfall Station 3B"
+    },
+    {
+     "t": "2026-09-25 16:05",
+     "wer": "L. Timm",
+     "was": "Fortsetzung am 30.09. als Einsatz E-2026-0930 geplant · 4 Geräte offen"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4477",
+   "tenant": "T-KLN",
+   "inv": "BM-0006",
+   "serviceType": "inspection",
+   "art": "dguv",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "terminiert",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "betriebsmittel",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": "2026-10-02",
+   "assigneeUserId": "M-7",
+   "executorOrgId": "O-MSR",
+   "source": "Fälligkeit",
+   "history": [
+    {
+     "t": "2026-09-26 21:07",
+     "wer": "K. Adler",
+     "was": "Leistungs-Gate Prüfung elektrischer Betriebsmittel nach DGUV Vorschrift 3 übersteuert · J. Reinhardt zugewiesen ohne befähigte Person DGUV V3 · Prüfung unter Aufsicht von T. Novak, Bestellung zur befähigten Person läuft (E89)"
+    },
+    {
+     "t": "2026-09-26 21:07",
+     "wer": "L. Timm",
+     "was": "In Einsatz E-2026-1002 mitgenommen — STK und DGUV in Haus A am selben Tag · T. Novak (Leistungs-Gate DGUV erfüllt, E89)"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4478",
+   "tenant": "T-KLN",
+   "inv": "BM-0007",
+   "serviceType": "inspection",
+   "art": "dguv",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "terminiert",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "betriebsmittel",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": "2026-10-02",
+   "assigneeUserId": "M-7",
+   "executorOrgId": "O-MSR",
+   "source": "Fälligkeit",
+   "history": [
+    {
+     "t": "2026-09-26 21:07",
+     "wer": "L. Timm",
+     "was": "In Einsatz E-2026-1002 mitgenommen — STK und DGUV in Haus A am selben Tag · T. Novak (Leistungs-Gate DGUV erfüllt, E89)"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4603",
+   "tenant": "T-KLN",
+   "inv": "BM-0001",
+   "serviceType": "inspection",
+   "art": "dguv",
+   "reason": "faelligkeit",
+   "reasonDueDate": null,
+   "state": "zugewiesen",
+   "proposed": false,
+   "mandatory": false,
+   "parentRequestId": null,
+   "followUpNeeds": null,
+   "fault": null,
+   "quote": null,
+   "report": null,
+   "operationalState": null,
+   "lock": null,
+   "replacement": null,
+   "postRepairCheckKind": null,
+   "fulfilment": "vor_ort",
+   "sendIn": null,
+   "trainingGateOverride": null,
+   "serviceGateOverride": null,
+   "deviceKind": "mp",
+   "collective": null,
+   "sticker": null,
+   "externalService": null,
+   "scheduledAt": null,
+   "assigneeUserId": "M-7",
+   "executorOrgId": "O-MSR",
+   "source": "Konsole",
+   "history": [
+    {
+     "t": "2026-09-26 21:07",
+     "wer": "L. Timm",
+     "was": "Auftrag in der Konsole angelegt · Anlass Fälligkeit · Leistung Prüfung elektrischer Betriebsmittel nach DGUV Vorschrift 3"
+    }
+   ]
+  }
+ ],
+ "kostenvoranschlaege": [
+  {
+   "ref": "SR-2026-4471",
+   "quote": {
+    "betragText": "ca. 240 EUR netto",
+    "umfang": "Diagnose vor Ort, Prüfung Schallkopf und Anschluss",
+    "erstelltAm": "2026-09-11",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-12",
+    "entschiedenVon": "Dr. Hesse (MPSB MVZ Rheinbogen)"
+   }
+  },
+  {
+   "ref": "SR-2026-4472",
+   "quote": {
+    "betragText": "ca. 1.900 EUR netto",
+    "umfang": "Schallkopf C5-2 Austausch inkl. Einbau und Kalibrierung",
+    "erstelltAm": "2026-09-23",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "offen"
+   }
+  },
+  {
+   "ref": "SR-2026-4260",
+   "quote": {
+    "betragText": "ca. 480 EUR netto",
+    "umfang": "Pumpenkopf tauschen, Kalibrierung, Funktionsprüfung",
+    "erstelltAm": "2026-09-19",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-20",
+    "entschiedenVon": "M. Ortmann (Gerätebeauftragter)"
+   }
+  },
+  {
+   "ref": "SR-2026-4249",
+   "quote": {
+    "betragText": "ca. 390 EUR netto",
+    "umfang": "Vakuumventil tauschen, Dichtheitsprüfung",
+    "erstelltAm": "2026-09-24",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-24",
+    "entschiedenVon": "M. Ortmann (Gerätebeauftragter)"
+   }
+  },
+  {
+   "ref": "SR-2026-4470",
+   "quote": {
+    "betragText": "ca. 160 EUR netto",
+    "umfang": "Akkupack tauschen",
+    "erstelltAm": "2026-09-23",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-23",
+    "entschiedenVon": "M. Ortmann (Gerätebeauftragter)"
+   }
+  },
+  {
+   "ref": "SR-2026-4474",
+   "quote": {
+    "betragText": "ca. 1.450 EUR netto",
+    "umfang": "Werkstattinstandsetzung Schallkopf C5-2 bei Sono Repair, inkl. Rückversand",
+    "erstelltAm": "2026-09-22",
+    "erstelltVon": "T. Lorenz",
+    "freigabe": "offen"
+   }
+  }
+ ],
+ "folgeauftraege": [
+  {
+   "ref": "SR-2026-4256",
+   "parentRequestId": "SR-2026-4249",
+   "proposed": false,
+   "mandatory": true,
+   "kind": "post_repair_inspection",
+   "postRepairCheckKind": "requalifizierung"
+  },
+  {
+   "ref": "SR-2026-4472",
+   "parentRequestId": "SR-2026-4471",
+   "proposed": true,
+   "mandatory": false,
+   "kind": "follow_up_visit",
+   "postRepairCheckKind": null
+  },
+  {
+   "ref": "SR-2026-4473",
+   "parentRequestId": "SR-2026-4470",
+   "proposed": true,
+   "mandatory": false,
+   "kind": "post_repair_inspection",
+   "postRepairCheckKind": "stk"
+  }
+ ],
+ "einsendungen": [
+  {
+   "ref": "SR-2026-4474",
+   "einsendung": {
+    "werkstatt": "Sono Repair GmbH",
+    "versandtAm": "2026-09-23",
+    "tracking": "DHL 0034 5521 7789",
+    "inWerkstattAm": "2026-09-25",
+    "rueckversandtAm": null,
+    "eingetroffenAm": null
+   }
+  }
+ ],
+ "bestellvorschlaege": [
+  {
+   "id": "BV-2026-001",
+   "auftragId": "SR-2026-4471",
+   "geraet": "Ultraschallsystem SonoLine 9",
+   "inv": "INV-MVZ-2021-0240",
+   "tenant": "T-MVZ",
+   "teile": [
+    {
+     "bez": "Schallkopf C5-2",
+     "teilNr": "MS-C52-01",
+     "sn": "",
+     "menge": 1
+    }
+   ],
+   "status": "offen",
+   "erstelltVon": "P. Serrano (Prüfpartner-Zugang)",
+   "erstelltAm": "2026-09-22",
+   "kanal": "plusorder",
+   "ausgeloestUeber": "devicecare"
+  },
+  {
+   "id": "BV-2026-002",
+   "auftragId": "SR-2026-4249",
+   "geraet": "Sterilisator AutoClave 80",
+   "inv": "INV-KLN-2017-0009",
+   "tenant": "T-KLN",
+   "teile": [
+    {
+     "bez": "Verschleißteilsatz AutoClave 80",
+     "teilNr": "VS-AC80",
+     "sn": "",
+     "menge": 1
+    }
+   ],
+   "status": "bestellt",
+   "erstelltVon": "J. Reinhardt (Prüfpartner-Zugang)",
+   "erstelltAm": "2026-09-18",
+   "kanal": "plusorder",
+   "ausgeloestUeber": "devicecare",
+   "bestelltAm": "2026-09-20",
+   "bestellRef": "PO-2026-1188",
+   "bestelltVon": "L. Timm"
+  }
+ ],
+ "uebersteuerungen": [
+  {
+   "ref": "SR-2026-4244",
+   "hersteller": "Radiotec",
+   "uebersteuerung": {
+    "typ": "leistung",
+    "leistung": "konstanz",
+    "qual": "fachkunde_strlsch",
+    "von": "L. Timm (Serviceleitung)",
+    "am": "2026-09-26",
+    "begruendung": "Messung unter Anleitung von H. Brandt (Fachkunde), Protokoll gegengezeichnet"
+   }
+  },
+  {
+   "ref": "SR-2026-4474",
+   "hersteller": "Medisens",
+   "uebersteuerung": {
+    "von": "K. Adler (Geschäftsführung)",
+    "am": "2026-09-22",
+    "begruendung": "Schallkopftausch nach Herstelleranleitung SR-SK-12, keine Öffnung des Geräts"
+   }
+  }
+ ],
+ "schulungsGate": {
+  "Medisens": "sperre"
+ },
+ "leistungsGates": {
+  "sv": {
+   "qual": "sachverstaendiger",
+   "gate": "sperre",
+   "uebersteuerbar": false,
+   "hinweis": "Nur behördlich bestimmte Sachverständige (§ 88 StrlSchV) — der Prüfdienst koordiniert, prüft nicht. Die Konsole vergibt die Prüfung als Fremdleistung an ein Sachverständigenbüro."
+  },
+  "konstanz": {
+   "qual": "fachkunde_strlsch",
+   "gate": "sperre",
+   "uebersteuerbar": "serviceleitung",
+   "hinweis": "Fachkunde im Strahlenschutz (§ 116 StrlSchV, DIN 6868) — Übersteuern kann die Serviceleitung mit Begründung."
+  },
+  "dguv": {
+   "qual": "befaehigte_person_elektro",
+   "gate": "sperre",
+   "uebersteuerbar": "gf",
+   "hinweis": "Befähigte Person nach DGUV Vorschrift 3 (DIN VDE 0701-0702) — Übersteuern kann nur die Geschäftsführung mit Begründung."
+  }
+ },
+ "plaketten": [
+  {
+   "ref": "SR-2026-4211",
+   "inv": "INV-KLN-2022-0089",
+   "nr": "MSR-2026-0388",
+   "am": "2026-09-24",
+   "leistung": "stk"
+  },
+  {
+   "ref": "SR-2026-3980",
+   "inv": "INV-KLN-2024-0418",
+   "nr": "MSR-2026-0291",
+   "am": "2026-06-12",
+   "leistung": "stk"
+  },
+  {
+   "ref": "SR-2026-4476",
+   "inv": "BM-0001",
+   "nr": "DG-2026-0144",
+   "am": "2026-09-25",
+   "leistung": "dguv"
+  },
+  {
+   "ref": "SR-2026-4476",
+   "inv": "BM-0002",
+   "nr": "DG-2026-0145",
+   "am": "2026-09-25",
+   "leistung": "dguv"
+  }
+ ],
+ "betriebsmittel": [
+  {
+   "inv": "BM-0001",
+   "n": "Medikamentenkühlschrank",
+   "tenant": "T-KLN",
+   "site": "Haus A",
+   "ort": "mehrere Bereiche",
+   "sk": null,
+   "art": "betriebsmittel"
+  },
+  {
+   "inv": "BM-0002",
+   "n": "Arbeitsplatz-PC Anmeldung",
+   "tenant": "T-KLN",
+   "site": "Haus A",
+   "ort": "Anmeldung",
+   "sk": "I",
+   "art": "betriebsmittel"
+  },
+  {
+   "inv": "BM-0003",
+   "n": "Laborzentrifuge",
+   "tenant": "T-KLN",
+   "site": "Haus A",
+   "ort": "Labor",
+   "sk": "I",
+   "art": "betriebsmittel"
+  },
+  {
+   "inv": "BM-0004",
+   "n": "Mehrfachsteckdose",
+   "tenant": "T-KLN",
+   "site": "Haus A",
+   "ort": "Behandlung 2",
+   "sk": "I",
+   "art": "betriebsmittel"
+  },
+  {
+   "inv": "BM-0005",
+   "n": "Kaffeemaschine",
+   "tenant": "T-KLN",
+   "site": "Haus A",
+   "ort": "Sozialraum",
+   "sk": "I",
+   "art": "betriebsmittel"
+  },
+  {
+   "inv": "BM-0006",
+   "n": "Wasserbad Labor",
+   "tenant": "T-KLN",
+   "site": "Haus A",
+   "ort": "Labor",
+   "sk": "I",
+   "art": "betriebsmittel"
+  },
+  {
+   "inv": "BM-0007",
+   "n": "Mehrfachsteckdose OP-Vorraum",
+   "tenant": "T-KLN",
+   "site": "Haus A",
+   "ort": "OP",
+   "sk": "I",
+   "art": "betriebsmittel"
+  }
+ ],
+ "sammelauftraege": [
+  {
+   "ref": "SR-2026-4476",
+   "tenant": "T-KLN",
+   "site": "Haus A",
+   "assigneeUserId": "M-7",
+   "state": "in_arbeit",
+   "devices": [
+    {
+     "inv": "BM-0001",
+     "name": "Medikamentenkühlschrank",
+     "kind": "betriebsmittel",
+     "protectionClass": "I",
+     "location": "Station 3B",
+     "sticker": "DG-2026-0144",
+     "result": "bestanden",
+     "at": "2026-09-25"
+    },
+    {
+     "inv": "BM-0002",
+     "name": "Arbeitsplatz-PC Anmeldung",
+     "kind": "betriebsmittel",
+     "protectionClass": "I",
+     "location": "Anmeldung",
+     "sticker": "DG-2026-0145",
+     "result": "bestanden",
+     "at": "2026-09-25"
+    },
+    {
+     "inv": "BM-0003",
+     "name": "Laborzentrifuge",
+     "kind": "betriebsmittel",
+     "protectionClass": "I",
+     "location": "Labor",
+     "sticker": null,
+     "result": null,
+     "at": null
+    },
+    {
+     "inv": "BM-0004",
+     "name": "Mehrfachsteckdose",
+     "kind": "betriebsmittel",
+     "protectionClass": "I",
+     "location": "Behandlung 2",
+     "sticker": null,
+     "result": null,
+     "at": null
+    },
+    {
+     "inv": "BM-0005",
+     "name": "Kaffeemaschine",
+     "kind": "betriebsmittel",
+     "protectionClass": "I",
+     "location": "Sozialraum",
+     "sticker": null,
+     "result": null,
+     "at": null
+    },
+    {
+     "inv": "INV-2023-0155",
+     "name": "Blutdruckmessgerät TensioCheck 2",
+     "kind": "mp",
+     "protectionClass": "II",
+     "location": "Station 3B",
+     "sticker": null,
+     "result": null,
+     "at": null
+    }
+   ]
+  }
+ ],
+ "fremdleistungen": [
+  {
+   "ref": "SR-2026-4250",
+   "art": "sv",
+   "externalService": {
+    "org": "O-SVX",
+    "beauftragtAm": "2026-09-08",
+    "bescheinigung": "Fremdbericht im Backoffice (E76)"
+   },
+   "assigneeUserId": null
+  }
+ ],
+ "mitarbeiter": [
+  {
+   "id": "M-1",
+   "name": "K. Adler",
+   "role": "gf",
+   "qualifications": []
+  },
+  {
+   "id": "M-2",
+   "name": "J. Reinhardt",
+   "role": "technik",
+   "qualifications": [
+    {
+     "key": "fachkunde_elektro",
+     "validUntil": null,
+     "evidence": "Zeugnis 03/2021"
+    },
+    {
+     "key": "messtechnik",
+     "validUntil": null,
+     "evidence": "Schulung 11/2022"
+    },
+    {
+     "key": "fachkunde_strlsch",
+     "validUntil": "2027-05-31",
+     "evidence": "Aktualisierungskurs 05/2022"
+    }
+   ]
+  },
+  {
+   "id": "M-3",
+   "name": "P. Serrano",
+   "role": "technik",
+   "qualifications": [
+    {
+     "key": "fachkunde_elektro",
+     "validUntil": null,
+     "evidence": "Zeugnis 07/2024"
+    },
+    {
+     "key": "messtechnik",
+     "validUntil": null,
+     "evidence": "Schulung 09/2024"
+    },
+    {
+     "key": "fachkunde_strlsch",
+     "validUntil": "2026-12-15",
+     "evidence": "Aktualisierungskurs 12/2021"
+    }
+   ]
+  },
+  {
+   "id": "M-4",
+   "name": "L. Timm",
+   "role": "serviceleitung",
+   "qualifications": []
+  },
+  {
+   "id": "M-5",
+   "name": "H. Brandt",
+   "role": "technik",
+   "qualifications": [
+    {
+     "key": "fachkunde_elektro",
+     "validUntil": null,
+     "evidence": "Zeugnis 05/2022"
+    },
+    {
+     "key": "fachkunde_strlsch",
+     "validUntil": "2028-09-30",
+     "evidence": "Aktualisierungskurs 09/2023"
+    }
+   ]
+  },
+  {
+   "id": "M-6",
+   "name": "R. Yilmaz",
+   "role": "technik",
+   "qualifications": [
+    {
+     "key": "fachkunde_elektro",
+     "validUntil": null,
+     "evidence": "Zeugnis 10/2020"
+    },
+    {
+     "key": "messtechnik",
+     "validUntil": null,
+     "evidence": "Schulung 02/2023"
+    },
+    {
+     "key": "akkreditierung_val",
+     "validUntil": "2027-03-31",
+     "evidence": "DAkkS D-ZE-12345-01"
+    }
+   ]
+  },
+  {
+   "id": "M-7",
+   "name": "T. Novak",
+   "role": "technik",
+   "qualifications": [
+    {
+     "key": "fachkunde_elektro",
+     "validUntil": null,
+     "evidence": "Zeugnis Elektrofachkraft 07/2019"
+    },
+    {
+     "key": "befaehigte_person_elektro",
+     "validUntil": "2029-07-31",
+     "evidence": "Bestellung zur befähigten Person DGUV V3 07/2026 · Schulung DIN VDE 0701-0702"
+    }
+   ]
+  }
+ ],
+ "einsaetze": [
+  {
+   "id": "E-2026-0912",
+   "tenant": "T-KLN",
+   "technicianId": "M-2",
+   "date": "2026-09-10",
+   "orders": [
+    "SR-2026-4101"
+   ],
+   "source": "Referenzliste"
+  },
+  {
+   "id": "E-2026-0924",
+   "tenant": "T-KLN",
+   "technicianId": "M-2",
+   "date": "2026-09-24",
+   "orders": [
+    "SR-2026-4211",
+    "SR-2026-4249"
+   ],
+   "source": "Referenzliste"
+  },
+  {
+   "id": "E-2026-0922",
+   "tenant": "T-MVZ",
+   "technicianId": "M-3",
+   "date": "2026-09-22",
+   "orders": [
+    "SR-2026-4231",
+    "SR-2026-4471"
+   ],
+   "source": "Referenzliste"
+  },
+  {
+   "id": "E-2026-0923",
+   "tenant": "T-PRX",
+   "technicianId": "M-3",
+   "date": "2026-09-23",
+   "orders": [
+    "SR-2026-4408"
+   ],
+   "source": "Referenzliste"
+  },
+  {
+   "id": "E-2026-0925",
+   "tenant": "T-KLN",
+   "technicianId": "M-2",
+   "date": "2026-09-25",
+   "orders": [
+    "SR-2026-4218",
+    "SR-2026-4470"
+   ],
+   "source": "Referenzliste"
+  },
+  {
+   "id": "E-2026-0928",
+   "tenant": "T-KLN",
+   "technicianId": "M-2",
+   "date": "2026-09-28",
+   "orders": [
+    "SR-2026-4190",
+    "SR-2026-4240",
+    "SR-2026-4260"
+   ],
+   "source": "Disposition"
+  },
+  {
+   "id": "E-2026-0929",
+   "tenant": "T-KLN",
+   "technicianId": "M-5",
+   "date": "2026-09-29",
+   "orders": [
+    "SR-2026-4225"
+   ],
+   "source": "Disposition"
+  },
+  {
+   "id": "E-2026-0612",
+   "tenant": "T-KLN",
+   "technicianId": "M-2",
+   "date": "2026-06-12",
+   "orders": [
+    "SR-2026-3980"
+   ],
+   "source": "Referenzliste"
+  },
+  {
+   "id": "E-2026-0814",
+   "tenant": "T-KLN",
+   "technicianId": "M-2",
+   "date": "2026-08-14",
+   "orders": [
+    "SR-2026-3811",
+    "SR-2026-3812"
+   ],
+   "source": "Disposition"
+  },
+  {
+   "id": "E-2026-0819",
+   "tenant": "T-MVZ",
+   "technicianId": "M-3",
+   "date": "2026-08-19",
+   "orders": [
+    "SR-2026-3820"
+   ],
+   "source": "Referenzliste"
+  },
+  {
+   "id": "E-2026-0930",
+   "tenant": "T-KLN",
+   "technicianId": "M-7",
+   "date": "2026-09-30",
+   "orders": [
+    "SR-2026-4476"
+   ],
+   "source": "Disposition"
+  },
+  {
+   "id": "E-2026-1002",
+   "tenant": "T-KLN",
+   "technicianId": "M-7",
+   "date": "2026-10-02",
+   "orders": [
+    "SR-2026-4479",
+    "SR-2026-4477",
+    "SR-2026-4478"
+   ],
+   "source": "Disposition"
+  }
+ ]
+}

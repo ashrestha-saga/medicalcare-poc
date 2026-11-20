@@ -1,4 +1,4 @@
-import type { DutyKey, Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { konstanzDueAtFromCadence } from "@/services/k10/k10HardRules";
 import { computeDutyDueAt } from "@/services/registration/dueDate";
 import {
@@ -15,71 +15,58 @@ export type DutyProjectionResult = {
 };
 
 /**
- * Central duty projection for one device: re-apply open overlap suspensions
- * and open constancy cadences. Call after reclassify, overlap decide/revoke,
- * cadence determine, or any writer that replaces DeviceDuty rows.
+ * Central duty projection for one device: re-apply DGUV covered_by_stk
+ * suspensions and open constancy cadences. Call after reclassify,
+ * DGUV determination, cadence determine, or any writer that replaces DeviceDuty rows.
  */
 export async function recomputeDutyProjection(
   tx: Tx,
   deviceInstanceId: string,
   now = new Date(),
 ): Promise<DutyProjectionResult> {
-  const openOverlaps = await tx.dutyOverlapDecision.findMany({
-    where: { deviceInstanceId, validTo: null },
-    select: { coveredDutyKey: true, reasonText: true },
-    orderBy: { decidedAt: "desc" },
-  });
-
-  /** First (newest) open reason wins per covered key. */
-  const coveredReason = new Map<string, string>();
-  for (const row of openOverlaps) {
-    if (!coveredReason.has(row.coveredDutyKey)) {
-      coveredReason.set(row.coveredDutyKey, row.reasonText);
-    }
-  }
-
-  let suspended = 0;
-  for (const [dutyKey, reasonText] of coveredReason) {
-    const result = await tx.deviceDuty.updateMany({
-      where: {
-        deviceInstanceId,
-        dutyKey: dutyKey as DutyKey,
-      },
-      data: {
-        applicable: false,
-        suspendedAt: now,
-        notApplicableReason: overlapNotApplicableReason(reasonText),
-      },
-    });
-    suspended += result.count;
-  }
-
-  const candidates = await tx.deviceDuty.findMany({
-    where: { deviceInstanceId },
+  const dguvDuties = await tx.deviceDuty.findMany({
+    where: { deviceInstanceId, dutyKey: "dguv" },
     select: {
       id: true,
-      dutyKey: true,
+      determinationState: true,
+      basisText: true,
       notApplicableReason: true,
     },
+    orderBy: { referenceDate: "desc" },
   });
-  const reactivateIds = candidates
-    .filter(
-      (d) =>
-        isOverlapSuspensionReason(d.notApplicableReason) && !coveredReason.has(d.dutyKey),
-    )
-    .map((d) => d.id);
 
+  let suspended = 0;
   let reactivated = 0;
-  if (reactivateIds.length > 0) {
-    const result = await tx.deviceDuty.updateMany({
-      where: { id: { in: reactivateIds } },
-      data: {
-        applicable: true,
-        suspendedAt: null,
-        notApplicableReason: null,
-      },
-    });
-    reactivated = result.count;
+
+  for (const duty of dguvDuties) {
+    if (duty.determinationState === "covered_by_stk") {
+      const reasonText =
+        duty.basisText?.trim() ||
+        (isOverlapSuspensionReason(duty.notApplicableReason)
+          ? duty.notApplicableReason!.slice("overlap:".length)
+          : "covered_by_stk");
+      const result = await tx.deviceDuty.updateMany({
+        where: { id: duty.id },
+        data: {
+          applicable: false,
+          suspendedAt: now,
+          notApplicableReason: overlapNotApplicableReason(reasonText),
+        },
+      });
+      suspended += result.count;
+    } else if (isOverlapSuspensionReason(duty.notApplicableReason)) {
+      // Clear STK-coverage suspension when Festlegung is no longer covered_by_stk.
+      // Do not touch not_applicable (no overlap: prefix) or other supersession reasons.
+      const result = await tx.deviceDuty.updateMany({
+        where: { id: duty.id },
+        data: {
+          applicable: true,
+          suspendedAt: null,
+          notApplicableReason: null,
+        },
+      });
+      reactivated += result.count;
+    }
   }
 
   const cadences = await tx.constancyCadence.findMany({
@@ -139,13 +126,13 @@ export async function recomputeDutyProjection(
   return { suspended, reactivated, cadenceUpdated };
 }
 
-/** Re-apply projection for every device that has an open overlap or cadence. */
+/** Re-apply projection for every device that has covered_by_stk DGUV or an open cadence. */
 export async function backfillDutyProjections(
   client: PrismaClient,
 ): Promise<{ devices: number }> {
-  const [overlapDevices, cadenceDevices] = await Promise.all([
-    client.dutyOverlapDecision.findMany({
-      where: { validTo: null },
+  const [coveredDevices, cadenceDevices] = await Promise.all([
+    client.deviceDuty.findMany({
+      where: { dutyKey: "dguv", determinationState: "covered_by_stk" },
       select: { deviceInstanceId: true },
       distinct: ["deviceInstanceId"],
     }),
@@ -156,7 +143,7 @@ export async function backfillDutyProjections(
     }),
   ]);
   const ids = new Set([
-    ...overlapDevices.map((r) => r.deviceInstanceId),
+    ...coveredDevices.map((r) => r.deviceInstanceId),
     ...cadenceDevices.map((r) => r.deviceInstanceId),
   ]);
   for (const deviceInstanceId of ids) {

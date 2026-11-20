@@ -30,19 +30,68 @@ export function assertVisitStarted(startedAt: Date | string | null | undefined):
   return { ok: true };
 }
 
-export function assertSignaturesPresent(signatures: SealSignatureInput[]): SealGateResult {
+export function assertSignaturesPresent(
+  signatures: SealSignatureInput[],
+  /** RD26 — visit-level institution countersignature satisfies every run under the visit. */
+  visitInstitution?: { signedAt: Date | string | null; signerName?: string | null } | null,
+): SealGateResult {
   const inspectorOk = signatures.some(
     (s) => s.kind === "inspector" && (Boolean(s.signedAt) || s.absent),
   );
-  const institutionOk = signatures.some(
+  const institutionOnRun = signatures.some(
     (s) => s.kind === "institution" && (Boolean(s.signedAt) || s.absent),
   );
+  const institutionOk = institutionOnRun || Boolean(visitInstitution?.signedAt);
   if (!inspectorOk || !institutionOk) {
     return {
       ok: false,
       message:
         "Inspector and institution signatures (or absence reasons) are required to seal.",
       field: "signatures",
+    };
+  }
+  return { ok: true };
+}
+
+const LABEL_RE = /^[A-Z]{2}-\d{4}-\d{4}$/;
+
+/** E90 / R38 — Prüfplakette on STK/DGUV pass; never on constancy. */
+export function assertLabelRequired(input: {
+  requiresLabel: boolean;
+  result: string;
+  labelNumber?: string | null;
+  labelNextDue?: string | Date | null;
+  isConstancy?: boolean;
+}): SealGateResult {
+  if (input.isConstancy && input.labelNumber) {
+    return {
+      ok: false,
+      message: "Constancy runs must not carry a Prüfplakette.",
+      field: "labelNumber",
+    };
+  }
+  if (!input.requiresLabel) return { ok: true };
+  if (input.result === "failed") return { ok: true };
+  const num = input.labelNumber?.trim() ?? "";
+  if (!num) {
+    return {
+      ok: false,
+      message: "Prüfplakettennummer fehlt — am Gerät anbringen und eintragen.",
+      field: "labelNumber",
+    };
+  }
+  if (!LABEL_RE.test(num)) {
+    return {
+      ok: false,
+      message: "Label format must be AA-YYYY-NNNN (e.g. DG-2026-0144).",
+      field: "labelNumber",
+    };
+  }
+  if (!input.labelNextDue) {
+    return {
+      ok: false,
+      message: "Next due month (MM/YYYY) is required with the label.",
+      field: "labelNextDue",
     };
   }
   return { ok: true };
@@ -69,12 +118,13 @@ export function assertLinkedVisitSealGates(input: {
   failedSteps: SealFailedStepInput[];
   /** E77 — send-in workshop reports skip the visit-started gate. */
   skipVisit?: boolean;
+  visitInstitution?: { signedAt: Date | string | null; signerName?: string | null } | null;
 }): SealGateResult {
   if (!input.skipVisit) {
     const visit = assertVisitStarted(input.visitStartedAt);
     if (!visit.ok) return visit;
   }
-  const sigs = assertSignaturesPresent(input.signatures);
+  const sigs = assertSignaturesPresent(input.signatures, input.visitInstitution);
   if (!sigs.ok) return sigs;
   return assertFailedStepsHaveEvidence(input.failedSteps);
 }

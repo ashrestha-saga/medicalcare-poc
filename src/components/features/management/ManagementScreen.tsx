@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { ManagementContractDTO } from "@/interfaces";
 import { useManagementOverview } from "@/components/hooks/management/useManagementOverview";
+import { ImportRightCard } from "@/components/features/management/ImportRightCard";
 import { Spinner } from "@/components/ui/Loading";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -223,6 +224,8 @@ export function ManagementScreen() {
               </CardContent>
             </Card>
           ) : null}
+
+          <ImportRightCard />
         </ListPageShell>
       </main>
     </div>

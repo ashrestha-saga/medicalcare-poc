@@ -8,6 +8,7 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "inventory:view",
   "inventory:update",
   "inventory:export",
+  "import:manage",
   "catalog:view",
   "catalog:update",
   "clarifications:view",
@@ -165,6 +166,7 @@ export const PERMISSION_GROUPS: readonly {
       { slug: "inventory:view", description: "View device inventory" },
       { slug: "inventory:update", description: "Change and release device records" },
       { slug: "inventory:export", description: "Export §14 inventory directory (CSV)" },
+      { slug: "import:manage", description: "Import inventory as acting Prüfpartner (contract grant)" },
       { slug: "clarifications:view", description: "View clarifications list" },
       { slug: "duties:view", description: "View duties and due dates" },
       { slug: "devicebook:view", description: "View medical device book entries" },
@@ -273,13 +275,13 @@ export const MENU_MODULES: readonly MenuModule[] = [
   // Nachweise
   { id: "device-book", label: "Device book", href: "/device-book", slug: "devicebook:view", group: "records" },
   { id: "reprocessing", label: "Reprocessing", href: "/reprocessing", slug: "reprocessing:view", group: "records" },
-  { id: "constancy-cadence", label: "Constancy takt", href: "/constancy-cadence", slug: "duties:view", group: "records" },
+  { id: "constancy-cadence", label: "Radiation · constancy", href: "/constancy-cadence", slug: "duties:view", group: "records" },
   { id: "training", label: "Training", href: "/training", slug: "training:view", group: "records" },
   // Meldungen
   { id: "incidents", label: "Incidents", href: "/incidents", slug: "incidents:view", group: "reports" },
   { id: "field-safety", label: "Field safety", href: "/field-safety", slug: "fieldsafety:view", group: "reports" },
   { id: "authority", label: "Authority", href: "/authority", slug: "authority:view", group: "reports" },
-  { id: "duty-overlap", label: "Duty overlap", href: "/duty-overlap", slug: "duties:view", group: "reports" },
+  { id: "dguv-determination", label: "DGUV determination", href: "/duties/dguv-determination", slug: "duties:view", group: "reports" },
   // Verwaltung (aufgeklappt by default in AppShell)
   { id: "locations", label: "Locations", href: "/locations", slug: "locations:view", group: "admin" },
   { id: "users", label: "Users", href: "/users", slug: "users:view", group: "admin" },
@@ -304,13 +306,15 @@ export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   // /clarifications redirects to /devices?tab=klaerliste — keep path map for deep links
   "/due-dates": "duties:view",
   "/constancy-cadence": "duties:view",
-  "/duty-overlap": "duties:view",
+  "/radiation/routine": "duties:view",
+  "/duties/dguv-determination": "duties:view",
   "/training": "training:view",
   "/catalog": "catalog:view",
   "/clarifications": "clarifications:view",
   "/requests": "requests:view-mine",
   "/fault-report": "requests:create",
   "/maintenance-events/new": "inventory:update",
+  "/requests/sv-certificate": "requests:approve",
   "/users": "users:view",
   "/locations": "locations:view",
   "/roles": "roles:view",
@@ -363,10 +367,12 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   if (pathname.startsWith("/registration")) return "inventory:update";
   if (pathname.startsWith("/due-dates")) return "duties:view";
   if (pathname.startsWith("/constancy-cadence")) return "duties:view";
-  if (pathname.startsWith("/duty-overlap")) return "duties:view";
+  if (pathname.startsWith("/radiation/routine")) return "duties:view";
+  if (pathname.startsWith("/duties/dguv-determination")) return "duties:view";
   if (pathname.startsWith("/training")) return "training:view";
   if (pathname.startsWith("/catalog")) return "catalog:view";
   if (pathname.startsWith("/clarifications")) return "clarifications:view";
+  if (pathname.startsWith("/requests/sv-certificate")) return "requests:approve";
   if (pathname.startsWith("/requests")) return "requests:view-mine";
   if (pathname.startsWith("/fault-report")) return "requests:create";
   if (pathname.startsWith("/maintenance-events")) return "inventory:update";
@@ -407,6 +413,10 @@ export function canAccessPath(
   if (pathname.startsWith("/maintenance-events")) {
     if (!slugSet.has("inventory:update") && !slugSet.has("requests:approve")) return false;
     return slugSet.has("shell:nav");
+  }
+  // R40 SV Bescheinigung — requires approve + shell.
+  if (pathname.startsWith("/requests/sv-certificate")) {
+    return slugSet.has("requests:approve") && slugSet.has("shell:nav");
   }
 
   const required = resolvePathPermission(pathname);

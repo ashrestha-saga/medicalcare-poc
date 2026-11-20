@@ -2,9 +2,15 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-/** Local filesystem dual-read store (Phase 6). Swap for S3 later behind the same API. */
+/**
+ * Local filesystem dual-read store (Phase 6). Swap for S3 later behind the same API.
+ * Default root is statically scoped under `.data/blobs` so Turbopack does not trace the whole project.
+ * Optional BLOB_STORAGE_DIR overrides that root (marked ignore for the bundler).
+ */
 export function blobStorageRoot(): string {
-  return process.env.BLOB_STORAGE_DIR?.trim() || path.join(process.cwd(), ".data", "blobs");
+  const override = process.env.BLOB_STORAGE_DIR?.trim();
+  if (override) return override;
+  return path.join(process.cwd(), ".data", "blobs");
 }
 
 export function buildStorageKey(tenantId: string, kind: string): string {
@@ -16,9 +22,16 @@ export async function writeBlobBytes(
   storageKey: string,
   bytes: Buffer,
 ): Promise<{ byteSize: number; sha256: string }> {
-  const full = path.join(blobStorageRoot(), storageKey);
-  await mkdir(path.dirname(full), { recursive: true });
-  await writeFile(full, bytes);
+  const override = process.env.BLOB_STORAGE_DIR?.trim();
+  if (override) {
+    const full = path.join(/* turbopackIgnore: true */ override, storageKey);
+    await mkdir(/* turbopackIgnore: true */ path.dirname(full), { recursive: true });
+    await writeFile(/* turbopackIgnore: true */ full, bytes);
+  } else {
+    const full = path.join(process.cwd(), ".data", "blobs", storageKey);
+    await mkdir(path.dirname(full), { recursive: true });
+    await writeFile(full, bytes);
+  }
   return {
     byteSize: bytes.length,
     sha256: createHash("sha256").update(bytes).digest("hex"),
@@ -26,8 +39,13 @@ export async function writeBlobBytes(
 }
 
 export async function readBlobBytes(storageKey: string): Promise<Buffer> {
-  const full = path.join(blobStorageRoot(), storageKey);
-  return readFile(full);
+  const override = process.env.BLOB_STORAGE_DIR?.trim();
+  if (override) {
+    return readFile(
+      /* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ override, storageKey),
+    );
+  }
+  return readFile(path.join(process.cwd(), ".data", "blobs", storageKey));
 }
 
 /** Parse a data URL into bytes + content type. */

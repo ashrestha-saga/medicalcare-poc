@@ -542,6 +542,24 @@ export function DeviceBookScreen() {
                                 .filter(Boolean)
                                 .join(" · ")}
                             </p>
+                            {ev.reportBlobId ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="mt-2"
+                                onClick={() =>
+                                  window.open(
+                                    `/api/attachments/${ev.reportBlobId}`,
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  )
+                                }
+                                data-testid={`book-maintenance-report-${ev.id}`}
+                              >
+                                {t("actions.openReport")}
+                              </Button>
+                            ) : null}
                           </li>
                         ))}
                       </ul>

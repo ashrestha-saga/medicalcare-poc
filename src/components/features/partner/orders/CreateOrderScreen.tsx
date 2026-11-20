@@ -26,7 +26,7 @@ type Assignee = { userId: string; name: string };
 
 type Consequence = "out_of_service" | "restricted" | "usable";
 type Urgency = "immediate" | "with_next_due" | "at_appointment";
-type Fulfilment = "on_site" | "send_in";
+type Fulfilment = "on_site" | "send_in" | "external";
 type Reason = "stoerung" | "instandsetzung" | "faelligkeit" | "befund" | "rueckruf";
 
 const selectClass =
@@ -62,6 +62,10 @@ export function CreateOrderScreen() {
   const [urgency, setUrgency] = useState<Urgency>("with_next_due");
   const [fulfilment, setFulfilment] = useState<Fulfilment>("on_site");
   const [workshopName, setWorkshopName] = useState("");
+  const [externalOrgName, setExternalOrgName] = useState("");
+  const [externalCommissionedAt, setExternalCommissionedAt] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [appointmentAt, setAppointmentAt] = useState("");
   const [assigneeUserId, setAssigneeUserId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -182,11 +186,14 @@ export function CreateOrderScreen() {
           faultReportedBy: faultRequired ? faultReportedBy.trim() : null,
           photoDataUrl: null,
           workshopName: fulfilment === "send_in" ? workshopName.trim() : null,
+          externalOrgName: fulfilment === "external" ? externalOrgName.trim() : null,
+          externalCommissionedAt:
+            fulfilment === "external" ? externalCommissionedAt : null,
           appointmentAt:
             fulfilment === "on_site" && appointmentAt
               ? new Date(`${appointmentAt}T12:00:00`).toISOString()
               : null,
-          assigneeUserId: assigneeUserId || null,
+          assigneeUserId: fulfilment === "external" ? null : assigneeUserId || null,
           note: null,
         }),
       });
@@ -372,6 +379,7 @@ export function CreateOrderScreen() {
                   [
                     ["on_site", t("fulfilmentOnSite")],
                     ["send_in", t("fulfilmentSendIn")],
+                    ["external", t("fulfilmentExternal")],
                   ] as const
                 ).map(([value, label]) => (
                   <button
@@ -417,6 +425,17 @@ export function CreateOrderScreen() {
                     data-testid="create-order-workshop"
                   />
                 </div>
+              ) : fulfilment === "external" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-order-external-org">{t("externalOrg")}</Label>
+                  <Input
+                    id="create-order-external-org"
+                    value={externalOrgName}
+                    onChange={(e) => setExternalOrgName(e.target.value)}
+                    required
+                    data-testid="create-order-external-org"
+                  />
+                </div>
               ) : (
                 <div className="space-y-1.5">
                   <Label htmlFor="create-order-appointment">{t("appointmentOptional")}</Label>
@@ -431,28 +450,44 @@ export function CreateOrderScreen() {
               )}
             </div>
 
+            {fulfilment === "external" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="create-order-external-at">{t("externalCommissionedAt")}</Label>
+                <Input
+                  id="create-order-external-at"
+                  type="date"
+                  value={externalCommissionedAt}
+                  onChange={(e) => setExternalCommissionedAt(e.target.value)}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">{t("externalOrgHint")}</p>
+              </div>
+            ) : null}
+
             {fulfilment === "send_in" ? (
               <p className="text-xs text-muted-foreground">{t("workshopHint")}</p>
             ) : null}
 
-            <div className="space-y-1.5">
-              <Label htmlFor="create-order-assignee">{t("assigneeOptional")}</Label>
-              <select
-                id="create-order-assignee"
-                className={selectClass}
-                value={assigneeUserId}
-                onChange={(e) => setAssigneeUserId(e.target.value)}
-                disabled={!contractId}
-              >
-                <option value="">{t("assigneeNone")}</option>
-                {assignees.map((a) => (
-                  <option key={a.userId} value={a.userId}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground">{t("assigneeGateHint")}</p>
-            </div>
+            {fulfilment !== "external" ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="create-order-assignee">{t("assigneeOptional")}</Label>
+                <select
+                  id="create-order-assignee"
+                  className={selectClass}
+                  value={assigneeUserId}
+                  onChange={(e) => setAssigneeUserId(e.target.value)}
+                  disabled={!contractId}
+                >
+                  <option value="">{t("assigneeNone")}</option>
+                  {assignees.map((a) => (
+                    <option key={a.userId} value={a.userId}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">{t("assigneeGateHint")}</p>
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap gap-2 border-t border-border pt-4">
               <Button asChild type="button" variant="outline">

@@ -11,6 +11,7 @@ export type ScanActionCtx =
   | "charge"
   | "charge-neu"
   | "konstanz"
+  | "dguv"
   | "anfragen"
   | "ersatz"
   | "info"
@@ -22,7 +23,7 @@ export type ScanPrimaryAction = {
   textKey: string;
   tone: "ok" | "warn" | "stop";
   /** Prefill service type when ctx === service */
-  servicePrefill?: "reparatur";
+  servicePrefill?: "reparatur" | "dguv";
   infoOnly?: boolean;
   batchId?: string;
 };
@@ -42,12 +43,18 @@ export type DeviceActionInput = {
   state: "draft" | "review" | "released" | "retired";
   /** Aufbereitungsgerät (product kind or istAufbGeraet + eigenTyp). */
   isEquipment: boolean;
+  /** Non-medical Betriebsmittel (DeviceKind.equipment) — E86. */
+  isBetriebsmittel: boolean;
   openBatchCount: number;
   openDailyChecks: boolean;
   /** Due/overdue/failed constancy duties on this device. */
   openKonstanzChecks: boolean;
   /** Device has any applicable konstanz duty (for further actions). */
   hasKonstanzDuties: boolean;
+  /** Due/overdue DGUV own_check. */
+  openDguvOwnCheck: boolean;
+  /** Applicable DGUV duty with determination own_check. */
+  hasDguvOwnCheck: boolean;
   /** Gebrauchsanweisung label (§ 4), when evidence exists. */
   ifuLabel: string | null;
   ifuOpenUrl?: string | null;
@@ -82,6 +89,7 @@ export function resolvePrimaryAction(input: DeviceActionInput): ScanPrimaryActio
   const canRelease = input.permissions.includes("reprocessing:release");
   const isAdmin = input.role === "device_admin" || input.role === "superadmin";
   const canKonstanz = input.permissions.includes("inventory:view");
+  const canDguv = input.permissions.includes("inventory:view");
 
   // Patient safety: open recall measure outranks routine / charge work.
   if (input.lage === "stop" && input.quelle === "rueckruf") {
@@ -90,6 +98,34 @@ export function resolvePrimaryAction(input: DeviceActionInput): ScanPrimaryActio
       titleKey: "actions.recallStop",
       textKey: "actions.recallStopHint",
       tone: "stop",
+      infoOnly: true,
+    };
+  }
+
+  // E86 Betriebsmittel — no MP book / reprocessing; DGUV own check is the work.
+  if (input.isBetriebsmittel) {
+    if (canDguv && input.openDguvOwnCheck) {
+      return {
+        ctx: "dguv",
+        titleKey: "actions.dguv",
+        textKey: "actions.dguvHint",
+        tone: "warn",
+      };
+    }
+    if (input.permissions.includes("requests:create")) {
+      return {
+        ctx: "service",
+        titleKey: "actions.service",
+        textKey: "actions.serviceDguvHint",
+        tone: "ok",
+        servicePrefill: "dguv",
+      };
+    }
+    return {
+      ctx: "info",
+      titleKey: "actions.notice",
+      textKey: "actions.betriebsmittelIdleHint",
+      tone: "ok",
       infoOnly: true,
     };
   }
@@ -111,6 +147,14 @@ export function resolvePrimaryAction(input: DeviceActionInput): ScanPrimaryActio
           ? "actions.konstanzFailedHint"
           : "actions.konstanzHint",
       tone: input.lage === "stop" && input.quelle === "konstanz" ? "stop" : "warn",
+    };
+  }
+  if (canDguv && input.openDguvOwnCheck) {
+    return {
+      ctx: "dguv",
+      titleKey: "actions.dguv",
+      textKey: "actions.dguvHint",
+      tone: "warn",
     };
   }
   if ((canReproc || isAdmin) && input.isEquipment && input.openBatchCount > 0 && canRelease) {
@@ -183,6 +227,26 @@ export function resolveFurtherActions(
   const isAdmin = input.role === "device_admin" || input.role === "superadmin";
   const out: ScanFurtherAction[] = [];
 
+  // E86 Betriebsmittel — no MP book / parts / §4 IFU.
+  if (input.isBetriebsmittel) {
+    if (input.hasDguvOwnCheck && primary.ctx !== "dguv") {
+      out.push({
+        ctx: "dguv",
+        titleKey: "actions.dguv",
+        textKey: input.openDguvOwnCheck ? "actions.dguvHint" : "actions.dguvDoneHint",
+        tone: input.openDguvOwnCheck ? "warn" : "ok",
+      });
+    }
+    if (canService && primary.ctx !== "service" && primary.ctx !== "anfragen") {
+      out.push({
+        ctx: "service",
+        titleKey: "actions.service",
+        textKey: input.openRequestRef ? "actions.serviceOpenHint" : "actions.serviceDguvHint",
+      });
+    }
+    return out;
+  }
+
   if (canBook && primary.ctx !== "stoerung") {
     out.push({ ctx: "stoerung", titleKey: "actions.stoerung", textKey: "actions.stoerungHint" });
   }
@@ -225,6 +289,14 @@ export function resolveFurtherActions(
       titleKey: "actions.konstanz",
       textKey: input.openKonstanzChecks ? "actions.konstanzHint" : "actions.konstanzDoneHint",
       tone: input.openKonstanzChecks ? "warn" : "ok",
+    });
+  }
+  if (input.hasDguvOwnCheck && primary.ctx !== "dguv") {
+    out.push({
+      ctx: "dguv",
+      titleKey: "actions.dguv",
+      textKey: input.openDguvOwnCheck ? "actions.dguvHint" : "actions.dguvDoneHint",
+      tone: input.openDguvOwnCheck ? "warn" : "ok",
     });
   }
   out.push({

@@ -8,16 +8,19 @@ import type {
   ScanChargeReleaseResultDTO,
   ScanDeviceCardDTO,
   ScanHeuteDTO,
+  ScanDguvResultDTO,
   ScanKonstanzResultDTO,
   ScanRoutineResultDTO,
   ScanStoerungResultDTO,
 } from "@/interfaces";
 import { useScanStore } from "@/store/scanStore";
+import { startServiceRequestFromDevice } from "@/lib/scan/startServiceRequestFromDevice";
 import { CameraPane } from "@/components/features/scan/CameraPane";
 import { CapturerInventoryPanel } from "@/components/features/scan/CapturerInventoryPanel";
 import { ChargeFreigabeForm } from "@/components/features/scan/ChargeFreigabeForm";
 import { ChargeNeuForm } from "@/components/features/scan/ChargeNeuForm";
 import { ChargenScreen } from "@/components/features/scan/ChargenScreen";
+import { DguvOwnCheckForm } from "@/components/features/scan/DguvOwnCheckForm";
 import { HeuteScreen } from "@/components/features/scan/HeuteScreen";
 import { KonstanzForm } from "@/components/features/scan/KonstanzForm";
 import { ScanCameraFlow } from "@/components/features/scan/ScanCameraFlow";
@@ -49,6 +52,7 @@ type Overlay =
   | { kind: "routine"; deviceId: string; back: OverlayBack }
   | { kind: "site-routine"; siteId: string; back: OverlayBack }
   | { kind: "konstanz"; deviceId: string; back: OverlayBack }
+  | { kind: "dguv"; deviceId: string; back: OverlayBack }
   | {
       kind: "charge-neu";
       deviceId: string;
@@ -93,6 +97,7 @@ export function ScanApp() {
   const tStoerung = useTranslations("scan.stoerung");
   const tRoutine = useTranslations("scan.routine");
   const tKonstanz = useTranslations("scan.konstanz");
+  const tDguv = useTranslations("scan.dguv");
   const tCharge = useTranslations("scan.charge");
   const tConfirm = useTranslations("scan.confirm");
   const tDevice = useTranslations("scan.device");
@@ -194,7 +199,20 @@ export function ScanApp() {
   const openService = async (card: ScanDeviceCardDTO) => {
     setOverlay(null);
     onTabChange("scan");
-    await resolve(card.inventoryNumber, "manual");
+    const prefill =
+      card.primary.servicePrefill === "dguv" || card.isBetriebsmittel
+        ? "DGUV"
+        : card.primary.servicePrefill === "reparatur"
+          ? "REPAIR"
+          : null;
+    try {
+      await startServiceRequestFromDevice({
+        inventoryNumber: card.inventoryNumber,
+        serviceType: prefill,
+      });
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : tDevice("comingSoon"));
+    }
   };
 
   const openParts = async (card: ScanDeviceCardDTO) => {
@@ -262,6 +280,27 @@ export function ScanApp() {
           : []),
       ],
       hint: result.result === "failed" ? tKonstanz("hintFailed") : null,
+    });
+  };
+
+  const onDguvSaved = (result: ScanDguvResultDTO, back: OverlayBack) => {
+    setOverlay({
+      kind: "confirm",
+      deviceId: result.deviceId,
+      back,
+      title: tDguv(`ok.${result.result}`),
+      lines: [
+        { label: tConfirm("device"), value: result.inventoryNumber },
+        { label: tDguv("performedAt"), value: result.performedAt },
+        ...(result.labelNumber
+          ? [{ label: tDguv("labelNumber"), value: result.labelNumber }]
+          : []),
+        ...(result.labelNextDue
+          ? [{ label: tDguv("labelNextDue"), value: result.labelNextDue }]
+          : []),
+        ...(result.dueAt ? [{ label: tDguv("nextDue"), value: result.dueAt.slice(0, 10) }] : []),
+      ],
+      hint: result.result === "failed" ? tDguv("hintFailed") : null,
     });
   };
 
@@ -404,6 +443,7 @@ export function ScanApp() {
           onKonstanz={(card) =>
             setOverlay({ kind: "konstanz", deviceId: card.deviceId, back: "card" })
           }
+          onDguv={(card) => setOverlay({ kind: "dguv", deviceId: card.deviceId, back: "card" })}
           onChargeNeu={(card) =>
             setOverlay({
               kind: "charge-neu",
@@ -456,6 +496,13 @@ export function ScanApp() {
           deviceId={overlay.deviceId}
           onCancel={() => backFromOverlay(overlay.back, overlay.deviceId)}
           onSaved={(result) => onKonstanzSaved(result, overlay.back)}
+        />
+      ) : null}
+      {overlay?.kind === "dguv" ? (
+        <DguvOwnCheckForm
+          deviceId={overlay.deviceId}
+          onCancel={() => backFromOverlay(overlay.back, overlay.deviceId)}
+          onSaved={(result) => onDguvSaved(result, overlay.back)}
         />
       ) : null}
       {overlay?.kind === "charge-neu" ? (

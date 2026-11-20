@@ -4,6 +4,7 @@ import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { conflict, forbidden, notFound, unprocessable } from "@/lib/errors";
 import { isRepairsEnabled } from "@/lib/features/repairs";
+import { isRadiationDguvEnabled } from "@/lib/features/radiationDguv";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
 
@@ -38,7 +39,11 @@ async function assertRepairs(ctx: TransitionCtx) {
     where: { id: ctx.tenantId },
     select: { featureFlags: true },
   });
-  if (!isRepairsEnabled(tenant?.featureFlags)) {
+  // E88 constancy lock (rso) also uses this transition table under radiation_dguv.
+  if (
+    !isRepairsEnabled(tenant?.featureFlags) &&
+    !isRadiationDguvEnabled(tenant?.featureFlags)
+  ) {
     throw forbidden("Repairs feature is not enabled for this tenant");
   }
 }

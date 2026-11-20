@@ -1,4 +1,7 @@
-/** Prefix on DeviceDuty.notApplicableReason when suspended by a DutyOverlapDecision. */
+/**
+ * Prefix on DeviceDuty.notApplicableReason when DGUV is suspended because
+ * Festlegung is covered_by_stk (STK covers DGUV).
+ */
 export const OVERLAP_REASON_PREFIX = "overlap:";
 
 export function overlapNotApplicableReason(reasonText: string): string {

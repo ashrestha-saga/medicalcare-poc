@@ -53,6 +53,12 @@ export interface DeviceInstanceDTO {
   modelName: string | null;
   tradeName: string | null;
   modelId: string | null;
+  /** E86 — medical product (default) vs non-medical Betriebsmittel. */
+  kind: "mp" | "equipment";
+  protectionClass: "I" | "II" | "III" | null;
+  portable: boolean | null;
+  electrical: boolean;
+  productKindCode: string | null;
   /** Instance lifecycle: draft | review | released | retired */
   state: "draft" | "review" | "released" | "retired";
   /**
@@ -102,6 +108,25 @@ export interface DeviceInstanceDTO {
   lockSource?: string | null;
   replacedById?: string | null;
   loanerLender?: string | null;
+  /** Linked loaner when this unit is replaced (from `replacedBy`). */
+  replacedBy?: {
+    id: string;
+    inventoryNumber: string;
+    loanerLender: string | null;
+    operationalState: string;
+  } | null;
+  /** When this unit is a loaner: defective unit(s) it replaces. */
+  replacementFor?: Array<{
+    id: string;
+    inventoryNumber: string;
+    operationalState: string;
+  }>;
+  /** wizard | manual | import | scan | external */
+  source?: string | null;
+  /** Provenance when source=import (file · sheet · row). */
+  importHint?: string | null;
+  importJobId?: string | null;
+  importFileName?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -141,6 +166,13 @@ export interface DeviceInstanceDetailDTO extends DeviceInstanceDTO {
   nextObligationDueAt: string | null;
   /** E77 — open send-in repair on this device (clinic chip), if any. */
   openSendInRepair: { reference: string; state: string } | null;
+  /** E90 — latest Prüfplakette per duty key (STK/DGUV). */
+  latestLabels: Array<{
+    dutyKey: string;
+    labelNumber: string;
+    labelNextDue: string | null;
+    performedAt: string;
+  }>;
 }
 
 export type CapturedNumberType = "gtin" | "pzn" | "manufacturer" | "none";

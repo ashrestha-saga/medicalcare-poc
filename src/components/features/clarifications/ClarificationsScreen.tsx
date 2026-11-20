@@ -56,6 +56,11 @@ export function ClarificationsScreen() {
                   modelName: null,
                   tradeName: item.title,
                   modelId: item.modelId,
+                  kind: "mp",
+                  protectionClass: null,
+                  portable: null,
+                  electrical: true,
+                  productKindCode: null,
                   state: "draft",
                   modelState: null,
                   location: item.locationText

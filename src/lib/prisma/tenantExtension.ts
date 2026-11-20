@@ -67,12 +67,17 @@ export const TENANT_SCOPED_MODELS = new Set([
   "AuthorityFinding",
   "DisclosureSession",
   "ChecklistItemReadiness",
-  "DutyOverlapDecision",
   "UserAreaAssignment",
   "AuthorityNotification",
   "NotificationDocument",
   "ModelDocument",
   "ExportLog",
+  // Nachtrag 3 — Bestandsimport
+  "ImportJob",
+  "ImportRow",
+  "Quote",
+  "MaintenancePart",
+  "ServiceVisit",
 ]);
 
 /** Required-tenantId models that stay off the guard (must filter manually or use bypass). */

@@ -64,4 +64,40 @@ describe("evaluateClarificationIssues", () => {
     expect(issues[0]?.code).toBe("duplicate_serial");
     expect(maxSeverity(issues)).toBe("high");
   });
+
+  it("skips MP classification / maintenance rules for Betriebsmittel", () => {
+    const issues = evaluateClarificationIssues({
+      kind: "equipment",
+      responsibleUserId: "u1",
+      responsiblePerson: "Ben",
+      maintenanceCycleMonths: null,
+      room: "Labor",
+      serialNumber: "SN-BM",
+      modelName: null,
+      tradeName: "Blutbank-Kühlschrank",
+      state: "released",
+      classificationConfidence: null,
+      hasModelClassification: false,
+      duplicateSerialInventoryNumbers: [],
+    });
+    expect(issues.map((i) => i.code)).toEqual([]);
+  });
+
+  it("still flags missing label on Betriebsmittel", () => {
+    const issues = evaluateClarificationIssues({
+      kind: "equipment",
+      responsibleUserId: "u1",
+      responsiblePerson: "Ben",
+      maintenanceCycleMonths: null,
+      room: "Labor",
+      serialNumber: "SN-BM",
+      modelName: null,
+      tradeName: null,
+      state: "released",
+      classificationConfidence: null,
+      hasModelClassification: false,
+      duplicateSerialInventoryNumbers: [],
+    });
+    expect(issues.map((i) => i.code)).toEqual(["missing_model_name"]);
+  });
 });

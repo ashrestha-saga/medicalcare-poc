@@ -13,7 +13,10 @@ export const DASHBOARD_TILE_LINKS: Record<string, DashboardTileLink> = {
   "faellig-30": { path: "/due-dates", query: { horizon: "30" } },
   "fristen-ohne-beleg": { path: "/due-dates" },
   "pruefungen-quartal": { path: "/due-dates", query: { horizon: "90" } },
-  "konstanz-heute": { path: "/due-dates", query: { dutyKey: "konstanz", scheduled: "1" } },
+  "konstanz-heute": {
+    path: "/constancy-cadence",
+    query: { tab: "routine" },
+  },
   "dguv-faellig": { path: "/due-dates", query: { dutyKey: "dguv", horizon: "30" } },
   "implantat-doku": { path: "/due-dates", query: { dutyKey: "implantat" } },
   "aufb-extern": { path: "/due-dates", query: { dutyKey: "kontrolle" } },
@@ -69,7 +72,8 @@ export const DASHBOARD_TILE_LINKS: Record<string, DashboardTileLink> = {
   },
 
   "konstanz-takt-offen": { path: "/constancy-cadence", query: { section: "missing" } },
-  "dguv-ohne-festlegung": { path: "/duty-overlap" },
+  /** DGUV Festlegung queue (E85). */
+  "dguv-ohne-festlegung": { path: "/duties/dguv-determination" },
 
   "befund-frist": {
     path: "/authority",

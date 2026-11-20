@@ -1,7 +1,7 @@
 /**
  * Master list of inspection/service types (canonical order).
  * The scan-flow dropdown filters this via `serviceTypesForClassification`:
- * STK/MTK from catalog annex flags; REPAIR / SOFTWARE / RADIATION / OTHER always.
+ * STK/MTK from catalog annex flags; DGUV / REPAIR / SOFTWARE / RADIATION / OTHER always.
  */
 export const INSPECTION_TYPES = [
   {

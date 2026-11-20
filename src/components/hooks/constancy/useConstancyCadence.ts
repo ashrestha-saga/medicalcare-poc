@@ -49,6 +49,18 @@ export function useConstancyCadence() {
     intervalUnit: "months" | "years" | "working_days";
     basisText: string;
     determinedAt: string;
+    captureMode?: "device_protocol" | "manual_measurement" | "visual";
+    protocolSource?: string | null;
+    referenceValuesJson?:
+      | Array<{
+          name: string;
+          value: number;
+          unit: string;
+          tolerancePct?: number | null;
+          toleranceAbs?: number | null;
+        }>
+      | { visualCheckpoints: string[] }
+      | null;
   }) {
     try {
       await api("/api/constancy-cadence", { method: "POST", body: JSON.stringify(input) });

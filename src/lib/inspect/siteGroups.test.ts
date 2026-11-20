@@ -5,6 +5,7 @@ import { buildDaySections, groupRowsBySite } from "./siteGroups";
 function row(partial: Partial<CataloguePreviewDTO> & { reference: string }): CataloguePreviewDTO {
   return {
     tenantId: "t1",
+    subjectType: "instance",
     deviceInstanceId: "d1",
     inventoryNumber: "INV",
     serialNumber: null,

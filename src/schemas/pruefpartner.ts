@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const startInspectionRunSchema = z.object({
   reference: z.string().trim().min(1).max(100),
+  /** Sammelauftrag item device (required when subjectType=group). */
+  deviceInstanceId: z.string().trim().min(1).max(100).nullable().optional(),
   occasionCode: z.string().trim().min(1).max(50).nullable().optional(),
   testEquipmentId: z.string().trim().min(1).max(100).nullable().optional(),
   performedAt: z.string().trim().min(1).max(32).optional(),
@@ -37,6 +39,24 @@ export type SaveInspectionStepsInput = z.infer<typeof saveInspectionStepsSchema>
 export const completeInspectionRunSchema = z.object({
   result: z.enum(["passed", "passed_with_conditions", "failed"]).optional(),
   note: z.string().trim().max(4000).nullable().optional(),
+  /** E90 — Prüfplakette on STK/DGUV pass. */
+  labelNumber: z
+    .string()
+    .trim()
+    .regex(/^[A-Z]{2}-\d{4}-\d{4}$/)
+    .nullable()
+    .optional(),
+  labelNextDue: z
+    .string()
+    .trim()
+    .regex(/^\d{4}-\d{2}(-\d{2})?$/)
+    .nullable()
+    .optional(),
+  captureMode: z
+    .enum(["device_protocol", "manual_measurement", "visual"])
+    .nullable()
+    .optional(),
+  protocolBlobId: z.string().trim().min(1).nullable().optional(),
 });
 
 export type CompleteInspectionRunInput = z.infer<typeof completeInspectionRunSchema>;

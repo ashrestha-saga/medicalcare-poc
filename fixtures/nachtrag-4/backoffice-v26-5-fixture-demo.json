@@ -1,0 +1,1325 @@
+{
+ "version": "backoffice-v26.5",
+ "stichtag": "2026-09-20",
+ "importJobs": [
+  {
+   "id": "IJ-2026-001",
+   "datei": "praxis-1-hausarzt-bestandsverzeichnis.xlsx",
+   "beispiel": "praxis1",
+   "titel": "Praxis Dr. Vogt (Hausarzt) — Testlauf",
+   "am": "2026-09-10",
+   "durch": "Einrichtung",
+   "wer": "M. Ortmann",
+   "status": "committed",
+   "blaetter": [
+    "Bestand"
+   ],
+   "hinweis": "Testlauf: vier Zeilen der Datei (2, 3, 5, 7)",
+   "stats": {
+    "zeilen": 4,
+    "geraetezeilen": 4,
+    "neu": 4,
+    "neuAngelegt": 4,
+    "aktualisiert": 0,
+    "gruen": 3,
+    "gelb": 1,
+    "rot": 0,
+    "exakt": 2,
+    "unscharf": 2,
+    "modelleNeu": 0,
+    "dubletten": 0,
+    "freigegeben": 0,
+    "gruenQuote": 75
+   },
+   "protokoll": "Import durch die Einrichtung — Betreuer informiert",
+   "zeilen": [
+    [
+     "Ultraschall-Vernebler",
+     "Aerotec · Aerosan 12",
+     "SN-45142",
+     "INV-0972",
+     "Klinikum Nord · Haus A",
+     "gruen",
+     "exakt"
+    ],
+    [
+     "Infusionspumpe",
+     "Vitamed Systems · VOLUMAT X-210",
+     "SN-18790",
+     "INV-0205",
+     "Klinikum Nord · Haus A",
+     "gruen",
+     "exakt"
+    ],
+    [
+     "Infusionspumpe",
+     "Vitamed Systems · VOLUMAT X-210 Plus",
+     "SN-81128",
+     "INV-0488",
+     "Klinikum Nord · Haus A",
+     "gelb",
+     "unscharf"
+    ],
+    [
+     "Infusionspumpe",
+     "Vitamed Systems · VOLUMAT X-210",
+     "(Zeile 7)",
+     "",
+     "Klinikum Nord · Haus A",
+     "gruen",
+     "exakt"
+    ]
+   ]
+  }
+ ],
+ "einladungen": [],
+ "importrecht": {
+  "dienstleister": true,
+  "quelle": "default",
+  "log": []
+ },
+ "importEntwuerfe": [
+  {
+   "code": "INV-0972",
+   "n": "Ultraschall-Vernebler",
+   "mk": "Aerotec",
+   "typ": "Aerosan 12",
+   "sn": "SN-45142",
+   "jahr": 2015,
+   "site": "H-A",
+   "raum": "EKG-Raum",
+   "modelId": "M-AERO12",
+   "state": "draft",
+   "importJob": "IJ-2026-001",
+   "importHint": "aus Praxis Dr. Vogt, Blatt Bestand, Zeile 2"
+  },
+  {
+   "code": "INV-0205",
+   "n": "Infusionspumpe",
+   "mk": "Vitamed Systems",
+   "typ": "VOLUMAT X-210",
+   "sn": "SN-18790",
+   "jahr": 2019,
+   "site": "H-A",
+   "raum": "Labor",
+   "modelId": "M-VOL210",
+   "state": "draft",
+   "importJob": "IJ-2026-001",
+   "importHint": "aus Praxis Dr. Vogt, Blatt Bestand, Zeile 3"
+  },
+  {
+   "code": "INV-0488",
+   "n": "Infusionspumpe",
+   "mk": "Vitamed Systems",
+   "typ": "VOLUMAT X-210 Plus",
+   "sn": "SN-81128",
+   "jahr": null,
+   "site": "H-A",
+   "raum": "Sprechzimmer 2",
+   "modelId": "M-VOL210",
+   "state": "draft",
+   "importJob": "IJ-2026-001",
+   "importHint": "aus Praxis Dr. Vogt, Blatt Bestand, Zeile 5"
+  },
+  {
+   "code": "INV-0501",
+   "n": "Infusionspumpe",
+   "mk": "Vitamed Systems",
+   "typ": "VOLUMAT X-210",
+   "sn": "SN-72807",
+   "jahr": 2012,
+   "site": "H-A",
+   "raum": "Empfang",
+   "modelId": "M-VOL210",
+   "state": "draft",
+   "importJob": "IJ-2026-001",
+   "importHint": "aus Praxis Dr. Vogt, Blatt Bestand, Zeile 7"
+  }
+ ],
+ "importModelle": [],
+ "importFristen": [
+  {
+   "id": "F-IMP-1",
+   "code": "INV-0205",
+   "art": "STK",
+   "grund": "§ 11 MPBetreibV · aus Import: letzte Prüfung 01.07.2024 + 24 Monate",
+   "anker": "monatsende",
+   "am": "2026-07-31",
+   "zuletzt": "2024-07-01",
+   "vertrauen": "derived",
+   "auftrag": null,
+   "src": "import"
+  }
+ ],
+ "fremdberichte": [
+  {
+   "id": "MH-2026-0012",
+   "geraet": "INV-2019-0071",
+   "datum": "2026-09-14",
+   "art": "instandsetzung",
+   "quelle": "fremd",
+   "durchfuehrender": "Radiotec Service, extern",
+   "massnahme": "teil_getauscht",
+   "ergebnis": "Teil getauscht · Röhreneinheit erneuert, Abnahme der Werkstatt dokumentiert",
+   "teile": [
+    {
+     "bez": "Röhreneinheit",
+     "teilNr": "RX90-RE-04",
+     "sn": "RE-11208",
+     "menge": 1
+    }
+   ],
+   "arbeitsminuten": null,
+   "anhang": "radiotec-servicebericht-2026-09-14.pdf",
+   "auftragId": null,
+   "folgeAuftragId": "SR-2026-4475",
+   "erfasstVon": "M. Ortmann",
+   "erfasstAm": "2026-09-14"
+  }
+ ],
+ "einsendungen": [
+  {
+   "ref": "SR-2026-4219",
+   "geraet": "INV-2023-0155",
+   "an": "Cardiotech Service (Hersteller)",
+   "einsendung": {
+    "versandtAm": "2026-09-19",
+    "tracking": "DHL 0034 5512 9981",
+    "inWerkstattAm": "2026-09-20",
+    "rueckversandtAm": null,
+    "eingetroffenAm": null
+   },
+   "zustand": "angenommen"
+  }
+ ],
+ "stoerungen": [
+  {
+   "id": "ST-2026-0001",
+   "geraet": "INV-2024-0417",
+   "was": "Förderung ohne Alarm gestoppt.",
+   "seit": "2026-09-18",
+   "folge": "ausser_betrieb",
+   "gemeldetVon": "S. Berger (Anwender)",
+   "am": "2026-09-18T11:20",
+   "foto": true,
+   "buchId": "B-1",
+   "sichtung": "auftrag",
+   "auftragId": "SR-2026-4260",
+   "klaerId": null
+  },
+  {
+   "id": "ST-2026-0002",
+   "geraet": "INV-2023-0155",
+   "was": "Manschettendruck baut sich verzögert auf, Messung dauert deutlich länger.",
+   "seit": "2026-09-19",
+   "folge": "eingeschraenkt",
+   "gemeldetVon": "S. Berger (Anwender)",
+   "am": "2026-09-19T08:05",
+   "foto": false,
+   "buchId": "B-5",
+   "sichtung": "offen",
+   "auftragId": null,
+   "klaerId": "K-ST-2"
+  },
+  {
+   "id": "ST-2026-0003",
+   "geraet": "INV-2023-0155",
+   "was": "Display ohne Anzeige, Gerät ohne Funktion (nach Sturz).",
+   "seit": "2026-09-19",
+   "folge": "ausser_betrieb",
+   "gemeldetVon": "S. Berger (Anwender)",
+   "am": "2026-09-19T11:02",
+   "foto": true,
+   "buchId": "B-6",
+   "sichtung": "auftrag",
+   "auftragId": "SR-2026-4219",
+   "klaerId": null
+  }
+ ],
+ "auftraege": [
+  {
+   "ref": "SR-2026-4240",
+   "code": "INV-2019-0071",
+   "art": "Konstanz · Monitor",
+   "quelle": "faelligkeit",
+   "grund": "faelligkeit",
+   "faelligId": "F-3",
+   "an": "O-RTS",
+   "zustand": "terminiert",
+   "termin": "2026-09-22",
+   "zugang": "Radiologie, Anmeldung am Tresen",
+   "hist": [
+    {
+     "t": "12.09.2026 09:10",
+     "w": "M. Ortmann",
+     "a": "Aus Fälligkeit erzeugt"
+    },
+    {
+     "t": "12.09.2026 09:11",
+     "w": "System",
+     "a": "An Radiotec Service übermittelt"
+    },
+    {
+     "t": "13.09.2026 08:02",
+     "w": "Radiotec Service",
+     "a": "Angenommen"
+    },
+    {
+     "t": "15.09.2026 14:30",
+     "w": "Radiotec Service",
+     "a": "Termin bestätigt: 22.09.2026"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4218",
+   "code": "INV-2023-0155",
+   "art": "MTK · 1.3",
+   "quelle": "app",
+   "grund": "faelligkeit",
+   "faelligId": null,
+   "an": "O-MSR",
+   "zustand": "angenommen",
+   "termin": null,
+   "zugang": "Anmeldung Ambulanz, Frau Sander, nur vormittags",
+   "hist": [
+    {
+     "t": "08.09.2026 11:20",
+     "w": "S. Berger",
+     "a": "Aus der Scan-App übermittelt"
+    },
+    {
+     "t": "08.09.2026 11:20",
+     "w": "System",
+     "a": "An Medtech Service Rhein GmbH übermittelt"
+    },
+    {
+     "t": "09.09.2026 07:45",
+     "w": "Medtech Service Rhein GmbH",
+     "a": "Angenommen"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4219",
+   "code": "INV-2023-0155",
+   "art": "Instandsetzung",
+   "artKey": "instandsetzung",
+   "quelle": "meldung",
+   "grund": "stoerung",
+   "stoerungId": "ST-2026-0003",
+   "faelligId": null,
+   "an": "O-CAR",
+   "zustand": "angenommen",
+   "termin": null,
+   "abwicklung": "einsendung",
+   "einsendungAn": "Cardiotech Service (Hersteller)",
+   "einsendung": {
+    "versandtAm": "2026-09-19",
+    "tracking": "DHL 0034 5512 9981",
+    "inWerkstattAm": "2026-09-20",
+    "rueckversandtAm": null,
+    "eingetroffenAm": null
+   },
+   "zugang": "Versand, kein Einsatz vor Ort — Rückversand an Ambulanz Haus A",
+   "hist": [
+    {
+     "t": "19.09.2026 11:05",
+     "w": "System",
+     "a": "Aus Störungsmeldung ST-2026-0003 erzeugt — Gerät außer Betrieb"
+    },
+    {
+     "t": "19.09.2026 11:20",
+     "w": "M. Ortmann",
+     "a": "Abwicklung Einsendung — an Cardiotech Service übermittelt"
+    },
+    {
+     "t": "19.09.2026 15:40",
+     "w": "M. Ortmann",
+     "a": "Versandt (DHL 0034 5512 9981)"
+    },
+    {
+     "t": "20.09.2026 08:30",
+     "w": "Cardiotech Service",
+     "a": "Eingang in der Werkstatt bestätigt"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4190",
+   "code": "INV-2024-0417",
+   "art": "STK",
+   "quelle": "faelligkeit",
+   "grund": "faelligkeit",
+   "faelligId": null,
+   "an": "O-MSR",
+   "zustand": "abgeschlossen",
+   "termin": "2026-08-28",
+   "zugang": "Stationszimmer 3B",
+   "ergebnis": "Mit Auflage freigegeben",
+   "hist": [
+    {
+     "t": "20.08.2026 10:00",
+     "w": "M. Ortmann",
+     "a": "Aus Fälligkeit erzeugt"
+    },
+    {
+     "t": "28.08.2026 11:40",
+     "w": "J. Reinhardt",
+     "a": "Protokoll abgeschlossen: Mit Auflage freigegeben"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4260",
+   "code": "INV-2024-0417",
+   "art": "Instandsetzung",
+   "artKey": "instandsetzung",
+   "quelle": "meldung",
+   "grund": "stoerung",
+   "stoerungId": "ST-2026-0001",
+   "faelligId": null,
+   "an": "O-MSR",
+   "zustand": "terminiert",
+   "termin": "2026-09-24",
+   "zugang": "Stationszimmer 3B, Gerät steht im Technikraum 2.14",
+   "kv": {
+    "betragText": "ca. 480 € netto",
+    "umfang": "Pumpenkopf tauschen, Kalibrierung, Funktionsprüfung",
+    "erstelltAm": "2026-09-19",
+    "erstelltVon": "L. Timm · Medtech Service Rhein GmbH",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-19",
+    "entschiedenVon": "M. Ortmann",
+    "begruendung": null
+   },
+   "hist": [
+    {
+     "t": "18.09.2026 11:24",
+     "w": "System",
+     "a": "Aus Störungsmeldung ST-2026-0001 erzeugt — Gerät außer Betrieb"
+    },
+    {
+     "t": "18.09.2026 11:24",
+     "w": "System",
+     "a": "An Medtech Service Rhein GmbH übermittelt"
+    },
+    {
+     "t": "18.09.2026 14:02",
+     "w": "Medtech Service Rhein GmbH",
+     "a": "Angenommen"
+    },
+    {
+     "t": "19.09.2026 09:30",
+     "w": "Medtech Service Rhein GmbH",
+     "a": "Kostenvoranschlag vorgelegt: ca. 480 € netto"
+    },
+    {
+     "t": "19.09.2026 10:15",
+     "w": "M. Ortmann",
+     "a": "Kostenvoranschlag freigegeben"
+    },
+    {
+     "t": "19.09.2026 10:40",
+     "w": "Medtech Service Rhein GmbH",
+     "a": "Termin bestätigt: 24.09.2026"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4251",
+   "code": "INV-2017-0009",
+   "art": "Instandsetzung",
+   "artKey": "instandsetzung",
+   "quelle": "meldung",
+   "grund": "stoerung",
+   "stoerungId": null,
+   "faelligId": null,
+   "an": "O-MSR",
+   "zustand": "abgeschlossen",
+   "termin": "2026-09-16",
+   "zugang": "Aufbereitung Haus B, Anmeldung bei der Leitung",
+   "instandhaltungId": "MH-2026-0007",
+   "ergebnis": "Instand gesetzt · Vakuumventil getauscht (SN VV-2291) · 75 min · Funktionsprüfung bestanden · sicherheitsrelevanter Eingriff → Erneute Leistungsbeurteilung (§ 7 Abs. 2) Pflicht",
+   "kv": {
+    "betragText": "ca. 310 € netto",
+    "umfang": "Vakuumventil tauschen, Vakuumtest",
+    "erstelltAm": "2026-09-13",
+    "erstelltVon": "L. Timm · Medtech Service Rhein GmbH",
+    "freigabe": "freigegeben",
+    "entschiedenAm": "2026-09-13",
+    "entschiedenVon": "M. Ortmann",
+    "begruendung": null
+   },
+   "hist": [
+    {
+     "t": "12.09.2026 07:50",
+     "w": "System",
+     "a": "Aus Routinekontrolle erzeugt — Vakuumtest nicht bestanden, Gerät gesperrt"
+    },
+    {
+     "t": "12.09.2026 07:50",
+     "w": "System",
+     "a": "An Medtech Service Rhein GmbH übermittelt"
+    },
+    {
+     "t": "13.09.2026 09:00",
+     "w": "M. Ortmann",
+     "a": "Kostenvoranschlag freigegeben"
+    },
+    {
+     "t": "16.09.2026 15:05",
+     "w": "J. Reinhardt",
+     "a": "Instandsetzungsbericht abgeschlossen: instand gesetzt, sicherheitsrelevanter Eingriff"
+    },
+    {
+     "t": "16.09.2026 15:05",
+     "w": "System",
+     "a": "Folgeauftrag SR-2026-4256 (Prüfung § 7 Abs. 2) als Pflicht angelegt — Sperre bleibt"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4256",
+   "code": "INV-2017-0009",
+   "art": "Erneute Leistungsbeurteilung nach Instandsetzung",
+   "artKey": "pruefung_nach_instandsetzung",
+   "pruefArt": "requalifizierung",
+   "quelle": "system",
+   "grund": "instandsetzung",
+   "parentRef": "SR-2026-4251",
+   "pflicht": true,
+   "faelligId": null,
+   "an": "O-MSR",
+   "zustand": "angenommen",
+   "termin": "2026-09-22",
+   "zugang": "Aufbereitung Haus B, Anmeldung bei der Leitung",
+   "hist": [
+    {
+     "t": "16.09.2026 15:05",
+     "w": "System",
+     "a": "Aus Instandsetzung SR-2026-4251 erzeugt — Pflicht nach sicherheitsrelevantem Eingriff"
+    },
+    {
+     "t": "16.09.2026 15:05",
+     "w": "System",
+     "a": "An Medtech Service Rhein GmbH übermittelt"
+    },
+    {
+     "t": "17.09.2026 08:12",
+     "w": "Medtech Service Rhein GmbH",
+     "a": "Angenommen, Termin 22.09.2026"
+    }
+   ]
+  },
+  {
+   "ref": "SR-2026-4475",
+   "code": "INV-2019-0071",
+   "art": "Abnahme-/Konstanzprüfung nach Instandsetzung",
+   "artKey": "pruefung_nach_instandsetzung",
+   "pruefArt": "abnahme_konstanz",
+   "quelle": "system",
+   "grund": "instandsetzung",
+   "fremdId": "MH-2026-0012",
+   "faelligId": null,
+   "an": "O-RTS",
+   "zustand": "erfasst",
+   "termin": null,
+   "zugang": "Radiologie, Anmeldung am Tresen",
+   "hist": [
+    {
+     "t": "14.09.2026 16:20",
+     "w": "M. Ortmann",
+     "a": "Aus Fremdbericht MH-2026-0012 erzeugt (Radiotec Service)"
+    }
+   ]
+  }
+ ],
+ "instandhaltung": [
+  {
+   "id": "MH-2025-0031",
+   "geraet": "INV-2017-0009",
+   "datum": "2025-09-18",
+   "art": "wartung",
+   "durchfuehrender": "J. Reinhardt · Medtech Service Rhein GmbH",
+   "ergebnis": "Wartung nach Herstellerangabe durchgeführt, Dichtungen getauscht, Funktionsprüfung bestanden",
+   "teile": [
+    {
+     "bez": "Türdichtung",
+     "teilNr": "AC80-DS-01",
+     "sn": "",
+     "menge": 1
+    }
+   ],
+   "arbeitsminuten": 60,
+   "auftragId": null,
+   "protokollRef": "PR-2025-0917"
+  },
+  {
+   "id": "MH-2026-0007",
+   "geraet": "INV-2017-0009",
+   "datum": "2026-09-16",
+   "art": "instandsetzung",
+   "durchfuehrender": "J. Reinhardt · Medtech Service Rhein GmbH",
+   "ergebnis": "instand gesetzt · Vakuumventil getauscht · Funktionsprüfung bestanden · sicherheitsrelevanter Eingriff → Erneute Leistungsbeurteilung (§ 7 Abs. 2) Pflicht",
+   "teile": [
+    {
+     "bez": "Vakuumventil",
+     "teilNr": "AC80-VV-12",
+     "sn": "VV-2291",
+     "menge": 1
+    }
+   ],
+   "arbeitsminuten": 75,
+   "softwareVor": "2.4.0",
+   "softwareNach": "2.4.0",
+   "auftragId": "SR-2026-4251",
+   "protokollRef": "PR-2026-0916-03"
+  },
+  {
+   "id": "MH-2026-0012",
+   "geraet": "INV-2019-0071",
+   "datum": "2026-09-14",
+   "art": "instandsetzung",
+   "quelle": "fremd",
+   "durchfuehrender": "Radiotec Service, extern",
+   "massnahme": "teil_getauscht",
+   "ergebnis": "Teil getauscht · Röhreneinheit erneuert, Abnahme der Werkstatt dokumentiert",
+   "teile": [
+    {
+     "bez": "Röhreneinheit",
+     "teilNr": "RX90-RE-04",
+     "sn": "RE-11208",
+     "menge": 1
+    }
+   ],
+   "arbeitsminuten": null,
+   "anhang": "radiotec-servicebericht-2026-09-14.pdf",
+   "auftragId": null,
+   "folgeAuftragId": "SR-2026-4475",
+   "erfasstVon": "M. Ortmann",
+   "erfasstAm": "2026-09-14"
+  }
+ ],
+ "geraeteBetrieb": [
+  {
+   "code": "INV-2024-0417",
+   "betrieb": "in_instandsetzung",
+   "sperre": {
+    "grund": "Förderung ohne Alarm gestoppt (ST-2026-0001)",
+    "seit": "2026-09-18",
+    "quelle": "anwender"
+   },
+   "ersatzDurch": "INV-2026-0901",
+   "ersatzFuer": null,
+   "leihgeber": null,
+   "einweisung": null
+  },
+  {
+   "code": "INV-2023-0155",
+   "betrieb": "in_instandsetzung",
+   "sperre": {
+    "grund": "Display ohne Anzeige, Gerät ohne Funktion (ST-2026-0003) — Einsendung an Cardiotech",
+    "seit": "2026-09-19",
+    "quelle": "anwender"
+   },
+   "ersatzDurch": null,
+   "ersatzFuer": null,
+   "leihgeber": null,
+   "einweisung": null
+  },
+  {
+   "code": "INV-2017-0009",
+   "betrieb": "gesperrt",
+   "sperre": {
+    "grund": "Vakuumtest nicht bestanden (Routinekontrolle 12.09.2026) — Freigabe erst nach erneuter Leistungsbeurteilung (§ 7 Abs. 2)",
+    "seit": "2026-09-12",
+    "quelle": "pruefpartner"
+   },
+   "ersatzDurch": null,
+   "ersatzFuer": null,
+   "leihgeber": null,
+   "einweisung": null
+  },
+  {
+   "code": "INV-2026-0901",
+   "betrieb": "leihgeraet",
+   "sperre": null,
+   "ersatzDurch": null,
+   "ersatzFuer": "INV-2024-0417",
+   "leihgeber": "Vitamed Systems (Leihstellung bis Rückgabe INV-2024-0417)",
+   "einweisung": true
+  }
+ ],
+ "buch": [
+  {
+   "id": "B-1",
+   "code": "INV-2024-0417",
+   "art": "stoerung",
+   "datum": "2026-09-18",
+   "was": "Förderung ohne Alarm gestoppt.",
+   "folge": "Gerät gesperrt.",
+   "wiederholung": null,
+   "vkId": "VK-1",
+   "stId": "ST-2026-0001",
+   "auftragId": "SR-2026-4260"
+  },
+  {
+   "id": "B-5",
+   "code": "INV-2023-0155",
+   "art": "stoerung",
+   "datum": "2026-09-19",
+   "was": "Manschettendruck baut sich verzögert auf, Messung dauert deutlich länger.",
+   "folge": "Eingeschränkt nutzbar, zur Sichtung gemeldet.",
+   "wiederholung": null,
+   "vkId": null,
+   "stId": "ST-2026-0002",
+   "auftragId": null
+  },
+  {
+   "id": "B-6",
+   "code": "INV-2023-0155",
+   "art": "stoerung",
+   "datum": "2026-09-19",
+   "was": "Display ohne Anzeige, Gerät ohne Funktion (nach Sturz).",
+   "folge": "Außer Betrieb, Gerät gesperrt; Einsendung an den Hersteller (SR-2026-4219).",
+   "wiederholung": null,
+   "vkId": null,
+   "stId": "ST-2026-0003",
+   "auftragId": "SR-2026-4219"
+  },
+  {
+   "id": "B-2",
+   "code": "INV-2021-0240",
+   "art": "bedienfehler",
+   "datum": "2026-09-12",
+   "was": "Schallkopf nach Gebrauch nicht in die Halterung gelegt, Kabel geknickt.",
+   "folge": "Hinweis an die Station, Sichtprüfung ohne Befund.",
+   "wiederholung": 3,
+   "vkId": null
+  },
+  {
+   "id": "B-3",
+   "code": "INV-2019-0071",
+   "art": "stoerung",
+   "datum": "2026-09-08",
+   "was": "Dosisindikator außerhalb des Bezugswerts.",
+   "folge": "Gerät gesperrt, Konstanzprüfung vorgezogen.",
+   "wiederholung": null,
+   "vkId": "VK-2"
+  },
+  {
+   "id": "B-4",
+   "code": "INV-2025-0120",
+   "art": "hinweis",
+   "datum": "2026-08-04",
+   "was": "Herstellerhinweis FSN-2026-0730-STE zur Beladung erhalten.",
+   "folge": "Arbeitsanweisung ergänzt.",
+   "wiederholung": null,
+   "vkId": null
+  }
+ ],
+ "leihgeraete": [
+  {
+   "modelId": "M-VOL200",
+   "code": "INV-2026-0901",
+   "n": "Infusionspumpe VOLUMAT X-200",
+   "mk": "Vitamed Systems",
+   "typ": "VOLUMAT X-200",
+   "sn": "VX2-91077",
+   "udi": "4250098770316",
+   "jahr": 2026,
+   "site": "H-A",
+   "area": "Station 3B",
+   "raum": "2.14",
+   "resp": "M. Ortmann",
+   "state": "released",
+   "by": "M. Ortmann",
+   "at": "18.09.2026",
+   "src": "manuell",
+   "quelle": "leihgeraet",
+   "betrieb": "leihgeraet",
+   "ersatzFuer": "INV-2024-0417",
+   "leihgeber": "Vitamed Systems (Leihstellung bis Rückgabe INV-2024-0417)",
+   "einweisung": true,
+   "hist": [
+    {
+     "t": "18.09.2026 13:40",
+     "w": "M. Ortmann",
+     "a": "Als Leihgerät angelegt — Ersatz für INV-2024-0417"
+    },
+    {
+     "t": "18.09.2026 13:41",
+     "w": "M. Ortmann",
+     "a": "Freigegeben"
+    },
+    {
+     "t": "18.09.2026 15:00",
+     "w": "S. Berger",
+     "a": "Einweisung Station 3B bestätigt (baugleich zu INV-2024-0417)"
+    }
+   ]
+  }
+ ],
+ "betriebsmittel": [
+  {
+   "code": "BM-0001",
+   "n": "Medikamentenkühlschrank",
+   "mk": "Liebherr",
+   "typ": "MKv 3910",
+   "sn": "LK-3910-2201",
+   "jahr": 2022,
+   "site": "H-A",
+   "area": "Station 3B",
+   "raum": "2.07",
+   "resp": "M. Ortmann",
+   "state": "released",
+   "schutzklasse": "I",
+   "ortsveraenderlich": false,
+   "elektrisch": true
+  },
+  {
+   "code": "BM-0002",
+   "n": "Arbeitsplatz-PC Anmeldung",
+   "mk": "Fujitsu",
+   "typ": "Esprimo D7",
+   "sn": "FJ-D7-88213",
+   "jahr": 2024,
+   "site": "H-A",
+   "area": "Ambulanz",
+   "raum": "EG.01",
+   "resp": "J. Sander",
+   "state": "released",
+   "schutzklasse": "I",
+   "ortsveraenderlich": false,
+   "elektrisch": true
+  },
+  {
+   "code": "BM-0003",
+   "n": "Laborzentrifuge",
+   "mk": "Hettich",
+   "typ": "Rotofix 32 A",
+   "sn": "HT-32A-5520",
+   "jahr": 2019,
+   "site": "H-A",
+   "area": "Ambulanz",
+   "raum": "Labor 0.12",
+   "resp": "J. Sander",
+   "state": "released",
+   "schutzklasse": "I",
+   "ortsveraenderlich": false,
+   "elektrisch": true
+  },
+  {
+   "code": "BM-0004",
+   "n": "Mehrfachsteckdose Behandlung 2",
+   "mk": "Brennenstuhl",
+   "typ": "Premium-Line 6-fach",
+   "sn": "",
+   "jahr": 2025,
+   "site": "H-A",
+   "area": "Ambulanz",
+   "raum": "Behandlung 2",
+   "resp": "J. Sander",
+   "state": "released",
+   "schutzklasse": "I",
+   "ortsveraenderlich": true,
+   "elektrisch": true
+  },
+  {
+   "code": "BM-0005",
+   "n": "Kaffeemaschine Sozialraum",
+   "mk": "Jura",
+   "typ": "X8",
+   "sn": "JU-X8-10442",
+   "jahr": 2021,
+   "site": "H-A",
+   "area": "Station 3B",
+   "raum": "Sozialraum 2.20",
+   "resp": "M. Ortmann",
+   "state": "released",
+   "schutzklasse": "I",
+   "ortsveraenderlich": true,
+   "elektrisch": true
+  }
+ ],
+ "dguvFestlegungen": [
+  {
+   "code": "INV-2024-0417",
+   "festlegung": "abgedeckt_stk",
+   "intervallMonate": null,
+   "quelle": "Gefährdungsbeurteilung GBU-2025-07 (Infusionstechnik)",
+   "ortsveraenderlich": false,
+   "festgelegtVon": "J. Sander",
+   "am": "2025-07-14",
+   "letzte": null
+  },
+  {
+   "code": "INV-2024-0418",
+   "festlegung": "abgedeckt_stk",
+   "intervallMonate": null,
+   "quelle": "Gefährdungsbeurteilung GBU-2025-07 (Infusionstechnik)",
+   "ortsveraenderlich": false,
+   "festgelegtVon": "J. Sander",
+   "am": "2025-07-14",
+   "letzte": null
+  },
+  {
+   "code": "INV-2026-0611",
+   "festlegung": "abgedeckt_stk",
+   "intervallMonate": null,
+   "quelle": "Gefährdungsbeurteilung GBU-2025-07 (Infusionstechnik)",
+   "ortsveraenderlich": false,
+   "festgelegtVon": "J. Sander",
+   "am": "2026-05-12",
+   "letzte": null
+  },
+  {
+   "code": "INV-2023-0155",
+   "festlegung": "eigene_pruefung",
+   "intervallMonate": 24,
+   "quelle": "Gefährdungsbeurteilung GBU-2025-03 (Ambulanz)",
+   "ortsveraenderlich": true,
+   "festgelegtVon": "J. Sander",
+   "am": "2025-03-02",
+   "letzte": "2026-09-14"
+  },
+  {
+   "code": "INV-2017-0009",
+   "festlegung": "eigene_pruefung",
+   "intervallMonate": 12,
+   "quelle": "Gefährdungsbeurteilung GBU-2025-09 (Aufbereitung Haus B)",
+   "ortsveraenderlich": false,
+   "festgelegtVon": "Technik",
+   "am": "2025-09-30",
+   "letzte": "2025-10-01"
+  },
+  {
+   "code": "BM-0001",
+   "festlegung": "eigene_pruefung",
+   "intervallMonate": 24,
+   "quelle": "Gefährdungsbeurteilung GBU-2024-11 (Station 3B)",
+   "ortsveraenderlich": false,
+   "festgelegtVon": "M. Ortmann",
+   "am": "2024-11-10",
+   "letzte": "2024-11-15"
+  },
+  {
+   "code": "BM-0002",
+   "festlegung": "eigene_pruefung",
+   "intervallMonate": 24,
+   "quelle": "Gefährdungsbeurteilung GBU-2024-10 (Verwaltung/Anmeldung)",
+   "ortsveraenderlich": false,
+   "festgelegtVon": "J. Sander",
+   "am": "2024-10-01",
+   "letzte": "2024-10-02"
+  },
+  {
+   "code": "BM-0003",
+   "festlegung": "eigene_pruefung",
+   "intervallMonate": 12,
+   "quelle": "Gefährdungsbeurteilung GBU-2025-08 (Labor)",
+   "ortsveraenderlich": false,
+   "festgelegtVon": "J. Sander",
+   "am": "2025-08-20",
+   "letzte": "2025-09-01"
+  },
+  {
+   "code": "BM-0004",
+   "festlegung": "eigene_pruefung",
+   "intervallMonate": 24,
+   "quelle": "Gefährdungsbeurteilung GBU-2025-08 (Ambulanz, ortsveränderlich)",
+   "ortsveraenderlich": true,
+   "festgelegtVon": "J. Sander",
+   "am": "2025-08-20",
+   "letzte": "2025-08-20"
+  },
+  {
+   "code": "BM-0005",
+   "festlegung": "eigene_pruefung",
+   "intervallMonate": 24,
+   "quelle": "Gefährdungsbeurteilung GBU-2024-11 (Station 3B, Sozialraum)",
+   "ortsveraenderlich": true,
+   "festgelegtVon": "M. Ortmann",
+   "am": "2025-02-10",
+   "letzte": "2025-02-11"
+  }
+ ],
+ "dguvFristen": [
+  {
+   "id": "FD-1",
+   "code": "INV-2023-0155",
+   "art": "DGUV",
+   "grund": "ArbSchG · BetrSichV · DGUV Vorschrift 3",
+   "anker": "intervall",
+   "am": "2028-09-14",
+   "zuletzt": "2026-09-14",
+   "vertrauen": "verified",
+   "auftrag": null,
+   "src": "dguv",
+   "quelle": "Gefährdungsbeurteilung GBU-2025-03 (Ambulanz)"
+  },
+  {
+   "id": "FD-2",
+   "code": "INV-2017-0009",
+   "art": "DGUV",
+   "grund": "ArbSchG · BetrSichV · DGUV Vorschrift 3",
+   "anker": "intervall",
+   "am": "2026-10-01",
+   "zuletzt": "2025-10-01",
+   "vertrauen": "verified",
+   "auftrag": null,
+   "src": "dguv",
+   "quelle": "Gefährdungsbeurteilung GBU-2025-09 (Aufbereitung Haus B)"
+  },
+  {
+   "id": "FD-3",
+   "code": "BM-0001",
+   "art": "DGUV",
+   "grund": "ArbSchG · BetrSichV · DGUV Vorschrift 3",
+   "anker": "intervall",
+   "am": "2026-11-15",
+   "zuletzt": "2024-11-15",
+   "vertrauen": "verified",
+   "auftrag": null,
+   "src": "dguv",
+   "quelle": "Gefährdungsbeurteilung GBU-2024-11 (Station 3B)"
+  },
+  {
+   "id": "FD-4",
+   "code": "BM-0002",
+   "art": "DGUV",
+   "grund": "ArbSchG · BetrSichV · DGUV Vorschrift 3",
+   "anker": "intervall",
+   "am": "2026-10-02",
+   "zuletzt": "2024-10-02",
+   "vertrauen": "verified",
+   "auftrag": null,
+   "src": "dguv",
+   "quelle": "Gefährdungsbeurteilung GBU-2024-10 (Verwaltung/Anmeldung)"
+  },
+  {
+   "id": "FD-5",
+   "code": "BM-0003",
+   "art": "DGUV",
+   "grund": "ArbSchG · BetrSichV · DGUV Vorschrift 3",
+   "anker": "intervall",
+   "am": "2026-09-01",
+   "zuletzt": "2025-09-01",
+   "vertrauen": "verified",
+   "auftrag": null,
+   "src": "dguv",
+   "quelle": "Gefährdungsbeurteilung GBU-2025-08 (Labor)"
+  },
+  {
+   "id": "FD-6",
+   "code": "BM-0004",
+   "art": "DGUV",
+   "grund": "ArbSchG · BetrSichV · DGUV Vorschrift 3",
+   "anker": "intervall",
+   "am": "2027-08-20",
+   "zuletzt": "2025-08-20",
+   "vertrauen": "verified",
+   "auftrag": null,
+   "src": "dguv",
+   "quelle": "Gefährdungsbeurteilung GBU-2025-08 (Ambulanz, ortsveränderlich)"
+  },
+  {
+   "id": "FD-7",
+   "code": "BM-0005",
+   "art": "DGUV",
+   "grund": "ArbSchG · BetrSichV · DGUV Vorschrift 3",
+   "anker": "intervall",
+   "am": "2027-02-11",
+   "zuletzt": "2025-02-11",
+   "vertrauen": "verified",
+   "auftrag": null,
+   "src": "dguv",
+   "quelle": "Gefährdungsbeurteilung GBU-2024-11 (Station 3B, Sozialraum)"
+  }
+ ],
+ "dguvPruefungen": [
+  {
+   "id": "DP-1",
+   "code": "INV-2023-0155",
+   "datum": "2026-09-14",
+   "von": "K. Brandt (Elektrofachkraft)",
+   "plakette": "DG-2026-0144",
+   "messwerte": {
+    "rpe": 0.12,
+    "riso": 48,
+    "iab": 0.08
+   },
+   "ergebnis": "bestanden",
+   "protokoll": "dguv-0155-2026-09.pdf",
+   "erfasstVon": "M. Ortmann",
+   "erfasstAm": "2026-09-14"
+  }
+ ],
+ "konstanzObjekte": [
+  {
+   "id": "INV-2019-0071|aufnahme-m",
+   "code": "INV-2019-0071",
+   "gegenstand": "aufnahme",
+   "name": "Aufnahmeplatz RX-90",
+   "weg": "A",
+   "takt": "monatlich",
+   "festgelegt": true,
+   "bezugswerte": [],
+   "pruefpunkte": [],
+   "protokollQuelle": "Herstellersoftware Radiotec QC-Suite",
+   "quelle": "Referenz — gegen aktuelle Norm prüfen (DIN 6868-Reihe / QS-RL), Stand 11/2026",
+   "stand": "ok",
+   "faellig": "2026-10-02"
+  },
+  {
+   "id": "INV-2019-0071|monitor-t",
+   "code": "INV-2019-0071",
+   "gegenstand": "monitor",
+   "name": "Befundmonitor Radiologie 1 — Sichtprüfung",
+   "weg": "C",
+   "takt": "arbeitstaeglich",
+   "festgelegt": true,
+   "bezugswerte": [],
+   "pruefpunkte": [
+    "Testbild TG18-QC: alle Graustufenfelder unterscheidbar",
+    "Keine Artefakte, Pixelfehler oder Nachleuchten",
+    "Umgebungsbeleuchtung wie festgelegt (abgedunkelt)"
+   ],
+   "protokollQuelle": null,
+   "quelle": "Referenz — gegen aktuelle Norm prüfen (DIN 6868-Reihe / QS-RL), Stand 11/2026",
+   "stand": "heute",
+   "faellig": "2026-09-20"
+  },
+  {
+   "id": "INV-2019-0071|monitor-m",
+   "code": "INV-2019-0071",
+   "gegenstand": "monitor",
+   "name": "Befundmonitor Radiologie 1 — Leuchtdichte",
+   "weg": "B",
+   "takt": "monatlich",
+   "festgelegt": true,
+   "bezugswerte": [
+    {
+     "name": "Lmax",
+     "wert": 450,
+     "einheit": "cd/m²",
+     "toleranz": 10,
+     "quelle": "Referenz — gegen aktuelle Norm prüfen (DIN 6868-Reihe / QS-RL), Stand 11/2026"
+    },
+    {
+     "name": "Lmin",
+     "wert": 1.2,
+     "einheit": "cd/m²",
+     "toleranz": 20,
+     "quelle": "Referenz — gegen aktuelle Norm prüfen (DIN 6868-Reihe / QS-RL), Stand 11/2026"
+    }
+   ],
+   "pruefpunkte": [],
+   "protokollQuelle": null,
+   "quelle": "Referenz — gegen aktuelle Norm prüfen (DIN 6868-Reihe / QS-RL), Stand 11/2026",
+   "stand": "ueberfaellig",
+   "faellig": "2026-09-15"
+  },
+  {
+   "id": "INV-2019-0071|digital-t",
+   "code": "INV-2019-0071",
+   "gegenstand": "digital",
+   "name": "Bildempfänger RX-90",
+   "weg": "C",
+   "takt": "arbeitstaeglich",
+   "festgelegt": false,
+   "bezugswerte": [],
+   "pruefpunkte": [
+    "Prüfkörperaufnahme ohne Artefakte",
+    "Dosisindikator im Referenzbereich",
+    "Bildbezeichnung und Seitenkennung korrekt"
+   ],
+   "protokollQuelle": null,
+   "quelle": "Referenz — gegen aktuelle Norm prüfen (DIN 6868-Reihe / QS-RL), Stand 11/2026",
+   "stand": "ohne_takt",
+   "faellig": null
+  },
+  {
+   "id": "INV-2019-0071|dosis-j",
+   "code": "INV-2019-0071",
+   "gegenstand": "dosis",
+   "name": "Dosisanzeige RX-90",
+   "weg": "B",
+   "takt": "jaehrlich",
+   "festgelegt": false,
+   "bezugswerte": [
+    {
+     "name": "DFP Anzeige/Referenz",
+     "wert": 100,
+     "einheit": "%",
+     "toleranz": 25,
+     "quelle": "Referenz — gegen aktuelle Norm prüfen (DIN 6868-Reihe / QS-RL), Stand 11/2026"
+    }
+   ],
+   "pruefpunkte": [],
+   "protokollQuelle": null,
+   "quelle": "Referenz — gegen aktuelle Norm prüfen (DIN 6868-Reihe / QS-RL), Stand 11/2026",
+   "stand": "ohne_takt",
+   "faellig": null
+  }
+ ],
+ "konstanzRoutine": [
+  {
+   "id": "KR-1",
+   "objId": "INV-2019-0071|aufnahme-m",
+   "datum": "2026-09-02",
+   "von": "K. Brandt (MTR)",
+   "weg": "A",
+   "ergebnis": "bestanden",
+   "messwerte": [],
+   "anhang": "rx90-konstanz-2026-09.pdf",
+   "bemerkung": "Protokoll QC-Suite 2026-09, alle Prüfpositionen im Toleranzband",
+   "klaerId": null,
+   "erfasstAm": "2026-09-02"
+  },
+  {
+   "id": "KR-2",
+   "objId": "INV-2019-0071|monitor-m",
+   "datum": "2026-07-15",
+   "von": "K. Brandt (MTR)",
+   "weg": "B",
+   "ergebnis": "bestanden",
+   "messwerte": [
+    {
+     "name": "Lmax",
+     "wert": 441,
+     "einheit": "cd/m²",
+     "bezug": 450,
+     "toleranz": 10,
+     "imRahmen": true
+    },
+    {
+     "name": "Lmin",
+     "wert": 1.25,
+     "einheit": "cd/m²",
+     "bezug": 1.2,
+     "toleranz": 20,
+     "imRahmen": true
+    }
+   ],
+   "anhang": "",
+   "bemerkung": "",
+   "klaerId": null,
+   "erfasstAm": "2026-07-15"
+  },
+  {
+   "id": "KR-3",
+   "objId": "INV-2019-0071|monitor-m",
+   "datum": "2026-08-15",
+   "von": "K. Brandt (MTR)",
+   "weg": "B",
+   "ergebnis": "abweichung",
+   "messwerte": [
+    {
+     "name": "Lmax",
+     "wert": 388,
+     "einheit": "cd/m²",
+     "bezug": 450,
+     "toleranz": 10,
+     "imRahmen": false
+    },
+    {
+     "name": "Lmin",
+     "wert": 1.3,
+     "einheit": "cd/m²",
+     "bezug": 1.2,
+     "toleranz": 20,
+     "imRahmen": true
+    }
+   ],
+   "anhang": "",
+   "bemerkung": "Lmax deutlich unter Bezug; Hintergrundbeleuchtung altert",
+   "klaerId": "KA-1",
+   "erfasstAm": "2026-08-15"
+  },
+  {
+   "id": "KR-4",
+   "objId": "INV-2019-0071|monitor-t",
+   "datum": "2026-09-19",
+   "von": "K. Brandt (MTR)",
+   "weg": "C",
+   "ergebnis": "bestanden",
+   "haken": [
+    true,
+    true,
+    true
+   ],
+   "befund": "",
+   "messwerte": [],
+   "anhang": "",
+   "bemerkung": "",
+   "klaerId": null,
+   "erfasstAm": "2026-09-19"
+  }
+ ],
+ "konstanzKlaerfaelle": [
+  {
+   "id": "KA-1",
+   "code": "INV-2019-0071",
+   "objId": "INV-2019-0071|monitor-m",
+   "objName": "Befundmonitor Radiologie 1 — Leuchtdichte",
+   "routineId": "KR-3",
+   "datum": "2026-08-15",
+   "weg": "B",
+   "abweichung": "Lmax 388 cd/m² außerhalb 450 cd/m² ±10 %",
+   "status": "offen",
+   "entscheidung": null,
+   "von": "K. Brandt (MTR)"
+  }
+ ],
+ "leistungsGates": {
+  "dguv": {
+   "festlegung": [
+    "eigene_pruefung",
+    "abgedeckt_stk",
+    "entfaellt"
+   ],
+   "abgedeckt_stk": "nur Anlage-1-Geräte mit STK",
+   "entfaellt": "nur nicht elektrische Geräte",
+   "intervall": "Pflicht bei eigene_pruefung, keine Vorgabe"
+  },
+  "konstanz": {
+   "wege": [
+    "A",
+    "B",
+    "C"
+   ],
+   "anhangPflicht": "Weg A mit Protokollquelle (E91)",
+   "sperre": "nur requests:approve (MPSB/SSB), nie automatisch"
+  }
+ },
+ "plaketten": [
+  {
+   "code": "INV-2023-0155",
+   "nr": "DG-2026-0144",
+   "geprueft": "2026-09-14",
+   "naechste": "09/2028",
+   "von": "K. Brandt (Elektrofachkraft)",
+   "art": "DGUV V3"
+  }
+ ],
+ "bescheinigungen": [],
+ "referenzen": {
+  "konstanz": {
+   "quelle": "DIN 6868-Reihe / QS-RL Röntgendiagnostik (Konstanzprüfung), DIN 6868-157 (Befundmonitore)",
+   "stand": "11/2026",
+   "hinweis": "Referenz — gegen aktuelle Norm prüfen"
+  },
+  "dguv": {
+   "quelle": "DGUV Vorschrift 3, DGUV Information 203-071 (Prüffristen), DIN VDE 0701-0702 / DIN EN 62353 (Messwerte)",
+   "stand": "11/2026",
+   "hinweis": "Referenz — gegen aktuelle Norm prüfen"
+  },
+  "sv": {
+   "quelle": "§ 88 Abs. 4 Nr. 1 StrlSchV — Sachverständigenprüfung alle 5 Jahre",
+   "stand": "11/2026",
+   "hinweis": "Referenz — gegen aktuelle Norm prüfen"
+  }
+ }
+}

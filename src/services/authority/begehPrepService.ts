@@ -68,16 +68,16 @@ export async function listBegehGaps(ctx: TenantWorkContext): Promise<BegehGapDTO
   add(openClarifications, "Open clarifications still unresolved", "/clarifications");
   add(
     missingDutyOverlap,
-    "Overlap questions without an operator decision",
-    "/duty-overlap",
+    "STK/DGUV overlap without a DGUV Festlegung",
+    "/duties/dguv-determination",
   );
 
   return gaps.sort((a, b) => b.count - a.count);
 }
 
 /**
- * R6 — devices that have a duty whose inspection type appears in
- * RefInspectionTypeOverlap but lack an open DutyOverlapDecision for that pair.
+ * R6 — devices that carry both sides of a RefInspectionTypeOverlap pair
+ * but still lack a DGUV Festlegung (determinationState).
  */
 async function countMissingDutyOverlapDecisions(): Promise<number> {
   const overlaps = await prisma.refInspectionTypeOverlap.findMany({
@@ -112,12 +112,16 @@ async function countMissingDutyOverlapDecisions(): Promise<number> {
   }
   if (candidateIds.length === 0) return 0;
 
-  const decided = await prisma.dutyOverlapDecision.findMany({
-    where: { deviceInstanceId: { in: candidateIds }, validTo: null },
+  const determined = await prisma.deviceDuty.findMany({
+    where: {
+      deviceInstanceId: { in: candidateIds },
+      dutyKey: "dguv",
+      determinationState: { not: null },
+    },
     select: { deviceInstanceId: true },
   });
-  const decidedSet = new Set(decided.map((d) => d.deviceInstanceId));
-  return candidateIds.filter((id) => !decidedSet.has(id)).length;
+  const determinedSet = new Set(determined.map((d) => d.deviceInstanceId));
+  return candidateIds.filter((id) => !determinedSet.has(id)).length;
 }
 
 /**

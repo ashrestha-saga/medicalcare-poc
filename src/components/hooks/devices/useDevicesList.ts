@@ -22,16 +22,25 @@ function parseState(raw: string | null): DeviceStateFilter {
   return null;
 }
 
+export type DeviceKindFilter = "mp" | "equipment" | null;
+
+function parseKind(raw: string | null): DeviceKindFilter {
+  if (raw === "mp" || raw === "equipment") return raw;
+  return null;
+}
+
 function buildListQuery(opts: {
   q: string;
   siteId: string | null;
   state: DeviceStateFilter;
+  kind: DeviceKindFilter;
   mineArea: boolean;
 }): string {
   const sp = new URLSearchParams();
   if (opts.q.trim()) sp.set("q", opts.q.trim());
   if (opts.siteId) sp.set("siteId", opts.siteId);
   if (opts.state) sp.set("state", opts.state);
+  if (opts.kind) sp.set("kind", opts.kind);
   if (opts.mineArea) sp.set("mineArea", "1");
   const qs = sp.toString();
   return qs ? `?${qs}` : "";
@@ -46,12 +55,14 @@ export function useDevicesList() {
   const qParam = useQueryParam("q");
   const stateParam = useQueryParam("state");
   const siteParam = useQueryParam("siteId");
+  const kindParam = useQueryParam("kind");
   const mineAreaParam = useQueryParam("mineArea");
 
   const [devices, setDevices] = useState<DeviceInstanceDTO[]>([]);
   const [q, setQState] = useState(qParam ?? "");
   const [stateFilter, setStateFilterState] = useState<DeviceStateFilter>(() => parseState(stateParam));
   const [siteFilter, setSiteFilterState] = useState<string | null>(siteParam);
+  const [kindFilter, setKindFilterState] = useState<DeviceKindFilter>(() => parseKind(kindParam));
   const [mineArea, setMineAreaState] = useState(mineAreaParam === "1");
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<DeviceInstanceDetailDTO | DeviceInstanceDTO | null>(null);
@@ -61,8 +72,9 @@ export function useDevicesList() {
     setQState(qParam ?? "");
     setStateFilterState(parseState(stateParam));
     setSiteFilterState(siteParam);
+    setKindFilterState(parseKind(kindParam));
     setMineAreaState(mineAreaParam === "1");
-  }, [qParam, stateParam, siteParam, mineAreaParam]);
+  }, [qParam, stateParam, siteParam, kindParam, mineAreaParam]);
 
   const setQ = useCallback(
     (value: string) => {
@@ -96,11 +108,20 @@ export function useDevicesList() {
     [sync],
   );
 
+  const setKindFilter = useCallback(
+    (value: DeviceKindFilter) => {
+      setKindFilterState(value);
+      sync({ kind: value });
+    },
+    [sync],
+  );
+
   const clearListFilters = useCallback(() => {
     setStateFilterState(null);
     setSiteFilterState(null);
+    setKindFilterState(null);
     setMineAreaState(false);
-    sync({ state: null, siteId: null, mineArea: null });
+    sync({ state: null, siteId: null, kind: null, mineArea: null });
   }, [sync]);
 
   const refresh = useCallback(
@@ -108,6 +129,7 @@ export function useDevicesList() {
       q?: string;
       siteId?: string | null;
       state?: DeviceStateFilter;
+      kind?: DeviceKindFilter;
       mineArea?: boolean;
     }) => {
       if (!canView) {
@@ -118,6 +140,7 @@ export function useDevicesList() {
       const nextQ = override?.q ?? q;
       const nextSite = override?.siteId !== undefined ? override.siteId : siteFilter;
       const nextState = override?.state !== undefined ? override.state : stateFilter;
+      const nextKind = override?.kind !== undefined ? override.kind : kindFilter;
       const nextMine = override?.mineArea !== undefined ? override.mineArea : mineArea;
       setLoading(true);
       try {
@@ -125,6 +148,7 @@ export function useDevicesList() {
           q: nextQ,
           siteId: nextSite,
           state: nextState,
+          kind: nextKind,
           mineArea: nextMine,
         });
         const res = await api<{ devices: DeviceInstanceDTO[] }>(`/api/devices${qs}`);
@@ -136,7 +160,7 @@ export function useDevicesList() {
         setLoading(false);
       }
     },
-    [canView, q, siteFilter, stateFilter, mineArea],
+    [canView, q, siteFilter, stateFilter, kindFilter, mineArea],
   );
 
   useEffect(() => {
@@ -144,10 +168,11 @@ export function useDevicesList() {
       q: qParam ?? "",
       siteId: siteParam,
       state: parseState(stateParam),
+      kind: parseKind(kindParam),
       mineArea: mineAreaParam === "1",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch when URL filters change
-  }, [canView, qParam, stateParam, siteParam, mineAreaParam]);
+  }, [canView, qParam, stateParam, siteParam, kindParam, mineAreaParam]);
 
   const selectDevice = useCallback(async (device: DeviceInstanceDTO) => {
     setDetailLoading(true);
@@ -196,6 +221,8 @@ export function useDevicesList() {
     setStateFilter,
     siteFilter,
     setSiteFilter,
+    kindFilter,
+    setKindFilter,
     mineArea,
     setMineArea,
     clearListFilters,

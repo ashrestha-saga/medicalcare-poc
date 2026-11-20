@@ -6,7 +6,10 @@ import { useTranslations } from "next-intl";
 import type { SiteDTO } from "@/interfaces";
 import { DropdownFilter, FilterToolbar } from "@/components/features/shared/filters";
 import { Button } from "@/components/ui/button";
-import type { DeviceStateFilter } from "@/components/hooks/devices/useDevicesList";
+import type {
+  DeviceKindFilter,
+  DeviceStateFilter,
+} from "@/components/hooks/devices/useDevicesList";
 import { cn } from "@/lib/utils";
 
 interface DevicesFilterToolbarProps {
@@ -15,6 +18,8 @@ interface DevicesFilterToolbarProps {
   onSiteChange: (value: string | string[] | null) => void;
   stateFilter: DeviceStateFilter;
   onStateChange: (value: string | string[] | null) => void;
+  kindFilter?: DeviceKindFilter;
+  onKindChange?: (value: string | string[] | null) => void;
   mineArea: boolean;
   onMineAreaChange: (value: boolean) => void;
   onClearAll: () => void;
@@ -35,6 +40,8 @@ export function DevicesFilterToolbar({
   onSiteChange,
   stateFilter,
   onStateChange,
+  kindFilter = null,
+  onKindChange,
   mineArea,
   onMineAreaChange,
   onClearAll,
@@ -42,7 +49,7 @@ export function DevicesFilterToolbar({
 }: DevicesFilterToolbarProps) {
   const t = useTranslations("filters");
   const tInv = useTranslations("pages.inventory");
-  const hasActiveFilters = Boolean(siteFilter || stateFilter || mineArea);
+  const hasActiveFilters = Boolean(siteFilter || stateFilter || kindFilter || mineArea);
   const siteOptions = sites.map((s) => ({ value: s.id, label: s.name }));
 
   return (
@@ -51,12 +58,24 @@ export function DevicesFilterToolbar({
       onClearAll={onClearAll}
       trailing={
         canRegister ? (
-          <Button type="button" size="sm" className="h-8" asChild data-testid="devices-erstanlage">
-            <Link href="/registration">
-              <Plus className="h-4 w-4" />
-              {tInv("registration")}
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" className="h-8" asChild data-testid="devices-erstanlage">
+              <Link href="/registration">
+                <Plus className="h-4 w-4" />
+                {tInv("registration")}
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8"
+              asChild
+              data-testid="devices-equipment-new"
+            >
+              <Link href="/devices/equipment/new">{tInv("addEquipment")}</Link>
+            </Button>
+          </div>
         ) : null
       }
     >
@@ -67,6 +86,17 @@ export function DevicesFilterToolbar({
         options={STATE_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
         onChange={onStateChange}
       />
+      {onKindChange ? (
+        <DropdownFilter
+          label={t("kind")}
+          value={kindFilter}
+          options={[
+            { value: "mp", label: t("kindMp") },
+            { value: "equipment", label: t("kindEquipment") },
+          ]}
+          onChange={onKindChange}
+        />
+      ) : null}
       <Button
         type="button"
         size="sm"

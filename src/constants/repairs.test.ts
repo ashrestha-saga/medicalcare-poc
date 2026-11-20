@@ -68,6 +68,15 @@ describe("inspectionTypeCodeForServiceRequest", () => {
       inspectionTypeCodeForServiceRequest({ serviceType: "STK" }),
     ).toBe("STK");
   });
+
+  it("maps DGUV / konstanz / sv service types (E85 Sammelauftrag)", () => {
+    expect(inspectionTypeCodeForServiceRequest({ serviceType: "DGUV" })).toBe("DGUV");
+    expect(inspectionTypeCodeForServiceRequest({ serviceType: "dguv" })).toBe("DGUV");
+    expect(inspectionTypeCodeForServiceRequest({ serviceType: "konstanz" })).toBe(
+      "CONSTANCY",
+    );
+    expect(inspectionTypeCodeForServiceRequest({ serviceType: "sv" })).toBe("SV");
+  });
 });
 
 describe("postRepairCheckByClass", () => {

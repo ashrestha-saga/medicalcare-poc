@@ -52,10 +52,10 @@ export function RepairDeviceSearchSelect({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return options.slice(0, 80);
-    return options
-      .filter((o) => o.label.toLowerCase().includes(q) || o.id.toLowerCase().includes(q))
-      .slice(0, 80);
+    if (!q) return options;
+    return options.filter(
+      (o) => o.label.toLowerCase().includes(q) || o.id.toLowerCase().includes(q),
+    );
   }, [options, query]);
 
   if (loading) {

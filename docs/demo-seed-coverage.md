@@ -115,7 +115,7 @@ See also the simplified ERD in [SCHEMA_AND_ARCHITECTURE.md](./SCHEMA_AND_ARCHITE
 | `ExecutorOrg` / `DispatchTarget` / `DispatchOutbox` | SR dispatch | **ExecutorOrg** now upserted with each contract (import + onboard + lifecycle). DispatchTarget channels still seed/demo-tenant only |
 | `OrderRequest` / `OrderItem` | Parts path | Spare-parts queue empty |
 | `AuthorityInspection` / findings | Compliance | Authority screens empty |
-| `DutyOverlapDecision` / overlap refs | Duties | Overlap UI empty |
+| DGUV Festlegung (`determinationState`) | Duties | Determination queue until operators decide |
 | `DashboardTileGrant` / `UserDashboardTile` | Users | Custom dashboards not pre-assigned |
 | `TenantOxidConnection` / `SmtpSettings` | Tenant / org | Settings integrations not prewired |
 | `TotpChallenge` / invitations / reset tokens | User | 2FA/invite only via live flows |
@@ -268,7 +268,7 @@ See also the simplified ERD in [SCHEMA_AND_ARCHITECTURE.md](./SCHEMA_AND_ARCHITE
 | Reprocessing | profile, links, checks, batches, items | Scan release / AEMP |
 | Constancy | `ConstancyCadence` | Cadence / missing takt |
 | Authority | `AuthorityInspection`, findings, checklist refs | Authority visits |
-| Overlap | `DutyOverlapDecision` | STK/DGUV overlap decisions |
+| DGUV Festlegung | `DeviceDuty.determinationState` | own_check / covered_by_stk / not_applicable |
 | Device book | `DeviceBookEntry` (+ composed duties from live duties) | Device book sections |
 
 ---

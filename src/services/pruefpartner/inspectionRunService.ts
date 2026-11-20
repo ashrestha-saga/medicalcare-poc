@@ -13,7 +13,11 @@ import { resolveCatalogueForAssignment } from "./catalogueResolutionService";
 import { checkQualificationGate } from "./qualificationGateService";
 import { checkTestEquipmentGate, listEligibleEquipment } from "./testEquipmentGateService";
 import { evaluateMeasurement } from "./limitEvaluationService";
-import { assertLinkedVisitSealGates, assertRepairReportGates } from "./sealGates";
+import {
+  assertLabelRequired,
+  assertLinkedVisitSealGates,
+  assertRepairReportGates,
+} from "./sealGates";
 import { assertCanStartRepairRun } from "@/services/repairs/trainingGateService";
 import { completeRepairFromRun } from "@/services/repairs/repairCompleteService";
 import {
@@ -80,8 +84,8 @@ async function loadAssignment(reference: string, tenantId: string) {
     },
   });
   if (!req) throw notFound("Assignment not found.");
-  if (req.subjectType !== "instance") {
-    throw unprocessable("Inspection runs require a device instance assignment.");
+  if (req.subjectType !== "instance" && req.subjectType !== "group") {
+    throw unprocessable("Inspection runs require a device instance or Sammelauftrag assignment.");
   }
   if (!req.transmittedAt) {
     throw unprocessable(
@@ -137,6 +141,8 @@ type RunWithCatalogue = {
   deviceConfirmCode: string | null;
   occasionCode: string | null;
   performedAt: Date;
+  startedAt?: Date | null;
+  completedAt?: Date | null;
   performedByName: string;
   result: string;
   note: string | null;
@@ -171,6 +177,8 @@ function toRunDto(
     deviceConfirmCode: run.deviceConfirmCode,
     occasionCode: run.occasionCode,
     performedAt: isoDate(run.performedAt)!,
+    startedAt: isoDateTime(run.startedAt),
+    completedAt: isoDateTime(run.completedAt),
     performedByName: run.performedByName,
     result: run.result,
     note: run.note,
@@ -181,7 +189,7 @@ function toRunDto(
     deviceLabel: deviceMeta.deviceLabel,
     testEquipmentId: run.testEquipmentId,
     steps,
-    sealed: Boolean(run.dutyPerformanceId),
+    sealed: Boolean(run.dutyPerformanceId) || Boolean(run.completedAt),
     visitId: run.visitId ?? null,
     visitStartedAt: extras?.visitStartedAt ? extras.visitStartedAt.toISOString() : null,
     signatures: extras?.signatures ?? [],
@@ -250,12 +258,147 @@ async function loadRunExtras(runId: string, visitId: string | null) {
 }
 
 export const inspectionRunService = {
-  async resolvePreview(ctx: ActingContext, reference: string): Promise<CataloguePreviewDTO> {
+  async resolvePreview(
+    ctx: ActingContext,
+    reference: string,
+    opts?: { deviceInstanceId?: string | null },
+  ): Promise<CataloguePreviewDTO> {
     requirePermission(ctx, "inspections:perform", "inspections:view");
     return withTenantStore(ctx, async () => {
       const req = await loadAssignment(reference, ctx.tenantId);
       assertAssignedToCaller(req, ctx.user.id);
-      const device = await loadDevice(ctx.tenantId, req.subjectId);
+
+      const selectedDeviceId = opts?.deviceInstanceId?.trim() || null;
+      const isGroup = req.subjectType === "group";
+
+      let collective: CataloguePreviewDTO["collective"] = null;
+      if (isGroup) {
+        const items = await prisma.serviceRequestItem.findMany({
+          where: { serviceRequestId: req.id, tenantId: ctx.tenantId },
+          orderBy: { position: "asc" },
+          include: {
+            deviceInstance: {
+              select: {
+                id: true,
+                inventoryNumber: true,
+                kind: true,
+                model: { select: { tradeName: true, modelName: true } },
+                characteristicsJson: true,
+              },
+            },
+          },
+        });
+        const done = items.filter((i) => i.status === "done" || i.status === "skipped").length;
+        collective = {
+          done,
+          total: items.length,
+          items: items.map((i) => {
+            let charName: string | null = null;
+            try {
+              const raw = i.deviceInstance.characteristicsJson;
+              if (raw) {
+                const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+                charName =
+                  (parsed as { tradeName?: string })?.tradeName?.trim() ||
+                  (parsed as { modelName?: string })?.modelName?.trim() ||
+                  null;
+              }
+            } catch {
+              /* ignore */
+            }
+            const deviceLabel =
+              i.deviceInstance.model?.tradeName ||
+              i.deviceInstance.model?.modelName ||
+              charName ||
+              i.deviceInstance.inventoryNumber;
+            return {
+              id: i.id,
+              position: i.position,
+              status: i.status,
+              deviceInstanceId: i.deviceInstanceId,
+              inventoryNumber: i.deviceInstance.inventoryNumber,
+              kind: i.deviceInstance.kind,
+              deviceLabel,
+              inspectionRunId: i.inspectionRunId,
+              skippedReason: i.skippedReason,
+            };
+          }),
+        };
+
+        // Group list view — no single device selected yet.
+        if (!selectedDeviceId) {
+          const site = req.siteId
+            ? await prisma.site.findFirst({
+                where: { id: req.siteId },
+                select: { id: true, name: true },
+              })
+            : null;
+          let visitId = req.visitId;
+          let visitStartedAt: string | null = null;
+          if (visitId) {
+            const visit = await prisma.serviceVisit.findFirst({
+              where: { id: visitId, tenantId: ctx.tenantId },
+              select: { startedAt: true },
+            });
+            if (!visit) visitId = null;
+            else visitStartedAt = isoDateTime(visit.startedAt);
+          }
+          const assignmentCompleted =
+            req.state === "completed" ||
+            req.state === "rejected" ||
+            (collective.total > 0 && collective.done >= collective.total);
+          return {
+            reference,
+            serviceRequestId: req.id,
+            tenantId: ctx.tenantId,
+            subjectType: "group",
+            deviceInstanceId: null,
+            inventoryNumber: "—",
+            serialNumber: null,
+            deviceLabel: `Sammelauftrag · ${collective.done} / ${collective.total}`,
+            modelName: null,
+            manufacturer: null,
+            locationText: req.locationText || site?.name || "—",
+            accessHint: req.accessHint,
+            siteId: req.siteId ?? site?.id ?? null,
+            siteName: site?.name ?? null,
+            scheduledAt: isoDateTime(req.scheduledAt),
+            visitId,
+            visitStartedAt,
+            overdue: false,
+            serviceType: req.serviceType,
+            fulfilment: req.fulfilment ?? "on_site",
+            dueAt: isoDate(req.duty?.dueAt),
+            inspectionTypeCode: inspectionTypeCodeForServiceRequest({
+              serviceType: req.serviceType,
+              dutyInspectionTypeCode: req.duty?.inspectionTypeCode,
+              checkType: req.checkType,
+            }),
+            sealed: assignmentCompleted,
+            catalogue: null,
+            qualificationGate: { ok: true, required: [], missing: [] },
+            equipmentGate: { ok: true, requiredClass: null, blockedReason: null },
+            eligibleEquipment: [],
+            draftRunId: null,
+            sealedRunId: null,
+            collective,
+          };
+        }
+      }
+
+      const deviceInstanceId = isGroup ? selectedDeviceId! : req.subjectId;
+      if (isGroup) {
+        const item = await prisma.serviceRequestItem.findFirst({
+          where: {
+            serviceRequestId: req.id,
+            deviceInstanceId,
+            tenantId: ctx.tenantId,
+          },
+        });
+        if (!item) throw unprocessable("Device is not part of this Sammelauftrag");
+      }
+
+      const device = await loadDevice(ctx.tenantId, deviceInstanceId);
       const duty = req.duty;
       let inspectionTypeCode = inspectionTypeCodeForServiceRequest({
         serviceType: req.serviceType,
@@ -265,7 +408,7 @@ export const inspectionRunService = {
 
       let resolved = await resolveCatalogueForAssignment({
         tenantId: ctx.tenantId,
-        deviceInstanceId: req.subjectId,
+        deviceInstanceId,
         inspectionTypeCode,
         constancyObjectCode: duty?.constancyObjectCode,
       });
@@ -274,7 +417,7 @@ export const inspectionRunService = {
         inspectionTypeCode = "ACCEPT";
         resolved = await resolveCatalogueForAssignment({
           tenantId: ctx.tenantId,
-          deviceInstanceId: req.subjectId,
+          deviceInstanceId,
           inspectionTypeCode,
           constancyObjectCode: duty?.constancyObjectCode,
         });
@@ -302,6 +445,7 @@ export const inspectionRunService = {
       const existingRun = await prisma.inspectionRun.findFirst({
         where: {
           serviceRequestId: req.id,
+          deviceInstanceId,
           dutyPerformanceId: null,
         },
         orderBy: { performedAt: "desc" },
@@ -310,13 +454,26 @@ export const inspectionRunService = {
       const sealedRun = await prisma.inspectionRun.findFirst({
         where: {
           serviceRequestId: req.id,
+          deviceInstanceId: isGroup ? deviceInstanceId : undefined,
           dutyPerformanceId: { not: null },
         },
         orderBy: { performedAt: "desc" },
         select: { id: true },
       });
+      const itemDone =
+        isGroup &&
+        Boolean(
+          collective?.items.find(
+            (i) =>
+              i.deviceInstanceId === deviceInstanceId &&
+              (i.status === "done" || i.status === "skipped"),
+          ),
+        );
       const assignmentCompleted =
-        req.state === "completed" || req.state === "rejected" || Boolean(sealedRun);
+        req.state === "completed" ||
+        req.state === "rejected" ||
+        itemDone ||
+        (!isGroup && Boolean(sealedRun));
 
       const catalogue = resolved
         ? {
@@ -349,7 +506,7 @@ export const inspectionRunService = {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const overdue = Boolean(
-        dueAt && new Date(`${dueAt}T00:00:00`) < today && !sealedRun,
+        dueAt && new Date(`${dueAt}T00:00:00`) < today && !assignmentCompleted,
       );
       const locParts = [device.area?.name, device.room].filter(Boolean);
       const siteId = req.siteId ?? device.area?.site?.id ?? null;
@@ -365,15 +522,31 @@ export const inspectionRunService = {
         else visitStartedAt = isoDateTime(visit.startedAt);
       }
 
+      let charName: string | null = null;
+      try {
+        const raw = device.characteristicsJson;
+        if (raw) {
+          const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+          charName =
+            (parsed as { tradeName?: string })?.tradeName?.trim() ||
+            (parsed as { modelName?: string })?.modelName?.trim() ||
+            null;
+        }
+      } catch {
+        /* ignore */
+      }
+
       return {
         reference,
         serviceRequestId: req.id,
         tenantId: ctx.tenantId,
-        deviceInstanceId: req.subjectId,
+        subjectType: req.subjectType,
+        deviceInstanceId,
         inventoryNumber: device.inventoryNumber,
         serialNumber: device.serialNumber,
-        deviceLabel: device.model?.tradeName || device.model?.modelName || req.locationText,
-        modelName: device.model?.modelName ?? device.model?.tradeName ?? null,
+        deviceLabel:
+          device.model?.tradeName || device.model?.modelName || charName || req.locationText,
+        modelName: device.model?.modelName ?? device.model?.tradeName ?? charName,
         manufacturer: device.model?.manufacturer ?? null,
         locationText: locParts.length > 0 ? locParts.join(" · ") : req.locationText || "—",
         accessHint: req.accessHint,
@@ -398,6 +571,7 @@ export const inspectionRunService = {
         eligibleEquipment: equipGate.instruments,
         draftRunId: assignmentCompleted ? null : (existingRun?.id ?? null),
         sealedRunId: sealedRun?.id ?? null,
+        collective,
       };
     });
   },
@@ -406,6 +580,8 @@ export const inspectionRunService = {
     ctx: ActingContext,
     body: {
       reference: string;
+      /** Required for Sammelauftrag (subjectType=group): which item device to run. */
+      deviceInstanceId?: string | null;
       occasionCode?: string | null;
       testEquipmentId?: string | null;
       performedAt?: string;
@@ -429,15 +605,62 @@ export const inspectionRunService = {
       if (req.state === "completed" || req.state === "rejected") {
         throw unprocessable("This assignment is already completed and cannot be started again.");
       }
-      const priorSealed = await prisma.inspectionRun.findFirst({
-        where: { serviceRequestId: req.id, dutyPerformanceId: { not: null } },
-        select: { id: true },
-      });
-      if (priorSealed) {
-        throw unprocessable("A sealed protocol already exists for this assignment.");
+      // E89 / R37 — service-type gate on partner run start (same as disposition assign).
+      if (ctx.user.accountKind === "partner" && ctx.user.organisationId) {
+        const { assertServiceTypeGate } = await import(
+          "@/services/gates/serviceTypeGateService"
+        );
+        await assertServiceTypeGate({
+          tenantId: ctx.tenantId,
+          organisationId: ctx.user.organisationId,
+          serviceType: req.serviceType,
+          assigneeUserId: ctx.user.id,
+          serviceRequestId: req.id,
+        });
       }
 
-      const device = await loadDevice(ctx.tenantId, req.subjectId);
+      let deviceInstanceId = req.subjectId;
+      if (req.subjectType === "group") {
+        const itemDeviceId = body.deviceInstanceId?.trim();
+        if (!itemDeviceId) {
+          throw unprocessable("deviceInstanceId required for Sammelauftrag", {
+            field: "deviceInstanceId",
+          });
+        }
+        const item = await prisma.serviceRequestItem.findFirst({
+          where: {
+            serviceRequestId: req.id,
+            deviceInstanceId: itemDeviceId,
+            tenantId: ctx.tenantId,
+          },
+        });
+        if (!item) throw unprocessable("Device is not part of this Sammelauftrag");
+        if (item.status === "done" || item.status === "skipped") {
+          throw unprocessable("This Sammelauftrag item is already finished");
+        }
+        deviceInstanceId = itemDeviceId;
+        const priorForDevice = await prisma.inspectionRun.findFirst({
+          where: {
+            serviceRequestId: req.id,
+            deviceInstanceId,
+            dutyPerformanceId: { not: null },
+          },
+          select: { id: true },
+        });
+        if (priorForDevice) {
+          throw unprocessable("A sealed protocol already exists for this device on the Sammelauftrag.");
+        }
+      } else {
+        const priorSealed = await prisma.inspectionRun.findFirst({
+          where: { serviceRequestId: req.id, dutyPerformanceId: { not: null } },
+          select: { id: true },
+        });
+        if (priorSealed) {
+          throw unprocessable("A sealed protocol already exists for this assignment.");
+        }
+      }
+
+      const device = await loadDevice(ctx.tenantId, deviceInstanceId);
       const duty = req.duty;
       let inspectionTypeCode = inspectionTypeCodeForServiceRequest({
         serviceType: req.serviceType,
@@ -447,7 +670,7 @@ export const inspectionRunService = {
 
       let resolved = await resolveCatalogueForAssignment({
         tenantId: ctx.tenantId,
-        deviceInstanceId: req.subjectId,
+        deviceInstanceId,
         inspectionTypeCode,
         constancyObjectCode: duty?.constancyObjectCode,
       });
@@ -455,7 +678,7 @@ export const inspectionRunService = {
         inspectionTypeCode = "ACCEPT";
         resolved = await resolveCatalogueForAssignment({
           tenantId: ctx.tenantId,
-          deviceInstanceId: req.subjectId,
+          deviceInstanceId,
           inspectionTypeCode,
           constancyObjectCode: duty?.constancyObjectCode,
         });
@@ -510,7 +733,11 @@ export const inspectionRunService = {
       });
 
       let run = await prisma.inspectionRun.findFirst({
-        where: { serviceRequestId: req.id, dutyPerformanceId: null },
+        where: {
+          serviceRequestId: req.id,
+          deviceInstanceId,
+          dutyPerformanceId: null,
+        },
         include: { catalogue: true },
       });
 
@@ -518,12 +745,15 @@ export const inspectionRunService = {
         run = await prisma.inspectionRun.create({
           data: {
             tenantId: ctx.tenantId,
-            deviceInstanceId: req.subjectId,
+            deviceInstanceId,
             catalogueId: resolved.catalogueId,
             deviceDutyId: duty?.id ?? null,
             serviceRequestId: req.id,
+            // Inherit site visit from the assignment when already started (Sammelauftrag).
+            visitId: req.visitId ?? null,
             occasionCode: body.occasionCode ?? null,
             performedAt: performanceDate,
+            startedAt: new Date(),
             performedByUserId: ctx.user.id,
             performedByName: ctx.user.name,
             organisationId: ctx.user.accountKind === "partner" ? ctx.user.organisationId : null,
@@ -532,6 +762,17 @@ export const inspectionRunService = {
           },
           include: { catalogue: true },
         });
+      } else {
+        const patch: { startedAt?: Date; visitId?: string } = {};
+        if (!run.startedAt) patch.startedAt = new Date();
+        if (!run.visitId && req.visitId) patch.visitId = req.visitId;
+        if (Object.keys(patch).length) {
+          run = await prisma.inspectionRun.update({
+            where: { id: run.id },
+            data: patch,
+            include: { catalogue: true },
+          });
+        }
       }
 
       if (req.state !== "in_progress") {
@@ -989,9 +1230,14 @@ export const inspectionRunService = {
     ctx: ActingContext,
     runId: string,
     body: {
-      result?: "passed" | "passed_with_conditions" | "failed";
+      result?: "passed" | "passed_with_conditions" | "failed" | "deviation";
       note?: string | null;
       idempotencyKey?: string;
+      /** E90 — Prüfplakette */
+      labelNumber?: string | null;
+      labelNextDue?: string | null;
+      captureMode?: "device_protocol" | "manual_measurement" | "visual" | null;
+      protocolBlobId?: string | null;
     },
   ): Promise<InspectionRunDTO> {
     requirePermission(ctx, "inspections:perform");
@@ -1055,7 +1301,11 @@ export const inspectionRunService = {
       const linkedVisit = visitId
         ? await prisma.serviceVisit.findFirst({
             where: { id: visitId },
-            select: { startedAt: true },
+            select: {
+              startedAt: true,
+              institutionSignedAt: true,
+              institutionSignerName: true,
+            },
           })
         : null;
       const signatures = await prisma.inspectionSignature.findMany({
@@ -1078,9 +1328,35 @@ export const inspectionRunService = {
         signatures,
         failedSteps: failedWithEvidence,
         skipVisit,
+        visitInstitution: linkedVisit?.institutionSignedAt
+          ? {
+              signedAt: linkedVisit.institutionSignedAt,
+              signerName: linkedVisit.institutionSignerName,
+            }
+          : null,
       });
       if (!gate.ok) {
         throw unprocessable(gate.message, { field: gate.field });
+      }
+
+      const inspType = await prisma.refInspectionType.findUnique({
+        where: { code: run.catalogue.inspectionTypeCode },
+        select: { requiresLabel: true, code: true },
+      });
+      const typeCode = (inspType?.code ?? run.catalogue.inspectionTypeCode).toLowerCase();
+      const isConstancy =
+        typeCode.includes("konstanz") ||
+        typeCode.includes("constancy") ||
+        typeCode === "radiation";
+      const labelGate = assertLabelRequired({
+        requiresLabel: Boolean(inspType?.requiresLabel),
+        result: body.result ?? "passed",
+        labelNumber: body.labelNumber,
+        labelNextDue: body.labelNextDue,
+        isConstancy,
+      });
+      if (!labelGate.ok) {
+        throw unprocessable(labelGate.message, { field: labelGate.field });
       }
 
       // A6/A7 — K-REP repair report gates before seal; MaintenanceEvent after seal.
@@ -1147,6 +1423,13 @@ export const inspectionRunService = {
       const result = body.result ?? "passed";
       const orgId =
         ctx.user.accountKind === "partner" ? ctx.user.organisationId : null;
+      const labelNextDue = body.labelNextDue?.trim()
+        ? new Date(
+            body.labelNextDue.includes("-")
+              ? `${body.labelNextDue.slice(0, 10)}T00:00:00.000Z`
+              : body.labelNextDue,
+          )
+        : null;
 
       await prisma.$transaction(async (tx) => {
         if (run.catalogue.setsBaseline) {
@@ -1207,14 +1490,17 @@ export const inspectionRunService = {
             note: body.note ?? run.note,
             source: "inspection_run",
             serviceRequestId: run.serviceRequestId,
-            result,
+            result: result === "deviation" ? "deviation" : result,
             unitEventSuffix: orgId ? `org ${orgId}` : null,
+            labelNumber:
+              result === "failed" ? null : body.labelNumber?.trim() || null,
+            labelNextDue: result === "failed" ? null : labelNextDue,
           });
           dutyPerformanceId = completion.dutyPerformanceId;
         }
 
-        // D4 — failed seal locks the device.
-        if (result === "failed") {
+        // D4 — failed seal locks the device (not for constancy: A44 — Betreiber decides).
+        if (result === "failed" && !isConstancy) {
           await tx.deviceInstance.update({
             where: { id: run.deviceInstanceId },
             data: {
@@ -1232,13 +1518,17 @@ export const inspectionRunService = {
             note: body.note ?? run.note,
             idempotencyKey: body.idempotencyKey ?? null,
             dutyPerformanceId,
+            completedAt: new Date(),
+            startedAt: run.startedAt ?? new Date(),
+            captureMode: body.captureMode ?? undefined,
+            protocolBlobId: body.protocolBlobId ?? undefined,
           },
         });
 
         if (run.serviceRequestId) {
           const current = await tx.serviceRequest.findFirst({
             where: { id: run.serviceRequestId },
-            select: { state: true },
+            select: { state: true, subjectType: true },
           });
           if (current && current.state !== "completed") {
             const resultLabel =
@@ -1249,25 +1539,68 @@ export const inspectionRunService = {
                   : result === "failed"
                     ? "Gesperrt"
                     : result;
-            await tx.statusEvent.create({
-              data: {
-                tenantId: ctx.tenantId,
-                serviceRequestId: run.serviceRequestId,
-                state: "completed",
-                source: "inspection_run",
-                actor: ctx.user.name,
-                note: [
-                  `Protocol sealed (${run.catalogue.code}) — ${resultLabel}`,
-                  body.note?.trim() || null,
-                ]
-                  .filter(Boolean)
-                  .join(": "),
-              },
-            });
-            await tx.serviceRequest.update({
-              where: { id: run.serviceRequestId },
-              data: { state: "completed" },
-            });
+
+            // RD26 — mark Sammelauftrag item done; complete order only when all items finish.
+            let completeRequest = current.subjectType !== "group";
+            if (current.subjectType === "group") {
+              const item = await tx.serviceRequestItem.findFirst({
+                where: {
+                  serviceRequestId: run.serviceRequestId,
+                  deviceInstanceId: run.deviceInstanceId,
+                },
+              });
+              if (item) {
+                await tx.serviceRequestItem.update({
+                  where: { id: item.id },
+                  data: { status: "done", inspectionRunId: runId },
+                });
+              }
+              const remaining = await tx.serviceRequestItem.count({
+                where: {
+                  serviceRequestId: run.serviceRequestId,
+                  status: "open",
+                },
+              });
+              completeRequest = remaining === 0;
+            }
+
+            if (completeRequest) {
+              await tx.statusEvent.create({
+                data: {
+                  tenantId: ctx.tenantId,
+                  serviceRequestId: run.serviceRequestId,
+                  state: "completed",
+                  source: "inspection_run",
+                  actor: ctx.user.name,
+                  note: [
+                    `Protocol sealed (${run.catalogue.code}) — ${resultLabel}`,
+                    body.note?.trim() || null,
+                  ]
+                    .filter(Boolean)
+                    .join(": "),
+                },
+              });
+              await tx.serviceRequest.update({
+                where: { id: run.serviceRequestId },
+                data: { state: "completed" },
+              });
+            } else {
+              await tx.statusEvent.create({
+                data: {
+                  tenantId: ctx.tenantId,
+                  serviceRequestId: run.serviceRequestId,
+                  state: "in_progress",
+                  source: "inspection_run",
+                  actor: ctx.user.name,
+                  note: [
+                    `Sammelauftrag item sealed (${run.catalogue.code}) — ${resultLabel}`,
+                    body.note?.trim() || null,
+                  ]
+                    .filter(Boolean)
+                    .join(": "),
+                },
+              });
+            }
           }
         }
       });

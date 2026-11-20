@@ -106,6 +106,21 @@ export type DeviceInstanceWithRelations = DeviceInstance & {
   maintenanceAnchorAt?: Date | null;
   lastMaintainedAt?: Date | null;
   nextMaintenanceDueAt?: Date | null;
+  source?: string | null;
+  importHint?: string | null;
+  importJobId?: string | null;
+  importJob?: { id: string; fileName: string; createdAt?: Date } | null;
+  replacedBy?: {
+    id: string;
+    inventoryNumber: string;
+    loanerLender: string | null;
+    operationalState: string;
+  } | null;
+  replacementFor?: Array<{
+    id: string;
+    inventoryNumber: string;
+    operationalState: string;
+  }>;
 };
 
 export function toDeviceInstanceDTO(row: DeviceInstanceWithRelations): DeviceInstanceDTO {
@@ -123,14 +138,35 @@ export function toDeviceInstanceDTO(row: DeviceInstanceWithRelations): DeviceIns
     row.state === "review" || row.state === "released" || row.state === "retired"
       ? row.state
       : "draft";
+  let equipTrade: string | null = null;
+  let equipMfr: string | null = null;
+  let equipModel: string | null = null;
+  if (!row.modelId && row.characteristicsJson) {
+    try {
+      const j = JSON.parse(row.characteristicsJson) as Record<string, unknown>;
+      if (typeof j.tradeName === "string") equipTrade = j.tradeName;
+      if (typeof j.manufacturer === "string") equipMfr = j.manufacturer;
+      if (typeof j.modelName === "string") equipModel = j.modelName;
+    } catch {
+      /* ignore */
+    }
+  }
   return {
     id: row.id,
     inventoryNumber: row.inventoryNumber,
     serialNumber: row.serialNumber,
-    manufacturer: row.model?.manufacturer ?? null,
-    modelName: row.model?.modelName ?? null,
-    tradeName: row.model?.tradeName ?? null,
+    manufacturer: row.model?.manufacturer ?? equipMfr,
+    modelName: row.model?.modelName ?? equipModel,
+    tradeName: row.model?.tradeName ?? equipTrade,
     modelId: row.modelId,
+    kind: row.kind === "equipment" ? "equipment" : "mp",
+    protectionClass:
+      row.protectionClass === "I" || row.protectionClass === "II" || row.protectionClass === "III"
+        ? row.protectionClass
+        : null,
+    portable: row.portable ?? null,
+    electrical: row.electrical !== false,
+    productKindCode: row.productKindCode ?? null,
     state: instanceState,
     modelState,
     location: row.area
@@ -168,7 +204,24 @@ export function toDeviceInstanceDTO(row: DeviceInstanceWithRelations): DeviceIns
     operationalState: row.operationalState ?? null,
     lockSource: row.lockSource ?? null,
     replacedById: row.replacedById ?? null,
-    loanerLender: row.loanerLender ?? null,
+    loanerLender: row.loanerLender ?? row.replacedBy?.loanerLender ?? null,
+    replacedBy: row.replacedBy
+      ? {
+          id: row.replacedBy.id,
+          inventoryNumber: row.replacedBy.inventoryNumber,
+          loanerLender: row.replacedBy.loanerLender ?? null,
+          operationalState: row.replacedBy.operationalState,
+        }
+      : null,
+    replacementFor: (row.replacementFor ?? []).map((d) => ({
+      id: d.id,
+      inventoryNumber: d.inventoryNumber,
+      operationalState: d.operationalState,
+    })),
+    source: row.source ?? null,
+    importHint: row.importHint ?? null,
+    importJobId: row.importJobId ?? row.importJob?.id ?? null,
+    importFileName: row.importJob?.fileName ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -212,15 +265,37 @@ export type ServiceRequestWithRelations = ServiceRequest & {
     result: string;
     note: string | null;
     performedAt: Date;
+    startedAt?: Date | null;
+    completedAt?: Date | null;
     performedByName: string;
     dutyPerformanceId: string | null;
     catalogue: { code: string; label: string | null } | null;
+    stepResults?: {
+      measuredValue: string | null;
+      withinLimit: boolean | null;
+      confirmed: boolean | null;
+      note: string | null;
+      step: {
+        position: number;
+        label: string;
+        inputKind: string;
+        unit: string | null;
+      } | null;
+    }[];
   }[];
   performances?: {
     result: string;
     note: string | null;
     performedAt: Date;
     performedBy: string;
+  }[];
+  maintenanceEvents?: {
+    result: string | null;
+    resultText: string | null;
+    note: string | null;
+    performedAt: Date;
+    performedBy: string | null;
+    kind: string;
   }[];
   subjectInstance?: {
     inventoryNumber: string;
@@ -339,20 +414,65 @@ export function toServiceRequestDTO(row: ServiceRequestWithRelations): ServiceRe
         }
       : null,
     completionOverview: (() => {
-      // Only sealed runs (dutyPerformanceId set) or completed assignments — not draft protocols.
-      const sealedRun = row.inspectionRuns?.find((r) => r.dutyPerformanceId) ?? null;
+      // Prefer duty-sealed runs; for duty-less K-REP / completed repairs fall back to
+      // the latest linked protocol and/or MaintenanceEvent.
+      const sealedRun =
+        row.inspectionRuns?.find((r) => r.dutyPerformanceId) ??
+        (row.state === "completed" || row.state === "rejected"
+          ? (row.inspectionRuns?.[0] ?? null)
+          : null);
       const performance = row.performances?.[0] ?? null;
-      if (!sealedRun && !performance && row.state !== "completed") return null;
+      const repairEvent = row.maintenanceEvents?.[0] ?? null;
+      if (!sealedRun && !performance && !repairEvent && row.state !== "completed") {
+        return null;
+      }
+      const noteParts = [
+        sealedRun?.note?.trim() || null,
+        repairEvent?.resultText?.trim() || null,
+        repairEvent?.note?.trim() || null,
+        performance?.note?.trim() || null,
+      ].filter(Boolean);
+      const uniqueNotes = [...new Set(noteParts)];
+      const protocolSteps = (sealedRun?.stepResults ?? [])
+        .filter((sr) => sr.step != null)
+        .map((sr) => ({
+          position: sr.step!.position,
+          label: sr.step!.label,
+          inputKind: sr.step!.inputKind,
+          unit: sr.step!.unit ?? null,
+          measuredValue: sr.measuredValue ?? null,
+          withinLimit: sr.withinLimit ?? null,
+          confirmed: sr.confirmed ?? null,
+          note: sr.note?.trim() || null,
+        }))
+        .sort((a, b) => a.position - b.position);
       return {
-        result: sealedRun?.result ?? performance?.result ?? "passed",
-        note: sealedRun?.note ?? performance?.note ?? null,
+        result:
+          repairEvent?.result ??
+          sealedRun?.result ??
+          performance?.result ??
+          "passed",
+        note: uniqueNotes.length > 0 ? uniqueNotes.join(" · ") : null,
         completedAt:
-          sealedRun?.performedAt?.toISOString() ?? performance?.performedAt?.toISOString() ?? null,
-        completedBy: sealedRun?.performedByName ?? performance?.performedBy ?? null,
+          sealedRun?.performedAt?.toISOString() ??
+          performance?.performedAt?.toISOString() ??
+          repairEvent?.performedAt?.toISOString() ??
+          null,
+        startedAt: sealedRun?.startedAt?.toISOString() ?? null,
+        finishedAt:
+          sealedRun?.completedAt?.toISOString() ??
+          repairEvent?.performedAt?.toISOString() ??
+          null,
+        completedBy:
+          sealedRun?.performedByName ??
+          performance?.performedBy ??
+          repairEvent?.performedBy ??
+          null,
         catalogueCode: sealedRun?.catalogue?.code ?? null,
         catalogueLabel: sealedRun?.catalogue?.label ?? null,
         nextDueAt: row.duty?.dueAt?.toISOString() ?? null,
         status: row.state,
+        protocolSteps,
       };
     })(),
     quote: row.quote
@@ -369,6 +489,19 @@ export function toServiceRequestDTO(row: ServiceRequestWithRelations): ServiceRe
         }
       : null,
     fulfilment: row.fulfilment ?? "on_site",
+    external: {
+      orgName: row.externalOrgName ?? null,
+      commissionedAt: row.externalCommissionedAt
+        ? row.externalCommissionedAt.toISOString().slice(0, 10)
+        : null,
+      certificateRef: row.externalCertificateRef ?? null,
+      certificateDate: row.externalCertificateDate
+        ? row.externalCertificateDate.toISOString().slice(0, 10)
+        : null,
+      certificateBlobId: row.externalCertificateBlobId ?? null,
+      result: row.externalResult ?? null,
+      defectsText: row.externalDefectsText ?? null,
+    },
     sendIn: {
       shippedAt: row.shippedAt ? row.shippedAt.toISOString().slice(0, 10) : null,
       trackingRef: row.trackingRef ?? null,

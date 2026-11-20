@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertFailedStepsHaveEvidence,
+  assertLabelRequired,
   assertLinkedVisitSealGates,
   assertRepairReportGates,
   assertSignaturesPresent,
@@ -161,6 +162,80 @@ describe("assertRepairReportGates R11", () => {
         hasPartPhotoOrReason: true,
         functionTestPassed: true,
       }).ok,
+    ).toBe(true);
+  });
+});
+
+describe("assertLabelRequired R38", () => {
+  it("skips when requiresLabel is false", () => {
+    expect(
+      assertLabelRequired({
+        requiresLabel: false,
+        result: "passed",
+        labelNumber: null,
+        labelNextDue: null,
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("allows failed without label", () => {
+    expect(
+      assertLabelRequired({
+        requiresLabel: true,
+        result: "failed",
+        labelNumber: null,
+        labelNextDue: null,
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("requires format and next due on pass", () => {
+    const missing = assertLabelRequired({
+      requiresLabel: true,
+      result: "passed",
+      labelNumber: null,
+      labelNextDue: null,
+    });
+    expect(missing.ok).toBe(false);
+
+    const bad = assertLabelRequired({
+      requiresLabel: true,
+      result: "passed",
+      labelNumber: "bad",
+      labelNextDue: "2027-01",
+    });
+    expect(bad.ok).toBe(false);
+
+    expect(
+      assertLabelRequired({
+        requiresLabel: true,
+        result: "passed",
+        labelNumber: "DG-2026-0144",
+        labelNextDue: "2027-01",
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("rejects label on constancy", () => {
+    const r = assertLabelRequired({
+      requiresLabel: false,
+      result: "passed",
+      labelNumber: "DG-2026-0144",
+      labelNextDue: "2027-01",
+      isConstancy: true,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.field).toBe("labelNumber");
+  });
+});
+
+describe("assertSignaturesPresent visit institution inheritance RD26", () => {
+  it("accepts visit-level institution signature without run signature", () => {
+    expect(
+      assertSignaturesPresent(
+        [{ kind: "inspector", signedAt: new Date(), absent: false }],
+        { signedAt: new Date(), signerName: "Klinik MFA" },
+      ).ok,
     ).toBe(true);
   });
 });

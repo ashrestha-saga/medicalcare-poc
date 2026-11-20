@@ -525,6 +525,7 @@ export const deviceBookService = {
         externalPerformer: ev.externalPerformer,
         serviceRequestReference: ev.serviceRequest?.reference ?? null,
         postRepairCheck: ev.postRepairCheck,
+        reportBlobId: ev.reportBlobId ?? null,
       })),
       incidents: incidents
         .filter((row) => !shouldHideFromRegisterIncident(row))

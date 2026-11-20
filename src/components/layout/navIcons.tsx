@@ -245,16 +245,6 @@ export function DashboardIcon() {
   );
 }
 
-/** Duty overlap decisions (STK ↔ DGUV). */
-export function DutyOverlapIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden>
-      <circle cx="9" cy="12" r="5" />
-      <circle cx="15" cy="12" r="5" />
-    </svg>
-  );
-}
-
 /** Device incidents / Vorkommnisse. */
 export function IncidentsIcon() {
   return (

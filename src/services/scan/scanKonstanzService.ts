@@ -12,6 +12,22 @@ import { recordAudit } from "@/services/audit/auditService";
 import { recordDutyCompletion } from "@/services/registration/recordDutyCompletion";
 import type { SubmitScanKonstanzInput } from "@/schemas/k10";
 import { assertDeviceInWorkAreas } from "@/services/users/userAreaScope";
+import {
+  captureDefaultsForObject,
+  referenceRowsFromJson,
+  visualCheckpointsFor,
+} from "@/lib/constancy/captureDefaults";
+
+function withinTolerance(
+  measured: number,
+  ref: { value: number; tolerancePct?: number | null; toleranceAbs?: number | null },
+): boolean {
+  if (ref.toleranceAbs != null) return Math.abs(measured - ref.value) <= ref.toleranceAbs;
+  if (ref.tolerancePct != null) {
+    return Math.abs(measured - ref.value) <= (Math.abs(ref.value) * ref.tolerancePct) / 100;
+  }
+  return measured === ref.value;
+}
 
 function startOfTodayUtc(): Date {
   const n = new Date();
@@ -39,19 +55,65 @@ async function baselineDoneForDevice(deviceInstanceId: string, tenantId: string)
   return Boolean(baseline?.lastCompletedAt) || (baseline?.performances?.length ?? 0) > 0;
 }
 
-async function openCadenceExists(
-  deviceInstanceId: string,
-  constancyObjectCode: string,
+/**
+ * Pass/conditions that clear a prior fail/deviation.
+ * Compare recordedAt — performedAt is date-only, so same-day retest must still clear.
+ */
+async function laterSuccessfulPerformance(
+  deviceDutyId: string,
+  afterRecordedAt: Date,
 ): Promise<boolean> {
-  const row = await prisma.constancyCadence.findFirst({
+  const laterOk = await prisma.dutyPerformance.findFirst({
     where: {
-      deviceInstanceId,
-      constancyObjectCode,
-      validTo: null,
+      deviceDutyId,
+      recordedAt: { gt: afterRecordedAt },
+      result: { in: ["passed", "passed_with_conditions"] },
     },
     select: { id: true },
   });
-  return Boolean(row);
+  return Boolean(laterOk);
+}
+
+async function latestUnclearedKonstanzFail(deviceId: string): Promise<{
+  performedAt: Date;
+  recordedAt: Date;
+  deviceDutyId: string;
+  note: string | null;
+  title: string;
+} | null> {
+  const fails = await prisma.dutyPerformance.findMany({
+    where: {
+      result: { in: ["failed", "deviation"] },
+      deviceDuty: {
+        deviceInstanceId: deviceId,
+        dutyKey: "konstanz",
+        applicable: true,
+        suspendedAt: null,
+      },
+    },
+    orderBy: { recordedAt: "desc" },
+    take: 50,
+    select: {
+      performedAt: true,
+      recordedAt: true,
+      deviceDutyId: true,
+      note: true,
+      deviceDuty: { select: { title: true, constancyObjectCode: true } },
+    },
+  });
+  for (const failed of fails) {
+    const cleared = await laterSuccessfulPerformance(failed.deviceDutyId, failed.recordedAt);
+    if (!cleared) {
+      return {
+        performedAt: failed.performedAt,
+        recordedAt: failed.recordedAt,
+        deviceDutyId: failed.deviceDutyId,
+        note: failed.note,
+        title: failed.deviceDuty.title ?? failed.deviceDuty.constancyObjectCode ?? "Konstanz",
+      };
+    }
+  }
+  return null;
 }
 
 export async function deviceHasOpenKonstanz(deviceId: string): Promise<boolean> {
@@ -68,29 +130,7 @@ export async function deviceHasOpenKonstanz(deviceId: string): Promise<boolean> 
   });
   if (due) return true;
 
-  const failed = await prisma.dutyPerformance.findFirst({
-    where: {
-      result: "failed",
-      deviceDuty: {
-        deviceInstanceId: deviceId,
-        dutyKey: "konstanz",
-        applicable: true,
-        suspendedAt: null,
-      },
-    },
-    orderBy: { performedAt: "desc" },
-    select: { performedAt: true, deviceDutyId: true },
-  });
-  if (!failed) return false;
-  const laterOk = await prisma.dutyPerformance.findFirst({
-    where: {
-      deviceDutyId: failed.deviceDutyId,
-      performedAt: { gt: failed.performedAt },
-      result: { in: ["passed", "passed_with_conditions"] },
-    },
-    select: { id: true },
-  });
-  return !laterOk;
+  return Boolean(await latestUnclearedKonstanzFail(deviceId));
 }
 
 export async function deriveKonstanzSperr(deviceId: string): Promise<{
@@ -98,42 +138,14 @@ export async function deriveKonstanzSperr(deviceId: string): Promise<{
   quelle: "konstanz";
   grund: string;
 } | null> {
-  const failed = await prisma.dutyPerformance.findFirst({
-    where: {
-      result: "failed",
-      deviceDuty: {
-        deviceInstanceId: deviceId,
-        dutyKey: "konstanz",
-        applicable: true,
-        suspendedAt: null,
-      },
-    },
-    orderBy: { performedAt: "desc" },
-    select: {
-      performedAt: true,
-      deviceDutyId: true,
-      note: true,
-      deviceDuty: { select: { title: true, constancyObjectCode: true } },
-    },
-  });
+  const failed = await latestUnclearedKonstanzFail(deviceId);
   if (failed) {
-    const laterOk = await prisma.dutyPerformance.findFirst({
-      where: {
-        deviceDutyId: failed.deviceDutyId,
-        performedAt: { gt: failed.performedAt },
-        result: { in: ["passed", "passed_with_conditions"] },
-      },
-      select: { id: true },
-    });
-    if (!laterOk) {
-      const d = failed.performedAt.toISOString().slice(0, 10);
-      const title = failed.deviceDuty.title ?? failed.deviceDuty.constancyObjectCode ?? "Konstanz";
-      return {
-        lage: "stop",
-        quelle: "konstanz",
-        grund: `Konstanzprüfung am ${d} nicht bestanden (${title})${failed.note ? `: ${failed.note}` : ""}`,
-      };
-    }
+    const d = failed.performedAt.toISOString().slice(0, 10);
+    return {
+      lage: "stop",
+      quelle: "konstanz",
+      grund: `Konstanzprüfung am ${d} nicht bestanden (${failed.title})${failed.note ? `: ${failed.note}` : ""}`,
+    };
   }
 
   const today = startOfTodayUtc();
@@ -187,7 +199,7 @@ export const scanKonstanzService = {
       include: {
         constancyObject: { select: { label: true } },
         performances: {
-          orderBy: { performedAt: "desc" },
+          orderBy: { recordedAt: "desc" },
           take: 1,
           select: { result: true, performedAt: true, note: true, performedBy: true, recordedAt: true },
         },
@@ -195,19 +207,33 @@ export const scanKonstanzService = {
       orderBy: [{ dueAt: "asc" }, { title: "asc" }],
     });
 
+    const objectCodes = [
+      ...new Set(duties.map((d) => d.constancyObjectCode).filter((c): c is string => Boolean(c))),
+    ];
+    const cadences =
+      objectCodes.length === 0
+        ? []
+        : await prisma.constancyCadence.findMany({
+            where: {
+              tenantId: ctx.tenantId,
+              deviceInstanceId: deviceId,
+              validTo: null,
+              constancyObjectCode: { in: objectCodes },
+            },
+          });
+    const cadenceByCode = new Map(cadences.map((c) => [c.constancyObjectCode, c]));
+
     const items: ScanKonstanzItemDTO[] = [];
     for (const d of duties) {
       const last = d.performances[0] ?? null;
-      const hasCadence =
-        d.dueAt != null ||
-        (d.constancyObjectCode
-          ? await openCadenceExists(deviceId, d.constancyObjectCode)
-          : false);
+      const cadence = d.constancyObjectCode
+        ? cadenceByCode.get(d.constancyObjectCode)
+        : undefined;
 
       let status: ScanKonstanzItemDTO["status"] = "ok";
       if (d.requiresBaseline && !hasBaseline) status = "baseline_missing";
-      else if (!hasCadence || d.dueAt == null) status = "missing_cadence";
-      else if (last?.result === "failed") status = "failed";
+      else if (!cadence || d.dueAt == null) status = "missing_cadence";
+      else if (last?.result === "failed" || last?.result === "deviation") status = "failed";
       else if (d.dueAt < today) status = "overdue";
       else if (isoDate(d.dueAt) === isoDate(today)) status = "due";
       else status = "ok";
@@ -216,6 +242,19 @@ export const scanKonstanzService = {
         status === "due" || status === "overdue" || status === "failed";
 
       if (status === "ok") continue;
+
+      const defaults = captureDefaultsForObject(d.constancyObjectCode);
+      const captureMode =
+        cadence?.captureMode === "manual_measurement" || cadence?.captureMode === "visual"
+          ? cadence.captureMode
+          : cadence?.captureMode === "device_protocol"
+            ? "device_protocol"
+            : defaults.captureMode;
+      const refs = referenceRowsFromJson(cadence?.referenceValuesJson);
+      const checkpoints = visualCheckpointsFor(
+        d.constancyObjectCode,
+        cadence?.referenceValuesJson,
+      );
 
       items.push({
         dutyId: d.id,
@@ -229,6 +268,20 @@ export const scanKonstanzService = {
         lastResult: last?.result ?? null,
         lastPerformedAt: isoDate(last?.performedAt ?? null),
         basisText: d.basisText,
+        captureMode,
+        protocolSource: cadence?.protocolSource ?? defaults.protocolSource,
+        referenceValues: refs.length
+          ? refs
+          : (defaults.referenceValues ?? []).map((r) => ({
+              name: r.name,
+              value: r.value,
+              unit: r.unit,
+              tolerancePct: r.tolerancePct ?? null,
+              toleranceAbs: r.toleranceAbs ?? null,
+            })),
+        visualCheckpoints: checkpoints.length
+          ? checkpoints
+          : (defaults.visualCheckpoints ?? []),
       });
     }
 
@@ -313,8 +366,12 @@ export const scanKonstanzService = {
     }
 
     if (
-      (input.result === "failed" || input.result === "passed_with_conditions") &&
-      !input.note?.trim()
+      (input.result === "failed" ||
+        input.result === "passed_with_conditions" ||
+        input.result === "deviation") &&
+      !input.note?.trim() &&
+      item.captureMode !== "manual_measurement" &&
+      item.captureMode !== "visual"
     ) {
       throw unprocessable("Note required for failed or conditional result.", { field: "note" });
     }
@@ -337,6 +394,71 @@ export const scanKonstanzService = {
       throw badRequest("Invalid performedAt date");
     }
 
+    const mode = input.captureMode ?? item.captureMode;
+    let result = input.result;
+    let measurementsJson: unknown = null;
+
+    if (mode === "manual_measurement") {
+      const refs = item.referenceValues;
+      if (!refs.length) {
+        throw unprocessable("No reference values for measurement mode", {
+          field: "measurements",
+        });
+      }
+      const rows = input.measurements ?? [];
+      if (rows.length < refs.length) {
+        throw unprocessable("Every reference row needs a measurement", {
+          field: "measurements",
+        });
+      }
+      let anyOut = false;
+      const evaluated = refs.map((ref) => {
+        const m =
+          rows.find((x) => x.name === ref.name) ?? rows[refs.indexOf(ref)];
+        const ok = withinTolerance(m.value, ref);
+        if (!ok) anyOut = true;
+        return {
+          name: ref.name,
+          value: m.value,
+          unit: m.unit || ref.unit,
+          withinLimit: ok,
+        };
+      });
+      measurementsJson = evaluated;
+      if (anyOut) result = "deviation";
+    } else if (mode === "visual") {
+      const points = item.visualCheckpoints;
+      const findings = input.visualFindings ?? [];
+      if (points.length) {
+        for (const point of points) {
+          const f = findings.find((x) => x.point === point);
+          if (!f) {
+            throw unprocessable(`Missing visual finding for: ${point}`, {
+              field: "visualFindings",
+            });
+          }
+          if (!f.ok && !f.finding?.trim()) {
+            throw unprocessable("Finding text required for failed checkpoints", {
+              field: "visualFindings",
+            });
+          }
+        }
+        measurementsJson = findings;
+        if (findings.some((f) => !f.ok)) result = "failed";
+      }
+    }
+
+    if (
+      (result === "failed" || result === "passed_with_conditions" || result === "deviation") &&
+      !input.note?.trim() &&
+      mode === "device_protocol"
+    ) {
+      throw unprocessable("Note required for failed or conditional result.", { field: "note" });
+    }
+
+    const retentionUntil = new Date(performedAt);
+    retentionUntil.setUTCFullYear(retentionUntil.getUTCFullYear() + 10);
+
     const { nextDue } = await prisma.$transaction(async (tx) =>
       recordDutyCompletion(tx, {
         tenantId: ctx.tenantId,
@@ -346,7 +468,17 @@ export const scanKonstanzService = {
         actorUserId: ctx.user.id,
         note: input.note?.trim() || null,
         source: "scan",
-        result: input.result,
+        result:
+          result === "deviation"
+            ? "deviation"
+            : result === "failed"
+              ? "failed"
+              : result === "passed_with_conditions"
+                ? "passed_with_conditions"
+                : "passed",
+        captureMode: mode,
+        measurementsJson: measurementsJson ?? undefined,
+        retentionUntil,
       }),
     );
 
@@ -355,7 +487,7 @@ export const scanKonstanzService = {
       resource: "duty",
       resourceId: duty.id,
       action: "complete",
-      summary: `Scan Konstanz ${item.title} → ${input.result}`,
+      summary: `Scan Konstanz ${item.title} → ${result}`,
     });
 
     return {
@@ -363,7 +495,14 @@ export const scanKonstanzService = {
       inventoryNumber: open.inventoryNumber,
       dutyId: duty.id,
       title: item.title,
-      result: input.result,
+      result:
+        result === "deviation"
+          ? "failed"
+          : result === "passed_with_conditions"
+            ? "passed_with_conditions"
+            : result === "failed"
+              ? "failed"
+              : "passed",
       performedAt: isoDate(performedAt)!,
       nextDueAt: isoDate(nextDue),
       note: input.note?.trim() || null,

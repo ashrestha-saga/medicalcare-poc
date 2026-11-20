@@ -64,6 +64,6 @@ export const UNMAPPED_PREPARATION_GAPS: PreparationGapDef[] = [
   },
   {
     code: "missing_duty_overlap",
-    target: "/duty-overlap",
+    target: "/duties/dguv-determination",
   },
 ];

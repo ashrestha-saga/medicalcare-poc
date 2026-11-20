@@ -3,10 +3,21 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import type { RequestDetailProps, ServiceRequestDTO } from "@/interfaces";
+import type {
+  AssignmentProtocolStepDTO,
+  RequestDetailProps,
+  ServiceRequestDTO,
+} from "@/interfaces";
 import { Spinner } from "@/components/ui/Loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   formatWhen,
   serviceRequestStateBadge,
@@ -18,6 +29,23 @@ import { api } from "@/lib/apiClient";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { QuoteDecidePanel } from "@/components/features/repairs/QuoteDecidePanel";
 import { WithdrawAssignmentDialog } from "./WithdrawAssignmentDialog";
+
+function protocolStepValue(
+  step: AssignmentProtocolStepDTO,
+  t: (key: string) => string,
+  dash: string,
+): string {
+  const parts: string[] = [];
+  if (step.measuredValue?.trim()) {
+    parts.push(step.unit ? `${step.measuredValue.trim()} ${step.unit}` : step.measuredValue.trim());
+  }
+  if (step.note?.trim()) parts.push(step.note.trim());
+  if (step.confirmed === true && !parts.length) parts.push(t("stepConfirmed"));
+  if (step.confirmed === false && !parts.length) parts.push(t("stepNotConfirmed"));
+  if (step.withinLimit === true) parts.push(t("stepWithinLimit"));
+  if (step.withinLimit === false) parts.push(t("stepOutOfLimit"));
+  return parts.length > 0 ? parts.join(" · ") : dash;
+}
 
 function MetaRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -62,6 +90,7 @@ export function RequestDetail({
     }
   }
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [protocolOpen, setProtocolOpen] = useState(false);
   const {
     busy,
     executorOrgId,
@@ -108,6 +137,10 @@ export function RequestDetail({
     if (result === "passed") return t("resultPassed");
     if (result === "passed_with_conditions") return t("resultPassedWithConditions");
     if (result === "failed") return t("resultFailed");
+    if (result === "repaired") return t("resultRepaired");
+    if (result === "provisional") return t("resultProvisional");
+    if (result === "not_repairable") return t("resultNotRepairable");
+    if (result === "parts_ordered") return t("resultPartsOrdered");
     return result;
   };
 
@@ -249,6 +282,45 @@ export function RequestDetail({
             </section>
           ) : null}
 
+          {request.fulfilment === "external" ? (
+            <section
+              className="rounded-lg border border-border bg-card p-4 sm:p-5"
+              data-testid="clinic-external-sv"
+            >
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                {t("externalTitle")}
+              </p>
+              <p className="mb-4 text-sm text-muted-foreground">{t("externalHint")}</p>
+              <dl>
+                <MetaRow label={t("externalOffice")}>
+                  {request.external?.orgName?.trim() || tCommon("dash")}
+                </MetaRow>
+                <MetaRow label={t("externalCommissioned")}>
+                  {request.external?.commissionedAt
+                    ? formatDate(request.external.commissionedAt, locale)
+                    : tCommon("dash")}
+                </MetaRow>
+                <MetaRow label={t("externalCertificate")}>
+                  {request.external?.certificateRef?.trim() || t("externalPendingCert")}
+                </MetaRow>
+                {request.external?.result ? (
+                  <MetaRow label={t("externalResult")}>{request.external.result}</MetaRow>
+                ) : null}
+              </dl>
+              {!request.external?.certificateRef && canDecideQuote ? (
+                <div className="mt-4">
+                  <Button type="button" size="sm" asChild data-testid="request-sv-certificate-cta">
+                    <Link
+                      href={`/requests/sv-certificate?reference=${encodeURIComponent(request.reference)}`}
+                    >
+                      {t("externalRecordCertificate")}
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
           {request.fulfilment === "send_in" ? (
             <section
               className="rounded-lg border border-border bg-card p-4 sm:p-5"
@@ -299,19 +371,45 @@ export function RequestDetail({
               <dl>
                 <MetaRow label={t("overviewStatus")}>{stateLabel(overview.status)}</MetaRow>
                 <MetaRow label={t("overviewResult")}>{resultLabel(overview.result)}</MetaRow>
-                <MetaRow label={t("overviewCompletedAt")}>
+                <MetaRow label={t("overviewPerformedAt")}>
                   {overview.completedAt
-                    ? formatDateTime(overview.completedAt, locale)
+                    ? formatDate(overview.completedAt, locale)
                     : tCommon("dash")}
+                </MetaRow>
+                <MetaRow label={t("overviewStartedAt")}>
+                  {overview.startedAt
+                    ? formatDateTime(overview.startedAt, locale)
+                    : tCommon("dash")}
+                </MetaRow>
+                <MetaRow label={t("overviewFinishedAt")}>
+                  {overview.finishedAt
+                    ? formatDateTime(overview.finishedAt, locale)
+                    : overview.completedAt
+                      ? formatDateTime(overview.completedAt, locale)
+                      : tCommon("dash")}
                 </MetaRow>
                 <MetaRow label={t("overviewCompletedBy")}>
                   {overview.completedBy?.trim() || tCommon("dash")}
                 </MetaRow>
                 <MetaRow label={t("overviewProtocol")}>
-                  {overview.catalogueLabel || overview.catalogueCode || tCommon("dash")}
-                  {overview.catalogueCode && overview.catalogueLabel
-                    ? ` (${overview.catalogueCode})`
-                    : ""}
+                  <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span>
+                      {overview.catalogueLabel || overview.catalogueCode || tCommon("dash")}
+                      {overview.catalogueCode && overview.catalogueLabel
+                        ? ` (${overview.catalogueCode})`
+                        : ""}
+                    </span>
+                    {(overview.protocolSteps?.length ?? 0) > 0 ? (
+                      <button
+                        type="button"
+                        className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                        onClick={() => setProtocolOpen(true)}
+                        data-testid="overview-protocol-link"
+                      >
+                        {t("overviewViewProtocol")}
+                      </button>
+                    ) : null}
+                  </span>
                 </MetaRow>
                 <MetaRow label={t("overviewNextDue")}>
                   {overview.nextDueAt ? formatDate(overview.nextDueAt, locale) : tCommon("dash")}
@@ -364,6 +462,70 @@ export function RequestDetail({
           ) : null}
         </aside>
       </div>
+
+      <Dialog open={protocolOpen} onOpenChange={setProtocolOpen}>
+        <DialogContent
+          className="max-h-[85vh] max-w-lg overflow-y-auto sm:max-w-xl"
+          data-testid="overview-protocol-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>{t("protocolModalTitle")}</DialogTitle>
+            <DialogDescription>
+              {[overview?.catalogueLabel, overview?.catalogueCode].filter(Boolean).join(" · ") ||
+                t("protocolModalFallback")}
+            </DialogDescription>
+          </DialogHeader>
+          {overview ? (
+            <dl className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+              <div className="grid gap-1 border-b border-border py-2 sm:grid-cols-[120px_1fr] sm:gap-3">
+                <dt className="text-muted-foreground">{t("overviewPerformedAt")}</dt>
+                <dd className="font-medium">
+                  {overview.completedAt
+                    ? formatDate(overview.completedAt, locale)
+                    : tCommon("dash")}
+                </dd>
+              </div>
+              <div className="grid gap-1 border-b border-border py-2 sm:grid-cols-[120px_1fr] sm:gap-3">
+                <dt className="text-muted-foreground">{t("overviewStartedAt")}</dt>
+                <dd className="font-medium">
+                  {overview.startedAt
+                    ? formatDateTime(overview.startedAt, locale)
+                    : tCommon("dash")}
+                </dd>
+              </div>
+              <div className="grid gap-1 py-2 sm:grid-cols-[120px_1fr] sm:gap-3">
+                <dt className="text-muted-foreground">{t("overviewFinishedAt")}</dt>
+                <dd className="font-medium">
+                  {overview.finishedAt
+                    ? formatDateTime(overview.finishedAt, locale)
+                    : tCommon("dash")}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
+          {(overview?.protocolSteps?.length ?? 0) > 0 ? (
+            <ol className="space-y-2" data-testid="overview-protocol-steps">
+              {overview!.protocolSteps.map((step) => (
+                <li
+                  key={`${step.position}-${step.label}`}
+                  className="rounded-md border border-border bg-background px-3 py-2.5"
+                >
+                  <p className="text-xs text-muted-foreground">
+                    {t("protocolStepIndex", { n: step.position })}
+                    {step.inputKind ? ` · ${step.inputKind}` : ""}
+                  </p>
+                  <p className="text-sm font-medium text-foreground">{step.label}</p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {protocolStepValue(step, t, tCommon("dash"))}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("protocolModalEmpty")}</p>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <WithdrawAssignmentDialog
         open={withdrawOpen}

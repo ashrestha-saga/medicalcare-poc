@@ -1,7 +1,11 @@
 import type { Prisma } from "@prisma/client";
 import { computeDutyDueAt } from "./dueDate";
 
-export type DutyCompletionResult = "passed" | "passed_with_conditions" | "failed";
+export type DutyCompletionResult =
+  | "passed"
+  | "passed_with_conditions"
+  | "failed"
+  | "deviation";
 
 export interface RecordDutyCompletionArgs {
   tenantId: string;
@@ -27,6 +31,15 @@ export interface RecordDutyCompletionArgs {
   result?: DutyCompletionResult;
   /** Extra note fragment for DeviceUnitEvent (e.g. "via assignment"). */
   unitEventSuffix?: string | null;
+  /** E90 — Prüfplakette on STK/DGUV pass. */
+  labelNumber?: string | null;
+  labelNextDue?: Date | null;
+  /** E87 — constancy capture extras. */
+  captureMode?: "device_protocol" | "manual_measurement" | "visual" | null;
+  measurementsJson?: unknown;
+  retentionUntil?: Date | null;
+  attachmentBlobId?: string | null;
+  clarificationId?: string | null;
 }
 
 /**
@@ -58,6 +71,13 @@ export async function recordDutyCompletion(
       performedBy: args.performedBy,
       performedByUserId: args.actorUserId ?? null,
       source: args.source,
+      labelNumber: args.labelNumber ?? null,
+      labelNextDue: args.labelNextDue ?? null,
+      captureMode: args.captureMode ?? undefined,
+      measurementsJson: args.measurementsJson ?? undefined,
+      retentionUntil: args.retentionUntil ?? undefined,
+      attachmentBlobId: args.attachmentBlobId ?? undefined,
+      clarificationId: args.clarificationId ?? undefined,
     },
   });
 

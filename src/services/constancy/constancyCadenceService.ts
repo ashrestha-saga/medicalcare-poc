@@ -42,12 +42,21 @@ function mapCadence(row: {
   determinedAt: Date;
   validFrom: Date;
   validTo: Date | null;
+  captureMode?: string | null;
+  protocolSource?: string | null;
+  referenceValuesJson?: unknown;
   deviceInstance: {
     inventoryNumber: string;
     model?: { tradeName: string | null; modelName: string | null } | null;
   };
   constancyObject: { label: string | null };
 }): ConstancyCadenceDTO {
+  const mode =
+    row.captureMode === "manual_measurement" || row.captureMode === "visual"
+      ? row.captureMode
+      : row.captureMode === "device_protocol"
+        ? "device_protocol"
+        : "device_protocol";
   return {
     id: row.id,
     deviceInstanceId: row.deviceInstanceId,
@@ -62,6 +71,9 @@ function mapCadence(row: {
     determinedAt: isoDate(row.determinedAt)!,
     validFrom: row.validFrom.toISOString(),
     validTo: row.validTo?.toISOString() ?? null,
+    captureMode: mode,
+    protocolSource: row.protocolSource ?? null,
+    referenceValuesJson: row.referenceValuesJson ?? null,
   };
 }
 
@@ -158,6 +170,9 @@ export const constancyCadenceService = {
         determinedByUserId: determiner.userId,
         determinedAt,
         openCadenceKey: key,
+        captureMode: input.captureMode ?? "device_protocol",
+        protocolSource: input.protocolSource?.trim() || null,
+        referenceValuesJson: input.referenceValuesJson ?? undefined,
       },
       include: {
         deviceInstance: { select: deviceSelect },

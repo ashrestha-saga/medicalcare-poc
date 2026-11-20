@@ -79,12 +79,18 @@ async function dropAllTables(prisma: PrismaClient) {
     SELECT TABLE_NAME FROM information_schema.TABLES
     WHERE TABLE_SCHEMA = DATABASE()
       AND TABLE_TYPE = 'BASE TABLE'`;
-  await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 0");
-  for (const { TABLE_NAME } of tables) {
-    await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS \`${TABLE_NAME}\``);
-  }
+  // One batch so FOREIGN_KEY_CHECKS stays off for the whole drop (some proxies reset per statement).
+  const drops = tables.map(({ TABLE_NAME }) => `DROP TABLE IF EXISTS \`${TABLE_NAME}\``).join("; ");
+  await prisma.$executeRawUnsafe(
+    `SET FOREIGN_KEY_CHECKS = 0; ${drops}; SET FOREIGN_KEY_CHECKS = 1`,
+  ).catch(async () => {
+    await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 0");
+    for (const { TABLE_NAME } of tables) {
+      await prisma.$executeRawUnsafe(`DROP TABLE IF EXISTS \`${TABLE_NAME}\``).catch(() => undefined);
+    }
+    await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 1");
+  });
   // Drop append-only triggers if left behind without table recreate yet.
   await prisma.$executeRawUnsafe("DROP TRIGGER IF EXISTS `AuditEvent_no_update`").catch(() => undefined);
   await prisma.$executeRawUnsafe("DROP TRIGGER IF EXISTS `AuditEvent_no_delete`").catch(() => undefined);
-  await prisma.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 1");
 }

@@ -32,6 +32,15 @@ function resultFromMeasure(measure: MeasureKey): "repaired" | "provisional" | "n
   return "repaired";
 }
 
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("read failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
 /** E76 Fremdbericht — clinic external repair report. Optional `?deviceId=` prefill. */
 export function ExternalRepairScreen() {
   const t = useTranslations("repairs.external");
@@ -48,6 +57,7 @@ export function ExternalRepairScreen() {
   const [partsText, setPartsText] = useState("");
   const [resultText, setResultText] = useState("");
   const [reportFileName, setReportFileName] = useState("");
+  const [reportDataUrl, setReportDataUrl] = useState<string | null>(null);
   const [createFollowUp, setCreateFollowUp] = useState(true);
   const [followUpSkippedReason, setFollowUpSkippedReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -89,19 +99,17 @@ export function ExternalRepairScreen() {
     }
     setSaving(true);
     try {
-      const resultPayload = reportFileName.trim()
-        ? `${resultText.trim()}\n${t("reportPrefix")}: ${reportFileName.trim()}`
-        : resultText.trim();
       await api("/api/maintenance-events", {
         method: "POST",
         body: JSON.stringify({
           deviceInstanceId: deviceInstanceId.trim(),
           performedAt,
           action: measureLabels[measure],
-          resultText: resultPayload,
+          resultText: resultText.trim(),
           externalPerformer: externalPerformer.trim(),
           result: resultFromMeasure(measure),
           partsText: partsText.trim() || null,
+          reportDataUrl: reportDataUrl || null,
           createFollowUp,
           followUpSkippedReason: createFollowUp ? null : followUpSkippedReason.trim(),
         }),
@@ -110,6 +118,7 @@ export function ExternalRepairScreen() {
       setPartsText("");
       setResultText("");
       setReportFileName("");
+      setReportDataUrl(null);
       setFollowUpSkippedReason("");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("error"));
@@ -216,10 +225,42 @@ export function ExternalRepairScreen() {
               <Label htmlFor="ext-report">{t("reportFile")}</Label>
               <Input
                 id="ext-report"
-                value={reportFileName}
-                onChange={(e) => setReportFileName(e.target.value)}
-                placeholder={t("reportPlaceholder")}
+                type="file"
+                accept="application/pdf,image/*"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) {
+                    setReportFileName("");
+                    setReportDataUrl(null);
+                    return;
+                  }
+                  const okType =
+                    file.type === "application/pdf" || file.type.startsWith("image/");
+                  if (!okType) {
+                    toast.error(t("reportTypeError"));
+                    e.target.value = "";
+                    setReportFileName("");
+                    setReportDataUrl(null);
+                    return;
+                  }
+                  try {
+                    setReportFileName(file.name);
+                    setReportDataUrl(await fileToDataUrl(file));
+                  } catch {
+                    toast.error(t("reportReadError"));
+                    setReportFileName("");
+                    setReportDataUrl(null);
+                  }
+                }}
+                data-testid="external-report-file"
               />
+              {reportFileName ? (
+                <p className="text-xs text-muted-foreground" data-testid="external-report-name">
+                  {reportFileName}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">{t("reportHint")}</p>
+              )}
             </div>
 
             <div className="space-y-3">

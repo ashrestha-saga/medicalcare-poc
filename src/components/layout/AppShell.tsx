@@ -28,7 +28,6 @@ import {
   DashboardIcon,
   DeviceBookIcon,
   DueDatesIcon,
-  DutyOverlapIcon,
   FieldSafetyIcon,
   IncidentsIcon,
   InventoryIcon,
@@ -220,7 +219,6 @@ function NavIcon({ id }: { id: MenuModuleId }) {
   if (id === "inventory") return <InventoryIcon />;
   if (id === "registration") return <RegistrationIcon />;
   if (id === "due-dates") return <DueDatesIcon />;
-  if (id === "duty-overlap") return <DutyOverlapIcon />;
   if (id === "training") return <TrainingIcon />;
   if (id === "catalog") return <CatalogIcon />;
   if (id === "clarifications") return <ClarificationsIcon />;
@@ -248,7 +246,6 @@ function isNavActive(id: MenuModuleId, pathname: string): boolean {
   if (id === "inventory") return pathname.startsWith("/devices");
   if (id === "registration") return pathname.startsWith("/registration");
   if (id === "due-dates") return pathname.startsWith("/due-dates");
-  if (id === "duty-overlap") return pathname.startsWith("/duty-overlap");
   if (id === "training") return pathname.startsWith("/training");
   if (id === "catalog") return pathname.startsWith("/catalog");
   if (id === "clarifications") return pathname.startsWith("/clarifications");
@@ -257,7 +254,10 @@ function isNavActive(id: MenuModuleId, pathname: string): boolean {
   if (id === "incidents") return pathname.startsWith("/incidents");
   if (id === "field-safety") return pathname.startsWith("/field-safety");
   if (id === "reprocessing") return pathname.startsWith("/reprocessing");
-  if (id === "constancy-cadence") return pathname.startsWith("/constancy-cadence");
+  if (id === "constancy-cadence") {
+    return pathname.startsWith("/constancy-cadence") || pathname.startsWith("/radiation/routine");
+  }
+  if (id === "dguv-determination") return pathname.startsWith("/duties/dguv-determination");
   if (id === "authority") return pathname.startsWith("/authority");
   if (id === "users") return pathname.startsWith("/users");
   if (id === "locations") return pathname.startsWith("/locations");

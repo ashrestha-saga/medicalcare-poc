@@ -69,7 +69,7 @@ const GAP_LABELS: Record<PreparationGapCode, string> = {
   missing_constancy_cadence: "Constancy objects without a determined takt",
   field_safety_unmatched: "Recall Abgleich open",
   open_clarifications: "Open clarifications still unresolved",
-  missing_duty_overlap: "Overlap questions without an operator decision",
+  missing_duty_overlap: "STK/DGUV overlap without a DGUV Festlegung",
 };
 
 async function gapCounts(ctx: TenantWorkContext): Promise<Record<PreparationGapCode, number>> {
@@ -88,7 +88,7 @@ async function gapCounts(ctx: TenantWorkContext): Promise<Record<PreparationGapC
     missing_constancy_cadence: byHref.get("/constancy-cadence?section=missing") ?? 0,
     draft_devices: byHref.get("/devices?state=draft") ?? 0,
     open_clarifications: byHref.get("/clarifications") ?? 0,
-    missing_duty_overlap: byHref.get("/duty-overlap") ?? 0,
+    missing_duty_overlap: byHref.get("/duties/dguv-determination") ?? 0,
   };
 }
 

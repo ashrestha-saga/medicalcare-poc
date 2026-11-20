@@ -561,6 +561,120 @@ export const invitationService = {
         return { userId: user.id, email: user.email, accountKind: "partner" as const };
       }
 
+      // E84 — institution invites Prüfpartner (possibly new org)
+      if (invite.kind === "partner_onboarding" && invite.invitingTenantId) {
+        const scope = (invite.scopeJson || {}) as {
+          providerName?: string;
+          rightsTemplate?: "inspect_and_maintain" | "inspect_only";
+        };
+        const { rightsTemplateSlugs } = await import(
+          "@/services/import/importPartnerInviteService"
+        );
+        const { importRightService } = await import("@/services/import/importRightService");
+        const slugs = rightsTemplateSlugs(scope.rightsTemplate || "inspect_and_maintain");
+
+        const user = await prisma.$transaction(async (tx) => {
+          let organisationId = invite.organisationId;
+          if (!organisationId) {
+            const code = `ORG-IMP-${randomBytes(4).toString("hex")}`;
+            const org = await tx.organisation.create({
+              data: {
+                code,
+                name: scope.providerName || invite.name || invite.email,
+                activeFrom: new Date(),
+              },
+            });
+            await tx.organisationRole.create({
+              data: {
+                organisationId: org.id,
+                role: "service_provider",
+                grantedFrom: new Date(),
+              },
+            });
+            organisationId = org.id;
+          }
+
+          const created = await tx.user.create({
+            data: {
+              email: invite.email,
+              name: displayName,
+              accountKind: "partner",
+              role: null,
+              passwordHash: hashPassword(password),
+              active: true,
+            },
+          });
+          await tx.orgMembership.create({
+            data: {
+              userId: created.id,
+              organisationId,
+              appRole: "admin",
+              validFrom: new Date(),
+            },
+          });
+
+          const existingContract = await tx.serviceContract.findFirst({
+            where: {
+              tenantId: invite.invitingTenantId!,
+              organisationId,
+            },
+          });
+          const contract =
+            existingContract ||
+            (await tx.serviceContract.create({
+              data: {
+                tenantId: invite.invitingTenantId!,
+                organisationId,
+                validFrom: new Date(),
+                scope: JSON.stringify(["inventory", "due-dates", "inspection"]),
+              },
+            }));
+          for (const permission of slugs) {
+            await tx.serviceContractScopeGrant.upsert({
+              where: {
+                contractId_permission: {
+                  contractId: contract.id,
+                  permission,
+                },
+              },
+              create: {
+                contractId: contract.id,
+                permission,
+                denied: false,
+                source: "manual",
+              },
+              update: { denied: false, source: "manual" },
+            });
+          }
+
+          await tx.userInvitation.update({
+            where: { id: invite.id },
+            data: { acceptedAt: new Date(), organisationId },
+          });
+          return created;
+        });
+
+        const tenant = await prisma.tenant.findFirst({
+          where: { id: invite.invitingTenantId },
+          select: { operatingModel: true },
+        });
+        if (tenant) {
+          const contract = await prisma.serviceContract.findFirst({
+            where: {
+              tenantId: invite.invitingTenantId,
+              terminatedAt: null,
+              suspendedAt: null,
+            },
+            orderBy: { validFrom: "desc" },
+          });
+          if (contract) {
+            await importRightService.ensureDefaultGrant(contract.id, tenant.operatingModel);
+          }
+        }
+
+        return { userId: user.id, email: user.email, accountKind: "partner" as const };
+      }
+
       throw unprocessable("Invitation is incomplete.");
     });
   },

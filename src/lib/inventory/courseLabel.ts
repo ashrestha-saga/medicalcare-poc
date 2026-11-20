@@ -6,3 +6,15 @@ export function readableCourseLabel(label: string): string {
     .replace(/\s{2,}/g, " ")
     .trim();
 }
+
+/** Prefer clear import provenance wording for unit-event actions. */
+export function courseLabelFromUnitEvent(action: string, note: string | null | undefined): string {
+  const hint = note?.trim() || "";
+  if (action === "imported") {
+    return hint ? `Imported · ${hint}` : "Imported";
+  }
+  if (action === "import_updated") {
+    return hint ? `Import update · ${hint}` : "Import update";
+  }
+  return readableCourseLabel(hint || action);
+}

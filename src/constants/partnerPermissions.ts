@@ -110,6 +110,7 @@ const ADMIN_BASE: readonly PermissionSlug[] = [
   "shell:nav",
   "inventory:view",
   "inventory:update",
+  "import:manage",
   "catalog:view",
   "clarifications:view",
   "locations:view",
@@ -349,6 +350,13 @@ export const CONSOLE_MENU_MODULES: readonly MenuModule[] = [
     group: "org",
   },
   {
+    id: "console-service-type-gates",
+    label: "Service type gates",
+    href: "/partner/service-type-gates",
+    slug: "console:staff:view",
+    group: "org",
+  },
+  {
     id: "console-external",
     label: "External inspectors",
     href: "/partner/external-inspectors",
@@ -412,6 +420,7 @@ export const CONSOLE_PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/partner/activity": "console:audit:view",
   "/partner/parts-proposals": "console:disposition:view",
   "/partner/training-gates": "console:staff:view",
+  "/partner/service-type-gates": "console:staff:view",
   "/partner/test-equipment": "testequipment:manage",
   "/partner/settings": "console:settings:view",
 };

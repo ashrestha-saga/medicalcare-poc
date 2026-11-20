@@ -468,9 +468,14 @@ async function valueForTile(ctx: TenantWorkContext, key: string): Promise<TileVa
       return W(null, "", "empty", null, null, "Sachkunde Aufbereitung noch nicht katalogisiert");
     case "konstanz-heute": {
       const count = await prisma.deviceDuty.count({
-        where: { dutyKey: "konstanz", applicable: true, suspendedAt: null, dueAt: { not: null } },
+        where: {
+          dutyKey: "konstanz",
+          applicable: true,
+          suspendedAt: null,
+          dueAt: { not: null, lte: today },
+        },
       });
-      return W(count, "mit geführtem Termin", count > 0 ? "info" : "ok");
+      return W(count, count ? "heute fällig / überfällig" : "keine heute", count > 0 ? "due" : "ok");
     }
     case "konstanz-takt-offen": {
       const [open, total] = await Promise.all([
@@ -541,17 +546,20 @@ async function valueForTile(ctx: TenantWorkContext, key: string): Promise<TileVa
       return W(count, "DGUV in den nächsten 30 Tagen", count > 0 ? "due" : "ok");
     }
     case "dguv-ohne-festlegung": {
-      const withDecision = await prisma.dutyOverlapDecision.findMany({
-        where: { validTo: null, coveredDutyKey: "dguv" },
-        select: { deviceInstanceId: true },
+      // E85 — missing DGUV Festlegung (own_check | covered_by_stk | not_applicable).
+      const count = await prisma.deviceDuty.count({
+        where: {
+          dutyKey: "dguv",
+          applicable: true,
+          suspendedAt: null,
+          determinationState: null,
+        },
       });
-      const decided = new Set(withDecision.map((d) => d.deviceInstanceId));
-      const dguvDuties = await prisma.deviceDuty.findMany({
-        where: { dutyKey: "dguv", applicable: true, suspendedAt: null },
-        select: { deviceInstanceId: true },
-      });
-      const count = dguvDuties.filter((d) => !decided.has(d.deviceInstanceId)).length;
-      return W(count, count ? "ohne Festlegung zur Abdeckung" : "alle festgelegt", count > 0 ? "info" : "ok");
+      return W(
+        count,
+        count ? "ohne DGUV-Festlegung" : "alle festgelegt",
+        count > 0 ? "info" : "ok",
+      );
     }
     case "befund-frist": {
       const [count, total] = await Promise.all([

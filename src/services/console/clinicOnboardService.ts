@@ -655,6 +655,8 @@ export const clinicOnboardService = {
           },
         });
         await syncContractScopeGrantsFromTokens(tx, contract.id, input.scope);
+        const { importRightService } = await import("@/services/import/importRightService");
+        await importRightService.ensureDefaultGrant(contract.id, input.operatingModel);
         await ensureInternalExecutor(tx, tenant.id);
         await ensureExecutorForContract(tx, {
           tenantId: tenant.id,

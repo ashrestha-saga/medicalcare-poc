@@ -234,6 +234,8 @@ enum LockSource {
   mpsb
   user
   recall
+  /// E88 / RD23 — radiation safety officer one-tap lock from constancy deviation.
+  rso
 }
 
 enum QuoteDecision {
@@ -268,6 +270,8 @@ enum StepInputKind {
 enum Fulfilment {
   on_site
   send_in
+  /// E89/E85 / RD25 — Sachverständigenprüfung as external expert office.
+  external
 }
 
 enum PostRepairCheckType {
@@ -398,6 +402,35 @@ enum DutyPerformanceResult {
   passed
   passed_with_conditions
   failed
+  /// E87 / RD22 — constancy out of tolerance; awaiting operator assessment (no auto-lock).
+  deviation
+}
+
+/// E86 / RD18 — medical device vs non-medical electrical equipment.
+enum DeviceKind {
+  mp
+  equipment
+}
+
+/// E86 — DGUV V3 protection class on Betriebsmittel / electrical devices.
+enum ProtectionClass {
+  I
+  II
+  III
+}
+
+/// E87 / RD21 — constancy capture mode A | B | C.
+enum ConstancyCaptureMode {
+  device_protocol
+  manual_measurement
+  visual
+}
+
+/// E89 / RD24 — who may override a service-type qualification gate.
+enum GateOverridableBy {
+  none
+  service_lead
+  management
 }
 
 enum OrderApprovalState {
@@ -430,7 +463,7 @@ model Tenant {
    * when a computed criterion reopens.
    */
   setupDismissedAt    DateTime?
-  /** Feature toggles e.g. `{ "repairs": true }` (E70–E80 package). */
+  /** Feature toggles e.g. `{ "repairs": true, "radiation_dguv": true }`. */
   featureFlags        Json?
   createdAt           DateTime                 @default(now())
   users               User[]
@@ -491,11 +524,13 @@ model Tenant {
   authorityFindings   AuthorityFinding[]
   disclosureSessions  DisclosureSession[]
   checklistItemReadiness ChecklistItemReadiness[]
-  dutyOverlapDecisions DutyOverlapDecision[]
   userAreaAssignments UserAreaAssignment[]
   authorityNotifications AuthorityNotification[]
   notificationDocuments NotificationDocument[]
   serviceVisits         ServiceVisit[]
+  importJobs            ImportJob[]
+  importRows            ImportRow[]
+  serviceRequestItems   ServiceRequestItem[]
 
   @@index([institutionOrgId])
 }
@@ -739,7 +774,7 @@ model DeviceModel {
   emdnCode               String?
   gmdnCode               String?
   productSeries          String?
-  source                 String // manual | catalog | beudamed | wizard
+  source                 String // manual | catalog | beudamed | wizard | import
   sourceFetchedAt        DateTime?
   version                Int                        @default(1)
   state                  DeviceState                @default(draft)
@@ -825,7 +860,19 @@ model DeviceInstance {
   /** ERF-04 — 1 self / 2 document / 3 third-party; derived from Merkmale on release. */
   releaseLevel           Int?
   productKindCode        String?
+  /// E86 / RD18 — mp (default) | equipment (non-medical Betriebsmittel).
+  kind                   DeviceKind               @default(mp)
+  protectionClass        ProtectionClass?
+  /// ortsveränderlich (DGUV V3 interval class).
+  portable               Boolean?
+  electrical             Boolean                  @default(true)
   source                 String                   @default("wizard") // wizard | manual | import | scan | external
+  /// Provenance when source=import (Nachtrag 3 / RD14).
+  importJobId            String?
+  importJob              ImportJob?               @relation(fields: [importJobId], references: [id])
+  /// e.g. "aus praxis-2-mvz-geraeteliste.xlsx, Blatt Haus B, Zeile 14"
+  importHint             String?
+  importRows             ImportRow[]
   legacyMedgvGroup1      Boolean                  @default(false)
   aedExemption           Boolean                  @default(false)
   /** Wizard Merkmale blob before/after freeze (JSON). */
@@ -866,7 +913,6 @@ model DeviceInstance {
   reprocessingBatchesAsEquipment ReprocessingBatch[] @relation("ReprocessingBatchEquipment")
   reprocessingBatchItems ReprocessingBatchItem[] @relation("ReprocessingBatchItemDevice")
   constancyCadences      ConstancyCadence[]
-  dutyOverlapDecisions   DutyOverlapDecision[]
   authorityFindings      AuthorityFinding[]
   authorityNotifications AuthorityNotification[] @relation("NotificationDevice")
   /// Set when a failed safety-relevant inspection step locks the device (D4).
@@ -886,6 +932,7 @@ model DeviceInstance {
   /// On the loaner instance: owner / lender as free text.
   loanerLender           String?
   replacementRequests    ServiceRequest[]         @relation("RequestReplacement")
+  serviceRequestItems    ServiceRequestItem[]
 
   @@unique([tenantId, inventoryNumber])
   /** SCH-01 — same serial under the same model is rejected (NULLs allowed). */
@@ -897,6 +944,8 @@ model DeviceInstance {
   @@index([tenantId, retainUntil])
   @@index([lockedAt])
   @@index([tenantId, operationalState])
+  @@index([importJobId])
+  @@index([tenantId, kind])
 }
 
 model MaintenanceEvent {
@@ -1041,6 +1090,8 @@ model RefInspectionType {
   sourceRef        String?
   addressee        DutyAddressee  @default(operator)
   authorityKind    AuthorityKind?
+  /// E90 / RD20 — STK and DGUV require a Prüfplakette number on pass.
+  requiresLabel    Boolean        @default(false)
   duties           DeviceDuty[]
   catalogues       RefInspectionCatalogue[]
   qualificationRules RefQualificationRule[]
@@ -1266,6 +1317,12 @@ model DeviceDuty {
   /** AUF-01 — product duty that references equipment instance. */
   referenceDeviceId   String?
   referenceDevice     DeviceInstance?        @relation("DutyReference", fields: [referenceDeviceId], references: [id])
+  /// E85 / RD19 — DGUV determination audit (null = ohne Festlegung).
+  determinedBy        String?
+  determinedByUserId  String?
+  determinedAt        DateTime?              @db.Date
+  /// null | own_check | covered_by_stk | not_applicable
+  determinationState  String?
   serviceRequests     ServiceRequest[]
   performances        DutyPerformance[]
   reminders           DutyReminder[]
@@ -1279,6 +1336,7 @@ model DeviceDuty {
   /** Tile filters that scope by dutyKey (konstanz, validierung, …). */
   @@index([tenantId, dutyKey, applicable, suspendedAt])
   @@index([referenceDeviceId])
+  @@index([tenantId, dutyKey, determinationState])
 }
 
 /** FA-715 — completion history that rolls the next due date. */
@@ -1298,14 +1356,31 @@ model DutyPerformance {
   /** Account that performed the duty when known; null for import/external actor strings. */
   performedByUserId String?
   performedByUser  User?          @relation("DutyPerformancePerformer", fields: [performedByUserId], references: [id])
-  source           String         @default("assignment") // assignment | manual | import
+  /// assignment | manual | import | routine | external
+  source           String         @default("assignment")
   recordedAt       DateTime       @default(now())
   inspectionRun    InspectionRun?
+  /// E90 / RD20 — Prüfplakette on STK/DGUV pass.
+  labelNumber      String?
+  labelNextDue     DateTime?      @db.Date
+  /// Own-staff DGUV short check or constancy mode-B rows.
+  measurementsJson Json?
+  /// E87 / RD22 — constancy routine capture mode.
+  captureMode      ConstancyCaptureMode?
+  attachmentBlobId String?
+  attachmentBlob   AttachmentBlob? @relation("PerformanceProtocol", fields: [attachmentBlobId], references: [id])
+  clarificationId  String?
+  clarification    DeviceClarification? @relation("PerformanceClarification", fields: [clarificationId], references: [id])
+  /// konstanz / SV certificate: performedAt + 10 years (§ 117 StrlSchV).
+  retentionUntil   DateTime?      @db.Date
 
   @@index([deviceDutyId, performedAt])
   @@index([tenantId])
   @@index([serviceRequestId])
   @@index([performedByUserId])
+  @@index([tenantId, retentionUntil])
+  @@index([attachmentBlobId])
+  @@index([clarificationId])
 }
 
 /// Legal entity once. Capacity lives on OrganisationRole — not inferred from the table.
@@ -1332,7 +1407,9 @@ model Organisation {
   followUpProposals ServiceRequest[] @relation("FollowUpProposedBy")
   fieldSafetySources FieldSafetyAction[] @relation("FieldSafetySourceOrg")
   manufacturerTrainingGates ManufacturerTrainingGate[]
+  serviceTypeGates          ServiceTypeGate[]
   partsOrderProposals PartsOrderProposal[]
+  importJobs          ImportJob[]
 
   @@index([activeTo])
 }
@@ -1348,6 +1425,26 @@ model ManufacturerTrainingGate {
   setAt          DateTime     @default(now())
 
   @@unique([organisationId, manufacturer])
+}
+
+/// E89 / RD24 — service-type qualification gates (sv | konstanz | dguv).
+model ServiceTypeGate {
+  id                String            @id @default(cuid())
+  organisationId    String
+  organisation      Organisation      @relation(fields: [organisationId], references: [id])
+  /// sv | konstanz | dguv
+  serviceType       String
+  qualificationCode String
+  qualification     RefQualification  @relation(fields: [qualificationCode], references: [code])
+  gate              String            @default("block") // hint | block
+  overridableBy     GateOverridableBy @default(none)
+  /// sv: true — not editable by the org
+  locked            Boolean           @default(false)
+  setBy             String
+  setAt             DateTime          @default(now())
+
+  @@unique([organisationId, serviceType])
+  @@index([qualificationCode])
 }
 
 /// E80 — parts-order proposal handed to plusorder (E52 attribution).
@@ -1465,6 +1562,7 @@ model RefQualification {
   rules      RefQualificationRule[]
   catalogues RefCatalogueQualification[]
   persons    PersonQualification[]
+  serviceTypeGates ServiceTypeGate[]
 }
 
 /// Device-specific familiarity catalogue.
@@ -1681,7 +1779,8 @@ model ServiceRequest {
   fingerprint     String
   tenantId        String
   tenant          Tenant              @relation(fields: [tenantId], references: [id])
-  subjectType     String // instance | model | captured
+  /// instance | model | captured | group (RD26 Sammelauftrag; subjectId = siteId)
+  subjectType     String
   subjectId       String
   serviceType     String
   priority        String?
@@ -1757,6 +1856,18 @@ model ServiceRequest {
   gateOverriddenByUserId String?
   gateOverriddenAt      DateTime?
   gateOverrideReason    String?           @db.Text
+  /// RD24 — manufacturer | service_type — which gate the override answered.
+  gateKind              String?
+  /// RD25 — external expert-office fulfilment (SV).
+  externalOrgName           String?
+  externalCommissionedAt    DateTime? @db.Date
+  externalCertificateRef    String?
+  externalCertificateDate   DateTime? @db.Date
+  externalCertificateBlobId String?
+  externalCertificateBlob   AttachmentBlob? @relation("ExternalCertificate", fields: [externalCertificateBlobId], references: [id])
+  /// passed | objected
+  externalResult            String?
+  externalDefectsText       String?   @db.Text
   quote                 Quote?
   maintenanceEvents     MaintenanceEvent[]
   partsOrderProposals   PartsOrderProposal[]
@@ -1766,6 +1877,7 @@ model ServiceRequest {
   performances    DutyPerformance[]
   dispatchOutbox  DispatchOutbox[]
   inspectionRuns  InspectionRun[]
+  items           ServiceRequestItem[]
 
   @@index([tenantId, createdAt])
   @@index([raisedById])
@@ -1778,6 +1890,28 @@ model ServiceRequest {
   @@index([proposedByOrgId])
   @@index([tenantId, serviceType, state])
   @@index([bookEntryId])
+  @@index([externalCertificateBlobId])
+}
+
+/// E85 / RD26 — one device line in a Sammelauftrag (subjectType=group).
+model ServiceRequestItem {
+  id               String         @id @default(cuid())
+  tenantId         String
+  tenant           Tenant         @relation(fields: [tenantId], references: [id])
+  serviceRequestId String
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
+  deviceInstanceId String
+  deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
+  position         Int
+  /// open | done | skipped
+  status           String         @default("open")
+  inspectionRunId  String?        @unique
+  inspectionRun    InspectionRun? @relation(fields: [inspectionRunId], references: [id])
+  skippedReason    String?        @db.Text
+
+  @@unique([serviceRequestId, deviceInstanceId])
+  @@index([tenantId, serviceRequestId])
+  @@index([deviceInstanceId])
 }
 
 /// D2 — one site visit that can carry multiple ServiceRequests / InspectionRuns.
@@ -1804,6 +1938,12 @@ model ServiceVisit {
   startRecordedLate Boolean       @default(false)
   setupMinutes      Int?
   idempotencyKey    String?       @unique
+  /// RD26 — one institution countersignature per visit for Sammelauftrag.
+  institutionSignerName      String?
+  institutionSignerRole      String?
+  institutionSignatureBlobId String?
+  institutionSignatureBlob   AttachmentBlob? @relation("VisitInstitutionSignature", fields: [institutionSignatureBlobId], references: [id])
+  institutionSignedAt        DateTime?
   requests         ServiceRequest[]
   inspectionRuns   InspectionRun[]
 
@@ -1812,6 +1952,7 @@ model ServiceVisit {
   @@index([organisationId, plannedAt])
   @@index([technicianUserId])
   @@index([siteId])
+  @@index([institutionSignatureBlobId])
 }
 
 model StatusEvent {
@@ -1865,6 +2006,10 @@ model AttachmentBlob {
   notificationDocuments NotificationDocument[]
   modelDocuments    ModelDocument[]
   maintenanceReports MaintenanceEvent[] @relation("MaintenanceReport")
+  importFiles        ImportJob[]         @relation("ImportFile")
+  performanceProtocols DutyPerformance[] @relation("PerformanceProtocol")
+  externalCertificates ServiceRequest[]  @relation("ExternalCertificate")
+  visitInstitutionSignatures ServiceVisit[] @relation("VisitInstitutionSignature")
 
   @@index([tenantId])
   @@index([tenantId, sha256])
@@ -2092,7 +2237,7 @@ model DeviceClarification {
   tenant           Tenant         @relation(fields: [tenantId], references: [id])
   deviceInstanceId String
   deviceInstance   DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
-  /** classification | evidence | duplicate | mandatory_field | partner_hint */
+  /** classification | evidence | duplicate | mandatory_field | missing_field | import_review | partner_hint | constancy_deviation */
   kind             String
   field            String?
   prerequisiteCode String?
@@ -2106,6 +2251,7 @@ model DeviceClarification {
   raisedByOrganisationId String?
   inspectionRunId        String?
   inspectionRun          InspectionRun? @relation(fields: [inspectionRunId], references: [id])
+  dutyPerformances       DutyPerformance[] @relation("PerformanceClarification")
 
   @@index([tenantId, deviceInstanceId])
   @@index([tenantId, resolvedAt])
@@ -2203,6 +2349,12 @@ model UserInvitation {
   homeAreaId       String?
   /** JSON string[] of Area ids the invitee may work. */
   areaIds          Json?
+  /** user (default) | partner_onboarding — institution inviting a service provider (E84 / RD17). */
+  kind             String        @default("user")
+  /** partner_onboarding: { providerName, scope, rightsTemplate, message, importJobId? } */
+  scopeJson        Json?
+  /** Inviting clinic tenant when kind=partner_onboarding (tenantId stays null for partner redeem). */
+  invitingTenantId String?
   tokenHash        String        @unique
   expiresAt        DateTime
   acceptedAt       DateTime?
@@ -2212,6 +2364,89 @@ model UserInvitation {
   @@index([tenantId, email])
   @@index([organisationId, email])
   @@index([expiresAt])
+  @@index([kind, invitingTenantId])
+}
+
+// ---------------------------------------------------------------------------
+// Nachtrag 3 — Bestandsimport (RD12–RD16)
+// ---------------------------------------------------------------------------
+
+/** One upload / mapping / commit cycle (V5 excel_14 in this package). */
+model ImportJob {
+  id              String          @id @default(cuid())
+  tenantId        String
+  tenant          Tenant          @relation(fields: [tenantId], references: [id])
+  /// Partner org when importing in acting context (E81); null for operator self-import.
+  organisationId  String?
+  organisation    Organisation?   @relation(fields: [organisationId], references: [id])
+  /// excel_14 | kundenstamm_oxid | … — this task ships excel_14 only.
+  template        String
+  fileName        String
+  fileBlobId      String
+  fileBlob        AttachmentBlob  @relation("ImportFile", fields: [fileBlobId], references: [id])
+  /// { headerRow, skippedRows, sheets: [...], columns: [...] }
+  mapping         Json?
+  /// uploaded | mapped | previewed | committed | failed
+  status          String          @default("uploaded")
+  /// Preview/commit counters incl. greenShare, modelHitRate (R30).
+  stats           Json?
+  createdBy       String
+  createdByUserId String?
+  /// clinic | partner
+  actorKind       String          @default("clinic")
+  createdAt       DateTime        @default(now())
+  committedAt     DateTime?
+  rows            ImportRow[]
+  instances       DeviceInstance[]
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([organisationId])
+  @@index([fileBlobId])
+}
+
+/** One source row: raw cells, normalised fields, Ampel, model match, outcome. */
+model ImportRow {
+  id               String          @id @default(cuid())
+  tenantId         String
+  tenant           Tenant          @relation(fields: [tenantId], references: [id])
+  jobId            String
+  job              ImportJob       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  sheet            String?
+  rowNo            Int
+  /// Normalised serial, else inventory number; red → "row:<sheet>:<rowNo>".
+  rowKey           String
+  raw              Json
+  normalized       Json?
+  /// green | yellow | red
+  quality          String?
+  /// exact | fuzzy | new | none
+  modelMatch       String?
+  modelId          String?
+  /// new | updated | conflict | skipped | review
+  outcome          String?
+  deviceInstanceId String?
+  deviceInstance   DeviceInstance? @relation(fields: [deviceInstanceId], references: [id])
+  clarificationIds Json?
+  note             String?         @db.Text
+
+  @@unique([jobId, rowKey])
+  @@index([tenantId, jobId, quality])
+  @@index([deviceInstanceId])
+  @@index([modelId])
+}
+
+/** Versioned synonym dictionary for header detection (global reference). */
+model RefImportDictionary {
+  id        String   @id @default(cuid())
+  template  String
+  version   String
+  content   Json
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([template, version])
+  @@index([template, active])
 }
 
 // ---------------------------------------------------------------------------
@@ -2396,6 +2631,10 @@ model InspectionRun {
   occasionCode        String?
   occasion            RefValidationOccasion? @relation(fields: [occasionCode], references: [code])
   performedAt         DateTime               @db.Date
+  /// Wall-clock when the inspector started this protocol (first startRun).
+  startedAt           DateTime?
+  /// Wall-clock when the protocol was sealed / completed.
+  completedAt         DateTime?
   performedByUserId   String?
   performedByUser     User?                  @relation("InspectionPerformer", fields: [performedByUserId], references: [id])
   performedByName     String
@@ -2413,11 +2652,15 @@ model InspectionRun {
   /** D2 — visit that owns this protocol. */
   visitId             String?
   visit               ServiceVisit?          @relation(fields: [visitId], references: [id])
+  /// RD22b — partner constancy mode A/B/C.
+  captureMode         ConstancyCaptureMode?
+  protocolBlobId      String?
   stepResults         InspectionStepResult[]
   baselines           BaselineMeasurement[]
   signatures          InspectionSignature[]
   notes               InspectionRunNote[]
   clarifications      DeviceClarification[]
+  serviceRequestItem  ServiceRequestItem?
 
   @@index([tenantId, deviceInstanceId, performedAt])
   @@index([catalogueId])
@@ -2884,6 +3127,12 @@ model ConstancyCadence {
   validTo             DateTime?
   /// Genau eine offene Festlegung je Exemplar und Prüfgegenstand.
   openCadenceKey      String?            @unique @db.VarChar(191)
+  /// E87 / RD21 — capture mode A | B | C.
+  captureMode         ConstancyCaptureMode @default(device_protocol)
+  /// e.g. "Radiotec QC-Suite" — attachment mandatory when set (mode A).
+  protocolSource      String?
+  /// Frozen with the cadence: [{name, value, unit, tolerancePct?, toleranceAbs?, source, asOf}]
+  referenceValuesJson Json?
 
   @@index([tenantId, deviceInstanceId, validTo])
   @@index([constancyObjectCode])
@@ -3206,31 +3455,6 @@ model RefInspectionTypeOverlap {
   legalNote          String?           @db.Text
 
   @@unique([inspectionTypeCode, satisfiedByCode])
-}
-
-/// Die Festlegung des Betreibers zu einer Überlappung, je Exemplar.
-/// Ohne Festlegung sind beide Pflichten getrennt fällig, und das ist die
-/// sichere Vorbelegung.
-model DutyOverlapDecision {
-  id                 String         @id @default(cuid())
-  tenantId           String
-  tenant             Tenant         @relation(fields: [tenantId], references: [id])
-  deviceInstanceId   String
-  deviceInstance     DeviceInstance @relation(fields: [deviceInstanceId], references: [id])
-  /// Welche Pflicht als abgedeckt gilt.
-  coveredDutyKey     DutyKey
-  /// Durch welche.
-  satisfiedByDutyKey DutyKey
-  /// Die Begründung des Betreibers. Pflichtfeld: eine Festlegung ohne
-  /// Begründung ist in der Begehung nicht vorzeigbar.
-  reasonText         String         @db.Text
-  decidedBy          String
-  decidedAt          DateTime       @db.Date
-  validFrom          DateTime       @default(now())
-  validTo            DateTime?
-  openDecisionKey    String?        @unique @db.VarChar(191)
-
-  @@index([tenantId, deviceInstanceId, validTo])
 }
 
 // ===========================================================================

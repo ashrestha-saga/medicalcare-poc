@@ -10,10 +10,13 @@ import { evaluateWithinLimit, openDailyRefCodesForDevice } from "./scanRoutineSe
 const base = {
   state: "released" as const,
   isEquipment: false,
+  isBetriebsmittel: false,
   openBatchCount: 0,
   openDailyChecks: false,
   openKonstanzChecks: false,
   hasKonstanzDuties: false,
+  openDguvOwnCheck: false,
+  hasDguvOwnCheck: false,
   ifuLabel: null as string | null,
   lage: "ok" as const,
   quelle: null,
@@ -115,6 +118,31 @@ describe("scanPrimaryAction", () => {
     expect(a.titleKey).toBe("actions.recallStop");
     expect(a.infoOnly).toBe(true);
   });
+
+  it("offers DGUV as primary on Betriebsmittel when own_check is due", () => {
+    const a = resolvePrimaryAction({
+      ...base,
+      isBetriebsmittel: true,
+      openDguvOwnCheck: true,
+      hasDguvOwnCheck: true,
+      permissions: ["inventory:view"],
+      role: "user",
+    });
+    expect(a.ctx).toBe("dguv");
+    expect(a.tone).toBe("warn");
+  });
+
+  it("offers partner DGUV service on Betriebsmittel when no own check due", () => {
+    const a = resolvePrimaryAction({
+      ...base,
+      isBetriebsmittel: true,
+      hasDguvOwnCheck: true,
+      permissions: ["inventory:view", "requests:create"],
+      role: "user",
+    });
+    expect(a.ctx).toBe("service");
+    expect(a.servicePrefill).toBe("dguv");
+  });
 });
 
 describe("resolveFurtherActions", () => {
@@ -179,6 +207,44 @@ describe("resolveFurtherActions", () => {
     expect(ctxs).toContain("service");
     expect(ctxs).toContain("ersatz");
     expect(ctxs).toContain("ifu");
+  });
+
+  it("hides MP book / parts / IFU on Betriebsmittel", () => {
+    const primary = resolvePrimaryAction({
+      ...base,
+      isBetriebsmittel: true,
+      openDguvOwnCheck: true,
+      hasDguvOwnCheck: true,
+      permissions: [
+        "inventory:view",
+        "devicebook:view",
+        "requests:create",
+        "parts:request",
+      ],
+      role: "user",
+    });
+    expect(primary.ctx).toBe("dguv");
+    const further = resolveFurtherActions(
+      {
+        ...base,
+        isBetriebsmittel: true,
+        openDguvOwnCheck: true,
+        hasDguvOwnCheck: true,
+        permissions: [
+          "inventory:view",
+          "devicebook:view",
+          "requests:create",
+          "parts:request",
+        ],
+        role: "user",
+      },
+      primary,
+    );
+    const ctxs = further.map((a) => a.ctx);
+    expect(ctxs).not.toContain("stoerung");
+    expect(ctxs).not.toContain("ersatz");
+    expect(ctxs).not.toContain("ifu");
+    expect(ctxs).toContain("service");
   });
 });
 

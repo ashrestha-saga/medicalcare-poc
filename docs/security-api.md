@@ -35,10 +35,10 @@ Prefer existing `*:view` / `*:manage` (or `*:update` / `*:release`) pairs. Do **
 | Device book | `devicebook:view` | — |
 | Reprocessing | `reprocessing:view` | `reprocessing:release` |
 | Authority | `authority:view` | record notifications (finding/device/site); incident kind needs `incidents:manage` |
-| Duties / constancy / overlap | `duties:view` | — |
+| Duties / constancy / DGUV determination | `duties:view` | — |
 | Dashboard | (tile assignment uses existing inventory/duties grants) | — |
 
-Constancy cadence and duty-overlap reuse `duties:view`. New screens should map to a row above before inventing a slug.
+Constancy cadence and DGUV determination reuse `duties:view`. New screens should map to a row above before inventing a slug.
 
 ### Partner forbidden list
 

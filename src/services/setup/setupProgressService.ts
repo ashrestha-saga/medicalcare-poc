@@ -76,6 +76,9 @@ export const setupProgressService = {
       exportCount,
       derivedCls,
       missingCls,
+      importJobsCommitted,
+      instanceCount,
+      importDeferred,
     ] = await Promise.all([
       prisma.user.count({
         where: { tenantId: ctx.tenantId, accountKind: "clinic", active: true },
@@ -128,6 +131,28 @@ export const setupProgressService = {
           },
         })
         .catch(() => 0),
+      // Guard: stale Prisma client before generate+restart has no importJob delegate
+      (
+        (prisma as { importJob?: { count: (a: object) => Promise<number> } }).importJob?.count({
+          where: { status: "committed" },
+        }) ?? Promise.resolve(0)
+      ).catch(() => 0),
+      prisma.deviceInstance.count().catch(() => 0),
+      (
+        (
+          prisma as {
+            userPreference?: { findFirst: (a: object) => Promise<unknown> };
+          }
+        ).userPreference
+          ?.findFirst({
+            where: {
+              userId: ctx.user.id,
+              scope: "general",
+              key: "setup.inventory_import.deferred",
+            },
+          })
+          .then((r) => Boolean(r)) ?? Promise.resolve(false)
+      ).catch(() => false),
     ]);
 
     const aufbRelevant = reprocEquipment > 0 || reprocActivity > 0;
@@ -187,14 +212,26 @@ export const setupProgressService = {
       href: "/management",
     });
 
-    // 5 Bestand
+    // 5 Bestand — ok when ≥1 committed import, ≥5 instances, legacy non-draft, or deferred
+    const bestandOk =
+      importJobsCommitted > 0 || instanceCount >= 5 || erfasst > 0 || importDeferred;
     steps.push({
       id: "bestand",
       titleKey: "bestand",
-      status: erfasst > 0 ? "ok" : "open",
-      whyKey: erfasst ? "bestandOk" : "bestandOpen",
-      whyParams: erfasst ? { count: erfasst } : undefined,
-      href: "/devices",
+      status: bestandOk ? "ok" : "open",
+      whyKey: importDeferred
+        ? "bestandDeferred"
+        : importJobsCommitted
+          ? "bestandImportOk"
+          : erfasst || instanceCount
+            ? "bestandOk"
+            : "bestandOpen",
+      whyParams: importJobsCommitted
+        ? { count: importJobsCommitted }
+        : erfasst || instanceCount
+          ? { count: Math.max(erfasst, instanceCount) }
+          : undefined,
+      href: bestandOk ? "/devices" : "/devices/import",
     });
 
     // 6 Einstufung
