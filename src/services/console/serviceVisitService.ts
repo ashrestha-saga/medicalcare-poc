@@ -39,6 +39,7 @@ export const serviceVisitService = {
           tenant: { select: { name: true } },
           site: { select: { name: true } },
           technician: { select: { name: true } },
+          requests: { select: { reference: true }, orderBy: { createdAt: "asc" }, take: 40 },
           _count: { select: { requests: true } },
         },
         orderBy: [{ plannedAt: "asc" }, { createdAt: "desc" }],
@@ -59,6 +60,10 @@ export const serviceVisitService = {
           technicianName: v.technician?.name ?? null,
           note: v.note,
           requestCount: v._count.requests,
+          requestReferences: v.requests.map((r) => r.reference),
+          sequence: v.sequence,
+          setupMinutes: v.setupMinutes,
+          secondVisitReason: v.secondVisitReason,
         })),
       };
     });
@@ -102,6 +107,7 @@ export const serviceVisitService = {
               tenant: { select: { name: true } },
               site: { select: { name: true } },
               technician: { select: { name: true } },
+              requests: { select: { reference: true }, orderBy: { createdAt: "asc" }, take: 40 },
               _count: { select: { requests: true } },
             },
           })
@@ -111,6 +117,7 @@ export const serviceVisitService = {
               tenant: { select: { name: true } },
               site: { select: { name: true } },
               technician: { select: { name: true } },
+              requests: { select: { reference: true }, orderBy: { createdAt: "asc" }, take: 40 },
               _count: { select: { requests: true } },
             },
           });
@@ -141,6 +148,10 @@ export const serviceVisitService = {
         technicianName: row.technician?.name ?? null,
         note: row.note,
         requestCount: row._count.requests,
+        requestReferences: row.requests.map((r) => r.reference),
+        sequence: row.sequence,
+        setupMinutes: row.setupMinutes,
+        secondVisitReason: row.secondVisitReason,
       };
     });
   },

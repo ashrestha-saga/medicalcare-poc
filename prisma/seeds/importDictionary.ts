@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -8,9 +8,10 @@ export const IMPORT_TEMPLATE_SHA256 =
 
 export async function seedImportDictionary(prisma: PrismaClient) {
   const path = join(process.cwd(), "fixtures/import/synonyme.json");
-  const content = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
   const version =
-    typeof content.version === "string" ? content.version : "v1 (04.11.2026)";
+    typeof parsed.version === "string" ? parsed.version : "v1 (04.11.2026)";
+  const content = parsed as unknown as Prisma.InputJsonValue;
 
   await prisma.refImportDictionary.upsert({
     where: { template_version: { template: "excel_14", version } },

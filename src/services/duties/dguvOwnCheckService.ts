@@ -1,6 +1,7 @@
 /**
  * E85 / R33 — own-staff DGUV short check with measurements + Plakette.
  */
+import type { DeadlineAnchor } from "@prisma/client";
 import type { TenantWorkContext } from "@/interfaces";
 import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
@@ -25,14 +26,14 @@ async function requireFlag(ctx: TenantWorkContext) {
  * After an interval is set, advance as exact_day so dueAt is not wiped to null.
  */
 function nextDueAfterDguvCheck(duty: {
-  deadlineAnchor: string;
+  deadlineAnchor: DeadlineAnchor | string;
   referenceDate: Date;
   intervalValue: number | null;
   intervalUnit: string | null;
-}, performedAt: Date): { dueAt: Date | null; deadlineAnchor: string } {
+}, performedAt: Date): { dueAt: Date | null; deadlineAnchor: DeadlineAnchor } {
   const intervalValue = duty.intervalValue ?? 24;
   const intervalUnit = duty.intervalUnit ?? "months";
-  const anchor =
+  const anchor: DeadlineAnchor =
     duty.deadlineAnchor === "interval" ||
     duty.deadlineAnchor === "event" ||
     duty.deadlineAnchor === "process" ||
@@ -40,7 +41,7 @@ function nextDueAfterDguvCheck(duty: {
     duty.deadlineAnchor === "none" ||
     duty.deadlineAnchor === "reference"
       ? "exact_day"
-      : duty.deadlineAnchor;
+      : (duty.deadlineAnchor as DeadlineAnchor);
 
   const dueAt =
     computeDutyDueAt({

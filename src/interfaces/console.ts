@@ -37,6 +37,12 @@ export type ServiceVisitDTO = {
   technicianName: string | null;
   note: string | null;
   requestCount: number;
+  /** Linked order references for Visits-tab chips. */
+  requestReferences: string[];
+  /** E34 sequence (1 = first visit that day). */
+  sequence: number;
+  setupMinutes: number | null;
+  secondVisitReason: string | null;
 };
 
 export type ConsoleActingScope = "managing_org" | "tenant" | "platform" | "other";

@@ -26,7 +26,7 @@ export function InspectPlanScreen({ mode }: { mode: Mode }) {
 
   const sections = useMemo(() => {
     if (mode === "queue") return [];
-    if (mode === "heute") return buildDaySections(q.openRows, "heute");
+    if (mode === "heute") return buildDaySections(q.openRows, "heute", q.doneRows);
     if (mode === "woche") return buildDaySections(q.openRows, "woche");
     return buildDaySections(q.openRows, "erledigt", q.doneRows);
   }, [mode, q.openRows, q.doneRows]);

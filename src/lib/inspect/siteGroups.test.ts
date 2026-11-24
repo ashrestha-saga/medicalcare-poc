@@ -19,6 +19,10 @@ function row(partial: Partial<CataloguePreviewDTO> & { reference: string }): Cat
     scheduledAt: null,
     visitId: null,
     visitStartedAt: null,
+    visitCompletedAt: null,
+    visitSequence: null,
+    setupMinutes: null,
+    secondVisitReason: null,
     overdue: false,
     serviceType: "STK",
     fulfilment: "on_site",
@@ -117,5 +121,41 @@ describe("buildDaySections", () => {
       today,
     );
     expect(sections[0]!.rows.map((r) => r.reference)).toEqual(["visit"]);
+  });
+
+  it("keeps sealed jobs on Heute while their site visit is still open", () => {
+    const today = new Date("2026-10-30T12:00:00.000Z");
+    const sealedActive = row({
+      reference: "done-job",
+      siteId: "s1",
+      siteName: "Haus A",
+      scheduledAt: "2026-10-30T08:00:00.000Z",
+      sealed: true,
+      visitId: "visit-1",
+      visitStartedAt: "2026-10-30T07:00:00.000Z",
+      visitCompletedAt: null,
+    });
+    const sections = buildDaySections([], "heute", [sealedActive], today);
+    expect(sections[0]!.sites).toHaveLength(1);
+    expect(sections[0]!.sites[0]!.openCount).toBe(0);
+    expect(sections[0]!.sites[0]!.visitId).toBe("visit-1");
+    expect(sections[0]!.sites[0]!.visitCompletedAt).toBeNull();
+  });
+
+  it("drops sealed jobs from Heute after the visit ends", () => {
+    const today = new Date("2026-10-30T12:00:00.000Z");
+    const sealedEnded = row({
+      reference: "done-job",
+      siteId: "s1",
+      siteName: "Haus A",
+      scheduledAt: "2026-10-30T08:00:00.000Z",
+      sealed: true,
+      visitId: "visit-1",
+      visitStartedAt: "2026-10-30T07:00:00.000Z",
+      visitCompletedAt: "2026-10-30T09:00:00.000Z",
+    });
+    const sections = buildDaySections([], "heute", [sealedEnded], today);
+    expect(sections[0]!.rows).toHaveLength(0);
+    expect(sections[0]!.sites).toHaveLength(0);
   });
 });

@@ -129,3 +129,19 @@ export const startSiteVisitSchema = z.object({
 });
 
 export type StartSiteVisitInput = z.infer<typeof startSiteVisitSchema>;
+
+/** E34 — second visit of the day (new travel). */
+export const SECOND_VISIT_REASONS = [
+  "notfall",
+  "teile",
+  "kunde",
+  "sonstiges",
+] as const;
+
+export const secondSiteVisitSchema = z.object({
+  reason: z.enum(SECOND_VISIT_REASONS),
+  note: z.string().trim().max(500).optional().nullable(),
+  references: z.array(z.string().trim().min(1)).max(200).default([]),
+});
+
+export type SecondSiteVisitInput = z.infer<typeof secondSiteVisitSchema>;

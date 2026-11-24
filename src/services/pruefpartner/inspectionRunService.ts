@@ -130,6 +130,69 @@ function isoDateTime(d: Date | null | undefined): string | null {
   return d ? d.toISOString() : null;
 }
 
+function minutesBetween(a: Date, b: Date): number {
+  return Math.max(0, Math.round((b.getTime() - a.getTime()) / 60_000));
+}
+
+/** UTC calendar date for E34 uniqueness (technician + site + day + sequence). */
+function visitDayUtc(d: Date = new Date()): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+type VisitPreviewFields = {
+  visitId: string | null;
+  visitStartedAt: string | null;
+  visitCompletedAt: string | null;
+  visitSequence: number | null;
+  setupMinutes: number | null;
+  secondVisitReason: string | null;
+};
+
+async function loadVisitPreviewFields(
+  tenantId: string,
+  visitId: string | null | undefined,
+): Promise<VisitPreviewFields> {
+  if (!visitId) {
+    return {
+      visitId: null,
+      visitStartedAt: null,
+      visitCompletedAt: null,
+      visitSequence: null,
+      setupMinutes: null,
+      secondVisitReason: null,
+    };
+  }
+  const visit = await prisma.serviceVisit.findFirst({
+    where: { id: visitId, tenantId },
+    select: {
+      id: true,
+      startedAt: true,
+      completedAt: true,
+      sequence: true,
+      setupMinutes: true,
+      secondVisitReason: true,
+    },
+  });
+  if (!visit) {
+    return {
+      visitId: null,
+      visitStartedAt: null,
+      visitCompletedAt: null,
+      visitSequence: null,
+      setupMinutes: null,
+      secondVisitReason: null,
+    };
+  }
+  return {
+    visitId: visit.id,
+    visitStartedAt: isoDateTime(visit.startedAt),
+    visitCompletedAt: isoDateTime(visit.completedAt),
+    visitSequence: visit.sequence,
+    setupMinutes: visit.setupMinutes,
+    secondVisitReason: visit.secondVisitReason,
+  };
+}
+
 type RunWithCatalogue = {
   id: string;
   tenantId: string;
@@ -333,16 +396,7 @@ export const inspectionRunService = {
                 select: { id: true, name: true },
               })
             : null;
-          let visitId = req.visitId;
-          let visitStartedAt: string | null = null;
-          if (visitId) {
-            const visit = await prisma.serviceVisit.findFirst({
-              where: { id: visitId, tenantId: ctx.tenantId },
-              select: { startedAt: true },
-            });
-            if (!visit) visitId = null;
-            else visitStartedAt = isoDateTime(visit.startedAt);
-          }
+          const visitFields = await loadVisitPreviewFields(ctx.tenantId, req.visitId);
           const assignmentCompleted =
             req.state === "completed" ||
             req.state === "rejected" ||
@@ -363,8 +417,7 @@ export const inspectionRunService = {
             siteId: req.siteId ?? site?.id ?? null,
             siteName: site?.name ?? null,
             scheduledAt: isoDateTime(req.scheduledAt),
-            visitId,
-            visitStartedAt,
+            ...visitFields,
             overdue: false,
             serviceType: req.serviceType,
             fulfilment: req.fulfilment ?? "on_site",
@@ -511,16 +564,10 @@ export const inspectionRunService = {
       const locParts = [device.area?.name, device.room].filter(Boolean);
       const siteId = req.siteId ?? device.area?.site?.id ?? null;
       const siteName = device.area?.site?.name ?? null;
-      let visitId = req.visitId ?? existingRun?.visitId ?? null;
-      let visitStartedAt: string | null = null;
-      if (visitId) {
-        const visit = await prisma.serviceVisit.findFirst({
-          where: { id: visitId, tenantId: ctx.tenantId },
-          select: { startedAt: true },
-        });
-        if (!visit) visitId = null;
-        else visitStartedAt = isoDateTime(visit.startedAt);
-      }
+      const visitFields = await loadVisitPreviewFields(
+        ctx.tenantId,
+        req.visitId ?? existingRun?.visitId ?? null,
+      );
 
       let charName: string | null = null;
       try {
@@ -553,8 +600,7 @@ export const inspectionRunService = {
         siteId,
         siteName,
         scheduledAt: isoDateTime(req.scheduledAt),
-        visitId,
-        visitStartedAt,
+        ...visitFields,
         overdue,
         serviceType: req.serviceType,
         fulfilment: req.fulfilment ?? "on_site",
@@ -917,10 +963,15 @@ export const inspectionRunService = {
           where: { id: visitId, tenantId: ctx.tenantId },
         });
         if (!existing) visitId = null;
-        else if (!existing.startedAt) {
+        else if (existing.completedAt) {
+          throw unprocessable(
+            "This visit already ended. Resume it or start a second visit with a reason (E34).",
+            { field: "visitId" },
+          );
+        } else if (!existing.startedAt) {
           await prisma.serviceVisit.update({
             where: { id: existing.id },
-            data: { startedAt: new Date() },
+            data: { startedAt: new Date(), date: existing.date ?? visitDayUtc() },
           });
         }
       }
@@ -934,6 +985,8 @@ export const inspectionRunService = {
             technicianUserId: run.serviceRequest?.assigneeUserId ?? ctx.user.id,
             plannedAt: new Date(),
             startedAt: new Date(),
+            date: visitDayUtc(),
+            sequence: 1,
           },
         });
         visitId = created.id;
@@ -956,8 +1009,8 @@ export const inspectionRunService = {
   },
 
   /**
-   * Day-plan site card — start (or resume) one ServiceVisit for the given
-   * assignments at a clinic site. Only refs assigned to the caller are linked.
+   * Day-plan site card — start one ServiceVisit for the given assignments.
+   * E34: a completed visit must be resumed or replaced by a second visit (not silently restarted).
    */
   async startSiteVisit(
     ctx: ActingContext,
@@ -998,10 +1051,19 @@ export const inspectionRunService = {
           where: { id: visitId, tenantId: ctx.tenantId, organisationId },
         });
         if (!existing) visitId = null;
-        else if (!existing.startedAt) {
+        else if (existing.completedAt) {
+          throw unprocessable(
+            "This visit already ended. Resume (no new travel) or start a second visit with a reason (E34).",
+            { field: "visitId" },
+          );
+        } else if (!existing.startedAt) {
           await prisma.serviceVisit.update({
             where: { id: existing.id },
-            data: { startedAt: new Date(), technicianUserId: ctx.user.id },
+            data: {
+              startedAt: new Date(),
+              technicianUserId: ctx.user.id,
+              date: existing.date ?? visitDayUtc(),
+            },
           });
         }
       }
@@ -1015,6 +1077,8 @@ export const inspectionRunService = {
             technicianUserId: ctx.user.id,
             plannedAt: new Date(),
             startedAt: new Date(),
+            date: visitDayUtc(),
+            sequence: 1,
           },
         });
         visitId = created.id;
@@ -1035,6 +1099,199 @@ export const inspectionRunService = {
 
       const visit = await prisma.serviceVisit.findFirstOrThrow({ where: { id: visitId } });
       return { visitId, startedAt: (visit.startedAt ?? new Date()).toISOString() };
+    });
+  },
+
+  /** End a running site visit (sets completedAt + setupMinutes). */
+  async endSiteVisit(
+    ctx: ActingContext,
+    visitId: string,
+  ): Promise<{ visitId: string; completedAt: string; setupMinutes: number }> {
+    requirePermission(ctx, "inspections:perform");
+    if (ctx.user.accountKind !== "partner" || !ctx.user.organisationId) {
+      throw forbidden();
+    }
+    const organisationId = ctx.user.organisationId;
+    return withTenantStore(ctx, async () => {
+      const visit = await prisma.serviceVisit.findFirst({
+        where: { id: visitId, tenantId: ctx.tenantId, organisationId },
+      });
+      if (!visit) throw notFound("Visit not found.");
+      if (!visit.startedAt) {
+        throw unprocessable("Visit has not been started.", { field: "visitId" });
+      }
+      if (visit.completedAt) {
+        return {
+          visitId: visit.id,
+          completedAt: visit.completedAt.toISOString(),
+          setupMinutes: visit.setupMinutes ?? 0,
+        };
+      }
+
+      const endedAt = new Date();
+      const runs = await prisma.inspectionRun.findMany({
+        where: { visitId: visit.id, tenantId: ctx.tenantId },
+        select: { startedAt: true, completedAt: true, performedAt: true },
+      });
+      const firstStep =
+        runs
+          .map((r) => r.startedAt ?? r.performedAt)
+          .filter((d): d is Date => Boolean(d))
+          .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+      const lastStep =
+        runs
+          .map((r) => r.completedAt)
+          .filter((d): d is Date => Boolean(d))
+          .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+      const vor = firstStep
+        ? minutesBetween(visit.startedAt, firstStep)
+        : minutesBetween(visit.startedAt, endedAt);
+      const nach = lastStep ? minutesBetween(lastStep, endedAt) : 0;
+      const setupMinutes = vor + nach;
+
+      const updated = await prisma.serviceVisit.update({
+        where: { id: visit.id },
+        data: { completedAt: endedAt, setupMinutes },
+      });
+      return {
+        visitId: updated.id,
+        completedAt: updated.completedAt!.toISOString(),
+        setupMinutes,
+      };
+    });
+  },
+
+  /** Resume an ended visit without a new travel stamp (clear completedAt). */
+  async resumeSiteVisit(
+    ctx: ActingContext,
+    visitId: string,
+  ): Promise<{ visitId: string; startedAt: string }> {
+    requirePermission(ctx, "inspections:perform");
+    if (ctx.user.accountKind !== "partner" || !ctx.user.organisationId) {
+      throw forbidden();
+    }
+    const organisationId = ctx.user.organisationId;
+    return withTenantStore(ctx, async () => {
+      const visit = await prisma.serviceVisit.findFirst({
+        where: { id: visitId, tenantId: ctx.tenantId, organisationId },
+      });
+      if (!visit) throw notFound("Visit not found.");
+      if (!visit.startedAt) {
+        throw unprocessable("Visit has not been started.", { field: "visitId" });
+      }
+      if (!visit.completedAt) {
+        return { visitId: visit.id, startedAt: visit.startedAt.toISOString() };
+      }
+      const updated = await prisma.serviceVisit.update({
+        where: { id: visit.id },
+        data: { completedAt: null, setupMinutes: null },
+      });
+      return {
+        visitId: updated.id,
+        startedAt: updated.startedAt!.toISOString(),
+      };
+    });
+  },
+
+  /**
+   * E34 — second visit today (new travel). Requires reason; links open refs to the new visit.
+   */
+  async startSecondSiteVisit(
+    ctx: ActingContext,
+    visitId: string,
+    body: {
+      reason: "notfall" | "teile" | "kunde" | "sonstiges";
+      note?: string | null;
+      references: string[];
+    },
+  ): Promise<{ visitId: string; startedAt: string; sequence: number }> {
+    requirePermission(ctx, "inspections:perform");
+    if (ctx.user.accountKind !== "partner" || !ctx.user.organisationId) {
+      throw forbidden();
+    }
+    const organisationId = ctx.user.organisationId;
+    const reasonLabels: Record<string, string> = {
+      notfall: "Interrupted by emergency",
+      teile: "Parts fetched",
+      kunde: "Customer postponed",
+      sonstiges: "other",
+    };
+    const note = body.note?.trim() || "";
+    if (body.reason === "sonstiges" && !note) {
+      throw unprocessable("Note is required for reason “other”.", { field: "note" });
+    }
+    const reasonText = `${reasonLabels[body.reason] ?? body.reason}${note ? ` — ${note}` : ""}`;
+
+    return withTenantStore(ctx, async () => {
+      const prior = await prisma.serviceVisit.findFirst({
+        where: { id: visitId, tenantId: ctx.tenantId, organisationId },
+      });
+      if (!prior) throw notFound("Visit not found.");
+      if (!prior.completedAt) {
+        throw unprocessable("End the current visit before starting a second visit (E34).", {
+          field: "visitId",
+        });
+      }
+
+      const refs = [...new Set(body.references)].filter(Boolean);
+      const requests = await prisma.serviceRequest.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          assigneeUserId: ctx.user.id,
+          transmittedAt: { not: null },
+          state: { notIn: ["completed", "rejected"] },
+          ...(refs.length > 0 ? { reference: { in: refs } } : { visitId: prior.id }),
+        },
+        select: { id: true },
+      });
+      if (requests.length === 0) {
+        throw unprocessable("No open assignments to attach to the second visit.");
+      }
+
+      const day = prior.date ?? visitDayUtc(prior.startedAt ?? new Date());
+      const maxSeq = await prisma.serviceVisit.aggregate({
+        where: {
+          tenantId: ctx.tenantId,
+          siteId: prior.siteId,
+          technicianUserId: prior.technicianUserId ?? ctx.user.id,
+          date: day,
+        },
+        _max: { sequence: true },
+      });
+      const sequence = (maxSeq._max.sequence ?? prior.sequence ?? 1) + 1;
+
+      const created = await prisma.serviceVisit.create({
+        data: {
+          tenantId: ctx.tenantId,
+          organisationId,
+          siteId: prior.siteId,
+          technicianUserId: prior.technicianUserId ?? ctx.user.id,
+          plannedAt: new Date(),
+          startedAt: new Date(),
+          date: day,
+          sequence,
+          secondVisitReason: reasonText,
+        },
+      });
+
+      await prisma.serviceRequest.updateMany({
+        where: { id: { in: requests.map((r) => r.id) } },
+        data: { visitId: created.id },
+      });
+      await prisma.inspectionRun.updateMany({
+        where: {
+          tenantId: ctx.tenantId,
+          serviceRequestId: { in: requests.map((r) => r.id) },
+          dutyPerformanceId: null,
+        },
+        data: { visitId: created.id },
+      });
+
+      return {
+        visitId: created.id,
+        startedAt: created.startedAt!.toISOString(),
+        sequence: created.sequence,
+      };
     });
   },
 
@@ -1154,21 +1411,31 @@ export const inspectionRunService = {
         where: { id: runId, tenantId: ctx.tenantId },
         include: {
           catalogue: { include: { steps: true } },
-          visit: { select: { id: true, startedAt: true } },
-          serviceRequest: { select: { visitId: true, visit: { select: { startedAt: true } } } },
+          visit: { select: { id: true, startedAt: true, completedAt: true } },
+          serviceRequest: {
+            select: {
+              visitId: true,
+              visit: { select: { startedAt: true, completedAt: true } },
+            },
+          },
         },
       });
       if (!run) throw notFound("Inspection run not found.");
       if (run.dutyPerformanceId) throw unprocessable("Run already completed.");
 
-      // D2 — when a visit is linked, steps require visit start.
-      const visitStarted =
-        run.visit?.startedAt ?? run.serviceRequest?.visit?.startedAt ?? null;
+      // D2 — when a visit is linked, steps require a running (started, not ended) visit.
+      const linkedVisit = run.visit ?? run.serviceRequest?.visit ?? null;
       const visitLinked = Boolean(run.visitId ?? run.serviceRequest?.visitId);
-      if (visitLinked && !visitStarted) {
+      if (visitLinked && !linkedVisit?.startedAt) {
         throw unprocessable("Start the site visit before recording inspection steps.", {
           field: "visitId",
         });
+      }
+      if (visitLinked && linkedVisit?.completedAt) {
+        throw unprocessable(
+          "This visit has ended. Resume it or start a second visit before recording steps.",
+          { field: "visitId" },
+        );
       }
 
       const resolved = await resolveCatalogueForAssignment({
@@ -1303,11 +1570,18 @@ export const inspectionRunService = {
             where: { id: visitId },
             select: {
               startedAt: true,
+              completedAt: true,
               institutionSignedAt: true,
               institutionSignerName: true,
             },
           })
         : null;
+      if (!skipVisit && linkedVisit?.completedAt) {
+        throw unprocessable(
+          "This visit has ended. Resume it or start a second visit before sealing.",
+          { field: "visitId" },
+        );
+      }
       const signatures = await prisma.inspectionSignature.findMany({
         where: { runId: run.id },
       });

@@ -90,6 +90,14 @@ export interface CataloguePreviewDTO {
   scheduledAt: string | null;
   visitId: string | null;
   visitStartedAt: string | null;
+  /** Set when the site visit was ended (mockup endedAt). */
+  visitCompletedAt: string | null;
+  /** E34 — 1 = first visit of the day, 2+ = second visit. */
+  visitSequence: number | null;
+  /** Computed setup minutes when the visit was ended. */
+  setupMinutes: number | null;
+  /** E34 — reason text when sequence > 1. */
+  secondVisitReason: string | null;
   overdue: boolean;
   serviceType: string;
   /** E77 — on_site | send_in */

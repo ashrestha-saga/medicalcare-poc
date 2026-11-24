@@ -11,6 +11,10 @@ export type InspectSiteGroup = {
   openCount: number;
   visitId: string | null;
   visitStartedAt: string | null;
+  visitCompletedAt: string | null;
+  visitSequence: number | null;
+  setupMinutes: number | null;
+  secondVisitReason: string | null;
   rows: CataloguePreviewDTO[];
 };
 
@@ -39,13 +43,10 @@ export function groupRowsBySite(rows: CataloguePreviewDTO[]): InspectSiteGroup[]
       .sort();
     const access =
       siteRows.map((r) => r.accessHint?.trim()).find((h) => h) ?? null;
-    const visitStarted = siteRows
-      .map((r) => r.visitStartedAt)
-      .filter((d): d is string => Boolean(d))
-      .sort()[0] ?? null;
-    const visitId =
-      siteRows.find((r) => r.visitId && r.visitStartedAt)?.visitId ??
-      siteRows.find((r) => r.visitId)?.visitId ??
+    const visitRow =
+      siteRows.find((r) => r.visitId && r.visitStartedAt && !r.visitCompletedAt) ??
+      siteRows.find((r) => r.visitId && r.visitStartedAt) ??
+      siteRows.find((r) => r.visitId) ??
       null;
 
     groups.push({
@@ -56,8 +57,12 @@ export function groupRowsBySite(rows: CataloguePreviewDTO[]): InspectSiteGroup[]
       earliestDue: dues[0] ?? null,
       doneCount: siteRows.filter((r) => r.sealed).length,
       openCount: siteRows.filter((r) => !r.sealed).length,
-      visitId,
-      visitStartedAt: visitStarted,
+      visitId: visitRow?.visitId ?? null,
+      visitStartedAt: visitRow?.visitStartedAt ?? null,
+      visitCompletedAt: visitRow?.visitCompletedAt ?? null,
+      visitSequence: visitRow?.visitSequence ?? null,
+      setupMinutes: visitRow?.setupMinutes ?? null,
+      secondVisitReason: visitRow?.secondVisitReason ?? null,
       rows: siteRows,
     });
   }
@@ -73,6 +78,17 @@ export function groupRowsBySite(rows: CataloguePreviewDTO[]): InspectSiteGroup[]
 /** E77 — send-ins are workshop jobs, not day-plan visit buckets. */
 export function isSendInRow(row: CataloguePreviewDTO): boolean {
   return row.fulfilment === "send_in";
+}
+
+/** Visit started and not ended — keep the site card on Heute until End visit. */
+export function isVisitStillOpen(row: CataloguePreviewDTO): boolean {
+  return Boolean(row.visitId && row.visitStartedAt && !row.visitCompletedAt);
+}
+
+function dedupeByReference(rows: CataloguePreviewDTO[]): CataloguePreviewDTO[] {
+  const map = new Map<string, CataloguePreviewDTO>();
+  for (const row of rows) map.set(row.reference, row);
+  return [...map.values()];
 }
 
 export function buildDaySections(
@@ -97,10 +113,15 @@ export function buildDaySections(
   const bucketOf = (row: CataloguePreviewDTO) => tagesBucket(planDate(row), today);
 
   if (mode === "heute") {
-    const rows = onSite.filter((r) => {
+    const openHeute = onSite.filter((r) => {
       const b = bucketOf(r);
       return b === "heute" || b === "ohne";
     });
+    // Sealed jobs whose visit is still running stay on Heute so End visit remains available.
+    const sealedActiveVisit = done.filter(
+      (r) => !isSendInRow(r) && isVisitStillOpen(r),
+    );
+    const rows = dedupeByReference([...openHeute, ...sealedActiveVisit]);
     return [{ key: "heute", rows, sites: groupRowsBySite(rows) }];
   }
 
