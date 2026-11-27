@@ -6,6 +6,8 @@ export const orderItemSchema = z.object({
   description: z.string().trim().min(1).max(300),
   quantity: z.number().int().min(1).max(999),
   unitPrice: z.number().nonnegative().nullable().optional(),
+  shopArticleId: z.string().trim().max(100).optional(),
+  gtin: z.string().trim().max(32).optional(),
 });
 
 export const createOrderRequestSchema = z.object({
@@ -22,6 +24,10 @@ export const createOrderRequestSchema = z.object({
   items: z.array(orderItemSchema).min(1, "Add at least one spare part.").max(50),
   raisedBy: z.string().trim().min(1).max(200),
   correlationId: z.string().trim().max(64).optional(),
+  purpose: z.enum(["device", "parts"]).optional(),
+  deviceInstanceId: z.string().trim().max(100).optional(),
+  serviceRequestId: z.string().trim().max(100).optional(),
+  deliverySiteId: z.string().trim().max(100).optional(),
 });
 
 export type CreateOrderRequestInput = z.infer<typeof createOrderRequestSchema>;

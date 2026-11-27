@@ -105,6 +105,8 @@ export interface CataloguePreviewDTO {
   dueAt: string | null;
   inspectionTypeCode: string;
   sealed: boolean;
+  /** E90 — suggested Prüfplakette when catalogue.requiresLabel (auto next-due + next sequence). */
+  suggestedLabel: { number: string; nextDue: string } | null;
   catalogue: ResolvedCataloguePreviewDTO | null;
   qualificationGate: {
     ok: boolean;

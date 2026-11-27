@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ExternalLink, Printer, ScanLine } from "lucide-react";
@@ -20,6 +20,8 @@ import { UnlockDevicePanel } from "@/components/features/repairs/UnlockDevicePan
 import { LoanerAssignPanel } from "@/components/features/repairs/LoanerAssignPanel";
 import { toast } from "@/store/toastStore";
 import { DeviceDutiesPanel } from "./DeviceDutiesPanel";
+import { DeviceReportsCard } from "./DeviceReportsCard";
+import { DeviceRoutineCard } from "./DeviceRoutineCard";
 
 interface DeviceDetailProps {
   device: DeviceInstanceDTO | DeviceInstanceDetailDTO;
@@ -33,6 +35,8 @@ interface DeviceDetailProps {
     dutyId: string,
     input: { note: string; result: "passed" | "passed_with_conditions" | "failed" },
   ) => void;
+  /** From notification deep link (`?focus=reports|duties`). */
+  focus?: string | null;
 }
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
@@ -57,6 +61,7 @@ export function DeviceDetail({
   onRefresh,
   completingDutyId,
   onCompleteDuty,
+  focus,
 }: DeviceDetailProps) {
   const t = useTranslations("inventoryDetail");
   const tCommon = useTranslations("common");
@@ -65,9 +70,34 @@ export function DeviceDetail({
   const { checkPermission } = usePermissions();
   const canViewCatalog = checkPermission("catalog:view");
   const canCreateRequest = checkPermission("requests:create");
+  const canShop = checkPermission("parts:request");
+  const canErstanlage = checkPermission("inventory:update");
   const detail = isDetail(device) ? device : null;
+
+  useEffect(() => {
+    if (!focus) return;
+    const id =
+      focus === "reports"
+        ? "device-detail-reports"
+        : focus === "duties"
+          ? "device-detail-duties"
+          : null;
+    if (!id) return;
+    const t = window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [focus, device.id]);
+
   const modelClass = detail?.modelClassification;
   const modelHref = device.modelId && canViewCatalog ? `/catalog/${device.modelId}` : null;
+  const hasProvisionalDuties = Boolean(detail?.duties?.some((d) => d.provisional));
+  // Unit-scoped path only — model-wide reclassify is a separate admin flow.
+  const provisionalNeedsErstanlage =
+    hasProvisionalDuties &&
+    (device.state === "draft" || device.state === "review" || device.state === "released");
+  const provisionalStuckReleased = hasProvisionalDuties && device.state === "released";
+  const openImportReviews = detail?.openImportReviews ?? [];
   const label = toInventoryLabel(device);
   const [requestBusy, setRequestBusy] = useState(false);
 
@@ -152,6 +182,17 @@ export function DeviceDetail({
             >
               <ScanLine className="h-4 w-4" />
               {requestBusy ? t("requestServiceBusy") : t("requestService")}
+            </Button>
+          )}
+          {canShop && (
+            <Button type="button" variant="outline" size="sm" className="h-8" asChild>
+              <Link
+                href={`/shop?device=${encodeURIComponent(device.id)}`}
+                title={t("openShopHint")}
+                data-testid="device-open-shop"
+              >
+                {t("openShop")}
+              </Link>
             </Button>
           )}
         </div>
@@ -283,9 +324,46 @@ export function DeviceDetail({
               ) : null}
             </>
           ) : null}
+          {hasProvisionalDuties ? (
+            <div
+              className="mt-3 space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-950 dark:text-amber-100"
+              data-testid="device-provisional-duties-banner"
+            >
+              <p>{t("provisionalDutiesBanner")}</p>
+              {provisionalStuckReleased ? (
+                <p className="text-xs opacity-90">{t("provisionalDutiesReleasedHint")}</p>
+              ) : null}
+              {canErstanlage && provisionalNeedsErstanlage ? (
+                <Link
+                  href={`/registration/${device.id}`}
+                  className="inline-flex font-medium text-primary underline-offset-2 hover:underline"
+                  data-testid="device-provisional-erstanlage-link"
+                >
+                  {t("provisionalDutiesCtaErstanlage")}
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+          {openImportReviews.length > 0 ? (
+            <div
+              className="mt-3 space-y-2 rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sm text-sky-950 dark:text-sky-100"
+              data-testid="device-import-review-banner"
+            >
+              <p className="font-medium">{t("importReviewBanner")}</p>
+              <p className="text-xs opacity-90">{openImportReviews[0]?.label}</p>
+              <Link
+                href="/devices?tab=klaerliste&issue=import_review"
+                className="inline-flex font-medium text-primary underline-offset-2 hover:underline"
+                data-testid="device-import-review-link"
+              >
+                {t("importReviewCta")}
+              </Link>
+            </div>
+          ) : null}
         </dl>
 
         <aside className="space-y-4">
+          <DeviceRoutineCard deviceId={device.id} />
           <div className="rounded-md border border-border bg-card/40 p-4" data-testid="device-detail-label">
             <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {t("labelPreview")}
@@ -367,13 +445,21 @@ export function DeviceDetail({
       )}
 
       {detail && (
-        <DeviceDutiesPanel
-          device={detail}
-          canComplete={canEdit}
-          completingId={completingDutyId}
-          onComplete={onCompleteDuty}
-        />
+        <div id="device-detail-duties">
+          <DeviceDutiesPanel
+            device={detail}
+            canComplete={canEdit}
+            completingId={completingDutyId}
+            onComplete={onCompleteDuty}
+            canUploadReport={Boolean(canEdit) || canCreateRequest}
+            onExternalRecorded={onRefresh}
+          />
+        </div>
       )}
+
+      <div id="device-detail-reports">
+        <DeviceReportsCard deviceId={device.id} />
+      </div>
 
       {canEdit ? (
         <UnlockDevicePanel

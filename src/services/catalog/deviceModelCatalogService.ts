@@ -32,8 +32,14 @@ function gtinCoverage(row: DeviceModel): number {
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
-function openClassification(rows: DeviceModelClassification[]): CatalogClassificationSummary | null {
-  const latest = rows.find((c) => c.validTo == null) ?? rows[0];
+function openClassification(
+  rows: DeviceModelClassification[],
+  tenantId?: string,
+): CatalogClassificationSummary | null {
+  const open = rows.filter((c) => c.validTo == null);
+  const tenantRow = tenantId ? open.find((c) => c.tenantId === tenantId) : undefined;
+  const globalRow = open.find((c) => c.tenantId == null);
+  const latest = tenantRow ?? globalRow ?? open[0] ?? rows[0];
   if (!latest) return null;
   return {
     annex1: latest.stk,
@@ -42,6 +48,7 @@ function openClassification(rows: DeviceModelClassification[]): CatalogClassific
     radiation: latest.radiation,
     confidence: latest.confidence,
     source: latest.evidenceText ?? "model-classification",
+    scope: latest.tenantId ? "tenant" : "global",
   };
 }
 
@@ -82,14 +89,14 @@ function resolveAnnex2Write(
 }
 
 
-function toListItem(row: ModelWithAggregates): CatalogModelListItemDTO {
+function toListItem(row: ModelWithAggregates, tenantId?: string): CatalogModelListItemDTO {
   const siteIds = new Set(
     row.instances.map((i) => i.area?.siteId).filter((id): id is string => Boolean(id)),
   );
   return {
     ...toDeviceModelDTO(row),
     displayName: displayName(row),
-    classification: openClassification(row.classifications),
+    classification: openClassification(row.classifications, tenantId),
     copyCount: row.instances.length,
     siteCount: siteIds.size,
     gtinCoverage: gtinCoverage(row),
@@ -116,8 +123,16 @@ async function buildSpread(modelId: string, tenantId: string): Promise<CatalogSp
     .sort((a, b) => b.copyCount - a.copyCount || a.siteName.localeCompare(b.siteName));
 }
 
-function characteristicsPrefill(row: ModelWithAggregates): RegistrationCharacteristics | null {
-  const latest = row.classifications.find((c) => c.validTo == null) ?? row.classifications[0];
+function characteristicsPrefill(
+  row: ModelWithAggregates,
+  tenantId?: string,
+): RegistrationCharacteristics | null {
+  const open = row.classifications.filter((c) => c.validTo == null);
+  const latest =
+    (tenantId ? open.find((c) => c.tenantId === tenantId) : undefined) ??
+    open.find((c) => c.tenantId == null) ??
+    open[0] ??
+    row.classifications[0];
   if (!latest?.characteristics?.trim()) return null;
   try {
     const parsed = JSON.parse(latest.characteristics) as RegistrationCharacteristics;
@@ -130,17 +145,25 @@ function characteristicsPrefill(row: ModelWithAggregates): RegistrationCharacter
 async function toDetail(row: ModelWithAggregates, tenantId: string): Promise<CatalogModelDetailDTO> {
   const spread = await buildSpread(row.id, tenantId);
   return {
-    ...toListItem(row),
+    ...toListItem(row, tenantId),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     spread,
-    characteristicsPrefill: characteristicsPrefill(row),
+    characteristicsPrefill: characteristicsPrefill(row, tenantId),
   };
 }
 
 function listIncludeForTenant(tenantId: string) {
   return {
-    classifications: { where: { validTo: null }, orderBy: { validFrom: "desc" as const }, take: 1 },
+    // E104 — load tenant + global open rows; picker prefers tenant.
+    classifications: {
+      where: {
+        validTo: null,
+        OR: [{ tenantId }, { tenantId: null }],
+      },
+      orderBy: { validFrom: "desc" as const },
+      take: 4,
+    },
     instances: {
       where: { tenantId },
       select: {
@@ -187,7 +210,7 @@ export const deviceModelCatalogService = {
       include: listIncludeForTenant(ctx.tenantId),
       orderBy: [{ tradeName: "asc" }, { modelName: "asc" }],
     });
-    return rows.map((r) => toListItem(r as ModelWithAggregates));
+    return rows.map((r) => toListItem(r as ModelWithAggregates, ctx.tenantId));
   },
 
   async getById(ctx: TenantWorkContext, id: string): Promise<CatalogModelDetailDTO> {
@@ -232,7 +255,7 @@ export const deviceModelCatalogService = {
       summary: `Created catalog model ${created.tradeName || created.modelName || created.id}`,
       after: { tradeName: created.tradeName, modelName: created.modelName, udiDi: created.udiDi },
     });
-    return toListItem(created as ModelWithAggregates);
+    return toListItem(created as ModelWithAggregates, ctx.tenantId);
   },
 
   async update(ctx: TenantWorkContext, id: string, input: UpdateCatalogModelInput): Promise<CatalogModelDetailDTO> {
@@ -278,34 +301,29 @@ export const deviceModelCatalogService = {
           (await tx.refRuleSet.findFirst());
         if (!ruleSet) throw unprocessable("Rule sets not loaded — please run the seed.");
 
-        if (prev) {
-          await tx.deviceModelClassification.update({
-            where: { id: prev.id },
-            data: { validTo: new Date(), openClassificationKey: null },
-          });
-        }
-
         const annex2Write = resolveAnnex2Write(
           input.classification.annex2,
           prev?.mtkItemId ?? null,
           prev?.evidenceText,
         );
 
-        await tx.deviceModelClassification.create({
-          data: {
-            deviceModelId: id,
-            openClassificationKey: id,
-            stk: input.classification.annex1 ?? prev?.stk ?? false,
-            radiation: input.classification.radiation ?? prev?.radiation ?? false,
-            softwareClass:
-              input.classification.softwareClass !== undefined
-                ? input.classification.softwareClass
-                : (prev?.softwareClass ?? null),
-            mtkItemId: annex2Write.mtkItemId,
-            confidence: prev?.confidence ?? "derived",
-            evidenceText: annex2Write.evidenceText,
-            ruleSetId: ruleSet.id,
-          },
+        const { createTenantClassification } = await import(
+          "@/services/registration/classificationScope"
+        );
+        // E104 — clinic catalog:update writes tenant row; never closes global template.
+        await createTenantClassification(tx, {
+          deviceModelId: id,
+          tenantId: ctx.tenantId,
+          ruleSetId: ruleSet.id,
+          stk: input.classification.annex1 ?? prev?.stk ?? false,
+          radiation: input.classification.radiation ?? prev?.radiation ?? false,
+          softwareClass:
+            input.classification.softwareClass !== undefined
+              ? input.classification.softwareClass
+              : (prev?.softwareClass ?? null),
+          mtkItemId: annex2Write.mtkItemId,
+          confidence: prev?.confidence ?? "derived",
+          evidenceText: annex2Write.evidenceText,
         });
       }
     });

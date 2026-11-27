@@ -18,6 +18,8 @@ import { prisma } from "@/lib/prisma";
 import { clarificationService } from "@/services/clarifications/clarificationService";
 import { countMissingConstancyCadences } from "@/services/constancy/missingCadenceMetrics";
 import { overdueDutyWhere } from "@/services/dueDates/dutyDueMetrics";
+import { notificationService } from "@/services/notifications/notificationService";
+import { reportAckService } from "@/services/reports/reportAckService";
 import { reprocessingEvidenceService } from "@/services/reprocessingEvidence/reprocessingEvidenceService";
 import {
   getAssignedAreaIds,
@@ -147,6 +149,39 @@ async function valueForTile(ctx: TenantWorkContext, key: string): Promise<TileVa
         total,
         "Gerät im Bestand|Geräten im Bestand",
       );
+    }
+    case "import-provisional": {
+      const [count, total] = await Promise.all([
+        prisma.deviceDuty.count({
+          where: {
+            applicable: true,
+            suspendedAt: null,
+            provisional: true,
+          },
+        }),
+        prisma.deviceDuty.count({
+          where: { applicable: true, suspendedAt: null, dueAt: { not: null } },
+        }),
+      ]);
+      return W(
+        count,
+        count ? "vorläufig aus Import" : "keine vorläufigen Fristen",
+        count > 0 ? "info" : "ok",
+        total,
+        "vorläufige Pflicht|vorläufige Pflichten",
+      );
+    }
+    case "berichte-ohne-bestaetigung": {
+      const count = await reportAckService.countUnacknowledged();
+      return W(
+        count,
+        count ? "Berichte ohne Bestätigung" : "alle Berichte bestätigt",
+        count > 0 ? "info" : "ok",
+      );
+    }
+    case "fuer-mich": {
+      const count = await notificationService.unreadCount(ctx.user.id);
+      return W(count, count ? "ungelesen" : "nichts Neues", count > 0 ? "info" : "ok");
     }
     case "klaerliste": {
       const count = await clarificationService.countOpenCases(ctx);
@@ -405,10 +440,18 @@ async function valueForTile(ctx: TenantWorkContext, key: string): Promise<TileVa
       );
     }
     case "routine-heute": {
-      const [open, dailyTotal] = await Promise.all([
+      const [openReproc, dailyTotal] = await Promise.all([
         reprocessingEvidenceService.countOpenDailyChecks(ctx),
         prisma.refReprocessingCheck.count({ where: { cadence: "daily" } }),
       ]);
+      let openIfu = 0;
+      try {
+        const { routineCheckService } = await import("@/services/routines/routineCheckService");
+        openIfu = await routineCheckService.countOpenToday(ctx);
+      } catch {
+        openIfu = 0;
+      }
+      const open = openReproc + openIfu;
       return W(
         open,
         open ? "heute noch offen" : "alles erledigt",

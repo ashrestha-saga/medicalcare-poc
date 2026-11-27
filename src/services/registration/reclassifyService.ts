@@ -354,28 +354,24 @@ export const reclassifyService = {
     const now = new Date();
 
     const result = await prisma.$transaction(async (tx) => {
-      await tx.deviceModelClassification.updateMany({
-        where: { deviceModelId: modelId, validTo: null },
-        data: { validTo: now, openClassificationKey: null },
-      });
-
-      const classification = await tx.deviceModelClassification.create({
-        data: {
-          deviceModelId: modelId,
-          openClassificationKey: modelId,
-          stk: stkFlagFromDuties(duties),
-          mtkItemId,
-          radiation: Boolean(characteristics.strahlung),
-          softwareClass:
-            characteristics.software && characteristics.swKlasse && characteristics.swKlasse !== "keine"
-              ? characteristics.swKlasse
-              : null,
-          confidence,
-          evidenceText,
-          ruleSetId: mpRule.id,
-          confirmedBy: confidence === "verified" ? ctx.user.name : null,
-          confirmedAt: confidence === "verified" ? now : null,
-        },
+      const { createTenantClassification } = await import(
+        "@/services/registration/classificationScope"
+      );
+      const classification = await createTenantClassification(tx, {
+        deviceModelId: modelId,
+        tenantId,
+        ruleSetId: mpRule.id,
+        stk: stkFlagFromDuties(duties),
+        mtkItemId,
+        radiation: Boolean(characteristics.strahlung),
+        softwareClass:
+          characteristics.software && characteristics.swKlasse && characteristics.swKlasse !== "keine"
+            ? characteristics.swKlasse
+            : null,
+        confidence,
+        evidenceText,
+        confirmedBy: confidence === "verified" ? ctx.user.name : null,
+        confirmedAt: confidence === "verified" ? now : null,
       });
 
       await tx.deviceModel.update({
@@ -506,6 +502,20 @@ export const reclassifyService = {
             lastMaintainedAt: inst.lastMaintainedAt,
           });
         }
+
+        const { suspendProvisionalAndRelinkPerformances } = await import(
+          "@/services/import/importProvisionalDuties"
+        );
+        const freshDuties = await tx.deviceDuty.findMany({
+          where: { snapshotId: snapshot.id },
+          select: { id: true, dutyKey: true },
+        });
+        const newDutiesByKey = new Map(freshDuties.map((d) => [d.dutyKey, d.id] as const));
+        await suspendProvisionalAndRelinkPerformances(tx, {
+          deviceInstanceId: inst.id,
+          newDutiesByKey,
+          now,
+        });
 
         await recomputeDutyProjection(tx, inst.id, now);
 

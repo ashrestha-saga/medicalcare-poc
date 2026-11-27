@@ -73,6 +73,15 @@ export function useDueDatesColumns(actions: DueDatesTableActions): ColumnDef<Due
           <div>
             <p className="text-foreground">{row.original.inspectionTypeLabel}</p>
             <p className="text-xs text-muted-foreground">{row.original.confidenceLabel}</p>
+            {row.original.provisional ? (
+              <Badge
+                variant="outline"
+                className="mt-1 text-[10px] uppercase tracking-wide"
+                data-testid="due-date-provisional-chip"
+              >
+                {t("provisionalImport")}
+              </Badge>
+            ) : null}
           </div>
         ),
       },

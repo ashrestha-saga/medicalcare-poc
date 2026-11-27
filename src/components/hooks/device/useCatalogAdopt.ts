@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useOpenSpareParts } from "@/components/hooks/device/useOpenSpareParts";
 import { useScanStore } from "@/store/scanStore";
 
 /**
@@ -10,7 +11,7 @@ export function useCatalogAdopt() {
   const resolution = useScanStore((s) => s.resolution);
   const captured = useScanStore((s) => s.captured);
   const continueToServiceRequest = useScanStore((s) => s.continueToServiceRequest);
-  const openParts = useScanStore((s) => s.openParts);
+  const openParts = useOpenSpareParts();
   const reset = useScanStore((s) => s.reset);
   const [catalogAdopted, setCatalogAdopted] = useState(false);
 

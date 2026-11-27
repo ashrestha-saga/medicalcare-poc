@@ -5,6 +5,7 @@ import {
 import {
   bytesFromDataUrl,
   buildStorageKey,
+  readBlobBytes,
   writeBlobBytes,
 } from "@/lib/storage/blobStore";
 
@@ -54,4 +55,32 @@ export async function createAttachmentFromDataUrl(
     },
   });
   return { id: row.id, storageKey: null, usedStorage: false };
+}
+
+/** Build a PDF data URL from raw bytes (used by server-rendered reports). */
+export function pdfDataUrl(bytes: Uint8Array): string {
+  return `data:application/pdf;base64,${Buffer.from(bytes).toString("base64")}`;
+}
+
+/** Read the bytes of an AttachmentBlob (storageKey or legacy dataUrl). Null when missing. */
+export async function readAttachmentBytes(
+  tx: Tx,
+  blobId: string,
+): Promise<{ bytes: Buffer; contentType: string } | null> {
+  const blob = await tx.attachmentBlob.findFirst({ where: { id: blobId } });
+  if (!blob) return null;
+  if (blob.storageKey) {
+    return {
+      bytes: await readBlobBytes(blob.storageKey),
+      contentType: blob.contentType?.trim() || "application/octet-stream",
+    };
+  }
+  if (blob.dataUrl) {
+    const { bytes, contentType } = bytesFromDataUrl(blob.dataUrl);
+    return {
+      bytes,
+      contentType: blob.contentType?.trim() || contentType || "application/octet-stream",
+    };
+  }
+  return null;
 }

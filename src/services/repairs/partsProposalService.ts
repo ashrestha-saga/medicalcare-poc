@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 import type { ActingContext, PartnerContext } from "@/interfaces";
+import { notificationDedup } from "@/constants/notifications";
 import { actorFromPartnerOrg } from "@/lib/auth/actorContext";
 import { requirePartnerPermission, requirePermission } from "@/lib/auth/tenantContext";
 import { conflict, forbidden, notFound, unprocessable } from "@/lib/errors";
 import { requireRepairsEnabled } from "@/lib/features/repairs";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
+import { notifyService } from "@/services/notifications/notifyService";
 import { getCachedPartnerConsolePermissions } from "@/services/roles/roleGrantsService";
 
 /** Pure ownership gate for createPartsProposal (E80).
@@ -159,6 +161,19 @@ export async function createPartsProposal(
     action: "create",
     summary: `Parts proposal for ${sr.reference}`,
   });
+
+  // E107 — clinic visibility for parts order proposals tied to their request.
+  await notifyService.pushToRoles(
+    ctx.tenantId,
+    ["device_admin", "security_officer", "superadmin"],
+    "approval_order",
+    notificationDedup.approvalOrder(created.id),
+    `Teilebestellung vorgeschlagen: ${sr.reference}`,
+    `${resolved.length} Position(en)`,
+    { type: "request", id: sr.reference },
+    ctx.tenantId,
+    organisationId,
+  );
 
   return created;
 }

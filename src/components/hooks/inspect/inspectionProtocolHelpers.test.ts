@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   failedStepsMissingEvidence,
+  listSealBlockers,
   protocolChecklist,
   signatureKindsSatisfied,
   stepsPayloadFromDraft,
@@ -39,6 +40,24 @@ describe("protocolChecklist", () => {
     expect(gates.find((g) => !g.done)?.id).toBe("device");
     expect(gates.find((g) => g.id === "evidence")?.done).toBe(false);
     expect(gates.find((g) => g.id === "visit")?.done).toBe(true);
+  });
+});
+
+describe("listSealBlockers", () => {
+  it("includes label when labelOk is false", () => {
+    expect(
+      listSealBlockers({
+        visitStarted: true,
+        deviceOk: true,
+        stepsComplete: true,
+        missingEvidence: 0,
+        signatures: [
+          { kind: "inspector", signedAt: "x", absent: false },
+          { kind: "institution", signedAt: null, absent: true },
+        ],
+        labelOk: false,
+      }),
+    ).toEqual(["label"]);
   });
 });
 

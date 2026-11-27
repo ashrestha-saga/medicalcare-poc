@@ -173,6 +173,8 @@ export interface DeviceInstanceDetailDTO extends DeviceInstanceDTO {
     labelNextDue: string | null;
     performedAt: string;
   }>;
+  /** Open import_review clarifications (identity drift / new duty key from file). */
+  openImportReviews?: Array<{ id: string; label: string; deferredAt: string }>;
 }
 
 export type CapturedNumberType = "gtin" | "pzn" | "manufacturer" | "none";

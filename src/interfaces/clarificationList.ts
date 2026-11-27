@@ -5,6 +5,7 @@ export type ClarificationIssueCode =
   | "missing_maintenance_cycle"
   | "missing_classification"
   | "derived_classification"
+  | "import_review"
   | "missing_room"
   | "missing_model_name"
   | "missing_serial"
@@ -50,6 +51,7 @@ export interface ClarificationSummaryDTO {
   openCases: number;
   duplicates: number;
   derivedClassification: number;
+  importReview: number;
   missingResponsible: number;
 }
 

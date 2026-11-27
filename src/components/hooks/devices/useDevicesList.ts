@@ -57,6 +57,8 @@ export function useDevicesList() {
   const siteParam = useQueryParam("siteId");
   const kindParam = useQueryParam("kind");
   const mineAreaParam = useQueryParam("mineArea");
+  const idParam = useQueryParam("id");
+  const focusParam = useQueryParam("focus");
 
   const [devices, setDevices] = useState<DeviceInstanceDTO[]>([]);
   const [q, setQState] = useState(qParam ?? "");
@@ -75,6 +77,32 @@ export function useDevicesList() {
     setKindFilterState(parseKind(kindParam));
     setMineAreaState(mineAreaParam === "1");
   }, [qParam, stateParam, siteParam, kindParam, mineAreaParam]);
+
+  /** Deep link from notifications / search: `/devices?id=…` opens the detail card. */
+  useEffect(() => {
+    if (!canView || !idParam) return;
+    if (selected?.id === idParam) return;
+    let alive = true;
+    setDetailLoading(true);
+    void api<{ device: DeviceInstanceDetailDTO }>(`/api/devices/${encodeURIComponent(idParam)}`)
+      .then((res) => {
+        if (alive) setSelected(res.device);
+      })
+      .catch((err) => {
+        if (alive) {
+          toast.error(err instanceof ApiError ? err.message : "Could not open device.");
+        }
+      })
+      .finally(() => {
+        if (alive) setDetailLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+    // intentionally omit selected — reopen only when id changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canView, idParam]);
+
 
   const setQ = useCallback(
     (value: string) => {
@@ -232,10 +260,14 @@ export function useDevicesList() {
     canUpdate,
     selected,
     selectDevice,
-    clearSelection: () => setSelected(null),
+    clearSelection: () => {
+      setSelected(null);
+      sync({ id: null, focus: null });
+    },
     detailLoading,
     applyUpdated,
     completingDutyId,
     completeDuty,
+    focus: focusParam,
   };
 }

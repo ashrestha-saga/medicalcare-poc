@@ -18,6 +18,7 @@ import { Field } from "@/components/ui/Field";
 import { formatDate } from "@/lib/format";
 import type { AppLocale } from "@/lib/locale";
 import { useSessionStore } from "@/store/sessionStore";
+import { ExternalPerformanceDialog } from "./ExternalPerformanceDialog";
 
 type DutyResult = "passed" | "passed_with_conditions" | "failed";
 
@@ -64,6 +65,10 @@ interface DeviceDutiesPanelProps {
   canComplete?: boolean;
   completingId?: string | null;
   onComplete?: (dutyId: string, input: { note: string; result: DutyResult }) => void;
+  /** E108 — inventory:update or requests:create: upload a third-party report. */
+  canUploadReport?: boolean;
+  /** Reload device detail after an external performance rolled the due date. */
+  onExternalRecorded?: () => void;
 }
 
 export function DeviceDutiesPanel({
@@ -71,6 +76,8 @@ export function DeviceDutiesPanel({
   canComplete,
   completingId,
   onComplete,
+  canUploadReport,
+  onExternalRecorded,
 }: DeviceDutiesPanelProps) {
   const t = useTranslations("inventoryDetail");
   const tCommon = useTranslations("common");
@@ -78,6 +85,7 @@ export function DeviceDutiesPanel({
   const actorName = useSessionStore((s) => s.user?.name) ?? "";
   const [showNotApplicable, setShowNotApplicable] = useState(false);
   const [pendingDuty, setPendingDuty] = useState<DeviceDutyDTO | null>(null);
+  const [uploadDuty, setUploadDuty] = useState<DeviceDutyDTO | null>(null);
   const [result, setResult] = useState<DutyResult>("passed");
   const [note, setNote] = useState("");
   const duties = device.duties ?? [];
@@ -162,7 +170,7 @@ export function DeviceDutiesPanel({
                 <th className="px-4 py-2 font-semibold">{t("colCycle")}</th>
                 <th className="px-4 py-2 font-semibold">{t("colDue")}</th>
                 <th className="px-4 py-2 font-semibold">{t("colLastDone")}</th>
-                {canComplete ? <th className="px-4 py-2 font-semibold" /> : null}
+                {canComplete || canUploadReport ? <th className="px-4 py-2 font-semibold" /> : null}
               </tr>
             </thead>
             <tbody>
@@ -187,9 +195,22 @@ export function DeviceDutiesPanel({
                   <td className="px-4 py-3 align-top text-muted-foreground">
                     {formatDate(duty.lastCompletedAt, locale)}
                   </td>
-                  {canComplete ? (
+                  {canComplete || canUploadReport ? (
                     <td className="px-4 py-3 align-top text-right">
-                      {duty.applicable ? (
+                      {duty.applicable && canUploadReport ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="mr-1 h-8"
+                          disabled={Boolean(completingId)}
+                          onClick={() => setUploadDuty(duty)}
+                          data-testid={`device-duty-upload-${duty.dutyKey}`}
+                        >
+                          {t("externalUploadAction")}
+                        </Button>
+                      ) : null}
+                      {duty.applicable && canComplete ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -265,6 +286,11 @@ export function DeviceDutiesPanel({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ExternalPerformanceDialog
+        duty={uploadDuty}
+        onClose={() => setUploadDuty(null)}
+        onRecorded={onExternalRecorded}
+      />
     </section>
   );
 }

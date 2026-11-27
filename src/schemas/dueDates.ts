@@ -42,6 +42,10 @@ export const dueDatesQuerySchema = z.object({
   scheduled: z
     .union([z.literal("1"), z.literal("true"), z.literal("0"), z.literal("false")])
     .optional(),
+  /** provisional=1 → import Erstanlage-light duties only (E103). */
+  provisional: z
+    .union([z.literal("1"), z.literal("true"), z.literal("0"), z.literal("false")])
+    .optional(),
   limit: z.coerce.number().int().positive().max(300).optional(),
   offset: z.coerce.number().int().min(0).max(100_000).optional(),
 });

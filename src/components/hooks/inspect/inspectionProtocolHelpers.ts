@@ -89,6 +89,9 @@ export type ProtocolGateId =
   | "inspector"
   | "institution";
 
+/** Extra seal blockers outside the checklist strip (e.g. Prüfplakette). */
+export type SealBlockerId = ProtocolGateId | "label";
+
 /** Reads the same conditions as canComplete / seal gates. Does not add rules. */
 export function protocolChecklist(input: {
   visitStarted: boolean;
@@ -112,6 +115,22 @@ export function protocolChecklist(input: {
     { id: "inspector", done: inspector },
     { id: "institution", done: institution },
   ];
+}
+
+/** Ordered list of incomplete seal gates (including optional label). */
+export function listSealBlockers(input: {
+  visitStarted: boolean;
+  deviceOk: boolean;
+  stepsComplete: boolean;
+  missingEvidence: number;
+  signatures: { kind: string; signedAt: string | null; absent: boolean }[] | undefined;
+  labelOk: boolean;
+}): SealBlockerId[] {
+  const missing: SealBlockerId[] = protocolChecklist(input)
+    .filter((g) => !g.done)
+    .map((g) => g.id);
+  if (!input.labelOk) missing.push("label");
+  return missing;
 }
 
 export function signatureKindsSatisfied(

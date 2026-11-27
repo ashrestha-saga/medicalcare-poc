@@ -17,6 +17,7 @@ const ISSUE_CODES: ClarificationIssueCode[] = [
   "missing_maintenance_cycle",
   "missing_classification",
   "derived_classification",
+  "import_review",
   "missing_room",
   "missing_model_name",
   "missing_serial",
@@ -52,6 +53,7 @@ export function useClarificationsList() {
     openCases: 0,
     duplicates: 0,
     derivedClassification: 0,
+    importReview: 0,
     missingResponsible: 0,
   });
   const [loading, setLoading] = useState(false);

@@ -11,6 +11,7 @@ import { useSites } from "@/components/hooks/location/useSites";
 import { OfflineBar } from "@/components/ui/OfflineBar";
 import { LocaleToggle } from "@/components/features/shared/LocaleToggle";
 import { AccountCornerMenu } from "@/components/layout/AccountCornerMenu";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { PartnerActingBar } from "@/components/layout/PartnerActingBar";
 import { NavBestandSearch } from "@/components/layout/NavBestandSearch";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
@@ -173,6 +174,7 @@ function AccountBar({
             <span className="p-acctbar__inventory-count">{countLabel}</span>
           </button>
         )}
+        <NotificationBell />
         {useCornerMenu ? (
           <AccountCornerMenu
             showSecurity={showSecurity}
@@ -233,6 +235,7 @@ function NavIcon({ id }: { id: MenuModuleId }) {
   if (id === "locations") return <LocationsIcon />;
   if (id === "roles") return <RolesIcon />;
   if (id === "management") return <ManagementIcon />;
+  if (id === "shop-orders") return <RequestsIcon />;
   if (id === "activity") return <ActivityIcon />;
   if (id === "security") return <SecurityIcon />;
   if (id === "settings") return <SettingsIcon />;
@@ -263,6 +266,7 @@ function isNavActive(id: MenuModuleId, pathname: string): boolean {
   if (id === "locations") return pathname.startsWith("/locations");
   if (id === "roles") return pathname.startsWith("/roles");
   if (id === "management") return pathname.startsWith("/management");
+  if (id === "shop-orders") return pathname.startsWith("/shop-orders");
   if (id === "activity") return pathname.startsWith("/activity");
   if (id === "security") return pathname.startsWith("/security");
   // Security lives under Settings (v26) — keep secondary rail highlighted.

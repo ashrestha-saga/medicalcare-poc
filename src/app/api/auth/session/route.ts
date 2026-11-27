@@ -13,7 +13,7 @@ function toPublicUser(user: NonNullable<Awaited<ReturnType<typeof readSession>>>
 /**
  * GET /api/auth/session — who am I (from the httpOnly cookie).
  * OXID is optional and loaded from Settings (`/api/settings/oxid`), not here —
- * avoids SEC-01 on TenantOxidConnection during every session hydrate.
+ * avoids SEC-01 on TenantShopConnection during every session hydrate.
  */
 export async function GET() {
   const user = await readSession();

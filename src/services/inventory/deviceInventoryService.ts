@@ -20,6 +20,7 @@ import {
   resolveMaintenanceCycleMonths,
 } from "@/lib/maintenance/schedule";
 import { listDutiesForInstance, nextObligationDueAt, syncWartungDutyOnComplete } from "@/services/registration/dutyService";
+import { lacksRealReleaseFreeze } from "@/services/import/importProvisionalDuties";
 import type { CreateDeviceInput, UpdateDeviceInput } from "@/schemas/device";
 import {
   assertDeviceInWorkAreas,
@@ -144,14 +145,15 @@ function parseCommissionedAt(value: string | null | undefined): Date | null | un
 
 async function resolveModelClassification(
   modelId: string | null,
+  tenantId?: string | null,
 ): Promise<ModelClassificationDTO | null> {
   if (!modelId) return null;
 
+  const { getOpenClassification } = await import(
+    "@/services/registration/classificationScope"
+  );
   const [cls, instanceCount] = await Promise.all([
-    prisma.deviceModelClassification.findFirst({
-      where: { deviceModelId: modelId, validTo: null },
-      orderBy: { validFrom: "desc" },
-    }),
+    getOpenClassification(prisma, modelId, tenantId),
     prisma.deviceInstance.count({ where: { modelId } }),
   ]);
 
@@ -250,7 +252,7 @@ async function buildDeviceCourse(
 
 async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstance>>>): Promise<DeviceInstanceDetailDTO> {
   const base = toDeviceInstanceDTO(row);
-  const modelClassification = await resolveModelClassification(row.modelId);
+  const modelClassification = await resolveModelClassification(row.modelId, row.tenantId);
   const inspectionTags =
     base.inspectionTags.length > 0
       ? base.inspectionTags
@@ -293,6 +295,16 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
     const key = r.deviceDuty.dutyKey;
     if (!latestByKey.has(key)) latestByKey.set(key, r);
   }
+  const openImportReviews = await prisma.deviceClarification.findMany({
+    where: {
+      deviceInstanceId: row.id,
+      resolvedAt: null,
+      kind: "import_review",
+    },
+    orderBy: { deferredAt: "desc" },
+    take: 5,
+    select: { id: true, label: true, deferredAt: true },
+  });
   return {
     ...presented,
     inspectionTags,
@@ -312,6 +324,11 @@ async function toDetailDTO(row: NonNullable<Awaited<ReturnType<typeof loadInstan
       labelNumber: r.labelNumber!,
       labelNextDue: r.labelNextDue ? r.labelNextDue.toISOString().slice(0, 10) : null,
       performedAt: r.performedAt.toISOString(),
+    })),
+    openImportReviews: openImportReviews.map((c) => ({
+      id: c.id,
+      label: c.label,
+      deferredAt: c.deferredAt.toISOString(),
     })),
   };
 }
@@ -619,6 +636,28 @@ export const deviceInventoryService: InventoryResolver & {
 
     const nextState = input.state ?? existing.state;
     const identityMutable = nextState !== "released" && nextState !== "retired";
+
+    // E103 — do not inventarize-flip to released while provisional import duties are open;
+    // that skips Erstanlage freeze. Use Erstanlage or reclassify instead.
+    if (
+      existing.state !== "released" &&
+      nextState === "released" &&
+      (await lacksRealReleaseFreeze(prisma, existing.id))
+    ) {
+      const openProvisional = await prisma.deviceDuty.count({
+        where: {
+          deviceInstanceId: existing.id,
+          provisional: true,
+          suspendedAt: null,
+        },
+      });
+      if (openProvisional > 0) {
+        throw unprocessable(
+          "Cannot set Released while provisional import duties are open. Complete Erstanlage or update classification first.",
+          { field: "state", code: "provisional_duties_open" },
+        );
+      }
+    }
 
     if (existing.state === "released" && nextState === "released") {
       const nextCommissionedPreview = parseCommissionedAt(input.commissionedAt);

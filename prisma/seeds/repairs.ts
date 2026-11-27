@@ -105,7 +105,16 @@ export async function seedRepairs(prisma: PrismaClient) {
       : {};
   await prisma.tenant.update({
     where: { id: DEMO_TENANT_ID },
-    data: { featureFlags: { ...prev, repairs: true } },
+    data: {
+      featureFlags: {
+        ...prev,
+        repairs: true,
+        // Addendum 6 — demo tenant enables February Gate features by default.
+        importProvisionalDuties: true,
+        routineChecks: true,
+        notifications: true,
+      },
+    },
   });
 
   await prisma.refInspectionType.upsert({

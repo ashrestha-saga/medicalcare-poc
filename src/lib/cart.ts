@@ -46,6 +46,8 @@ export function cartTotal(items: CartItemDTO[]): { amount: number; currency: str
 export function toOrderItems(items: CartItemDTO[]): CreateOrderItemDTO[] {
   return items.map((i) => ({
     articleId: i.part.id,
+    // Shop article OXID id — required by checkout addtocart (`oxid` field).
+    shopArticleId: i.part.id,
     articleNumber: i.part.articleNumber,
     description: i.part.description,
     quantity: i.quantity,

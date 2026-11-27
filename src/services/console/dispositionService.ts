@@ -1,3 +1,5 @@
+import { notificationDedup } from "@/constants/notifications";
+import { notifyService } from "@/services/notifications/notifyService";
 import type { PartnerContext } from "@/interfaces/session";
 import type {
   ConsoleRequestListDTO,
@@ -1103,6 +1105,20 @@ export const dispositionService = {
           state: updated.state,
         },
       });
+
+      // E107 — tell the newly assigned technician (inbox "Für mich").
+      if (updated.assigneeUserId && updated.assigneeUserId !== row.assigneeUserId) {
+        await notifyService.pushSafe(
+          updated.assigneeUserId,
+          "assignment",
+          notificationDedup.assignment(updated.id),
+          `Neuer Auftrag ${reference}`,
+          updated.tenant?.name ?? null,
+          { type: "request", id: reference },
+          row.tenantId,
+          ctx.organisationId,
+        );
+      }
 
       const devices = await deviceLabelsForRequests([updated]);
       return mapRow(

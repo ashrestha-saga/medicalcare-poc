@@ -9,11 +9,18 @@ import type { ActorContext } from "@/interfaces/audit";
 import { recordAudit } from "@/services/audit/auditService";
 import { allocateInventoryNumber } from "@/services/inventory/deviceInventoryService";
 import { createAttachmentFromDataUrl } from "@/services/storage/attachmentBlobService";
+import { notificationDedup } from "@/constants/notifications";
+import { notifyService } from "@/services/notifications/notifyService";
 import { loadActiveDictionary, proposeSheetMappings } from "./importDictionary";
 import { resolveModelForImport } from "./importModelResolve";
 import { impNorm } from "./importNorm";
 import { iterMappedRows } from "./importNormalize";
 import { parseImportBuffer } from "./importParse";
+import {
+  lastPerformancesFromNormalized,
+  mergeImportPerformances,
+} from "./importProvisionalDuties";
+import { recomputeDutyProjection } from "@/services/duties/dutyProjection";
 import type {
   ImportStats,
   ImportTargetField,
@@ -82,13 +89,6 @@ function emptyStats(sheets: number): ImportStats {
     modelHitRate: 0,
     sheets,
   };
-}
-
-function addMonthsEnd(iso: string, months: number): Date {
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(Date.UTC(y!, m! - 1 + months, d || 1));
-  const end = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 0));
-  return end;
 }
 
 async function loadJobOrThrow(jobId: string) {
@@ -322,6 +322,9 @@ export const importJobService = {
         inventoryNumber: true,
         serialNumber: true,
         state: true,
+        room: true,
+        responsiblePerson: true,
+        udiDi: true,
       },
     });
 
@@ -388,8 +391,14 @@ export const importJobService = {
 
           if (bySn) {
             if (bySn.state === "released") {
-              outcome = "review";
               stats.releasedHits++;
+              // Date-only merge is automatic; Klärliste only when identity drifts.
+              if (importIdentityDrift(bySn, normalized).length) {
+                outcome = "review";
+              } else {
+                outcome = "updated";
+                stats.updated++;
+              }
             } else {
               outcome = "updated";
               stats.updated++;
@@ -403,8 +412,13 @@ export const importJobService = {
               );
               stats.new++;
             } else if (byInv.state === "released") {
-              outcome = "review";
               stats.releasedHits++;
+              if (importIdentityDrift(byInv, normalized).length) {
+                outcome = "review";
+              } else {
+                outcome = "updated";
+                stats.updated++;
+              }
             } else {
               outcome = "updated";
               stats.updated++;
@@ -488,7 +502,10 @@ export const importJobService = {
     });
     const siteById = new Map(sites.map((s) => [s.id, s]));
 
-    const result = await prisma.$transaction(async (tx) => {
+    // Multi-row commit (sites, devices, provisional duties) routinely exceeds Prisma's
+    // default 5s interactive TX budget once E103 writes lastPerformances.
+    const result = await prisma.$transaction(
+      async (tx) => {
       const siteResolve = new Map<string, string>(); // sheet name → siteId
       for (const sm of mapping.sheets) {
         if (sm.siteId && siteById.has(sm.siteId)) {
@@ -536,41 +553,6 @@ export const importJobService = {
           });
           continue;
         }
-        if (row.outcome === "review") {
-          const sn = n.seriennummer;
-          const hit = sn
-            ? await tx.deviceInstance.findFirst({
-                where: {
-                  tenantId: ctx.tenantId,
-                  serialNumber: { equals: sn },
-                  state: "released",
-                },
-              })
-            : null;
-          if (hit) {
-            const clar = await tx.deviceClarification.create({
-              data: {
-                tenantId: ctx.tenantId,
-                deviceInstanceId: hit.id,
-                kind: "import_review",
-                field: null,
-                label: `Import-Treffer auf freigegebenes Gerät (${job.fileName}, ${n.sheet} Z.${n.rowNo})`,
-                deferredBy: actorLabel(ctx),
-                deferredAt: new Date(),
-              },
-            });
-            klaer++;
-            await tx.importRow.update({
-              where: { id: row.id },
-              data: {
-                clarificationIds: [clar.id] as unknown as Prisma.InputJsonValue,
-                deviceInstanceId: hit.id,
-              },
-            });
-          }
-          continue;
-        }
-
         // Resolve / create model
         let modelId = row.modelId;
         if (!modelId || row.modelMatch === "new") {
@@ -633,13 +615,93 @@ export const importJobService = {
 
         const hint = `aus ${job.fileName}, Blatt ${n.sheet}, Zeile ${n.rowNo}`;
         const commissionedAt = n.jahr ? new Date(Date.UTC(n.jahr, 0, 1)) : null;
-
-        let device =
-          row.outcome === "updated"
-            ? await findExistingDraft(tx, ctx.tenantId, n)
-            : null;
-
+        const performances = lastPerformancesFromNormalized(n);
         const clarIds: string[] = [];
+
+        // Match existing unit for update / released date-merge (not on conflict → new inventar).
+        const existing =
+          row.outcome === "conflict"
+            ? null
+            : await findExistingForImport(tx, ctx.tenantId, n);
+
+        // Preview said review but no match — do not invent a second unit.
+        if (row.outcome === "review" && !existing) {
+          rest++;
+          await tx.importRow.update({
+            where: { id: row.id },
+            data: { outcome: "skipped", deviceInstanceId: null },
+          });
+          continue;
+        }
+
+        // Released: merge duty dates only; identity stays immutable; clar only when needed.
+        if (existing?.state === "released") {
+          aktualisiert++;
+          const modelRow = modelId
+            ? await tx.deviceModel.findFirst({
+                where: { id: modelId },
+                select: { maintenanceCycleMonths: true },
+              })
+            : null;
+          const merge = await mergeImportPerformances(tx, {
+            tenantId: ctx.tenantId,
+            deviceInstanceId: existing.id,
+            actorLabel: actorLabel(ctx),
+            jobFileName: job.fileName,
+            sheet: n.sheet,
+            rowNo: n.rowNo,
+            performances,
+            maintenanceCycleMonths: modelRow?.maintenanceCycleMonths ?? null,
+            requireReviewForNewKeys: true,
+          });
+          faellig += merge.updated;
+          if (merge.updated > 0) {
+            await recomputeDutyProjection(tx, existing.id);
+            await tx.deviceUnitEvent.create({
+              data: {
+                tenantId: ctx.tenantId,
+                deviceInstanceId: existing.id,
+                actor: actorLabel(ctx),
+                action: "import_duty_dates",
+                note: `${hint} — Pflichttermine aktualisiert (${merge.updated})`,
+              },
+            });
+          }
+
+          const drift = importIdentityDrift(existing, n);
+          const reviewBits = [
+            ...drift,
+            ...merge.pendingNewKeys.map((k) => `Neue Pflicht ${k.toUpperCase()} aus Datei — Freigabe prüfen`),
+          ];
+          if (reviewBits.length) {
+            const clar = await tx.deviceClarification.create({
+              data: {
+                tenantId: ctx.tenantId,
+                deviceInstanceId: existing.id,
+                kind: "import_review",
+                field: null,
+                label: `Import-Prüfung (${job.fileName}, ${n.sheet} Z.${n.rowNo}): ${reviewBits.join(" · ")}`,
+                deferredBy: actorLabel(ctx),
+                deferredAt: new Date(),
+              },
+            });
+            clarIds.push(clar.id);
+            klaer++;
+          }
+
+          await tx.importRow.update({
+            where: { id: row.id },
+            data: {
+              deviceInstanceId: existing.id,
+              modelId,
+              clarificationIds: clarIds as unknown as Prisma.InputJsonValue,
+              outcome: reviewBits.length ? "review" : "updated",
+            },
+          });
+          continue;
+        }
+
+        let device = existing;
         let updatedExisting = false;
 
         if (device) {
@@ -682,6 +744,14 @@ export const importJobService = {
               note: changeBits.length ? `${hint} (${changeBits.join(", ")})` : hint,
             },
           });
+          // Drop stale missing-field / classification clars; never wipe duties.
+          await tx.deviceClarification.deleteMany({
+            where: {
+              deviceInstanceId: device.id,
+              resolvedAt: null,
+              kind: { in: ["missing_field", "classification"] },
+            },
+          });
         } else {
           neu++;
           let inv = n.inventarnummer;
@@ -714,18 +784,6 @@ export const importJobService = {
               action: "imported",
               toState: "draft",
               note: hint,
-            },
-          });
-        }
-
-        // Re-import: clear old duties/clars first, then write fresh ones.
-        if (updatedExisting) {
-          await clearDeviceDutiesForImport(tx, device.id);
-          await tx.deviceClarification.deleteMany({
-            where: {
-              deviceInstanceId: device.id,
-              resolvedAt: null,
-              kind: { in: ["missing_field", "classification"] },
             },
           });
         }
@@ -765,55 +823,29 @@ export const importJobService = {
           klaer++;
         }
 
-        // R26 due dates
-        for (const p of n.pruefungen || []) {
-          const dutyKey = p.art === "MTK" ? "mtk" : "stk";
-          const months = 24;
-          const ref = new Date(`${p.iso}T00:00:00.000Z`);
-          const dueAt = addMonthsEnd(p.iso, months);
-          const snapshot = await tx.deviceReleaseSnapshot.create({
-            data: {
-              tenantId: ctx.tenantId,
-              deviceInstanceId: device.id,
-              releasedBy: actorLabel(ctx),
-              ruleSetIds: "[]",
-              characteristics: "{}",
-              derivedDuties: JSON.stringify([{ id: dutyKey, from: "import" }]),
-              prerequisites: "[]",
-              appVersion: "import",
-            },
+        // Merge STK/MTK/… by duty key — never wipe Wartung or other duties.
+        if (performances.length) {
+          const modelRow = modelId
+            ? await tx.deviceModel.findFirst({
+                where: { id: modelId },
+                select: { maintenanceCycleMonths: true },
+              })
+            : null;
+          const merge = await mergeImportPerformances(tx, {
+            tenantId: ctx.tenantId,
+            deviceInstanceId: device.id,
+            actorLabel: actorLabel(ctx),
+            jobFileName: job.fileName,
+            sheet: n.sheet,
+            rowNo: n.rowNo,
+            performances,
+            maintenanceCycleMonths: modelRow?.maintenanceCycleMonths ?? null,
+            requireReviewForNewKeys: false,
           });
-          const duty = await tx.deviceDuty.create({
-            data: {
-              tenantId: ctx.tenantId,
-              deviceInstanceId: device.id,
-              snapshotId: snapshot.id,
-              dutyKey,
-              inspectionTypeCode: p.art,
-              deadlineAnchor: "month_end",
-              intervalValue: months,
-              intervalUnit: "months",
-              basisText: `aus Import: letzte Prüfung ${p.iso} + ${months} Monate`,
-              confidence: "derived",
-              applicable: true,
-              referenceDate: ref,
-              dueAt,
-              title: p.art,
-              category: "inspection",
-            },
-          });
-          await tx.dutyPerformance.create({
-            data: {
-              tenantId: ctx.tenantId,
-              deviceDutyId: duty.id,
-              performedAt: ref,
-              result: "passed",
-              note: p.raw,
-              performedBy: "Import",
-              source: "import",
-            },
-          });
-          faellig++;
+          faellig += merge.updated + merge.createdProvisional;
+          if (merge.updated + merge.createdProvisional > 0) {
+            await recomputeDutyProjection(tx, device.id);
+          }
         }
 
         await tx.importRow.update({
@@ -822,7 +854,12 @@ export const importJobService = {
             deviceInstanceId: device.id,
             modelId,
             clarificationIds: clarIds as unknown as Prisma.InputJsonValue,
-            outcome: row.outcome === "conflict" ? "conflict" : device ? (aktualisiert && row.outcome === "updated" ? "updated" : "new") : "new",
+            outcome:
+              row.outcome === "conflict"
+                ? "conflict"
+                : updatedExisting
+                  ? "updated"
+                  : "new",
           },
         });
       }
@@ -854,7 +891,9 @@ export const importJobService = {
       });
 
       return { job: updatedJob, neu, aktualisiert, klaer, modelle, rest, faellig };
-    });
+      },
+      { maxWait: 15_000, timeout: 120_000 },
+    );
 
     if (!("already" in result) || !result.already) {
       const actor = auditActor(ctx);
@@ -868,6 +907,19 @@ export const importJobService = {
         summary: `Bestandsimport ${job.fileName}: ${neu} neu, ${aktualisiert} aktualisiert`,
         after: result.job.stats,
       });
+
+      // E107 — tell the device admins the import finished (provisional duties need review).
+      await notifyService.pushToRoles(
+        ctx.tenantId,
+        ["device_admin"],
+        "import_review",
+        notificationDedup.importFinished(job.id),
+        `Import abgeschlossen: ${job.fileName}`,
+        `${neu} neu, ${aktualisiert} aktualisiert`,
+        { type: "import_job", id: job.id, focus: "klaerliste" },
+        ctx.tenantId,
+        null,
+      );
 
       if (
         actorKindOf(ctx) === "clinic" &&
@@ -918,6 +970,7 @@ export const importJobService = {
     const models = await prisma.deviceModel.findMany({
       where: { id: { in: ids } },
       include: { classifications: { orderBy: { validFrom: "desc" }, take: 1 } },
+      orderBy: { createdAt: "desc" },
     });
     return models.filter((m) => !m.classifications[0]);
   },
@@ -935,46 +988,48 @@ export const importJobService = {
   },
 };
 
-/** Drop duties (+ import snapshots) so a second import does not stack STK/MTK. */
-async function clearDeviceDutiesForImport(
-  tx: Prisma.TransactionClient,
-  deviceInstanceId: string,
-) {
-  const duties = await tx.deviceDuty.findMany({
-    where: { deviceInstanceId },
-    select: { id: true, snapshotId: true },
-  });
-  if (!duties.length) {
-    await tx.deviceReleaseSnapshot.deleteMany({
-      where: { deviceInstanceId, appVersion: "import" },
-    });
-    return;
-  }
-  const dutyIds = duties.map((d) => d.id);
-  const snapshotIds = [...new Set(duties.map((d) => d.snapshotId))];
+type ImportIdentityDevice = {
+  inventoryNumber: string;
+  serialNumber: string | null;
+  room: string | null;
+  responsiblePerson: string | null;
+  udiDi: string | null;
+};
 
-  await tx.serviceRequest.updateMany({
-    where: { dutyId: { in: dutyIds } },
-    data: { dutyId: null },
-  });
-  await tx.inspectionRun.updateMany({
-    where: { deviceDutyId: { in: dutyIds } },
-    data: { deviceDutyId: null },
-  });
-  await tx.dutyReminder.deleteMany({ where: { deviceDutyId: { in: dutyIds } } });
-  await tx.dutyPerformance.deleteMany({ where: { deviceDutyId: { in: dutyIds } } });
-  await tx.deviceDuty.deleteMany({ where: { id: { in: dutyIds } } });
-  await tx.deviceReleaseSnapshot.deleteMany({
-    where: {
-      OR: [
-        { id: { in: snapshotIds } },
-        { deviceInstanceId, appVersion: "import" },
-      ],
-    },
-  });
+/** Identity fields that differ between file and released inventory (for review clar). */
+function importIdentityDrift(device: ImportIdentityDevice, n: NormalizedRow): string[] {
+  const bits: string[] = [];
+  if (n.raum?.trim() && device.room?.trim() && impNorm(n.raum) !== impNorm(device.room)) {
+    bits.push(`Raum Datei=${n.raum.trim()} / Bestand=${device.room.trim()}`);
+  }
+  if (
+    n.verantwortlich?.trim() &&
+    device.responsiblePerson?.trim() &&
+    impNorm(n.verantwortlich) !== impNorm(device.responsiblePerson)
+  ) {
+    bits.push(
+      `Verantwortlich Datei=${n.verantwortlich.trim()} / Bestand=${device.responsiblePerson.trim()}`,
+    );
+  }
+  const fileGtin = (n.gtin || "").replace(/\D/g, "");
+  const stockGtin = (device.udiDi || "").replace(/\D/g, "");
+  if (fileGtin && stockGtin && fileGtin !== stockGtin && !n.gtin.includes("E+")) {
+    bits.push(`UDI Datei≠Bestand`);
+  }
+  if (
+    n.inventarnummer?.trim() &&
+    device.inventoryNumber &&
+    impNorm(n.inventarnummer) !== impNorm(device.inventoryNumber)
+  ) {
+    bits.push(
+      `Inventar Datei=${n.inventarnummer.trim()} / Bestand=${device.inventoryNumber}`,
+    );
+  }
+  return bits;
 }
 
-async function findExistingDraft(
+/** Match by serial then inventory number — any non-retired state. */
+async function findExistingForImport(
   tx: Prisma.TransactionClient,
   tenantId: string,
   n: NormalizedRow,
@@ -984,7 +1039,7 @@ async function findExistingDraft(
       where: {
         tenantId,
         serialNumber: n.seriennummer,
-        state: { in: ["draft", "review"] },
+        state: { not: "retired" },
       },
     });
     if (bySn) return bySn;
@@ -994,7 +1049,7 @@ async function findExistingDraft(
       where: {
         tenantId,
         inventoryNumber: n.inventarnummer,
-        state: { in: ["draft", "review"] },
+        state: { not: "retired" },
       },
     });
   }

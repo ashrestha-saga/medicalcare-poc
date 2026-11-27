@@ -8,6 +8,7 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "inventory:view",
   "inventory:update",
   "inventory:export",
+  "export:dossier",
   "import:manage",
   "catalog:view",
   "catalog:update",
@@ -36,6 +37,7 @@ export const ALL_PERMISSIONS: readonly PermissionSlug[] = [
   "roles:view",
   "roles:update",
   "management:view",
+  "shop-orders:view",
   "training:view",
   "audit:view",
   "audit:export",
@@ -96,6 +98,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
     ...SERVICE_STAFF,
     "inventory:update",
     "inventory:export",
+    "export:dossier",
     "catalog:update",
     "clarifications:view",
     "inspections:view",
@@ -112,10 +115,12 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
     "authority:view",
     "authority:manage",
     "requests:approve",
+    "shop-orders:view",
   ],
   security_officer: [
     ...SERVICE_STAFF,
     "inventory:export",
+    "export:dossier",
     "requests:view-all",
     "requests:approve",
     "incidents:view",
@@ -124,6 +129,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, readonly PermissionSlug[]> = {
     "fieldsafety:create",
     "devicebook:view",
     "authority:view",
+    "shop-orders:view",
   ],
   // No shell:nav → Inventory-only chrome; /requests is blocked by RouteGuard.
   // /security and /device-book are allowed without shell:nav (see canAccessPath).
@@ -166,6 +172,7 @@ export const PERMISSION_GROUPS: readonly {
       { slug: "inventory:view", description: "View device inventory" },
       { slug: "inventory:update", description: "Change and release device records" },
       { slug: "inventory:export", description: "Export §14 inventory directory (CSV)" },
+      { slug: "export:dossier", description: "Export device dossier ZIP (Gerätemappe)" },
       { slug: "import:manage", description: "Import inventory as acting Prüfpartner (contract grant)" },
       { slug: "clarifications:view", description: "View clarifications list" },
       { slug: "duties:view", description: "View duties and due dates" },
@@ -222,6 +229,7 @@ export const PERMISSION_GROUPS: readonly {
     items: [
       { slug: "training:view", description: "View training and instruction records" },
       { slug: "management:view", description: "Management reports and overview" },
+      { slug: "shop-orders:view", description: "View shop orders (admin / management)" },
     ],
   },
   {
@@ -287,6 +295,7 @@ export const MENU_MODULES: readonly MenuModule[] = [
   { id: "users", label: "Users", href: "/users", slug: "users:view", group: "admin" },
   { id: "catalog", label: "Catalog", href: "/catalog", slug: "catalog:view", group: "admin" },
   { id: "management", label: "Management", href: "/management", slug: "management:view", group: "admin" },
+  { id: "shop-orders", label: "Shop orders", href: "/shop-orders", slug: "shop-orders:view", group: "admin" },
   { id: "roles", label: "Roles", href: "/roles", slug: "roles:view", group: "admin" },
   { id: "activity", label: "Activity", href: "/activity", slug: "audit:view", group: "admin" },
   // Secondary rail only
@@ -319,6 +328,8 @@ export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/locations": "locations:view",
   "/roles": "roles:view",
   "/management": "management:view",
+  "/shop-orders": "shop-orders:view",
+  "/shop": "parts:request",
   "/commissioning": "shell:nav",
   "/activity": "audit:view",
   "/security": "account:security",
@@ -327,6 +338,9 @@ export const PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/field-safety": "fieldsafety:view",
   "/device-book": "devicebook:view",
   "/reprocessing": "reprocessing:view",
+  "/routines": "inventory:view",
+  "/reports/pending": "inventory:view",
+
   "/authority": "authority:view",
 };
 
@@ -380,7 +394,10 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   if (pathname.startsWith("/locations")) return "locations:view";
   if (pathname.startsWith("/roles")) return "roles:view";
   if (pathname.startsWith("/management")) return "management:view";
+  if (pathname.startsWith("/shop-orders")) return "shop-orders:view";
+  if (pathname.startsWith("/shop")) return "parts:request";
   if (pathname.startsWith("/commissioning")) return "shell:nav";
+  if (pathname.startsWith("/notifications")) return "shell:nav";
   if (pathname.startsWith("/activity")) return "audit:view";
   if (pathname.startsWith("/security")) return "account:security";
   if (pathname.startsWith("/settings")) return "settings:view";
@@ -389,6 +406,8 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
   if (pathname.startsWith("/field-safety")) return "fieldsafety:view";
   if (pathname.startsWith("/device-book")) return "devicebook:view";
   if (pathname.startsWith("/reprocessing")) return "reprocessing:view";
+  if (pathname.startsWith("/routines")) return "inventory:view";
+  if (pathname.startsWith("/reports")) return "inventory:view";
   if (pathname.startsWith("/authority")) return "authority:view";
   return null;
 }
@@ -399,6 +418,7 @@ export function resolvePathPermission(path: string): PermissionSlug | null {
  * - Home `/` needs only its resource slug (works without shell:nav).
  * - `/security` needs only account:security (works without shell:nav for capturers).
  * - `/device-book` needs only devicebook:view (area-scoped capturers; no shell:nav).
+ * - `/shop` needs only parts:request (clinic users can order without full shell nav).
  * - Any other app path needs `shell:nav` plus the path’s resource slug.
  */
 export function canAccessPath(
@@ -428,7 +448,9 @@ export function canAccessPath(
     pathname === "/security" ||
     pathname.startsWith("/security") ||
     pathname === "/device-book" ||
-    pathname.startsWith("/device-book")
+    pathname.startsWith("/device-book") ||
+    pathname === "/shop" ||
+    pathname.startsWith("/shop/")
   ) {
     return true;
   }

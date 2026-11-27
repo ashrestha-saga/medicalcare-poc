@@ -29,6 +29,15 @@ import { toProductKindDTO } from "./productKinds";
 import { extractModelCharacteristics } from "./modelCharacteristics";
 import type { RegistrationCharacteristics } from "./types";
 import { modelDocumentService } from "@/services/catalog/modelDocumentService";
+import {
+  lacksRealReleaseFreeze,
+  suspendProvisionalAndRelinkPerformances,
+} from "@/services/import/importProvisionalDuties";
+import {
+  createTenantClassification,
+  getOpenClassification,
+} from "@/services/registration/classificationScope";
+import type { DutyKey } from "@prisma/client";
 
 const IFU_PREREQUISITE_CODES = new Set(["ga", "ifu", "gebrauchsanweisung"]);
 
@@ -323,8 +332,32 @@ export const releaseService = {
       include: { area: true, model: true },
     });
     if (!row) throw notFound("Draft not found.");
-    if (row.state === "released") throw unprocessable("Already released.");
     if (row.state === "retired") throw unprocessable("Retired record.");
+    // E103 — allow one repair freeze when inventory flipped to released without Erstanlage.
+    if (row.state === "released" && !(await lacksRealReleaseFreeze(prisma, row.id))) {
+      throw unprocessable("Already released.");
+    }
+
+    // If the model already has a clinic classification, import "missing classification"
+    // clars are stale — resolve them so Erstanlage / catalog-link is not blocked.
+    if (row.modelId) {
+      const openModelClass = await getOpenClassification(prisma, row.modelId, tenantId);
+      if (openModelClass) {
+        await prisma.deviceClarification.updateMany({
+          where: {
+            tenantId,
+            deviceInstanceId: row.id,
+            resolvedAt: null,
+            kind: "classification",
+          },
+          data: {
+            resolvedBy: ctx.user.name,
+            resolvedAt: new Date(),
+            resolutionNote: "Resolved — model already classified",
+          },
+        });
+      }
+    }
 
     const openClarifications = await prisma.deviceClarification.count({
       where: {
@@ -426,23 +459,16 @@ export const releaseService = {
 
     const existingOpenClassification =
       catalogLink && row.modelId
-        ? await prisma.deviceModelClassification.findFirst({
-            where: { deviceModelId: row.modelId, validTo: null },
-            orderBy: { validFrom: "desc" },
-          })
+        ? await getOpenClassification(prisma, row.modelId, tenantId)
         : null;
 
     const result = await prisma.$transaction(async (tx) => {
-      let classificationId: string | null = existingOpenClassification?.id ?? null;
+      let classificationId: string | null =
+        catalogLink && existingOpenClassification?.tenantId === tenantId
+          ? existingOpenClassification.id
+          : null;
 
-      if (!catalogLink || !existingOpenClassification) {
-        if (row.modelId) {
-          await tx.deviceModelClassification.updateMany({
-            where: { deviceModelId: row.modelId, validTo: null },
-            data: { validTo: new Date(), openClassificationKey: null },
-          });
-        }
-
+      if (!catalogLink || !classificationId) {
         const fieldStates: Record<string, string> = {};
         const deferredFields: string[] = [];
         for (const [field, meta] of Object.entries(characteristicsFrozen.answerMeta ?? {})) {
@@ -461,32 +487,30 @@ export const releaseService = {
 
         const classification =
           row.modelId != null
-            ? await tx.deviceModelClassification.create({
-                data: {
-                  deviceModelId: row.modelId,
-                  openClassificationKey: row.modelId,
-                  stk: stkFlagFromDuties(preview.duties),
-                  mtkItemId,
-                  radiation: Boolean(characteristics.strahlung),
-                  softwareClass:
-                    characteristics.software &&
-                    characteristics.swKlasse &&
-                    characteristics.swKlasse !== "keine"
-                      ? characteristics.swKlasse
-                      : null,
-                  confidence,
-                  evidenceText,
-                  ruleSetId: mpRule.id,
-                  confirmedBy:
-                    confidence === "verified" || confidence === "responsible" ? ctx.user.name : null,
-                  confirmedAt:
-                    confidence === "verified" || confidence === "responsible" ? new Date() : null,
-                  productKindCode: characteristics.produktart || row.productKindCode,
-                  characteristics: JSON.stringify(modelChars),
-                  fieldStates: JSON.stringify(fieldStates),
-                  decisions: JSON.stringify(protocol),
-                  deferredFields: deferredFields.length ? JSON.stringify(deferredFields) : null,
-                },
+            ? await createTenantClassification(tx, {
+                deviceModelId: row.modelId,
+                tenantId,
+                ruleSetId: mpRule.id,
+                stk: stkFlagFromDuties(preview.duties),
+                mtkItemId,
+                radiation: Boolean(characteristics.strahlung),
+                softwareClass:
+                  characteristics.software &&
+                  characteristics.swKlasse &&
+                  characteristics.swKlasse !== "keine"
+                    ? characteristics.swKlasse
+                    : null,
+                confidence,
+                evidenceText,
+                confirmedBy:
+                  confidence === "verified" || confidence === "responsible" ? ctx.user.name : null,
+                confirmedAt:
+                  confidence === "verified" || confidence === "responsible" ? new Date() : null,
+                productKindCode: characteristics.produktart || row.productKindCode,
+                characteristics: JSON.stringify(modelChars),
+                fieldStates: JSON.stringify(fieldStates),
+                decisions: JSON.stringify(protocol),
+                deferredFields: deferredFields.length ? JSON.stringify(deferredFields) : null,
               })
             : null;
         classificationId = classification?.id ?? null;
@@ -522,6 +546,20 @@ export const releaseService = {
           lastMaintainedAt: row.lastMaintainedAt,
         });
       }
+
+      // E103 / R66 — suspend provisional import duties; re-link imported performances.
+      const freshDuties = await tx.deviceDuty.findMany({
+        where: { snapshotId: snapshot.id, provisional: false },
+        select: { id: true, dutyKey: true },
+      });
+      const newDutiesByKey = new Map<DutyKey, string>();
+      for (const d of freshDuties) {
+        if (!newDutiesByKey.has(d.dutyKey)) newDutiesByKey.set(d.dutyKey, d.id);
+      }
+      await suspendProvisionalAndRelinkPerformances(tx, {
+        deviceInstanceId: row.id,
+        newDutiesByKey,
+      });
 
       await recomputeDutyProjection(tx, row.id);
 
@@ -588,7 +626,7 @@ export const releaseService = {
           action: "state_change",
           fromState: row.state,
           toState: "released",
-          note: `Release with snapshot ${snapshot.id} (level ${releaseLevel}) — answers: ${answerCounts.confirmed} confirmed, ${answerCounts.changed} changed, ${answerCounts.selfChosen} self-chosen`,
+          note: `${row.state === "released" ? "Repair freeze" : "Release"} with snapshot ${snapshot.id} (level ${releaseLevel}) — answers: ${answerCounts.confirmed} confirmed, ${answerCounts.changed} changed, ${answerCounts.selfChosen} self-chosen`,
         },
       });
 

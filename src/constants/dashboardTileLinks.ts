@@ -13,6 +13,10 @@ export const DASHBOARD_TILE_LINKS: Record<string, DashboardTileLink> = {
   "faellig-30": { path: "/due-dates", query: { horizon: "30" } },
   "fristen-ohne-beleg": { path: "/due-dates" },
   "pruefungen-quartal": { path: "/due-dates", query: { horizon: "90" } },
+  "import-provisional": { path: "/due-dates", query: { provisional: "1" } },
+  "berichte-ohne-bestaetigung": { path: "/reports/pending" },
+
+  "fuer-mich": { path: "/notifications" },
   "konstanz-heute": {
     path: "/constancy-cadence",
     query: { tab: "routine" },
@@ -52,11 +56,13 @@ export const DASHBOARD_TILE_LINKS: Record<string, DashboardTileLink> = {
   "auftraege-termin": { path: "/requests", query: { state: "scheduled" } },
   "stoerung-melden": { path: "/fault-report" },
 
+  /** E105 IFU open-today (not reprocessing equipment checks). */
   "routine-heute": {
-    path: "/reprocessing",
-    query: { section: "checks", cadence: "daily", openToday: "1" },
+    path: "/routines",
+    query: { openToday: "1" },
   },
   "charge-offen": { path: "/reprocessing", query: { section: "batches" } },
+
   "wasser-chemie": {
     path: "/reprocessing",
     query: { section: "checks", cadence: "daily", openToday: "1", scope: "water,chemistry" },

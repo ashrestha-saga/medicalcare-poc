@@ -24,6 +24,8 @@ export interface CreateOrderItemDTO {
   description: string;
   quantity: number;
   unitPrice?: number | null;
+  shopArticleId?: string;
+  gtin?: string;
 }
 
 export interface CreateOrderRequestDTO {
@@ -35,6 +37,21 @@ export interface CreateOrderRequestDTO {
   items: CreateOrderItemDTO[];
   raisedBy: string;
   correlationId?: string;
+  purpose?: "device" | "parts";
+  deviceInstanceId?: string;
+  serviceRequestId?: string;
+  deliverySiteId?: string;
+}
+
+export interface OrderStatusEventDTO {
+  id: string;
+  externalState: string;
+  source: string;
+  eventId: string;
+  actorName: string | null;
+  invoiceRef: string | null;
+  netTotal: number | null;
+  receivedAt: string;
 }
 
 export interface OrderRequestDTO {
@@ -49,6 +66,33 @@ export interface OrderRequestDTO {
   state: "captured";
   raisedBy: string | null;
   createdAt: string;
+  updatedAt?: string;
+  purpose?: "device" | "parts";
+  deviceInstanceId?: string | null;
+  /** Resolved inventory device when order was placed for a device / its accessories. */
+  device?: {
+    id: string;
+    inventoryNumber: string;
+    label: string;
+    href: string;
+  } | null;
+  externalState?: string;
+  externalOrderRef?: string | null;
+  externalOrderId?: string | null;
+  orderedByName?: string | null;
+  netTotalFromSource?: number | null;
+  currency?: string | null;
+  /** Shop cart totals captured at submit; null when not yet priced by the shop. */
+  priceBreakdown?: {
+    netSubtotal?: number | null;
+    vat?: number | null;
+    grossSubtotal?: number | null;
+    shipping?: number | null;
+    total?: number | null;
+    currency?: string | null;
+  } | null;
+  lastSubmitError?: string | null;
+  itemCount?: number;
   items: {
     id: string;
     articleId: string | null;
@@ -56,7 +100,26 @@ export interface OrderRequestDTO {
     description: string;
     quantity: number;
     unitPrice: number | null;
+    gtin?: string | null;
+    priceSource?: string;
+    quantityConfirmed?: number | null;
   }[];
+  statusEvents?: OrderStatusEventDTO[];
+}
+
+export interface ShopOrdersSummaryDTO {
+  total: number;
+  ordered: number;
+  submitting: number;
+  intent: number;
+  shipped: number;
+  failed: number;
+  other: number;
+}
+
+export interface ShopOrdersListResponse {
+  orders: OrderRequestDTO[];
+  summary: ShopOrdersSummaryDTO;
 }
 
 export interface CreateOrderRequestResult {

@@ -5,6 +5,23 @@ import nextTs from "eslint-config-next/typescript";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/services/shop/shopRegistry.ts", "src/services/shop/providers/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/services/shop/providers/**", "@/services/shop/providers/*", "@/services/shop/providers/**"],
+              message: "Import shop providers only via @/services/shop/shopRegistry.",
+            },
+          ],
+        },
+      ],
+    },
+  },
   globalIgnores([
     ".next/**",
     "out/**",
@@ -16,3 +33,4 @@ export default defineConfig([
     "prisma/dev.db*",
   ]),
 ]);
+

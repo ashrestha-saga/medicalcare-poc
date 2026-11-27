@@ -171,4 +171,6 @@ export interface DeviceDutyDTO {
   status: DutyScheduleStatus;
   inventoryNumber?: string;
   tradeName?: string | null;
+  /** E103 — import Erstanlage light; full release still pending. */
+  provisional?: boolean;
 }

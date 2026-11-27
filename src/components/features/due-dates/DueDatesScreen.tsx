@@ -45,6 +45,8 @@ export function DueDatesScreen() {
               confidence={list.confidence}
               onConfidenceChange={list.setConfidence}
               scheduled={list.scheduled}
+              provisional={list.provisional}
+              onProvisionalChange={list.setProvisional}
               onClearAll={list.clearExtraFilters}
             />
             <DueDatesTable list={list} />

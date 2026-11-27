@@ -1,27 +1,36 @@
 import { requirePermission, requireTenantContext, withTenantStore } from "@/lib/auth/tenantContext";
-import { errorResponse, downstreamUnavailable } from "@/lib/errors";
+import { errorResponse } from "@/lib/errors";
 import { hasPermission } from "@/constants/permissions";
-import { oxidAuthService } from "@/services/oxid/oxidAuthService";
-import { tenantOxidService } from "@/services/oxid/tenantOxidService";
+import { actorFromContext } from "@/lib/auth/actorContext";
+import { shopAuthService } from "@/services/shop/shopAuthService";
+import { shopConnectionService } from "@/services/shop/shopConnectionService";
 
-/** GET /api/settings/oxid — public status of the tenant OXID link (any signed-in user). */
+/** GET /api/settings/oxid — shim to shop connection status. */
 export async function GET(req: Request) {
   let correlationId: string | undefined;
   try {
     const ctx = await requireTenantContext(req);
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
-      const status = await tenantOxidService.getPublicStatus(ctx.tenantId);
+      const canManage = hasPermission(ctx.user.role, "settings:oxid");
+      const status = await shopConnectionService.getPublicStatus(ctx.tenantId, canManage);
       return Response.json({
-        ...status,
-        canManage: hasPermission(ctx.user.role, "settings:oxid") });
+        configured: status.configured,
+        status: status.status,
+        customerNumber: status.customerNumber,
+        companyName: status.companyName,
+        shopBaseUrl: status.shopBaseUrl,
+        connectedAt: status.connectedAt,
+        lastError: status.lastError,
+        canManage: status.canManage,
+      });
     });
   } catch (error) {
     return errorResponse(error, correlationId);
   }
 }
 
-/** POST /api/settings/oxid — superadmin starts OAuth to connect the tenant shop. */
+/** POST /api/settings/oxid — start shop OAuth connect. */
 export async function POST(req: Request) {
   let correlationId: string | undefined;
   try {
@@ -29,11 +38,11 @@ export async function POST(req: Request) {
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       requirePermission(ctx, "settings:oxid");
-      if (!oxidAuthService.isConfigured()) throw downstreamUnavailable("OXID is not configured on the server.");
-      const authorizeUrl = oxidAuthService.beginTenantConnect({
+      const authorizeUrl = await shopAuthService.beginConnect({
         tenantId: ctx.tenantId,
         adminUserId: ctx.user.id,
-        returnTo: "/settings" });
+        returnTo: "/settings",
+      });
       return Response.json({ authorizeUrl });
     });
   } catch (error) {
@@ -41,7 +50,7 @@ export async function POST(req: Request) {
   }
 }
 
-/** DELETE /api/settings/oxid — superadmin disconnects the tenant shop. */
+/** DELETE /api/settings/oxid — disconnect shop tokens. */
 export async function DELETE(req: Request) {
   let correlationId: string | undefined;
   try {
@@ -49,8 +58,17 @@ export async function DELETE(req: Request) {
     return await withTenantStore(ctx, async () => {
       correlationId = ctx.correlationId;
       requirePermission(ctx, "settings:oxid");
-      const status = await tenantOxidService.disconnect(ctx.tenantId);
-      return Response.json({ ...status, canManage: true });
+      const status = await shopConnectionService.disconnect(ctx.tenantId, actorFromContext(ctx));
+      return Response.json({
+        configured: status.configured,
+        status: status.status,
+        customerNumber: status.customerNumber,
+        companyName: status.companyName,
+        shopBaseUrl: status.shopBaseUrl,
+        connectedAt: status.connectedAt,
+        lastError: status.lastError,
+        canManage: true,
+      });
     });
   } catch (error) {
     return errorResponse(error, correlationId);

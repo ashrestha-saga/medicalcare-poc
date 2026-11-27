@@ -225,10 +225,15 @@ export function useRegistrationWizard(initialDraftId?: string) {
       const hasInstanceChars = Boolean(draft.characteristics?.produktart);
       const hasModelPrefill = Boolean(draft.modelClassificationPrefill?.produktart);
 
-      if (!hasInstanceChars && hasModelPrefill && draft.modelClassificationPrefill) {
+      // Clinic already classified this Bauart → reuse it (catalog-link). Never re-ask
+      // Merkmale on a single-unit resume/repair; model-wide changes go through reclassify.
+      if (hasModelPrefill && draft.modelClassificationPrefill) {
         const year = draft.purchaseYear ? String(draft.purchaseYear) : "";
         const characteristics = hydrateAnswerMeta(
-          mergeModelPrefill(emptyCharacteristics(), draft.modelClassificationPrefill),
+          mergeModelPrefill(
+            hasInstanceChars ? hydrateAnswerMeta(draft.characteristics) : emptyCharacteristics(),
+            draft.modelClassificationPrefill,
+          ),
         );
         setMerkmale(characteristics);
         try {
@@ -246,20 +251,10 @@ export function useRegistrationWizard(initialDraftId?: string) {
         return;
       }
 
-      setMerkmale(() => {
-        const base = hasInstanceChars
-          ? hydrateAnswerMeta(draft.characteristics)
-          : emptyCharacteristics();
-        if (
-          hasInstanceChars &&
-          draft.modelClassificationPrefill &&
-          draft.modelClassificationFieldStates
-        ) {
-          return base;
-        }
-        return base;
-      });
-      if (hasInstanceChars || hasModelPrefill) {
+      setMerkmale(
+        hasInstanceChars ? hydrateAnswerMeta(draft.characteristics) : emptyCharacteristics(),
+      );
+      if (hasInstanceChars) {
         setMaxStep(2);
         setStep(2);
       }
@@ -447,7 +442,8 @@ export function useRegistrationWizard(initialDraftId?: string) {
         const dup = await api<{ device: DeviceInstanceDTO | null }>(
           `/api/devices?serial=${encodeURIComponent(parsed.data.serialNumber!.trim())}&modelId=${encodeURIComponent(linkedModelId)}`,
         );
-        if (dup.device) {
+        // Resume /repair on the same unit must not treat self as a duplicate.
+        if (dup.device && dup.device.id !== draftId) {
           setError(
             `Serial already in inventory${dup.device.inventoryNumber ? ` · ${dup.device.inventoryNumber}` : ""}.`,
           );
@@ -483,7 +479,7 @@ export function useRegistrationWizard(initialDraftId?: string) {
     setCharacteristicsSkipped(false);
     setCatalogLinkMode(false);
     unlockAndGo(2);
-  }, [form, linkedModelId, modelClassificationPrefill, unlockAndGo, applyPreviewResult]);
+  }, [form, linkedModelId, draftId, modelClassificationPrefill, unlockAndGo, applyPreviewResult]);
 
   const saveCharacteristicsAndDerive = useCallback(async () => {
     if (!merkmale.produktart) {

@@ -19,11 +19,23 @@ import { toast } from "@/store/toastStore";
 import {
   buildSealNote,
   failedStepsMissingEvidence,
+  listSealBlockers,
   ratedStepCount,
   seedStepDraft,
   signatureKindsSatisfied,
   stepsPayloadFromDraft,
+  type SealBlockerId,
 } from "./inspectionProtocolHelpers";
+
+const SEAL_BLOCKER_LABEL: Record<SealBlockerId, string> = {
+  visit: "gateVisit",
+  device: "gateDevice",
+  steps: "gateSteps",
+  evidence: "gateEvidence",
+  inspector: "gateInspector",
+  institution: "gateInstitution",
+  label: "gateLabel",
+};
 
 type FieldErrors = {
   visitId?: string;
@@ -129,6 +141,10 @@ export function useInspectionProtocol(reference: string) {
       if (p.catalogue?.occasions.length === 1) {
         setOccasionCode(p.catalogue.occasions[0]!);
       }
+      if (p.suggestedLabel) {
+        setLabelNumber((prev) => prev.trim() || p.suggestedLabel!.number);
+        setLabelNextDue((prev) => prev.trim() || p.suggestedLabel!.nextDue);
+      }
       const runId = p.sealed ? p.sealedRunId : p.draftRunId;
       if (runId) {
         const res = await api<{ run: InspectionRunDTO }>(
@@ -199,9 +215,11 @@ export function useInspectionProtocol(reference: string) {
     catalogueSteps.length === 0 ||
     catalogueRatedCount >= catalogueSteps.length;
 
+  // Server auto-fills missing label/next-due on seal; suggestedLabel covers the empty prefill race.
   const labelOk =
     !catalogue?.requiresLabel ||
     result === "failed" ||
+    Boolean(preview?.suggestedLabel) ||
     (/^[A-Z]{2}-\d{4}-\d{4}$/.test(labelNumber.trim()) && Boolean(labelNextDue.trim()));
 
   const canComplete =
@@ -292,6 +310,38 @@ export function useInspectionProtocol(reference: string) {
       setBusy(false);
     }
   }, [run, t]);
+
+  /** Resume an ended site visit (if needed), then attach it to this run. */
+  const resumeVisit = useCallback(async () => {
+    if (!run) return;
+    const siteVisitId = run.visitId ?? preview?.visitId ?? null;
+    setBusy(true);
+    setFieldErrors({});
+    try {
+      if (siteVisitId && preview?.visitCompletedAt) {
+        await api(`/api/partner/inspect/visits/${encodeURIComponent(siteVisitId)}/resume`, {
+          method: "POST",
+          body: "{}",
+        });
+      }
+      const res = await api<{ visit: { visitId: string; startedAt: string } }>(
+        `/api/partner/inspection-runs/${run.id}/visit/start`,
+        { method: "POST", body: "{}" },
+      );
+      setRun({
+        ...run,
+        visitId: res.visit.visitId,
+        visitStartedAt: res.visit.startedAt,
+      });
+      toast.success(t("visitStarted"));
+      await refresh();
+    } catch (e) {
+      setFieldErrors(fieldFromApiError(e));
+      toast.error(e instanceof ApiError ? e.message : t("visitStartFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }, [run, preview?.visitId, preview?.visitCompletedAt, t, refresh]);
 
   const saveSignature = useCallback(
     async (kind: "inspector" | "institution", imageDataUrl?: string | null) => {
@@ -454,19 +504,27 @@ export function useInspectionProtocol(reference: string) {
 
   const completeRun = useCallback(async () => {
     if (!run) return;
-    if (!visitStarted) {
-      setFieldErrors({ visitId: t("visitRequiredBeforeSeal") });
-      toast.error(t("visitRequiredBeforeSeal"));
-      return;
-    }
-    if (!signaturesOk) {
-      setFieldErrors({ signatures: t("signaturesRequired") });
-      toast.error(t("signaturesRequired"));
-      return;
-    }
-    if (missingEvidence.length > 0) {
-      setFieldErrors({ noPhotoReason: t("failedStepEvidenceRequired") });
-      toast.error(t("failedStepEvidenceRequired"));
+    const deviceOk = Boolean(run.deviceConfirmed || run.deviceConfirmSkipped);
+    const blockers = listSealBlockers({
+      visitStarted,
+      deviceOk,
+      stepsComplete,
+      missingEvidence: missingEvidence.length,
+      signatures: run.signatures,
+      labelOk,
+    });
+    if (blockers.length > 0) {
+      const items = blockers.map((id) => t(SEAL_BLOCKER_LABEL[id])).join(", ");
+      const first = blockers[0]!;
+      if (first === "visit") setFieldErrors({ visitId: t("visitRequiredBeforeSeal") });
+      else if (first === "inspector" || first === "institution") {
+        setFieldErrors({ signatures: t("signaturesRequired") });
+      } else if (first === "evidence") {
+        setFieldErrors({ noPhotoReason: t("failedStepEvidenceRequired") });
+      } else if (first === "label") {
+        setFieldErrors({ labelNumber: t("gateLabel") });
+      }
+      toast.error(t("sealBlocked", { items }));
       return;
     }
     if (catalogue?.traceabilityRequired && testEquipmentId) {
@@ -480,6 +538,7 @@ export function useInspectionProtocol(reference: string) {
     setFieldErrors({});
     const idempotencyKey = `pp-${run.id}-${Date.now()}`;
     const note = buildSealNote({ defects, familySteps, stepDraft });
+    const visitIdToEnd = run.visitId ?? preview?.visitId ?? null;
     try {
       if (!online) {
         await enqueueInspectionComplete({
@@ -522,6 +581,7 @@ export function useInspectionProtocol(reference: string) {
             note,
             ...(needsLabel
               ? {
+                  // Empty → server allocates number + computes next due from duty interval.
                   labelNumber: labelNumber.trim() || null,
                   labelNextDue: labelNextDue.trim() || null,
                 }
@@ -532,6 +592,17 @@ export function useInspectionProtocol(reference: string) {
       setRun(res.run);
       markDone(reference);
       toast.success(t("sealedTitle"));
+      if (visitIdToEnd) {
+        try {
+          await api(`/api/partner/inspect/visits/${encodeURIComponent(visitIdToEnd)}/end`, {
+            method: "POST",
+            body: "{}",
+          });
+          toast.info(t("visitEndedAfterSeal"));
+        } catch {
+          /* seal already succeeded — ending visit is best-effort */
+        }
+      }
       router.push("/inspect/heute");
     } catch (e) {
       setFieldErrors(fieldFromApiError(e));
@@ -542,8 +613,9 @@ export function useInspectionProtocol(reference: string) {
   }, [
     run,
     visitStarted,
-    signaturesOk,
+    stepsComplete,
     missingEvidence,
+    labelOk,
     catalogue,
     testEquipmentId,
     preview,
@@ -602,6 +674,9 @@ export function useInspectionProtocol(reference: string) {
     visitStarted,
     signaturesOk,
     missingEvidence,
+    labelOk,
+    siteVisitEnded: Boolean(preview?.visitCompletedAt),
+    siteVisitAlready: Boolean(preview?.visitStartedAt && !preview?.visitCompletedAt),
     inspectorAbsent,
     setInspectorAbsent,
     inspectorName,
@@ -627,6 +702,7 @@ export function useInspectionProtocol(reference: string) {
     startRun,
     discardDraft,
     startVisit,
+    resumeVisit,
     saveSignature,
     uploadStepPhoto,
     confirmScan,

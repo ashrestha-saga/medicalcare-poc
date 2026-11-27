@@ -2,12 +2,14 @@
  * E87 / R34–R35 — clinic constancy routine capture + deviation clarification (no auto-lock).
  */
 import type { TenantWorkContext } from "@/interfaces";
+import { notificationDedup } from "@/constants/notifications";
 import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { notFound, unprocessable } from "@/lib/errors";
 import { requireRadiationDguvEnabled } from "@/lib/features/radiationDguv";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
+import { notifyService } from "@/services/notifications/notifyService";
 import { computeDutyDueAt } from "@/services/registration/dueDate";
 import { transitionOperationalState } from "@/services/repairs/operationalStateService";
 import type {
@@ -477,6 +479,50 @@ export const constancyRoutineService = {
       summary: `Konstanz routine ${mode} → ${result}`,
     });
 
+    // E107 — deviation / fail opens a clinic inbox item for the responsible person.
+    if (out.clarificationId) {
+      const device = await prisma.deviceInstance.findFirst({
+        where: { id: duty.deviceInstanceId },
+        select: { inventoryNumber: true, responsibleUserId: true },
+      });
+      const inv = device?.inventoryNumber ?? duty.deviceInstanceId;
+      const title = `Konstanzabweichung: ${inv}`;
+      const body = `Ergebnis ${result} — Klärung offen.`;
+      const target = {
+        type: "device" as const,
+        id: duty.deviceInstanceId,
+        inventoryNumber: inv,
+        tenantId: ctx.tenantId,
+        focus: "duties" as const,
+      };
+      const dedup = notificationDedup.deviation(out.clarificationId);
+      const responsibleId = device?.responsibleUserId;
+      if (responsibleId && responsibleId !== ctx.user.id) {
+        await notifyService.pushSafe(
+          responsibleId,
+          "deviation",
+          dedup,
+          title,
+          body,
+          target,
+          ctx.tenantId,
+          null,
+        );
+      } else {
+        await notifyService.pushToRoles(
+          ctx.tenantId,
+          ["device_admin", "security_officer"],
+          "deviation",
+          dedup,
+          title,
+          body,
+          target,
+          ctx.tenantId,
+          null,
+        );
+      }
+    }
+
     return {
       performanceId: out.perf.id,
       result,
@@ -551,6 +597,16 @@ export const constancyRoutineService = {
           ? "Constancy deviation → lock (rso)"
           : `Constancy deviation → continue (${input.reason})`,
     });
+
+    await prisma.userNotification
+      .updateMany({
+        where: {
+          dedupKey: notificationDedup.deviation(clarificationId),
+          state: { not: "done" },
+        },
+        data: { state: "done", doneAt: now, readAt: now },
+      })
+      .catch(() => undefined);
 
     return { ok: true as const, action: input.action };
   },

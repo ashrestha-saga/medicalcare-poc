@@ -8,6 +8,12 @@ export type TenantFeatureFlags = {
   repairs?: boolean;
   /** Nachtrag 4 — Strahlenschutz / DGUV (E85–E91). */
   radiation_dguv?: boolean;
+  /** Addendum 6 — E103 import → provisional duties. */
+  importProvisionalDuties?: boolean;
+  /** Addendum 6 — E105 IFU routines. */
+  routineChecks?: boolean;
+  /** Addendum 6 — E107 user notifications. */
+  notifications?: boolean;
 };
 
 export function parseFeatureFlags(raw: unknown): TenantFeatureFlags {
@@ -16,6 +22,9 @@ export function parseFeatureFlags(raw: unknown): TenantFeatureFlags {
   return {
     repairs: obj.repairs === true,
     radiation_dguv: obj.radiation_dguv === true,
+    importProvisionalDuties: obj.importProvisionalDuties === true,
+    routineChecks: obj.routineChecks === true,
+    notifications: obj.notifications === true,
   };
 }
 

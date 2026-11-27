@@ -51,10 +51,18 @@ export interface ResolvedCatalogueDTO {
   missingBaseline: boolean;
 }
 
-async function openClassification(deviceModelId: string | null | undefined) {
+async function openClassification(
+  deviceModelId: string | null | undefined,
+  tenantId?: string | null,
+) {
   if (!deviceModelId) return null;
+  const { getOpenClassification } = await import(
+    "@/services/registration/classificationScope"
+  );
+  const base = await getOpenClassification(prisma, deviceModelId, tenantId);
+  if (!base) return null;
   return prisma.deviceModelClassification.findFirst({
-    where: { deviceModelId, validTo: null },
+    where: { id: base.id },
     include: {
       mtkItem: { select: { itemNo: true } },
       appliedPart: true,
@@ -131,7 +139,7 @@ export async function resolveCatalogueForAssignment(args: {
   });
   if (!device) throw notFound("Device not found.");
 
-  const classification = await openClassification(device.modelId);
+  const classification = await openClassification(device.modelId, args.tenantId);
   const catalogue = await resolveCatalogueRecord({
     inspectionTypeCode: args.inspectionTypeCode,
     classification,

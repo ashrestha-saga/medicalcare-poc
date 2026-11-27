@@ -27,6 +27,7 @@ type DutyRow = {
   lastCompletedAt: Date | null;
   evidenceHint: string | null;
   confidence: string;
+  provisional?: boolean;
   deviceInstance?: {
     inventoryNumber: string;
     model: { tradeName: string | null } | null;
@@ -60,6 +61,7 @@ export function toDutyDTO(row: DutyRow): DeviceDutyDTO {
     status: dutyStatus(row),
     inventoryNumber: row.deviceInstance?.inventoryNumber,
     tradeName: row.deviceInstance?.model?.tradeName ?? null,
+    provisional: row.provisional === true,
   };
 }
 

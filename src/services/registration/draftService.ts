@@ -6,6 +6,8 @@ import { conflict, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { allocateInventoryNumber } from "@/services/inventory/deviceInventoryService";
 import { userOptionsService } from "@/services/users/userOptionsService";
+import { lacksRealReleaseFreeze } from "@/services/import/importProvisionalDuties";
+import { getOpenClassification } from "@/services/registration/classificationScope";
 import { characteristicConflicts } from "./conflicts";
 import type { RegistrationCharacteristics } from "./types";
 
@@ -176,7 +178,11 @@ export const draftService = {
       where: { id, tenantId: ctx.tenantId },
     });
     if (!row) throw notFound("Draft not found.");
-    if (row.state === "released" || row.state === "retired") {
+    if (row.state === "retired") {
+      throw unprocessable("Released or retired records cannot be changed.");
+    }
+    // E103 — allow identity/characteristics edits for a repair freeze (released, no real snapshot).
+    if (row.state === "released" && !(await lacksRealReleaseFreeze(prisma, row.id))) {
       throw unprocessable("Released or retired records cannot be changed.");
     }
 
@@ -316,22 +322,17 @@ export const draftService = {
     const row = await prisma.deviceInstance.findFirst({
       where: { id, tenantId: ctx.tenantId },
       include: {
-        model: {
-          include: {
-            classifications: {
-              where: { validTo: null },
-              orderBy: { validFrom: "desc" },
-              take: 1,
-            },
-          },
-        },
+        model: true,
         area: { include: { site: true } },
         clarifications: { where: { resolvedAt: null } },
       },
     });
     if (!row) throw notFound("Draft not found.");
 
-    const openCls = row.model?.classifications[0] ?? null;
+    // Prefer tenant classification, else global template (same rule as release catalog-link).
+    const openCls = row.modelId
+      ? await getOpenClassification(prisma, row.modelId, ctx.tenantId)
+      : null;
     let modelClassificationPrefill: RegistrationCharacteristics | null = null;
     if (openCls?.characteristics) {
       try {
@@ -339,6 +340,12 @@ export const draftService = {
       } catch {
         modelClassificationPrefill = null;
       }
+    }
+    if (!modelClassificationPrefill?.produktart && openCls?.productKindCode) {
+      modelClassificationPrefill = {
+        ...(modelClassificationPrefill ?? { produktart: "" }),
+        produktart: openCls.productKindCode,
+      };
     }
 
     return {

@@ -13,6 +13,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
 import {
   catalogClassificationOptions,
@@ -119,9 +125,49 @@ export function CatalogDetail({ model, canEdit, onBack, onEdit }: CatalogDetailP
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base lowercase">{tClass("sectionTitle")}</CardTitle>
-              <CardDescription>{tClass("sectionDescription")}</CardDescription>
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+              <div className="min-w-0 space-y-1">
+                <CardTitle className="text-base lowercase">{tClass("sectionTitle")}</CardTitle>
+                <CardDescription>{tClass("sectionDescription")}</CardDescription>
+              </div>
+              {model.classification?.scope ? (
+                <TooltipProvider delayDuration={150}>
+                  <div
+                    className="flex shrink-0 items-center gap-1"
+                    data-testid="catalog-classification-scope"
+                  >
+                    <Badge
+                      variant={model.classification.scope === "tenant" ? "success" : "outline"}
+                      className={
+                        model.classification.scope === "tenant"
+                          ? "border border-[var(--green)]/30 px-2.5 py-1 text-[11px] font-semibold tracking-wide"
+                          : "px-2.5 py-1 text-[11px] font-semibold tracking-wide text-muted-foreground"
+                      }
+                    >
+                      {model.classification.scope === "tenant"
+                        ? tClass("scopeTenant")
+                        : tClass("scopeGlobal")}
+                    </Badge>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          aria-label={tClass("scopeInfoAria")}
+                          data-testid="catalog-classification-scope-info"
+                        >
+                          <Info className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" align="end" className="max-w-[260px] text-xs leading-snug">
+                        {model.classification.scope === "tenant"
+                          ? tClass("scopeTenantHint")
+                          : tClass("scopeGlobalHint")}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
+              ) : null}
             </CardHeader>
             <CardContent className="space-y-3">
               {options.map((opt) => (

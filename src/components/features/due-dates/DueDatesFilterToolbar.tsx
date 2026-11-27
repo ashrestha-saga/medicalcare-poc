@@ -45,6 +45,8 @@ interface DueDatesFilterToolbarProps {
   confidence: DueDatesConfidenceFilter | null;
   onConfidenceChange: (value: DueDatesConfidenceFilter | null) => void;
   scheduled: boolean;
+  provisional: boolean;
+  onProvisionalChange: (value: boolean) => void;
   onClearAll: () => void;
 }
 
@@ -56,10 +58,12 @@ export function DueDatesFilterToolbar({
   confidence,
   onConfidenceChange,
   scheduled,
+  provisional,
+  onProvisionalChange,
   onClearAll,
 }: DueDatesFilterToolbarProps) {
   const t = useTranslations("filters");
-  const hasActiveFilters = Boolean(dutyKey || horizon || confidence || scheduled);
+  const hasActiveFilters = Boolean(dutyKey || horizon || confidence || scheduled || provisional);
 
   return (
     <FilterToolbar hasActiveFilters={hasActiveFilters} onClearAll={onClearAll}>
@@ -116,6 +120,16 @@ export function DueDatesFilterToolbar({
           {t("scheduledOnly")}
         </Button>
       ) : null}
+      <Button
+        type="button"
+        size="sm"
+        variant={provisional ? "secondary" : "outline"}
+        className="h-8"
+        onClick={() => onProvisionalChange(!provisional)}
+        data-testid="due-dates-filter-provisional"
+      >
+        {t("provisionalImport")}
+      </Button>
     </FilterToolbar>
   );
 }

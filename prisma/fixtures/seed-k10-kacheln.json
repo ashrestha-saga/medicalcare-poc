@@ -460,6 +460,39 @@
    "dutyKey": null,
    "requiredPermission": "roles:view",
    "partnerOnly": false
+  },
+  {
+   "key": "import-provisional",
+   "title": "Import: Pflichten vorläufig",
+   "question": "Welche Fristen stammen noch aus dem Import?",
+   "zone": "worklist",
+   "sortOrder": 22,
+   "dutyKey": null,
+   "requiredPermission": "duties:view",
+   "partnerOnly": false,
+   "note": "E103 — Erstanlage light"
+  },
+  {
+   "key": "berichte-ohne-bestaetigung",
+   "title": "Berichte ohne Bestätigung",
+   "question": "Welche Prüfberichte warten auf die Einrichtung?",
+   "zone": "worklist",
+   "sortOrder": 23,
+   "dutyKey": null,
+   "requiredPermission": "requests:approve",
+   "partnerOnly": false,
+   "note": "E106"
+  },
+  {
+   "key": "fuer-mich",
+   "title": "Für mich",
+   "question": "Was braucht meine Aufmerksamkeit?",
+   "zone": "worklist",
+   "sortOrder": 1,
+   "dutyKey": null,
+   "requiredPermission": null,
+   "partnerOnly": false,
+   "note": "E107"
   }
  ],
  "DashboardTileGrant": [
@@ -628,6 +661,14 @@
    "tileKey": "routine-heute"
   },
   {
+   "role": "superadmin",
+   "tileKey": "routine-heute"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "routine-heute"
+  },
+  {
    "role": "device_admin",
    "tileKey": "charge-offen"
   },
@@ -750,6 +791,50 @@
   {
    "role": "superadmin",
    "tileKey": "traegerschaft-luecke"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "import-provisional"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "import-provisional"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "import-provisional"
+  },
+  {
+   "role": "user",
+   "tileKey": "import-provisional"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "berichte-ohne-bestaetigung"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "berichte-ohne-bestaetigung"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "berichte-ohne-bestaetigung"
+  },
+  {
+   "role": "superadmin",
+   "tileKey": "fuer-mich"
+  },
+  {
+   "role": "device_admin",
+   "tileKey": "fuer-mich"
+  },
+  {
+   "role": "security_officer",
+   "tileKey": "fuer-mich"
+  },
+  {
+   "role": "user",
+   "tileKey": "fuer-mich"
   }
  ],
  "RefAuthorityChecklist": [

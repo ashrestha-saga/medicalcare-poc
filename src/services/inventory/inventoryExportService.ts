@@ -19,6 +19,7 @@ const CSV_HEADERS = [
   "Inbetriebnahme",
   "Status",
   "Produktart",
+  "Pflichten vorläufig",
 ] as const;
 
 export type InventoryExportFilters = {
@@ -67,6 +68,11 @@ export const inventoryExportService = {
         model: { select: { manufacturer: true, modelName: true, tradeName: true } },
         area: { include: { site: true } },
         responsibleUser: { select: { name: true } },
+        duties: {
+          where: { provisional: true, suspendedAt: null, applicable: true },
+          select: { id: true },
+          take: 1,
+        },
       },
       orderBy: [{ inventoryNumber: "asc" }],
     });
@@ -88,6 +94,7 @@ export const inventoryExportService = {
           cell(r.commissionedAt?.toISOString().slice(0, 10)),
           cell(r.state),
           cell(r.productKindCode),
+          cell(r.duties.length ? "vorläufig" : ""),
         ].join(";"),
       ),
     ];

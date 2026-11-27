@@ -423,6 +423,7 @@ export const CONSOLE_PATH_PERMISSION_MAP: Record<string, PermissionSlug> = {
   "/partner/service-type-gates": "console:staff:view",
   "/partner/test-equipment": "testequipment:manage",
   "/partner/settings": "console:settings:view",
+  "/partner/notifications": "console:nav",
 };
 
 export function normalizeContractScope(raw: string[]): ContractScopeToken[] {

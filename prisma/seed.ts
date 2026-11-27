@@ -5,6 +5,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { pathToFileURL } from "node:url";
+import { encryptSecret } from "../src/lib/crypto/secretBox";
 import { hashPassword } from "../src/lib/password";
 import { seedRoleGrantsIfEmpty } from "../src/services/roles/roleGrantsService";
 import { backfillDutyAndEvidenceAttribution } from "../src/services/attribution/runBackfillAttribution";
@@ -87,12 +88,18 @@ export async function seed(prisma: PrismaClient) {
 
   const tenant = await prisma.tenant.upsert({
     where: { id: SEED.tenantId },
-    update: { name: "Demo Clinic", code: "T-KLN", operatingModel: "institution_operated" },
+    update: {
+      name: "Demo Clinic",
+      code: "T-KLN",
+      operatingModel: "institution_operated",
+      featureFlags: { ordering: true, repairs: true },
+    },
     create: {
       id: SEED.tenantId,
       name: "Demo Clinic",
       code: "T-KLN",
       operatingModel: "institution_operated",
+      featureFlags: { ordering: true, repairs: true },
     },
   });
 
@@ -127,6 +134,38 @@ export async function seed(prisma: PrismaClient) {
       },
     });
   }
+
+  // Mock shop connection for ordering e2e / demo (PIN 1234 via mock provider).
+  await prisma.tenantShopConnection.upsert({
+    where: { tenantId: tenant.id },
+    create: {
+      tenantId: tenant.id,
+      provider: "mock",
+      shopBaseUrl: "https://shop.example.com",
+      clientId: "demo-mock-client",
+      clientSecretEnc: encryptSecret("demo-mock-secret"),
+      scope: "api objects.me.read objects.items.read objects.orders.write objects.orders.read",
+      status: "connected",
+      accessTokenEnc: encryptSecret("demo-mock-access"),
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      hasSubUsers: true,
+      customerNumber: "K-104477",
+      companyName: "Demo Clinic Shop",
+      connectedAt: new Date(),
+      connectedByUserId: SEED.users.admin,
+    },
+    update: {
+      provider: "mock",
+      shopBaseUrl: "https://shop.example.com",
+      clientId: "demo-mock-client",
+      status: "connected",
+      accessTokenEnc: encryptSecret("demo-mock-access"),
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      hasSubUsers: true,
+      customerNumber: "K-104477",
+      companyName: "Demo Clinic Shop",
+    },
+  });
 
   await prisma.site.upsert({
     where: { id: SEED.sites.bonn },
@@ -517,6 +556,10 @@ export async function seed(prisma: PrismaClient) {
   // Nachtrag 4 — radiation / DGUV flag, K-DGUV, Betriebsmittel demo (after DGUV RefInspectionType).
   const radiationDguv = await seedRadiationDguv(prisma);
 
+  // Addendum 6 — E105 reference IFU routines.
+  const { seedRoutineChecks } = await import("./seeds/routineChecks");
+  const routineChecks = await seedRoutineChecks(prisma);
+
   const dutiesBackfilled = await dutyService.backfillDueDates(prisma);
   const attributionBackfilled = await backfillDutyAndEvidenceAttribution(prisma);
   const contractScopeBackfilled = await backfillAllContractScopeGrants(prisma);
@@ -540,6 +583,7 @@ export async function seed(prisma: PrismaClient) {
     bandDemo,
     repairs,
     radiationDguv,
+    routineChecks,
     dutiesBackfilled,
     attributionBackfilled,
     contractScopeBackfilled,

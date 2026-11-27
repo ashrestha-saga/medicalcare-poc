@@ -300,7 +300,11 @@ export function InspectionProtocolScreen({ reference }: { reference: string }) {
                 </div>
               ) : (
                 <>
-                  {siteVisitAlready ? (
+                  {p.siteVisitEnded ? (
+                    <div className="pp-note" data-t="warn">
+                      {t("visitResumeHint")}
+                    </div>
+                  ) : siteVisitAlready ? (
                     <div className="pp-note" data-t="ok">
                       {t("visitStartedAtSite")}
                     </div>
@@ -309,9 +313,14 @@ export function InspectionProtocolScreen({ reference }: { reference: string }) {
                     type="button"
                     className="pp-btn pp-btn--primary"
                     disabled={p.busy}
-                    onClick={() => void p.startVisit()}
+                    data-testid="inspect-resume-visit"
+                    onClick={() => void (p.siteVisitEnded ? p.resumeVisit() : p.startVisit())}
                   >
-                    {siteVisitAlready ? t("visitContinueJob") : t("visitStartForJob")}
+                    {p.siteVisitEnded
+                      ? t("visitResumeForJob")
+                      : siteVisitAlready
+                        ? t("visitContinueJob")
+                        : t("visitStartForJob")}
                   </button>
                 </>
               )}
@@ -679,10 +688,25 @@ function ProtocolCloseout({
         <Link className="pp-btn" href="/inspect/heute">
           {t("back")}
         </Link>
+        {!p.visitStarted ? (
+          <button
+            type="button"
+            className="pp-btn"
+            disabled={p.busy}
+            data-testid="inspect-resume-visit-actions"
+            onClick={() => void (p.siteVisitEnded ? p.resumeVisit() : p.startVisit())}
+          >
+            {p.siteVisitEnded
+              ? t("visitResumeForJob")
+              : p.siteVisitAlready
+                ? t("visitContinueJob")
+                : t("visitStartForJob")}
+          </button>
+        ) : null}
         <button
           type="button"
           className="pp-btn"
-          disabled={p.busy || !p.visitStarted}
+          disabled={p.busy}
           onClick={() => void p.saveStepsWithToast()}
         >
           {t("saveSteps")}
@@ -690,7 +714,8 @@ function ProtocolCloseout({
         <button
           type="button"
           className="pp-btn pp-btn--primary"
-          disabled={p.busy || !p.canComplete}
+          disabled={p.busy}
+          data-testid="inspect-seal"
           onClick={() => void p.completeRun()}
         >
           {t("completeProtocol")}

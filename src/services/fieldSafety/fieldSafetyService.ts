@@ -1,10 +1,12 @@
 import type { FieldSafetyActionDTO, FieldSafetyAffectedModelDTO, TenantWorkContext } from "@/interfaces";
+import { notificationDedup } from "@/constants/notifications";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { actorFromContext } from "@/lib/auth/actorContext";
 import { recordedByAttribution } from "@/lib/auth/attribution";
 import { badRequest, notFound } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
+import { notifyService } from "@/services/notifications/notifyService";
 import type {
   AddFieldSafetyAffectedModelsInput,
   CreateFieldSafetyInput,
@@ -296,6 +298,22 @@ export const fieldSafetyService = {
       action: "create",
       summary: `FSCA ${row.reference}${affectedModels.length ? ` + ${affectedModels.length} model scopes` : ""}`,
     });
+
+    // E107 — recall / field-safety inbox for clinic admins + security officers.
+    await notifyService.pushToRoles(
+      ctx.tenantId,
+      ["device_admin", "security_officer", "superadmin"],
+      "recall",
+      notificationDedup.recall(row.id),
+      `Rückruf / FSN: ${row.reference}`,
+      row.title,
+      deviceIds[0]
+        ? { type: "device", id: deviceIds[0], tenantId: ctx.tenantId, focus: "duties" }
+        : { type: "device", id: row.id, tenantId: ctx.tenantId },
+      ctx.tenantId,
+      null,
+    );
+
     return mapAction(row, await suggestedCountForAction(ctx.tenantId, row));
   },
 

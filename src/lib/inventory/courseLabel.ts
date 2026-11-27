@@ -16,5 +16,8 @@ export function courseLabelFromUnitEvent(action: string, note: string | null | u
   if (action === "import_updated") {
     return hint ? `Import update · ${hint}` : "Import update";
   }
+  if (action === "import_duty_dates") {
+    return hint ? `Import duty dates · ${hint}` : "Import duty dates";
+  }
   return readableCourseLabel(hint || action);
 }

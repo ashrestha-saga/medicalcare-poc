@@ -9,6 +9,8 @@ export interface CatalogClassificationSummary {
   radiation: boolean | null;
   confidence: string | null;
   source: string | null;
+  /** E104 — tenant row vs global template. */
+  scope?: "tenant" | "global";
 }
 
 /** Per-site distribution of DeviceInstance copies for a model (current tenant only). */

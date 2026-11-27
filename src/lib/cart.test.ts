@@ -45,7 +45,16 @@ describe("cart math", () => {
 
   it("maps to order items", () => {
     const items = toOrderItems(addToCart([], part("a"), 2));
-    expect(items).toEqual([{ articleId: "a", articleNumber: "A-a", description: "Part a", quantity: 2, unitPrice: 10 }]);
+    expect(items).toEqual([
+      {
+        articleId: "a",
+        shopArticleId: "a",
+        articleNumber: "A-a",
+        description: "Part a",
+        quantity: 2,
+        unitPrice: 10,
+      },
+    ]);
     expect(removeFromCart(addToCart([], part("a")), "a")).toEqual([]);
   });
 });

@@ -2,7 +2,7 @@ import type { OxidTokenSet } from "@/interfaces/external";
 
 /**
  * SEC-900 — legacy in-memory token map (user-keyed). Tenant OXID tokens live in
- * TenantOxidConnection; this map is only for transitional helpers.
+ * TenantShopConnection; this map is only for transitional helpers (legacy).
  */
 export interface TokenStorage {
   get(userId: string): Promise<OxidTokenSet | null>;

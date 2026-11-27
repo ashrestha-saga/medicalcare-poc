@@ -15,7 +15,8 @@ import { getTenantStore } from "@/lib/auth/tenantStore";
  * mutates it under `runWithoutTenantAsync` (bypass).
  */
 export const TENANT_SCOPED_MODELS = new Set([
-  "TenantOxidConnection",
+  "TenantShopConnection",
+  "OrderStatusEvent",
   "Site",
   "Area",
   "SiteHeadcount",
@@ -78,11 +79,14 @@ export const TENANT_SCOPED_MODELS = new Set([
   "Quote",
   "MaintenancePart",
   "ServiceVisit",
+  // Addendum 6 — E105 routine captures (RefRoutineCheck with tenantId stays unguarded)
+  "RoutineCheck",
 ]);
 
 /** Required-tenantId models that stay off the guard (must filter manually or use bypass). */
 export const TENANT_GUARD_EXCLUSIONS = new Set<string>([
-  // none today — all required tenantId models are guarded
+  /** OAuth callback reads/deletes by state before tenant ALS is entered. */
+  "ShopOAuthState",
 ]);
 
 const READ_OPS = new Set([

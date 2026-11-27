@@ -18,7 +18,7 @@ For a deeper Prisma/MySQL schema map and layer architecture, see [`SCHEMA_AND_AR
 6. [API surface](#6-api-surface)
 7. [Device resolution pipeline](#7-device-resolution-pipeline)
 8. [Erstanlage & classification](#8-erstanlage--classification)
-9. [Service requests & spare-parts orders](#9-service-requests--spare-parts-orders)
+9. [Service requests & spare-parts orders](#9-service-requests--spare-parts-orders) (incl. shop-led `/shop` checkout)
 10. [Dispatch (mail / OXID / webhook)](#10-dispatch-mail--oxid--webhook)
 11. [Post-request inventarize](#11-post-request-inventarize)
 12. [Inventory & catalog](#12-inventory--catalog)
@@ -130,7 +130,8 @@ Primary entities (see `prisma/schema.prisma`):
 - **Erstanlage** — wizard holds identity/characteristics in the client; release (`POST /api/registration/release`) creates the instance and freezes duties (`DeviceReleaseSnapshot` / `DeviceDuty`). Inventarize still creates a draft and deep-links to `/registration/[id]`. Scan uses **manual** service-type select (no proposal engine).
 - **Prüfpartner** — catalogues / steps; `InspectionRun` / step results / signatures; `ServiceVisit`; `BaselineMeasurement`; partner `TestEquipment`; D3 follow-up SRs (`parentRequestId`). See [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) §4.8 / §5.3–5.4.
 - **ExternalSourceRecord** — BEUDAMED (and similar) cache entries.
-- **TenantOxidConnection** — OAuth tokens for the linked OXID shop (server-side only).
+- **TenantShopConnection** — Per-tenant shop OAuth (OXID or mock): URL, client credentials, tokens, `hasSubUsers`, submit lease. Replaces `TenantOxidConnection`.
+- **ShopOAuthState** — PKCE state for shop connect (DB-backed; callback has no tenant ALS yet).
 - **TotpChallenge** — short-lived login challenge between password success and session issue.
 
 ---
@@ -142,6 +143,8 @@ Primary entities (see `prisma/schema.prisma`):
 | `/` | Scanner / resolve / request workflow (home) |
 | `/login` | Email + password (+ TOTP step when enabled) |
 | `/devices` | Inventory list & detail |
+| `/shop` | Device shop catalog + cart (`parts:request`); query: `device`, optional `tab` (`device` \| `accessories` \| `suggestions`), `returnTo` |
+| `/shop-orders`, `/shop-orders/[reference]` | Shop order list & detail (`shop-orders:view`); list summary cards sync `?filter=` |
 | `/due-dates` | Frozen duty due dates and assignments (`duties:view`); create assignment → `/requests/[reference]` |
 | `/registration`, `/registration/[id]` | Erstanlage wizard (create / resume draft) |
 | `/registration/reclassify/[modelId]` | Admin model-wide reclassification (incl. third-party evidence) |
@@ -156,12 +159,12 @@ Primary entities (see `prisma/schema.prisma`):
 | `/locations` | Sites and areas |
 | `/roles` | Role catalog (DB grants; editable with `roles:update`) |
 | `/security` | Enroll / disable TOTP (QR + backup codes) |
-| `/settings` | Tenant settings (appearance, **dispatch channels** per executor, OXID shop link, SMTP) |
-| `/auth/callback` | OXID OAuth2 callback (route handler) |
+| `/settings` | Tenant settings (appearance, **dispatch channels** per executor, shop OAuth config/connect, SMTP) |
+| `/auth/callback` | Shop OAuth2 callback (route handler; DB `ShopOAuthState`) |
 
 Layouts: root, `(app)` (clinic shell), `(partner)`, `(inspect)`, `(auth)`.
 
-Capturers with role `user` have no sidebar (`shell:nav`) but can use home (`/`) and `/security`.
+Capturers with role `user` have no sidebar (`shell:nav`) but can use home (`/`), `/shop` (with `parts:request`), and `/security`.
 
 ---
 
@@ -217,7 +220,7 @@ Route handlers under `src/app/api/`:
 | `POST` | `/api/service-requests/[reference]/allocate` |
 | `POST` | `/api/service-requests/[reference]/transmit` |
 | `POST` | `/api/service-requests/[reference]/withdraw` | Pre-transmit only |
-| `GET`/`POST` | `/api/order-requests` |
+| `GET`/`POST` | `/api/order-requests` | Create shop-led intent (cart); submit is under Admin / shop |
 | `GET` | `/api/attachments/[id]` |
 
 ### Prüfpartner / partner inspect
@@ -241,7 +244,17 @@ Route handlers under `src/app/api/`:
 | `GET` | `/api/roles` | Catalog + all permission slugs (`roles:view`) |
 | `PATCH` | `/api/roles/[role]` | Replace grants (`roles:update`) |
 | `GET`/`POST`/`PATCH`/`DELETE` | `/api/sites` |
-| `GET`/`POST`/`DELETE` | `/api/settings/oxid` |
+| `GET`/`PUT`/`DELETE` | `/api/settings/shop` | Shop credentials + status (`settings:oxid`) |
+| `POST` | `/api/settings/shop/connect` | Start PKCE shop OAuth |
+| `GET`/`POST`/`DELETE` | `/api/settings/oxid` | Thin shim → shop connection |
+| `GET` | `/api/devices/[id]/shop-catalog` | Device shop shell; optional `?section=accessories\|suggestions` (lazy tabs) |
+| `GET` | `/api/devices/[id]/shop-articles` | Legacy/compat device + accessories bundle |
+| `GET` | `/api/shop/articles/[oxid]` | Article detail + variants (lazy on Add when parent has variants) |
+| `GET` | `/api/shop/account` | Shop account / delivery addresses |
+| `GET` | `/api/shop-orders` | Management list + summary buckets |
+| `GET` | `/api/shop-orders/[reference]` | Order detail + status events |
+| `POST` | `/api/order-requests/[reference]/submit` | PIN-gated shop checkout |
+| `POST` | `/api/jobs/orders/poll`, `/api/jobs/orders/expire` | CRON status poll / intent expiry |
 | `GET`/`PATCH` | `/api/settings/dispatch-targets` | List executor channels (`settings:view`); enable/disable (`settings:smtp`) |
 | `GET`/`POST` | `/api/oxid/token`, `GET` `/api/oxid/categories` |
 | `GET` | `/api/health` |
@@ -336,13 +349,53 @@ Downstream systems can push status via `POST .../status`. Staff can transition o
 
 `POST /api/order-requests` — separate entity from service requests. Manual-capture subjects cannot order parts (`serviceOnly`).
 
+### Shop-led checkout (`/shop`)
+
+Feature flag `Tenant.featureFlags.ordering` + a connected `TenantShopConnection` enable the device shop UI.
+
+**Entry**
+
+- Scan device card / Parts / inventory spare-parts CTA → `shopPathForDevice(deviceId, scanResumePath(deviceId), { tab: "accessories" })` (`src/lib/scan/shopNavigation.ts`).
+- Query: `?device=` (required), optional `tab`, `returnTo` (same-origin app path only; resume scan card via `/?device=`).
+
+**Catalog UI (`ShopScreen`)**
+
+| Tab | Load |
+|---|---|
+| Device | Shell from `GET …/shop-catalog` (device article) |
+| Accessories / Suggestions | Lazy `?section=` on first open; cached thereafter |
+| Parent with variants | On Add → `GET /api/shop/articles/[oxid]` → variant picker (parent not orderable alone) |
+
+Sticky cart (right on wide layouts), delivery address from `GET /api/shop/account`, note, confirm → optional PIN when `hasSubUsers`.
+
+**Checkout (`useShopOrderFlow`)**
+
+1. Create intent `POST /api/order-requests` (idempotency key; may queue offline).
+2. Optional PIN modal → `POST /api/order-requests/[reference]/submit` (online-only; PIN never stored).
+3. Success → full-page `ShopOrderSuccess` snapshot (DeviceCare reference, shop order ref, ordered-by, delivery, lines with ticks, total). No success toast.
+4. OK CTA: capturer (`!shell:nav` + `inventory:view`) → `/`; backoffice → `/devices`. `dismissSuccess` clears snapshot.
+
+**OXID add-to-cart rules**
+
+- Prefer shop `az_catalog_nr` as `articleNumber` (not `oxartnum` like `VA-305880`).
+- Checkout body sends orderable artnum only (`orderableArtnum` strips a leading `VA-`); do not send OXID object id as artnum.
+- Verify lines landed in the remote basket; map `BELOW_MIN_ORDER_VALUE` to a 422 `ShopError` (UI must meet shop minimum, typically ≥ 100 €).
+- Cart change after a failed submit rotates the client idempotency key so a new intent is not blocked by 409.
+
+**Management list (`/shop-orders`)**
+
+- Summary cards (total / ordered / shipped / failed) filter the table client-side; active filter in `?filter=` (`ordered` \| `shipped` \| `failed`; toggle again → all).
+- Failed bucket = `failed` \| `cancelled` \| `expired` (same as server summary). Counts stay unfiltered.
+
 ### Client submit path
 
-`useSubmitServiceRequest`:
+`useSubmitServiceRequest` (service requests):
 
 - Online success → success UI (and optionally inventarize offer).
 - Offline / network failure → enqueue with the **same** idempotency key.
 - Business validation (422) → surface errors; do **not** queue.
+
+Shop intents use the same offline queue for **create**; **submit** is online-only (`useShopOrderFlow`).
 
 ---
 
@@ -427,9 +480,9 @@ If the user has TOTP enabled, login returns a challenge and the UI asks for a 6-
 - TTL: **12 hours**
 - Tenant and user identity always derived from the cookie on the server
 
-### OXID OAuth
+### Shop OAuth (OXID)
 
-OXID OAuth2 + PKCE links a **tenant shop** (Settings → `/auth/callback`). Tokens stay server-side (`TenantOxidConnection`). Used for catalog/parts adapters — not the primary staff password login UI.
+OAuth2 + PKCE links a **tenant shop** (`/api/settings/shop` → `/auth/callback`). Credentials and tokens live in `TenantShopConnection` (per tenant). Provider port: `ShopProvider` via `shopRegistry` (`oxid` | `mock`). Feature flag `Tenant.featureFlags.ordering` enables shop-led intents + PIN submit (`POST /api/order-requests/[reference]/submit`). PIN is never stored. Catalog GTIN lookup, `/shop` catalog APIs, checkout, and `/shop-orders` use the same registry.
 
 ---
 
@@ -474,7 +527,7 @@ Permission slug: **`account:security`**. Path `/security` is reachable **without
 
 ### Permission slugs (catalog)
 
-`shell:nav`, `inventory:view` / `update`, `catalog:view` / `update`, `clarifications:view`, `duties:view`, `requests:create`, `parts:request`, `requests:view-mine` / `view-open` / `view-all` / `transition`, `account:security`, `settings:view` / `oxid`, `users:*`, `locations:*`, `roles:view` / `update`.
+`shell:nav`, `inventory:view` / `update`, `catalog:view` / `update`, `clarifications:view`, `duties:view`, `requests:create`, `parts:request`, `shop-orders:view`, `requests:view-mine` / `view-open` / `view-all` / `transition`, `account:security`, `settings:view` / `oxid`, `users:*`, `locations:*`, `roles:view` / `update`.
 
 ### Path guard
 
@@ -483,6 +536,8 @@ Permission slug: **`account:security`**. Path `/security` is reachable **without
 - Always-allow paths (e.g. `/login`) pass.
 - `/` needs `inventory:view` (works without sidebar).
 - `/security` needs only `account:security`.
+- `/shop` needs only `parts:request` (capturers can order without `shell:nav`).
+- `/shop-orders` needs `shop-orders:view` (plus `shell:nav` for sidebar).
 - Other app paths need `shell:nav` **plus** the path’s resource slug.
 
 Capabilities are also exposed to the client via `GET /api/me/capabilities`.

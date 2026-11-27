@@ -21,6 +21,7 @@ export async function GET(req: Request) {
         horizon: raw.horizon,
         confidence: raw.confidence,
         scheduled: raw.scheduled === "1" || raw.scheduled === "true",
+        provisional: raw.provisional === "1" || raw.provisional === "true",
         limit: raw.limit,
         offset: raw.offset,
       });

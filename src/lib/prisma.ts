@@ -8,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Bump when User/schema fields change so next.dev drops a stale client. */
-const PRISMA_SCHEMA_VERSION = "bestandsimport-rd12-rd17-v2";
+const PRISMA_SCHEMA_VERSION = "addendum6-rd42-rd46-v1";
 
 function createBaseClient() {
   return new PrismaClient({

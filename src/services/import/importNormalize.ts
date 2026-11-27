@@ -2,6 +2,7 @@ import { ampel } from "./importAmpel";
 import { impNorm } from "./importNorm";
 import type {
   AmpelResult,
+  ImportLastPerformance,
   NormalizedRow,
   ParsedSheet,
   PruefungHint,
@@ -24,6 +25,26 @@ export function parseAnschaffung(raw: string): { jahr: number | null; hinweis?: 
   return { jahr: null, hinweis: `unbekanntes Datumsformat (${t})` };
 }
 
+/** Extract ISO date from free text (DD.MM.YYYY, YYYY-MM, MM/YYYY, year). */
+export function parsePerformanceDate(raw: string): string | null {
+  const t = String(raw || "").trim();
+  if (!t) return null;
+  const dmy = t.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2]!.padStart(2, "0")}-${dmy[1]!.padStart(2, "0")}`;
+  }
+  const ym = t.match(/(\d{4})-(\d{1,2})\b/) || t.match(/(\d{1,2})\/(\d{4})/);
+  if (ym && ym[0].includes("-")) {
+    return `${ym[1]}-${ym[2]!.padStart(2, "0")}-01`;
+  }
+  if (ym) {
+    return `${ym[2]}-${ym[1]!.padStart(2, "0")}-01`;
+  }
+  const y = t.match(/\b(20\d{2}|19\d{2})\b/);
+  if (y) return `${y[1]}-01-01`;
+  return null;
+}
+
 /** Free-text "STK 03/2025", "MTK 2024-11", "STK 14.09.2024". */
 export function parsePruefung(raw: string, fallbackArt?: "STK" | "MTK"): PruefungHint | null {
   const t = String(raw || "").trim();
@@ -31,24 +52,28 @@ export function parsePruefung(raw: string, fallbackArt?: "STK" | "MTK"): Pruefun
   const artMatch = t.match(/\b(STK|MTK)\b/i);
   const art = (artMatch?.[1]?.toUpperCase() as "STK" | "MTK" | undefined) || fallbackArt;
   if (!art) return null;
-
-  let iso: string | null = null;
-  const dmy = t.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
-  if (dmy) {
-    iso = `${dmy[3]}-${dmy[2]!.padStart(2, "0")}-${dmy[1]!.padStart(2, "0")}`;
-  } else {
-    const ym = t.match(/(\d{4})-(\d{1,2})\b/) || t.match(/(\d{1,2})\/(\d{4})/);
-    if (ym && ym[0].includes("-")) {
-      iso = `${ym[1]}-${ym[2]!.padStart(2, "0")}-01`;
-    } else if (ym) {
-      iso = `${ym[2]}-${ym[1]!.padStart(2, "0")}-01`;
-    } else {
-      const y = t.match(/\b(20\d{2}|19\d{2})\b/);
-      if (y) iso = `${y[1]}-01-01`;
-    }
-  }
+  const iso = parsePerformanceDate(t);
   if (!iso) return null;
   return { art, iso, raw: t };
+}
+
+function performanceFromField(
+  raw: string,
+  dutyKey: ImportLastPerformance["dutyKey"],
+): ImportLastPerformance | null {
+  const iso = parsePerformanceDate(raw);
+  if (!iso) return null;
+  const firm =
+    raw.match(/(?:Fa\.|Firma|durch)\s*([A-Za-zÄÖÜäöüß0-9 ./-]{2,40})/i)?.[1]?.trim() ||
+    undefined;
+  return {
+    dutyKey,
+    performedAt: iso,
+    result: /fehl|fail|nicht bestanden/i.test(raw) ? "failed" : "passed",
+    performedBy: firm,
+    reportRef: raw.trim(),
+    source: "file",
+  };
 }
 
 function emptyNormalized(
@@ -70,11 +95,16 @@ function emptyNormalized(
     verantwortlich: "",
     letzte_stk: "",
     letzte_mtk: "",
+    letzte_wartung: "",
+    letzte_dguv: "",
+    letzte_konstanz: "",
+    letzte_validierung: "",
     naechste_pruefung: "",
     gtin: "",
     bemerkung: "",
     hinweise: [],
     pruefungen: [],
+    lastPerformances: [],
     siteId,
     newSiteName,
     raum: "",
@@ -146,6 +176,33 @@ export function normalizeDataRow(
   if (!rec.pruefungen.length && rec.letzte_stk) {
     const p = parsePruefung(rec.letzte_stk);
     if (p) rec.pruefungen.push(p);
+  }
+
+  const perfFields: Array<[keyof NormalizedRow, ImportLastPerformance["dutyKey"]]> = [
+    ["letzte_stk", "stk"],
+    ["letzte_mtk", "mtk"],
+    ["letzte_wartung", "wartung"],
+    ["letzte_dguv", "dguv"],
+    ["letzte_konstanz", "konstanz"],
+    ["letzte_validierung", "validierung"],
+  ];
+  for (const [field, dutyKey] of perfFields) {
+    const raw = String(rec[field] || "");
+    if (!raw) continue;
+    const perf = performanceFromField(raw, dutyKey);
+    if (perf) rec.lastPerformances.push(perf);
+  }
+  // Legacy pruefungen → lastPerformances when columns only filled via STK/MTK parse
+  if (!rec.lastPerformances.length) {
+    for (const p of rec.pruefungen) {
+      rec.lastPerformances.push({
+        dutyKey: p.art === "MTK" ? "mtk" : "stk",
+        performedAt: p.iso,
+        result: "passed",
+        reportRef: p.raw,
+        source: "file",
+      });
+    }
   }
 
   if (rec.naechste_pruefung) {

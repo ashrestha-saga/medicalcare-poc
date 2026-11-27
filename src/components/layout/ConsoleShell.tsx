@@ -10,9 +10,11 @@ import { useSessionStore } from "@/store/sessionStore";
 import { usePermissions } from "@/lib/providers/PermissionProvider";
 import { usePartnerNavCounts } from "@/components/hooks/partner/usePartnerNavCounts";
 import { LocaleToggle } from "@/components/features/shared/LocaleToggle";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 import { NavPartnerSearch } from "@/components/layout/NavPartnerSearch";
 import { cn } from "@/lib/utils";
 import { Loading } from "@/components/ui/Loading";
+
 import {
   ActivityIcon,
   AssignmentsIcon,
@@ -251,7 +253,10 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
               : ""}
           </div>
         </div>
-        <LocaleToggle />
+        <div className="flex items-center gap-2">
+          <NotificationBell seeAllHref="/partner/notifications" variant="light" />
+          <LocaleToggle />
+        </div>
       </header>
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {permissionsLoading ? (

@@ -86,6 +86,10 @@ function buildBaseDutyWhere(
     where.confidence = query.confidence;
   }
 
+  if (query.provisional) {
+    where.provisional = true;
+  }
+
   return where;
 }
 
@@ -277,6 +281,7 @@ export const dueDatesService = {
         assignment: assignment
           ? { id: assignment.id, reference: assignment.reference, state: assignment.state }
           : null,
+        provisional: row.provisional === true,
       };
     });
 

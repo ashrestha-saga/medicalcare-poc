@@ -4,8 +4,8 @@ DeviceCare uses **three intentional stacks**. Do not invent a fourth. When touch
 
 | Surface | Routes | Stack | Primary controls |
 |---------|--------|-------|------------------|
-| **Field / clinic chrome** | Scan, registration, device detail, cart, capturer | BEM `p-*` / `t-*` in `globals.css`, form-factor | `.p-cta`, `.p-field`, native select when in mockup flows |
-| **Clinic admin lists** | Dashboard, inventory, incidents, DGUV determination, … inside AppShell | Tailwind + shadcn + `ListPageShell` | `@/components/ui/button`, Dialog, Select, Field |
+| **Field / clinic chrome** | Scan, registration, device detail, cart, capturer, **`/shop`** (order success uses ListPageShell inside field chrome) | BEM `p-*` / `t-*` in `globals.css`, form-factor | `.p-cta`, `.p-field`, native select when in mockup flows; scan→shop via `shopPathForDevice` |
+| **Clinic admin lists** | Dashboard, inventory, **`/shop-orders`**, incidents, DGUV determination, … inside AppShell | Tailwind + shadcn + `ListPageShell` | `@/components/ui/button`, Dialog, Select, Field |
 | **Partner console** | `/partner/*` | Tailwind + shadcn + `ConsoleShell` | Same as clinic admin |
 | **Inspect portal** | `/inspect/*` | `pp-*` CSS (day plan, steps, gates, signatures); prefer shadcn when adding new chrome | Labelled controls; Dialog for overlays; theme tokens for fail wash (no hard-coded light pink) |
 
@@ -34,6 +34,6 @@ DeviceCare uses **three intentional stacks**. Do not invent a fourth. When touch
 
 | Kind | Use |
 |------|-----|
-| **Inventories** (devices, users, catalog, partner staff/orders) | Shared `DataTable` — search/sort/filter |
+| **Inventories** (devices, users, catalog, `/shop-orders`, partner staff/orders) | Shared `DataTable` — search/sort/filter; `/shop-orders` also uses summary cards → `?filter=` (like due-dates) |
 | **Compose / small tables** (DGUV determination, constancy form+list) | Hand-rolled `<table>` OK; still wrap with `ResponsiveTableSwitch` if ≥5 columns |
 | **Wide operational lists** (incidents, FSCA, reprocessing, device book, customers) | Desktop table + **card stack under `md`** (`ResponsiveTableSwitch`) |

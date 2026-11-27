@@ -30,6 +30,8 @@ export interface DueDateRowDTO {
   lastCompletedAt: string | null;
   status: DutyScheduleStatus;
   assignment: DueDateAssignmentDTO | null;
+  /** E103 — duty created from import last performance (Erstanlage light). */
+  provisional?: boolean;
 }
 
 export interface DueDatesSummaryDTO {
@@ -60,6 +62,8 @@ export interface DueDatesListQuery {
   confidence?: DueDatesConfidenceFilter;
   /** When true, only duties with a dueAt. */
   scheduled?: boolean;
+  /** E103 — only provisional (import) duties. */
+  provisional?: boolean;
   /** Page size (default 100, max 300). */
   limit?: number;
   /** Row offset for pagination. */

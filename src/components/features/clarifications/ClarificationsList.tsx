@@ -59,9 +59,12 @@ function translateIssue(
     case "missing_maintenance_cycle":
     case "missing_classification":
     case "derived_classification":
+    case "import_review":
     case "missing_room":
     case "missing_model_name":
     case "missing_serial":
+      // Prefer the deferred/import label when it carries concrete compare text.
+      if (issue.code === "import_review" && issue.label.trim()) return issue.label;
       return t(issue.code);
     default:
       return issue.label;
@@ -143,7 +146,7 @@ export function ClarificationsList({
 
   return (
     <div className="space-y-4" data-testid="clarifications-list">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <SummaryCard
           value={summary.openCases}
           label={t("openCases")}
@@ -167,6 +170,14 @@ export function ClarificationsList({
           active={issue === "derived_classification"}
           onClick={() => toggleIssue("derived_classification")}
           testId="clarification-card-derived"
+        />
+        <SummaryCard
+          value={summary.importReview}
+          label={t("importReview")}
+          hint={t("importReviewHint")}
+          active={issue === "import_review"}
+          onClick={() => toggleIssue("import_review")}
+          testId="clarification-card-import-review"
         />
         <SummaryCard
           value={summary.missingResponsible}

@@ -18,6 +18,11 @@ import {
   assertLinkedVisitSealGates,
   assertRepairReportGates,
 } from "./sealGates";
+import {
+  allocateLabelNumber,
+  resolveInspectionLabel,
+  suggestLabelNextDue,
+} from "./inspectionLabel";
 import { assertCanStartRepairRun } from "@/services/repairs/trainingGateService";
 import { completeRepairFromRun } from "@/services/repairs/repairCompleteService";
 import {
@@ -31,6 +36,7 @@ import {
 } from "@/constants/repairs";
 import { requireRepairsEnabled } from "@/lib/features/repairs";
 import { createAttachmentFromDataUrl } from "@/services/storage/attachmentBlobService";
+import { inspectionReportService } from "@/services/reports/inspectionReportService";
 
 function isKRepRun(run: {
   catalogue: { code: string };
@@ -428,6 +434,7 @@ export const inspectionRunService = {
               checkType: req.checkType,
             }),
             sealed: assignmentCompleted,
+            suggestedLabel: null,
             catalogue: null,
             qualificationGate: { ok: true, required: [], missing: [] },
             equipmentGate: { ok: true, requiredClass: null, blockedReason: null },
@@ -561,6 +568,18 @@ export const inspectionRunService = {
       const overdue = Boolean(
         dueAt && new Date(`${dueAt}T00:00:00`) < today && !assignmentCompleted,
       );
+      let suggestedLabel: CataloguePreviewDTO["suggestedLabel"] = null;
+      if (catalogue?.requiresLabel && !assignmentCompleted) {
+        const nextDue = suggestLabelNextDue({
+          performedAt: new Date(),
+          deadlineAnchor: duty?.deadlineAnchor,
+          referenceDate: duty?.referenceDate,
+          intervalValue: duty?.intervalValue,
+          intervalUnit: duty?.intervalUnit,
+        });
+        const number = await allocateLabelNumber({ tenantId: ctx.tenantId });
+        suggestedLabel = { number, nextDue };
+      }
       const locParts = [device.area?.name, device.room].filter(Boolean);
       const siteId = req.siteId ?? device.area?.site?.id ?? null;
       const siteName = device.area?.site?.name ?? null;
@@ -607,6 +626,7 @@ export const inspectionRunService = {
         dueAt,
         inspectionTypeCode,
         sealed: assignmentCompleted,
+        suggestedLabel,
         catalogue,
         qualificationGate: qualGate,
         equipmentGate: {
@@ -773,10 +793,12 @@ export const inspectionRunService = {
         throw unprocessable("Validation occasion required.");
       }
 
-      const classification = await prisma.deviceModelClassification.findFirst({
-        where: { deviceModelId: device.modelId ?? undefined, validTo: null },
-        select: { appliedPartCode: true },
-      });
+      const { getOpenClassification } = await import(
+        "@/services/registration/classificationScope"
+      );
+      const classification = device.modelId
+        ? await getOpenClassification(prisma, device.modelId, ctx.tenantId)
+        : null;
 
       let run = await prisma.inspectionRun.findFirst({
         where: {
@@ -1622,11 +1644,29 @@ export const inspectionRunService = {
         typeCode.includes("konstanz") ||
         typeCode.includes("constancy") ||
         typeCode === "radiation";
-      const labelGate = assertLabelRequired({
+      const resultCode = body.result ?? "passed";
+      const dutyForLabel = run.serviceRequest?.duty
+        ? {
+            deadlineAnchor: run.serviceRequest.duty.deadlineAnchor,
+            referenceDate: run.serviceRequest.duty.referenceDate,
+            intervalValue: run.serviceRequest.duty.intervalValue,
+            intervalUnit: run.serviceRequest.duty.intervalUnit,
+          }
+        : null;
+      const resolvedLabel = await resolveInspectionLabel({
+        tenantId: ctx.tenantId,
         requiresLabel: Boolean(inspType?.requiresLabel),
-        result: body.result ?? "passed",
+        result: resultCode,
         labelNumber: body.labelNumber,
         labelNextDue: body.labelNextDue,
+        duty: dutyForLabel,
+        performedAt: run.performedAt,
+      });
+      const labelGate = assertLabelRequired({
+        requiresLabel: Boolean(inspType?.requiresLabel),
+        result: resultCode,
+        labelNumber: resolvedLabel.labelNumber,
+        labelNextDue: resolvedLabel.labelNextDue,
         isConstancy,
       });
       if (!labelGate.ok) {
@@ -1694,14 +1734,17 @@ export const inspectionRunService = {
         }
       }
 
-      const result = body.result ?? "passed";
+      const result = resultCode;
       const orgId =
         ctx.user.accountKind === "partner" ? ctx.user.organisationId : null;
-      const labelNextDue = body.labelNextDue?.trim()
+      const labelNextDueRaw = resolvedLabel.labelNextDue?.trim() || null;
+      const labelNextDue = labelNextDueRaw
         ? new Date(
-            body.labelNextDue.includes("-")
-              ? `${body.labelNextDue.slice(0, 10)}T00:00:00.000Z`
-              : body.labelNextDue,
+            labelNextDueRaw.length === 7
+              ? `${labelNextDueRaw}-01T00:00:00.000Z`
+              : labelNextDueRaw.includes("-")
+                ? `${labelNextDueRaw.slice(0, 10)}T00:00:00.000Z`
+                : labelNextDueRaw,
           )
         : null;
 
@@ -1766,8 +1809,7 @@ export const inspectionRunService = {
             serviceRequestId: run.serviceRequestId,
             result: result === "deviation" ? "deviation" : result,
             unitEventSuffix: orgId ? `org ${orgId}` : null,
-            labelNumber:
-              result === "failed" ? null : body.labelNumber?.trim() || null,
+            labelNumber: result === "failed" ? null : resolvedLabel.labelNumber,
             labelNextDue: result === "failed" ? null : labelNextDue,
           });
           dutyPerformanceId = completion.dutyPerformanceId;
@@ -1879,8 +1921,45 @@ export const inspectionRunService = {
         }
       });
 
+      // E106 — render the sealed report outside the seal tx; failure leaves reportBlobId null
+      // and POST /api/jobs/reports fills it later (never fails the seal).
+      await inspectionReportService.enqueueOrRenderAfterSeal(runId);
+
       if (kRepComplete) {
         await completeRepairFromRun(ctx, kRepComplete);
+      }
+
+      // End the linked site visit after a successful seal (resume remains available for more jobs).
+      if (visitId && !skipVisit && linkedVisit && !linkedVisit.completedAt) {
+        try {
+          const endedAt = new Date();
+          const runs = await prisma.inspectionRun.findMany({
+            where: { visitId, tenantId: ctx.tenantId },
+            select: { startedAt: true, completedAt: true, performedAt: true },
+          });
+          const firstStep =
+            runs
+              .map((r) => r.startedAt ?? r.performedAt)
+              .filter((d): d is Date => Boolean(d))
+              .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+          const lastStep =
+            runs
+              .map((r) => r.completedAt)
+              .filter((d): d is Date => Boolean(d))
+              .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+          const vor = firstStep
+            ? Math.max(0, Math.round((firstStep.getTime() - linkedVisit.startedAt!.getTime()) / 60_000))
+            : Math.max(0, Math.round((endedAt.getTime() - linkedVisit.startedAt!.getTime()) / 60_000));
+          const nach = lastStep
+            ? Math.max(0, Math.round((endedAt.getTime() - lastStep.getTime()) / 60_000))
+            : 0;
+          await prisma.serviceVisit.update({
+            where: { id: visitId },
+            data: { completedAt: endedAt, setupMinutes: vor + nach },
+          });
+        } catch {
+          /* seal already committed — visit end is best-effort */
+        }
       }
 
       return this.getRun(ctx, runId);

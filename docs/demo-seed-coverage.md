@@ -113,11 +113,11 @@ See also the simplified ERD in [SCHEMA_AND_ARCHITECTURE.md](./SCHEMA_AND_ARCHITE
 | `ConstancyCadence` | Duties / constancy objects | Constancy cadence screen empty |
 | `CapturedArticle` | Resolve stage 4 | No pre-seeded unknown devices |
 | `ExecutorOrg` / `DispatchTarget` / `DispatchOutbox` | SR dispatch | **ExecutorOrg** now upserted with each contract (import + onboard + lifecycle). DispatchTarget channels still seed/demo-tenant only |
-| `OrderRequest` / `OrderItem` | Parts path | Spare-parts queue empty |
+| `OrderRequest` / `OrderItem` | `/shop` → `/shop-orders` | No seeded shop orders — list/summary cards empty until live checkout |
 | `AuthorityInspection` / findings | Compliance | Authority screens empty |
 | DGUV Festlegung (`determinationState`) | Duties | Determination queue until operators decide |
 | `DashboardTileGrant` / `UserDashboardTile` | Users | Custom dashboards not pre-assigned |
-| `TenantOxidConnection` / `SmtpSettings` | Tenant / org | Settings integrations not prewired |
+| `TenantShopConnection` / `SmtpSettings` | Tenant / org | Demo seeds mock shop (`ordering` + PIN) so `/shop` works; SMTP not prewired |
 | `TotpChallenge` / invitations / reset tokens | User | 2FA/invite only via live flows |
 | `AuditEvent` | Tenant | Audit timeline empty until actions run |
 | `ExternalSourceRecord` | Model | BEUDAMED cache not prefilled (resolve will fetch/create) |
@@ -232,7 +232,7 @@ See also the simplified ERD in [SCHEMA_AND_ARCHITECTURE.md](./SCHEMA_AND_ARCHITE
 | `ServiceRequest` | STK due → assigned, `state` captured→… | Requests UI |
 | `StatusEvent` | Timeline | Audit of transitions |
 | `DispatchRecord` / `DispatchOutbox` | Mail/API pending | Dispatch worker demos |
-| `OrderRequest` | Spare part for known instance | Parts path |
+| `OrderRequest` | Shop checkout from known instance | `/shop` → `/shop-orders` |
 | `CapturedArticle` | Unknown nameplate | Capture-only SR |
 
 **Connection:** SR may point at `deviceInstanceId` and/or `dutyId`; partner disposition sets `assigneeUserId` / `executorOrgId`.

@@ -1,10 +1,12 @@
 import { requirePermission, requireActingContext, withTenantStore } from "@/lib/auth/tenantContext";
 import { errorResponse, notFound, unprocessable } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
+import { createTenantClassification } from "@/services/registration/classificationScope";
 
 /**
  * POST /api/catalog/models/:id/classify-quick
  * Body: { annex: 'anlage1' | 'anlage2' | 'none', confirmed?: boolean }
+ * E104 — writes the acting tenant row only (never closes global template).
  */
 export async function POST(req: Request, ctxParams: { params: Promise<{ id: string }> }) {
   let correlationId: string | undefined;
@@ -24,32 +26,49 @@ export async function POST(req: Request, ctxParams: { params: Promise<{ id: stri
       if (!model) throw notFound("Model");
 
       const ruleSetId = "rs-mpbetreibv";
-      await prisma.deviceModelClassification.updateMany({
-        where: { deviceModelId: id, validTo: null },
-        data: { validTo: new Date(), openClassificationKey: null },
-      });
-
       const stk = body.annex === "anlage1";
-      const row = await prisma.deviceModelClassification.create({
-        data: {
+      const row = await prisma.$transaction(async (tx) => {
+        const classification = await createTenantClassification(tx, {
           deviceModelId: id,
+          tenantId: ctx.tenantId,
+          ruleSetId,
           stk,
           radiation: false,
           confidence: "responsible",
-          ruleSetId,
           confirmedBy: body.confirmed === false ? null : ctx.user.name,
           confirmedAt: body.confirmed === false ? null : new Date(),
-          openClassificationKey: id,
           evidenceText:
             body.annex === "none"
               ? "Keine Einstufung Anlage 1/2 (Import-Schnellklassifikation)"
               : `Import-Schnellklassifikation ${body.annex}`,
-        },
-      });
+        });
+        await tx.deviceModel.update({
+          where: { id },
+          data: { state: "released" },
+        });
 
-      await prisma.deviceModel.update({
-        where: { id },
-        data: { state: "released" },
+        // Import opens per-unit "Modell ohne Einstufung" clars — clear them so Erstanlage is not blocked.
+        const instances = await tx.deviceInstance.findMany({
+          where: { tenantId: ctx.tenantId, modelId: id },
+          select: { id: true },
+        });
+        if (instances.length) {
+          await tx.deviceClarification.updateMany({
+            where: {
+              tenantId: ctx.tenantId,
+              deviceInstanceId: { in: instances.map((i) => i.id) },
+              resolvedAt: null,
+              kind: "classification",
+            },
+            data: {
+              resolvedBy: ctx.user.name,
+              resolvedAt: new Date(),
+              resolutionNote: "Resolved by import quick-classify",
+            },
+          });
+        }
+
+        return classification;
       });
 
       return Response.json(

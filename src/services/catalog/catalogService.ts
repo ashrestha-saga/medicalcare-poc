@@ -134,6 +134,56 @@ export function createCatalogService(adapter: CatalogSearchAdapter = selectCatal
       }
       logger.info("catalog.local.miss", { gtin });
 
+      // Prefer shop provider registry when the tenant has a connected shop session.
+      try {
+        const { shopAuthService } = await import("@/services/shop/shopAuthService");
+        const { shopConnectionService } = await import("@/services/shop/shopConnectionService");
+        const { getShopProvider } = await import("@/services/shop/shopRegistry");
+        const session = await shopAuthService.getSession(tenantId);
+        if (session) {
+          const provider = getShopProvider(await shopConnectionService.getProviderType(tenantId));
+          const articles = await provider.catalog.findArticles(session, "gtin", [gtin]);
+          const article = articles[0];
+          if (article) {
+            const hit: CatalogSearchHit = {
+              model: {
+                id: article.id,
+                basicUdiDi: null,
+                udiDi: article.gtin ?? gtin,
+                gtins: article.gtin ? [article.gtin] : [gtin],
+                manufacturer: article.manufacturer,
+                manufacturerSrn: null,
+                tradeName: article.title,
+                modelName: article.articleNumber,
+                riskClass: null,
+                emdnCode: null,
+                gmdnCode: null,
+                source: "catalog",
+                sourceFetchedAt: new Date().toISOString(),
+                version: 1,
+                state: "released",
+                maintenanceCycleMonths: null,
+              },
+              raw: article,
+            };
+            const persisted = await upsertOxidCatalogModel(hit, gtin);
+            logger.info("catalog.shop_provider.response", {
+              provider: provider.type,
+              hit: true,
+              modelId: persisted.id,
+              articleNumber: article.articleNumber,
+            });
+            return { model: persisted, system: "oxid-catalog" };
+          }
+        }
+      } catch (error) {
+        logger.warn("catalog.shop_provider.response", {
+          hit: false,
+          gtin,
+          error: errorMessage(error),
+        });
+      }
+
       try {
         logger.info("catalog.adapter.request", {
           adapter: adapter.name,

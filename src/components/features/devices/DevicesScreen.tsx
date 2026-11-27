@@ -136,6 +136,7 @@ export function DevicesScreen() {
             onRefresh={() => void list.selectDevice(list.selected!)}
             completingDutyId={list.completingDutyId}
             onCompleteDuty={(id, input) => void list.completeDuty(id, input)}
+            focus={list.focus}
           />
         ) : (
           <ListPageShell

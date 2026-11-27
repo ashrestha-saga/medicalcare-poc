@@ -1,4 +1,5 @@
 import type {
+  ClarificationIssueCode,
   ClarificationItemDTO,
   ClarificationsResponse,
   ClarificationSummaryDTO,
@@ -35,10 +36,21 @@ function buildSummary(items: ClarificationItemDTO[]): ClarificationSummaryDTO {
     derivedClassification: items.filter((i) =>
       i.issues.some((x) => x.code === "derived_classification"),
     ).length,
+    importReview: items.filter((i) => i.issues.some((x) => x.code === "import_review")).length,
     missingResponsible: items.filter((i) =>
       i.issues.some((x) => x.code === "missing_responsible"),
     ).length,
   };
+}
+
+function issueCodeFromClarificationKind(kind: string): ClarificationIssueCode {
+  if (kind === "duplicate") return "duplicate_serial";
+  if (kind === "import_review") return "import_review";
+  if (kind === "classification" || kind === "missing_classification") {
+    return "missing_classification";
+  }
+  // Legacy / generic deferred rows — keep prior mapping for evidence etc.
+  return "derived_classification";
 }
 
 /**
@@ -101,11 +113,12 @@ async function collectOpenItems(): Promise<ClarificationItemDTO[]> {
 
     for (const c of row.clarifications) {
       // Deferred MP classification / UDI clarifications do not apply to Betriebsmittel.
-      if (isEquipment && c.kind !== "duplicate") continue;
+      if (isEquipment && c.kind !== "duplicate" && c.kind !== "import_review") continue;
+      const code = issueCodeFromClarificationKind(c.kind);
       issues.push({
-        code: c.kind === "duplicate" ? "duplicate_serial" : "derived_classification",
+        code,
         label: `${c.label} (deferred by ${c.deferredBy})`,
-        severity: c.kind === "evidence" ? "high" : "medium",
+        severity: c.kind === "evidence" ? "high" : c.kind === "import_review" ? "medium" : "medium",
       });
     }
 

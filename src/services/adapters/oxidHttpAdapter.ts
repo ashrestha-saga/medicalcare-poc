@@ -4,7 +4,7 @@ import { env } from "@/lib/env";
 import { fetchJson, HttpStatusError } from "@/lib/http";
 import { errorMessage, logger } from "@/lib/logger";
 import { oxidEndpoint } from "@/lib/oxid/url";
-import { oxidAuthService } from "@/services/oxid/oxidAuthService";
+import { shopAuthService } from "@/services/shop/shopAuthService";
 import type { CatalogSearchAdapter, OxidCatalogAdapter } from "./types";
 
 /**
@@ -74,7 +74,7 @@ export function mapOxidArticleToDeviceModel(row: Record<string, unknown>, lookup
 
 async function bearerForCatalog(tenantId?: string): Promise<string> {
   if (!tenantId) throw new Error("OXID catalog search requires a tenant");
-  const token = await oxidAuthService.getAccessTokenForTenant(tenantId);
+  const token = await shopAuthService.getAccessTokenForTenant(tenantId);
   if (!token) throw new Error("No OXID shop connection — ask an admin to link OXID in Settings");
   return token;
 }

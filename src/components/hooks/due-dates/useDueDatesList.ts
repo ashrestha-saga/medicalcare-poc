@@ -78,6 +78,7 @@ function buildQuery(opts: {
   horizon: DueDatesHorizon | null;
   confidence: DueDatesConfidenceFilter | null;
   scheduled: boolean;
+  provisional: boolean;
   q: string;
   offset: number;
 }): string {
@@ -88,6 +89,7 @@ function buildQuery(opts: {
   if (opts.horizon) sp.set("horizon", String(opts.horizon));
   if (opts.confidence) sp.set("confidence", opts.confidence);
   if (opts.scheduled) sp.set("scheduled", "1");
+  if (opts.provisional) sp.set("provisional", "1");
   if (opts.q.trim()) sp.set("q", opts.q.trim());
   sp.set("limit", String(PAGE_LIMIT));
   if (opts.offset > 0) sp.set("offset", String(opts.offset));
@@ -108,6 +110,7 @@ export function useDueDatesList() {
   const horizonParam = useQueryParam("horizon");
   const confidenceParam = useQueryParam("confidence");
   const scheduledParam = useQueryParam("scheduled");
+  const provisionalParam = useQueryParam("provisional");
   const qParam = useQueryParam("q");
 
   const [board, setBoard] = useState<DueDatesBoardDTO | null>(null);
@@ -120,6 +123,9 @@ export function useDueDatesList() {
     parseConfidence(confidenceParam),
   );
   const [scheduled, setScheduledState] = useState(scheduledParam === "1" || scheduledParam === "true");
+  const [provisional, setProvisionalState] = useState(
+    provisionalParam === "1" || provisionalParam === "true",
+  );
   const [q, setQState] = useState(qParam ?? "");
   const [assigningId, setAssigningId] = useState<string | null>(null);
 
@@ -129,8 +135,18 @@ export function useDueDatesList() {
     setHorizonState(parseHorizon(horizonParam));
     setConfidenceState(parseConfidence(confidenceParam));
     setScheduledState(scheduledParam === "1" || scheduledParam === "true");
+    setProvisionalState(provisionalParam === "1" || provisionalParam === "true");
     setQState(qParam ?? "");
-  }, [filterParam, dutyKeyParam, dutyIdParam, horizonParam, confidenceParam, scheduledParam, qParam]);
+  }, [
+    filterParam,
+    dutyKeyParam,
+    dutyIdParam,
+    horizonParam,
+    confidenceParam,
+    scheduledParam,
+    provisionalParam,
+    qParam,
+  ]);
 
   const setFilter = useCallback(
     (next: DueDatesBoardFilter) => {
@@ -172,12 +188,28 @@ export function useDueDatesList() {
     [sync],
   );
 
+  const setProvisional = useCallback(
+    (next: boolean) => {
+      setProvisionalState(next);
+      sync({ provisional: next ? "1" : null });
+    },
+    [sync],
+  );
+
   const clearExtraFilters = useCallback(() => {
     setDutyKeyState(null);
     setHorizonState(null);
     setConfidenceState(null);
     setScheduledState(false);
-    sync({ dutyKey: null, dutyId: null, horizon: null, confidence: null, scheduled: null });
+    setProvisionalState(false);
+    sync({
+      dutyKey: null,
+      dutyId: null,
+      horizon: null,
+      confidence: null,
+      scheduled: null,
+      provisional: null,
+    });
   }, [sync]);
 
   const filterArgs = useCallback(
@@ -188,6 +220,7 @@ export function useDueDatesList() {
       horizon: parseHorizon(horizonParam),
       confidence: parseConfidence(confidenceParam),
       scheduled: scheduledParam === "1" || scheduledParam === "true",
+      provisional: provisionalParam === "1" || provisionalParam === "true",
       q: qParam ?? "",
     }),
     [
@@ -197,6 +230,7 @@ export function useDueDatesList() {
       horizonParam,
       confidenceParam,
       scheduledParam,
+      provisionalParam,
       qParam,
     ],
   );
@@ -286,6 +320,8 @@ export function useDueDatesList() {
     confidence,
     setConfidence,
     scheduled,
+    provisional,
+    setProvisional,
     q,
     setQ,
     clearExtraFilters,

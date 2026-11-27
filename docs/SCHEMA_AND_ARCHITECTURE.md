@@ -10,14 +10,14 @@ Detailed reference for the Prisma/MySQL data model and how the application layer
 2. [Architecture (layers)](#2-architecture-layers)
 3. [Tenancy & identity](#3-tenancy--identity)
 4. [Schema by domain](#4-schema-by-domain)
-5. [Core workflows](#5-core-workflows) (resolve, Erstanlage, service handoff → my-sites → inspect, **Prüfpartner** + Nachbesuche, auth)
+5. [Core workflows](#5-core-workflows) (resolve, Erstanlage, service handoff → my-sites → inspect, **Prüfpartner** + Nachbesuche, auth, **shop-led checkout**)
 6. [Client architecture](#6-client-architecture)
 7. [Security (schema-related)](#7-security-schema-related)
 8. [Entity relationship (simplified)](#8-entity-relationship-simplified)
 9. [Adapter boundary](#9-adapter-boundary)
 10. [Seed data](#10-seed-data) (app seed users + large demo pack)
 
-Schema domains in §4 include tenancy, devices (incl. **ModelDocument** IFU), Ref*, classification/duties, partners (**ExecutorOrg** sync), training, requests/dispatch (soft transmit + channel toggles), **Prüfpartner (§4.8)**, and ops (§4.9).
+Schema domains in §4 include tenancy, devices (incl. **ModelDocument** IFU), Ref*, classification/duties, partners (**ExecutorOrg** sync), training, requests/dispatch (soft transmit + channel toggles), **shop-led OrderRequest**, **Prüfpartner (§4.8)**, and ops (§4.9).
 
 ---
 
@@ -153,7 +153,7 @@ Each domain starts with a **quick-reference table**, then a longer write-up per 
 | **UserInvitation** | Hashed invite token (clinic or partner); optional `permissions` JSON | `POST /api/users/invites`, `/api/partner/invites`, `/api/auth/invite/redeem` |
 | **PasswordResetToken** | Hashed admin-triggered password reset link | `POST /api/users/[id]/reset-password`, `/api/auth/reset-password/redeem` |
 | **TotpChallenge** | Short-lived 2FA challenge after password OK | `POST /api/auth/login` → `POST /api/auth/2fa/verify` |
-| **TenantOxidConnection** | One OXID shop link per tenant (tokens server-side) | Settings OXID, `/auth/callback`, OXID adapters |
+| **TenantShopConnection** | One shop link per tenant (OXID/mock; tokens + OAuth client server-side) | Settings shop, `/auth/callback`, `/shop`, `/shop-orders`, shop registry |
 | **Site** / **Area** | Location hierarchy; site has structured address + display line | Locations UI, inventarize, service request location, console onboard, `User.homeArea` |
 | **SiteHeadcount** | §6 headcount history | Registration prerequisites gate |
 | **SafetyOfficerAppointment** | MPSB / safety officer appointments | Registration prerequisites / site compliance |
@@ -204,11 +204,11 @@ Each domain starts with a **quick-reference table**, then a longer write-up per 
 
 **In the app:** Created on `POST /api/auth/login` when `totpEnabled`; consumed / deleted on `POST /api/auth/2fa/verify`. Expiry + attempt counters limit brute force. UI: second step on the login form (`/security` for enrollment).
 
-#### TenantOxidConnection
+#### TenantShopConnection
 
-**Purpose:** Exactly one OXID e-shop link per tenant. Holds OAuth tokens and connection metadata **server-side only** so catalog / parts / dispatch adapters can call the shop.
+**Purpose:** Exactly one shop link per tenant (`oxid` or `mock`). Holds shop URL, OAuth client credentials (encrypted secret), tokens, `hasSubUsers`, and submit lease columns **server-side only**.
 
-**In the app:** Settings → OXID panel; OAuth PKCE via `/auth/callback`; used by OXID adapters when `OXID_ADAPTER_MODE=http`. Status: `disconnected` \| `connected` \| `error`.
+**In the app:** Settings → shop panel (`/api/settings/shop`); OAuth PKCE via `/auth/callback` + `ShopOAuthState`; catalog / accessories / checkout via `shopRegistry`. Feature flag `ordering` enables `/shop` (catalog + cart), shop order intents + PIN submit, and `/shop-orders` management. Status: `disconnected` \| `connected` \| `error`.
 
 #### Site
 
@@ -272,7 +272,7 @@ Each domain starts with a **quick-reference table**, then a longer write-up per 
 - Catalog browse / edit / XLSX import (`/catalog`, `deviceModelCatalogService`) — list returns **all** matching rows (no hard limit)
 - Resolve stages 2–3 (local match, then OXID; BEUDAMED may create/update in `review`)
 - Anchor for `DeviceModelClassification`, `ModelDocument`, and model-scoped training events
-- Reclassify wizard (`/registration/reclassify/[modelId]`) updates the **shared** open classification, then re-freezes **this tenant’s** instance copies (see classification tenancy note below)
+- Reclassify wizard (`/registration/reclassify/[modelId]`) writes a **tenant** open classification (E104), then re-freezes **this tenant’s** instance copies (see classification tenancy note below)
 
 #### ModelDocument
 
@@ -413,7 +413,7 @@ These tables are **not** tenant-scoped. They are seeded once (`prisma/seeds/`, `
 
 | Model | Purpose | Where it works |
 |---|---|---|
-| **DeviceModelClassification** | Historised model Einstufung (`validTo` null = open). **Global today** (no `tenantId`; one open per `deviceModelId`). STK/MTK/radiation/software; optional `mtkItemId`, **`appliedPartCode`**, **`deviceFamilyCode`**. C4: productKindCode, characteristics, fieldStates, decisions, deferredFields | Erstanlage, reclassify, catalogue resolution (STK family steps / patient leakage) |
+| **DeviceModelClassification** | Historised model Einstufung (`validTo` null = open). **E104:** nullable `tenantId` + `templateId`. Global rows (`tenantId` null, key `global:<modelId>`) are templates; clinic writes use `<tenantId>:<modelId>`. STK/MTK/radiation/software; optional `mtkItemId`, **`appliedPartCode`**, **`deviceFamilyCode`**. C4: productKindCode, characteristics, fieldStates, decisions, deferredFields | Erstanlage, reclassify, catalogue resolution (STK family steps / patient leakage) |
 | **DeviceReleaseSnapshot** | Immutable freeze at release (characteristics, derivedDuties, prerequisites JSON + evidence ids) | `POST /api/registration/release` |
 | **DeviceDuty** | Frozen per-instance obligations + `dueAt`; category (inspection\|operating), setsBaseline / requiresBaseline, referenceDeviceId | `/due-dates`, device duties APIs, assignment → service request |
 | **DeviceEvidence** | Commissioning evidence (blob or external ref) keyed by prerequisiteCode | Erstanlage prerequisites / release gate |
@@ -427,11 +427,11 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 **Purpose:** Historised **Einstufung** at model level (STK yes/no, MTK annex item, radiation, software class, confidence, evidence). Open row = `validTo` null; reclassify closes the old row and inserts a new one.
 
-**Tenancy (current):** **Global** — no `tenantId`. Uniqueness while open: `openClassificationKey = deviceModelId` (SCH-02). Not in `TENANT_SCOPED_MODELS`. Erstanlage prefill, catalog edit, and reclassify therefore share one open Einstufung across all clinics that use the model.
+**Tenancy (E104 / RD43 — implemented):** `DeviceModel` stays **global**. Classification rows are either:
+- **Global template** — `tenantId` null, `openClassificationKey = global:<deviceModelId>` (platform / catalogue seed). Not rewritten by clinic reclassify.
+- **Tenant override** — `tenantId` set, `openClassificationKey = <tenantId>:<deviceModelId>`, optional `templateId` pointing at the global row that was copied. Clinic Erstanlage / reclassify / quick-classify close and insert **only** the acting tenant’s open row.
 
-**Multi-tenant implication:** Reclassify / catalog classification update closes the single global open row and creates a new one, but only re-releases **the acting tenant’s** instances. Other tenants keep old living `DeviceDuty` rows while catalogue/prefill flip to the new Einstufung. Living schedules (`DeviceDuty`, instance maintenance fields) are already tenant-scoped; the leak is the shared open classification.
-
-**Recommended direction (not implemented):** keep `DeviceModel` global; add `tenantId` on classification with `openClassificationKey = tenantId:deviceModelId` (same pattern as `ReprocessingOnDevice.openLinkKey`). Lazy: one open row per tenant that classifies that model — not N×full catalogue. See also [`demo-seed-coverage.md`](./demo-seed-coverage.md).
+**Resolution:** `getOpenClassification(db, modelId, tenantId)` returns the tenant open row when present, otherwise the global template. Living schedules (`DeviceDuty`, instance maintenance) remain tenant-scoped; other clinics keep their own override (or fall back to the shared template). See `classificationScope.ts` and [`demo-seed-coverage.md`](./demo-seed-coverage.md).
 
 **Key Prüfpartner fields (on the open row):**
 
@@ -573,7 +573,7 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 | **Attachment** / **AttachmentBlob** | Photos / files | Capture + request submit; offline queue stores downscaled images |
 | **DispatchTarget** | Per-tenant + optional `executorOrgId`; mail \| oxid \| webhook; `enabled` | Seed, Settings toggles, transmit dispatch |
 | **DispatchRecord** | Per-send outcome | On transmit when channels run; request may still be `transmitted` with no sends |
-| **OrderRequest** / **OrderItem** | Spare-parts cart | Parts flow; blocked for `serviceOnly` captures |
+| **OrderRequest** / **OrderItem** | Shop-led spare-parts / device cart; external shop state | `/shop` checkout, `/shop-orders`; blocked for `serviceOnly` captures |
 
 #### ServiceRequest
 
@@ -615,15 +615,19 @@ Flow: wizard answers → `deriveDuties` (TS, no silent rewrite after freeze) →
 
 #### OrderRequest
 
-**Purpose:** Spare-parts order — separate lifecycle from service requests. Has its own reference, idempotency, approval state (default `pending_approval`), and line items.
+**Purpose:** Shop-led spare-parts (or device) order — separate lifecycle from service requests. Has its own reference, idempotency, approval state (default `pending_approval`), shop linkage, and external shop state.
 
-**In the app:** Parts / cart flow after resolve when subject is not `serviceOnly`. Manual capture subjects cannot order parts.
+**Key fields:** `purpose` (`parts` \| `device`), optional `deviceInstanceId` / `serviceRequestId` / `shopConnectionId`, `externalState` (`intent` → `submitting` → `ordered` / `failed` / …), `externalOrderRef` / `externalOrderId`, `submitKey` (shop Idempotency-Key), `orderedByName`, `netTotalFromSource` + `currency`, `priceBreakdownJson`, `lastSubmitError`, `deliveryAddress` / optional `deliverySiteId`.
+
+**In the app:** Primary path is `/shop?device=` (scan / Parts / inventory bridge). Create intent `POST /api/order-requests` → optional PIN → `POST …/submit`. Success UI snapshots reference + shop ref + lines. Management: `/shop-orders` (summary cards → `?filter=ordered|shipped|failed`) and `/shop-orders/[reference]` (+ `OrderStatusEvent`). Manual-capture subjects cannot order parts (`serviceOnly`).
 
 #### OrderItem
 
-**Purpose:** Line on an order (article number, description, quantity, optional unit price / article id).
+**Purpose:** Line on an order (article number, description, quantity, optional unit price).
 
-**In the app:** Built from the parts cart UI; stored with the parent `OrderRequest`.
+**Key fields:** `articleNumber` (checkout-safe; prefer shop `az_catalog_nr`, not `VA-…` oxartnum), optional `shopArticleId` / `gtin`, `priceSource` (`none` \| `shop`), `quantityConfirmed`.
+
+**In the app:** Built from the `/shop` cart; OXID addtocart sends orderable artnum only. Stored with the parent `OrderRequest`.
 
 ---
 
@@ -864,14 +868,38 @@ Partner path: same `User` row with `accountKind=partner` + `OrgMembership` + `Se
 
 **Services:** `src/services/auth/userAuthService.ts`, `totpService.ts`, `invitationService.ts`, `passwordResetService.ts`.
 
+### 5.6 Shop-led order (`/shop` → checkout → `/shop-orders`)
+
+```
+Scan / Parts / inventory CTA
+  → shopPathForDevice(id, returnTo=/?device=…, tab=accessories)
+  → /shop?device=…
+       GET …/shop-catalog          (device shell)
+       lazy ?section=accessories|suggestions
+       on Add (hasVariants) → GET /api/shop/articles/[oxid]
+  → cart (requestStore) + delivery from GET /api/shop/account
+  → POST /api/order-requests        (intent; offline-queueable)
+  → optional PIN (hasSubUsers)
+  → POST …/submit                   (online; OXID addtocart via az_catalog_nr)
+  → ShopOrderSuccess snapshot
+       capturer → / ; backoffice → /devices
+  → optional /shop-orders?filter=…  (management)
+```
+
+**Checkout rules:** Prefer `az_catalog_nr`; strip leading `VA-` for addtocart; map `BELOW_MIN_ORDER_VALUE` → 422; rotate client idempotency key after failed submit + cart change.
+
+**Tables:** `OrderRequest`, `OrderItem`, `OrderStatusEvent`, `TenantShopConnection`, `ShopOAuthState`, `ExternalCallLog`.
+
+**Services / UI:** `src/services/shop/*` (incl. `oxidShopProvider`, `shopOrderService`), `useShopOrderFlow`, `ShopScreen` / `ShopOrderSuccess`, `useShopOrdersList`.
+
 ---
 
 ## 6. Client architecture
 
 | Store | Job |
 |---|---|
-| `scanStore` | Resolve → classify → service/parts → success \| queued state machine |
-| `requestStore` | Draft request fields / cart |
+| `scanStore` | Resolve → classify → service/parts; shop bridge uses `openParts` / resume via `/?device=` |
+| `requestStore` | Draft request fields / shop cart + order note / idempotency key |
 | `sessionStore` | Client mirror of `/api/auth/session` (user / tenantName); no local PIN lock |
 | `inspectQueueStore` | Session hand-off from My institutions → Heute (`userId`, `tenantId`, references); cleared/filtered if another user or 403 |
 | `offlineQueueStore` + `idb` | Queue failed submits; `replayQueue` mutex |
@@ -887,14 +915,14 @@ Offline replay rules: 2xx remove · 409 mark synced · 400/404/422 keep with err
 - **SEC-03 session revoke:** `User.sessionsValidFrom` — on deactivate, role change, or password reset the timestamp is bumped; `readSession` rejects cookies whose `iat` is older.
 - **SEC-04 lockout:** `failedLoginAttempts` / `lockedUntil` on `User` (threshold via `AUTH_MAX_FAILED_LOGINS`, duration via `AUTH_LOCKOUT_MINUTES`).
 - Passwords: hashed (`src/lib/password`); TOTP, OXID tokens, and SMTP `passEnc` AES-GCM via `src/lib/crypto/secretBox.ts`.
-- **SEC-01 tenant guard:** `AsyncLocalStorage` bound in `requireTenantContext` / `requireActingContext`; Prisma `$extends` injects `tenantId` on tenant-scoped models and throws if no context. Seed/tests/jobs use `runWithoutTenant` / `bindTenantBypass`. Unguarded client: `prismaSystem`. `UserInvitation` is allowlisted when clinic-scoped; org-scoped invites and redeem use `runWithoutTenantAsync`. `PasswordResetToken` is tenant-scoped; redeem runs without tenant. **Global by design (not guarded):** `DeviceModel`, `DeviceModelClassification`, `ExternalSourceRecord`, all `Ref*`, `Organisation` / partner membership graphs, `RoleGrant`.
+- **SEC-01 tenant guard:** `AsyncLocalStorage` bound in `requireTenantContext` / `requireActingContext`; Prisma `$extends` injects `tenantId` on tenant-scoped models and throws if no context. Seed/tests/jobs use `runWithoutTenant` / `bindTenantBypass`. Unguarded client: `prismaSystem`. `UserInvitation` is allowlisted when clinic-scoped; org-scoped invites and redeem use `runWithoutTenantAsync`. `PasswordResetToken` is tenant-scoped; redeem runs without tenant. **Global by design (not guarded):** `DeviceModel`, `DeviceModelClassification` (nullable `tenantId` — filter by scope in services, not the Prisma guard), `ExternalSourceRecord`, all `Ref*`, `Organisation` / partner membership graphs, `RoleGrant`.
 - **SEC-02:** child tables (`Attachment`, `StatusEvent`, `DispatchRecord`, `OrderItem`, `Area`, `SiteHeadcount`, `SafetyOfficerAppointment`) carry `tenantId` with FK.
 - **SEC-06:** MySQL triggers reject `UPDATE`/`DELETE` on `AuditEvent` (append-only). App DB user should also lack those privileges (ops).
 - **SEC-07 invites & resets:** `UserInvitation` + hashed token (optional clinic `permissions` snapshot → `UserPermission`); `PasswordResetToken` + hashed token. Redeem sets password (no session cookie from the link).
 - RBAC: clinic effective permissions = `UserPermission` snapshot or `RoleGrant` (`kind=clinic`) + path guard `canAccessPath`. Partner: `RoleGrant` `partner_console` / `partner_acting` (static fallback) ∩ contract scope for acting; reserved slugs (`users:*`, `roles:*`, `training:*`, `settings:*`, `catalog:update`) stripped from acting.
 - Audit: `AuditEvent` is append-only with actor **snapshots** built in the gate (`actorKind` clinic vs partner + `organisationId` / `serviceContractId`). Do not join `User` later for history.
 - External identifiers in logs: hashed in `ExternalCallLog`.
-- Capturers (`role=user`): no `shell:nav`, but home (`/`) and `/security` remain reachable.
+- Capturers (`role=user`): no `shell:nav`, but home (`/`), `/shop` (`parts:request`), and `/security` remain reachable.
 
 ### Wave 2 schema hygiene (bucket B)
 
@@ -930,7 +958,7 @@ Offline replay rules: 2xx remove · 409 mark synced · 400/404/422 keep with err
 | **DutyKey / IntervalUnit** | Persisted as Prisma enums; dynamic duty ids map via `canonicalDutyKey` |
 | **Confidence.guess** | Deprecated; write/read normalize to `derived` |
 | **Validation anchor** | Product decision: equipment validation stays **`year_end`** |
-| **OrderRequestState** | Create stamp only (`captured`); spare-parts lifecycle is `OrderApprovalState` |
+| **OrderRequestState** | Create stamp only (`captured`); clinic approval is `OrderApprovalState`; shop lifecycle is `ExternalOrderState` (`intent` / `submitting` / `ordered` / `shipped` / `failed` / …) via `OrderPurpose` |
 | **deriveDuties P1–P3 / P6** | NA meta; one STK; Wartung determination / implant N/A; accessory evidence by class |
 | **AED UI + STK** | Question only aktiv-therapie / sonstiges; exemption overrides Anlage1/Altgerät |
 | **Classification.stk** | Written from `stkFlagFromDuties(preview.duties)` — one expression with derivation |
@@ -951,7 +979,7 @@ Schedule both URLs from external cron (e.g. every 15 minutes). Failed dispatch t
 ### SCH uniqueness
 
 - `DeviceInstance` unique `(tenantId, modelId, serialNumber)` (NULLs allowed).
-- `DeviceModelClassification.openClassificationKey` unique while open (`= deviceModelId` today — **one open Einstufung per model globally**; cleared when `validTo` set). Future tenant-scoped design would use `` `${tenantId}:${deviceModelId}` ``.
+- `DeviceModelClassification.openClassificationKey` unique while open: `global:<deviceModelId>` for templates, `<tenantId>:<deviceModelId>` for clinic overrides (E104); cleared when `validTo` set.
 
 ---
 

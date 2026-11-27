@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useSession } from "@/hooks/useSession";
 import { useSessionStore } from "@/store/sessionStore";
 import { LocaleToggle } from "@/components/features/shared/LocaleToggle";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 /** Minimal chrome for partner sessions — org name + sign out, no clinic nav. */
 export function PartnerShell({ children }: { children: ReactNode }) {
@@ -32,6 +33,7 @@ export function PartnerShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <NotificationBell seeAllHref="/partner/notifications" variant="dark" />
           <LocaleToggle />
           <button
             type="button"

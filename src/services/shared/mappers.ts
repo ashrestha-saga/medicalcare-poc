@@ -548,7 +548,48 @@ export function toDispatchTargetDTO(row: DispatchTarget): DispatchTargetDTO {
   };
 }
 
-export function toOrderRequestDTO(row: OrderRequest & { items: OrderItem[] }): OrderRequestDTO {
+export function toOrderRequestDTO(
+  row: OrderRequest & {
+    items: OrderItem[];
+    statusEvents?: Array<{
+      id: string;
+      externalState: string;
+      source: string;
+      eventId: string;
+      actorName: string | null;
+      invoiceRef: string | null;
+      netTotal: { toNumber?: () => number } | number | null;
+      receivedAt: Date;
+    }>;
+  },
+): OrderRequestDTO {
+  const extended = row as OrderRequest & {
+    purpose?: "device" | "parts";
+    deviceInstanceId?: string | null;
+    externalState?: string;
+    externalOrderRef?: string | null;
+    externalOrderId?: string | null;
+    orderedByName?: string | null;
+    lastSubmitError?: string | null;
+    netTotalFromSource?: { toNumber?: () => number } | number | null;
+    currency?: string | null;
+    priceBreakdownJson?: string | null;
+    items: Array<
+      OrderItem & { gtin?: string | null; priceSource?: string; quantityConfirmed?: number | null }
+    >;
+  };
+  const net =
+    extended.netTotalFromSource == null
+      ? null
+      : typeof extended.netTotalFromSource === "number"
+        ? extended.netTotalFromSource
+        : typeof extended.netTotalFromSource.toNumber === "function"
+          ? extended.netTotalFromSource.toNumber()
+          : Number(extended.netTotalFromSource);
+  const priceBreakdown = parseJson<OrderRequestDTO["priceBreakdown"]>(
+    extended.priceBreakdownJson ?? null,
+    null,
+  );
   return {
     id: row.id,
     reference: row.reference,
@@ -561,13 +602,45 @@ export function toOrderRequestDTO(row: OrderRequest & { items: OrderItem[] }): O
     state: row.state,
     raisedBy: row.raisedBy,
     createdAt: row.createdAt.toISOString(),
-    items: row.items.map((i) => ({
+    updatedAt: row.updatedAt.toISOString(),
+    purpose: extended.purpose,
+    deviceInstanceId: extended.deviceInstanceId ?? null,
+    externalState: extended.externalState,
+    externalOrderRef: extended.externalOrderRef ?? null,
+    externalOrderId: extended.externalOrderId ?? null,
+    orderedByName: extended.orderedByName ?? null,
+    netTotalFromSource: net,
+    currency: extended.currency ?? null,
+    priceBreakdown,
+    lastSubmitError: extended.lastSubmitError ?? null,
+    itemCount: extended.items.length,
+    items: extended.items.map((i) => ({
       id: i.id,
       articleId: i.articleId,
       articleNumber: i.articleNumber,
       description: i.description,
       quantity: i.quantity,
       unitPrice: i.unitPrice,
+      gtin: i.gtin ?? null,
+      priceSource: i.priceSource,
+      quantityConfirmed: i.quantityConfirmed ?? null,
+    })),
+    statusEvents: row.statusEvents?.map((e) => ({
+      id: e.id,
+      externalState: e.externalState,
+      source: e.source,
+      eventId: e.eventId,
+      actorName: e.actorName,
+      invoiceRef: e.invoiceRef,
+      netTotal:
+        e.netTotal == null
+          ? null
+          : typeof e.netTotal === "number"
+            ? e.netTotal
+            : typeof e.netTotal.toNumber === "function"
+              ? e.netTotal.toNumber()
+              : Number(e.netTotal),
+      receivedAt: e.receivedAt.toISOString(),
     })),
   };
 }

@@ -29,6 +29,7 @@ function row(partial: Partial<CataloguePreviewDTO> & { reference: string }): Cat
     dueAt: null,
     inspectionTypeCode: "STK",
     sealed: false,
+    suggestedLabel: null,
     catalogue: null,
     qualificationGate: { ok: true, required: [], missing: [] },
     equipmentGate: { ok: true, requiredClass: null, blockedReason: null },

@@ -1,5 +1,6 @@
 import type { QuoteDecision, ServiceRequestState } from "@prisma/client";
 import type { ActingContext, TenantWorkContext } from "@/interfaces";
+import { notificationDedup } from "@/constants/notifications";
 import { actorFromContext } from "@/lib/auth/actorContext";
 import {
   requireActingPartnerConsolePermission,
@@ -10,6 +11,7 @@ import { normalizeEuroText } from "@/lib/euro";
 import { isRepairsEnabled } from "@/lib/features/repairs";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
+import { notifyService } from "@/services/notifications/notifyService";
 
 async function assertClinicRepairs(ctx: { tenantId: string }) {
   const tenant = await prisma.tenant.findUnique({
@@ -152,6 +154,21 @@ export async function upsertQuote(
     },
   });
 
+  // E107 — clinic must approve an open quote.
+  if (row.decision === "open") {
+    await notifyService.pushToRoles(
+      ctx.tenantId,
+      ["device_admin", "security_officer", "superadmin"],
+      "approval_quote",
+      notificationDedup.approvalQuote(sr.id),
+      `Angebot zur Freigabe: ${sr.reference}`,
+      `${amountText} · ${scopeText.slice(0, 120)}`,
+      { type: "request", id: sr.reference },
+      ctx.tenantId,
+      null,
+    );
+  }
+
   return row;
 }
 
@@ -225,6 +242,32 @@ export async function decideQuote(
     before: { decision: "open" },
     after: { decision: updated.decision, decisionNote: updated.decisionNote },
   });
+
+  // Close clinic inbox items for this quote.
+  const now = new Date();
+  await prisma.userNotification
+    .updateMany({
+      where: {
+        dedupKey: notificationDedup.approvalQuote(sr.id),
+        state: { not: "done" },
+      },
+      data: { state: "done", doneAt: now, readAt: now },
+    })
+    .catch(() => undefined);
+
+  // Tell the partner who submitted the quote.
+  if (quote.createdByUserId && quote.createdByUserId !== ctx.user.id) {
+    await notifyService.pushSafe(
+      quote.createdByUserId,
+      "follow_up",
+      `quote_decided:${updated.id}`,
+      `Angebot ${input.decision === "approved" ? "freigegeben" : "abgelehnt"}: ${sr.reference}`,
+      input.decisionNote?.trim() || null,
+      { type: "request", id: sr.reference },
+      ctx.tenantId,
+      null,
+    );
+  }
 
   return updated;
 }

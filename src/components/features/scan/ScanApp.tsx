@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import type {
   InventoryScanExtraAction,
   ScanChargeDetailDTO,
@@ -14,6 +15,7 @@ import type {
   ScanStoerungResultDTO,
 } from "@/interfaces";
 import { useScanStore } from "@/store/scanStore";
+import { scanResumePath, shopPathForDevice } from "@/lib/scan/shopNavigation";
 import { startServiceRequestFromDevice } from "@/lib/scan/startServiceRequestFromDevice";
 import { CameraPane } from "@/components/features/scan/CameraPane";
 import { CapturerInventoryPanel } from "@/components/features/scan/CapturerInventoryPanel";
@@ -77,8 +79,11 @@ type Overlay =
  */
 export function ScanApp() {
   const form = useFormFactor();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const phase = useScanStore((s) => s.phase);
   const resolution = useScanStore((s) => s.resolution);
+  const backToDevice = useScanStore((s) => s.backToDevice);
   const { checkPermission } = usePermissions();
   const isCapturer = !checkPermission("shell:nav") && checkPermission("inventory:view");
   const canReprocessing = checkPermission("reprocessing:view");
@@ -105,6 +110,7 @@ export function ScanApp() {
   const [tab, setTab] = useState<ScanTabId>("scan");
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [heuteRemaining, setHeuteRemaining] = useState(0);
+  const resumeInFlight = useRef<string | null>(null);
 
   const tabs = useMemo(() => {
     const list: { id: ScanTabId; badge?: number }[] = [
@@ -215,11 +221,49 @@ export function ScanApp() {
     }
   };
 
-  const openParts = async (card: ScanDeviceCardDTO) => {
+  const openParts = (card: ScanDeviceCardDTO) => {
     setOverlay(null);
-    onTabChange("scan");
-    await resolve(card.inventoryNumber, "manual");
+    router.push(shopPathForDevice(card.deviceId, scanResumePath(card.deviceId), { tab: "accessories" }));
   };
+
+  /** Return from /shop?returnTo=/?device=… — restore inventory device card. */
+  useEffect(() => {
+    const deviceId = searchParams.get("device")?.trim();
+    if (!deviceId) return;
+
+    const clearQuery = () => router.replace("/", { scroll: false });
+    const currentId = useScanStore.getState().resolution?.device?.id;
+    const currentPhase = useScanStore.getState().phase;
+
+    if (currentId === deviceId) {
+      if (currentPhase === "parts" || currentPhase === "service-request") {
+        backToDevice();
+      }
+      setOverlay(null);
+      setTab("scan");
+      clearQuery();
+      return;
+    }
+
+    if (resumeInFlight.current === deviceId) return;
+    resumeInFlight.current = deviceId;
+    setOverlay(null);
+    setTab("scan");
+
+    void (async () => {
+      try {
+        const res = await api<{ card: ScanDeviceCardDTO }>(
+          `/api/scan/devices/${encodeURIComponent(deviceId)}`,
+        );
+        await resolve(res.card.inventoryNumber, "manual");
+      } catch (e) {
+        toast.error(e instanceof ApiError ? e.message : tDevice("comingSoon"));
+      } finally {
+        resumeInFlight.current = null;
+        clearQuery();
+      }
+    })();
+  }, [searchParams, resolve, router, backToDevice, tDevice]);
 
   const onStoerungSaved = (result: ScanStoerungResultDTO, deviceId: string, back: OverlayBack) => {
     setOverlay({
@@ -462,7 +506,7 @@ export function ScanApp() {
             })
           }
           onService={(card) => void openService(card)}
-          onParts={(card) => void openParts(card)}
+          onParts={openParts}
         />
       ) : null}
       {overlay?.kind === "stoerung" ? (

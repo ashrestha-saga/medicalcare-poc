@@ -1,5 +1,6 @@
 import type { LockSource, OperationalState, Prisma } from "@prisma/client";
 import type { TenantWorkContext } from "@/interfaces";
+import { notificationDedup } from "@/constants/notifications";
 import { actorFromContext } from "@/lib/auth/actorContext";
 import { requirePermission } from "@/lib/auth/tenantContext";
 import { conflict, forbidden, notFound, unprocessable } from "@/lib/errors";
@@ -7,6 +8,7 @@ import { isRepairsEnabled } from "@/lib/features/repairs";
 import { isRadiationDguvEnabled } from "@/lib/features/radiationDguv";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/services/audit/auditService";
+import { notifyService } from "@/services/notifications/notifyService";
 
 /** Full acting/clinic ctx, or minimal system-driven ctx (repair outcomes pass `system` + `tx`). */
 type TransitionCtx =
@@ -72,6 +74,7 @@ export async function transitionOperationalState(
       inventoryNumber: true,
       operationalState: true,
       lockSource: true,
+      responsibleUserId: true,
     },
   });
   if (!device) throw notFound("Device not found");
@@ -126,6 +129,54 @@ export async function transitionOperationalState(
       summary: `${device.inventoryNumber}: ${from} → ${to}`,
       after: { from, to, note: input.note ?? null },
     });
+  }
+
+  // E107 — lock inbox item (skip when nested in a caller transaction).
+  if (!input.tx && to === "locked") {
+    const title = `Gerät gesperrt: ${device.inventoryNumber}`;
+    const body = input.note?.trim() || null;
+    const target = {
+      type: "device" as const,
+      id: device.id,
+      inventoryNumber: device.inventoryNumber,
+      tenantId: ctx.tenantId,
+      focus: "duties" as const,
+    };
+    const dedup = notificationDedup.lock(device.id);
+    if (device.responsibleUserId && device.responsibleUserId !== ctx.user.id) {
+      await notifyService.pushSafe(
+        device.responsibleUserId,
+        "lock",
+        dedup,
+        title,
+        body,
+        target,
+        ctx.tenantId,
+        null,
+      );
+    } else if (!device.responsibleUserId) {
+      await notifyService.pushToRoles(
+        ctx.tenantId,
+        ["device_admin", "security_officer"],
+        "lock",
+        dedup,
+        title,
+        body,
+        target,
+        ctx.tenantId,
+        null,
+      );
+    }
+  }
+
+  if (!input.tx && from === "locked" && to === "in_service") {
+    const now = new Date();
+    await prisma.userNotification
+      .updateMany({
+        where: { dedupKey: notificationDedup.lock(device.id), state: { not: "done" } },
+        data: { state: "done", doneAt: now, readAt: now },
+      })
+      .catch(() => undefined);
   }
 
   return { from, to };

@@ -11,6 +11,10 @@ export type ImportTargetField =
   | "verantwortlich"
   | "letzte_stk"
   | "letzte_mtk"
+  | "letzte_wartung"
+  | "letzte_dguv"
+  | "letzte_konstanz"
+  | "letzte_validierung"
   | "naechste_pruefung"
   | "gtin"
   | "bemerkung"
@@ -45,6 +49,17 @@ export type PruefungHint = {
   raw: string;
 };
 
+/** E103 — last performances carried on ImportRow.normalized (no new table). */
+export type ImportLastPerformance = {
+  dutyKey: "stk" | "mtk" | "wartung" | "dguv" | "konstanz" | "validierung";
+  performedAt: string; // YYYY-MM-DD
+  result?: "passed" | "failed" | "unknown";
+  performedBy?: string;
+  reportRef?: string;
+  intervalMonths?: number;
+  source: "file";
+};
+
 export type NormalizedRow = {
   bezeichnung: string;
   typ: string;
@@ -58,11 +73,17 @@ export type NormalizedRow = {
   verantwortlich: string;
   letzte_stk: string;
   letzte_mtk: string;
+  letzte_wartung: string;
+  letzte_dguv: string;
+  letzte_konstanz: string;
+  letzte_validierung: string;
   naechste_pruefung: string;
   gtin: string;
   bemerkung: string;
   hinweise: string[];
   pruefungen: PruefungHint[];
+  /** E103 — structured last performances (preferred over pruefungen). */
+  lastPerformances: ImportLastPerformance[];
   siteId: string | null;
   newSiteName: string | null;
   raum: string;

@@ -106,12 +106,46 @@
    "stk",
    "letzte prüfung",
    "letzte pruefung",
-   "letzte sicherheitstechnische kontrolle"
+   "letzte sicherheitstechnische kontrolle",
+   "prüfdatum stk",
+   "pruefdatum stk",
+   "stk am"
   ],
   "letzte_mtk": [
    "letzte mtk",
    "mtk letzte",
-   "mtk"
+   "mtk",
+   "prüfdatum mtk",
+   "pruefdatum mtk",
+   "mtk am"
+  ],
+  "letzte_wartung": [
+   "letzte wartung",
+   "wartung letzte",
+   "wartung",
+   "wartung am",
+   "letzte inspektion"
+  ],
+  "letzte_dguv": [
+   "letzte dguv",
+   "dguv letzte",
+   "dguv",
+   "dguv v3",
+   "letzte ortsveränderliche prüfung",
+   "elektroprüfung",
+   "elektropruefung"
+  ],
+  "letzte_konstanz": [
+   "letzte konstanz",
+   "konstanz letzte",
+   "konstanzprüfung",
+   "konstanzpruefung",
+   "konstanz"
+  ],
+  "letzte_validierung": [
+   "letzte validierung",
+   "validierung letzte",
+   "validierung"
   ],
   "naechste_pruefung": [
    "nächste stk",
