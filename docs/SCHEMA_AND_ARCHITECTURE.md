@@ -1053,6 +1053,8 @@ Small clinic + partner + Ref* bootstrap for local development.
 
 Password for all demo clinic accounts: **`demo`**. Use the clinic login door. Partner demo users, contracts, and Prüfpartner catalogues/equipment are seeded separately (`prisma/seeds/partnerOrgs.ts`, `refPruefpartner.ts`, …).
 
+Full clinic roster (all tenants, sites, qualifications, large-pack `Demo2026!` accounts): [`clinic-accounts.docx`](./clinic-accounts.docx).
+
 ### 10.2 Large multi-tenant demo pack (`seed/`)
 
 In-repo pack: **4 tenants** (T-KLN, T-MVZ, T-HZF, T-RSG), **5 000** shared `DeviceModel` + open classification, **528** instances, **101** clinic users, plus a **process layer** (~115 release snapshots, ~155 duties, 12 service requests, MSR/RTS contracts, clarifications, training, incidents).

@@ -660,6 +660,7 @@ Try these identifiers after seed:
 ## Related reading
 
 - Root [`README.md`](../README.md) — quick start and high-level architecture
+- [`clinic-accounts.docx`](./clinic-accounts.docx) — clinic (and partner) demo logins by tenant: email, password, role, site, qualification
 - [`SCHEMA_AND_ARCHITECTURE.md`](./SCHEMA_AND_ARCHITECTURE.md) — schema map (§4.8 Prüfpartner, §5.3–5.4 handoff / inspect)
 - `prisma/schema.prisma` — authoritative data model
 - `src/constants/permissions.ts` — RBAC defaults + path/menu helpers

@@ -251,7 +251,7 @@ export function ShopScreen() {
                           quantity={qtyForCard(article)}
                           onAdd={(toAdd) => addArticle(toAdd)}
                           onQty={(q) => setPartQty(article.id, q)}
-                          emphasize={activeTab === "device" && article.id === catalog.data.primary?.id}
+                          emphasize={activeTab === "device" && article.id === catalog.data?.primary?.id}
                           onVariantsLoaded={onVariantsLoaded}
                         />
                       ))
